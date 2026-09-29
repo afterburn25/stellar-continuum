@@ -145,6 +145,76 @@ bool ExplorationMissionPlanner::needs_survey_work(
       fleet, knowledge.system_survey_level(fleet.civilization_id, system_id));
 }
 
+void ExplorationMissionPlanner::refresh_survey_work(
+    ExplorationPlanningWorldView world, const FleetState &subject,
+    ExplorationPlanningSharedIndex::SurveyWorkList &entry,
+    SurveyCatalogIndex &catalog) {
+  const int civilization = subject.civilization_id;
+  const auto revision = world.knowledge.survey_level_revision(civilization);
+  // Duplicate catalog ids would leave entries/positions asymmetric —
+  // fall back to a full rescan so pathological catalogs keep the
+  // original iterate-everything behavior. A revision below the list's
+  // means a replaced/rewound knowledge object whose marks cannot
+  // account for the gap — rescan rather than patch.
+  if (!entry.valid || entry.positions.size() != entry.entries.size() ||
+      revision < entry.level_revision) {
+    entry.entries.clear();
+    entry.positions.clear();
+    for (const auto &system : world.systems) {
+      const auto level =
+          world.knowledge.system_survey_level(civilization, system.id);
+      if (needs_survey_work_at_level(subject, level)) {
+        entry.positions[system.id] = entry.entries.size();
+        entry.entries.push_back(
+            {&system, survey_priority(subject.role, level)});
+      }
+    }
+    entry.level_revision = revision;
+    entry.valid = true;
+    return;
+  }
+  if (entry.level_revision == revision)
+    return;
+  // Patch only the systems whose level moved since this list was built —
+  // identical membership and bands to a full rescan. The dirty buckets
+  // are keyed by the revision that recorded them, so buckets at or below
+  // the list's revision were already incorporated and each mark is
+  // visited once per list over the campaign.
+  const auto &buckets =
+      world.knowledge.survey_level_dirty_marks(civilization);
+  const auto &by_id = catalog.systems_index_for(world.systems);
+  for (auto bucket = buckets.upper_bound(entry.level_revision);
+       bucket != buckets.end(); ++bucket) {
+    for (const int system_id : bucket->second) {
+      const auto level =
+          world.knowledge.system_survey_level(civilization, system_id);
+      const auto it = entry.positions.find(system_id);
+      if (needs_survey_work_at_level(subject, level)) {
+        const int band = survey_priority(subject.role, level);
+        if (it != entry.positions.end()) {
+          entry.entries[it->second].second = band;
+        } else {
+          const auto found = by_id.find(system_id);
+          if (found == by_id.end())
+            continue; // known to the civ but not in the catalog
+          entry.positions[system_id] = entry.entries.size();
+          entry.entries.push_back({found->second, band});
+        }
+      } else if (it != entry.positions.end()) {
+        const auto position = it->second;
+        const auto back = entry.entries.size() - 1;
+        if (position != back) {
+          entry.entries[position] = entry.entries[back];
+          entry.positions[entry.entries[position].first->id] = position;
+        }
+        entry.entries.pop_back();
+        entry.positions.erase(it);
+      }
+    }
+  }
+  entry.level_revision = revision;
+}
+
 int ExplorationMissionPlanner::survey_priority(FleetRole role,
                                                SystemSurveyLevel level) {
   if (role == FleetRole::Science) {
@@ -395,21 +465,15 @@ ExplorationMissionPlanner::select_supported_candidate(
     const std::int64_t key =
         (static_cast<std::int64_t>(subject.civilization_id) << 32) |
         static_cast<std::uint32_t>(static_cast<int>(subject.role));
-    auto &entry = shared->survey_work[key];
+    auto &entry = shared->survey_work_store()
+                          .for_span(world.systems)[key];
     if (!entry.valid ||
-        entry.level_revision != world.knowledge.survey_level_revision(subject.civilization_id)) {
+        entry.level_revision !=
+            world.knowledge.survey_level_revision(
+                subject.civilization_id)) {
       if (profiling)
         ++prof.work_rebuilds;
-      entry.entries.clear();
-      for (const auto &system : world.systems) {
-        const auto level = world.knowledge.system_survey_level(
-            subject.civilization_id, system.id);
-        if (needs_survey_work_at_level(subject, level))
-          entry.entries.push_back(
-              {&system, survey_priority(subject.role, level)});
-      }
-      entry.level_revision = world.knowledge.survey_level_revision(subject.civilization_id);
-      entry.valid = true;
+      refresh_survey_work(world, subject, entry, shared->catalog());
     }
     work = &entry.entries;
   } else {
@@ -632,19 +696,13 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
     const std::int64_t key =
         (static_cast<std::int64_t>(subject.civilization_id) << 32) |
         static_cast<std::uint32_t>(static_cast<int>(subject.role));
-    auto &entry = shared->survey_work[key];
+    auto &entry = shared->survey_work_store()
+                          .for_span(world.systems)[key];
     if (!entry.valid ||
-        entry.level_revision != world.knowledge.survey_level_revision(subject.civilization_id)) {
-      entry.entries.clear();
-      for (const auto &system : world.systems)
-        if (needs_survey_work(world.knowledge, subject, system.id))
-          entry.entries.push_back(
-              {&system,
-               survey_priority(subject.role,
-                               world.knowledge.system_survey_level(
-                                   subject.civilization_id, system.id))});
-      entry.level_revision = world.knowledge.survey_level_revision(subject.civilization_id);
-      entry.valid = true;
+        entry.level_revision !=
+            world.knowledge.survey_level_revision(
+                subject.civilization_id)) {
+      refresh_survey_work(world, subject, entry, shared->catalog());
     }
     work = &entry.entries;
   } else {

@@ -33,6 +33,10 @@ struct ExplProf {
       return_hops{0};
   // activate() split: nearest-base pick vs route assignment + message.
   std::atomic<long long> return_pick_ns{0};
+  // process_local_survey internals: catalog profile build, knowledge
+  // write, and the contact scan that follows a productive survey tick.
+  std::atomic<long long> survey_build_ns{0}, survey_adv_ns{0},
+      survey_detect_ns{0};
   std::atomic<long long> band_candidates{0}, reveal_attempts{0};
   ~ExplProf() {
     if (!enabled.load()) return;
@@ -66,6 +70,12 @@ struct ExplProf {
                  inbound_contacts_ns.load() / 1000000,
                  inbound_return_ns.load() / 1000000, return_hops.load(),
                  return_pick_ns.load() / 1000000);
+    std::fprintf(stderr,
+                 "EXPL-PROF survey-inner: build=%lldms adv=%lldms "
+                 "detect=%lldms\n",
+                 survey_build_ns.load() / 1000000,
+                 survey_adv_ns.load() / 1000000,
+                 survey_detect_ns.load() / 1000000);
   }
 };
 

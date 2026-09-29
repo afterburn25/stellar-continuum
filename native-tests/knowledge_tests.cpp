@@ -527,6 +527,73 @@ void run_sensor_sweep_coverage_contract() {
         "sweep coverage: record keeps the widest radius");
   std::cout << "knowledge_tests: sensor sweep coverage contract passed\n";
 }
+
+void run_dirty_mark_contract() {
+  CivilizationKnowledgeState knowledge;
+  check(knowledge.survey_level_revision(7) == 0,
+        "dirty marks: unseen civilization must start at revision 0");
+  check(knowledge.survey_level_dirty_marks(7).empty(),
+        "dirty marks: unseen civilization must have no marks");
+
+  // First reveal inserts the survey entry (unknown -> detected): the
+  // revision bumps and the system lands in that revision's bucket.
+  knowledge.reveal_system(7, 42);
+  const auto revision1 = knowledge.survey_level_revision(7);
+  check(revision1 == 1, "dirty marks: insert must bump the revision");
+  check(knowledge.survey_level_dirty_marks(7).at(revision1) ==
+            std::vector<int>{42},
+        "dirty marks: insert must mark the system at the new revision");
+
+  // detected -> partially_surveyed is a level transition: bump + mark.
+  knowledge.advance_system_survey(7, 42, 0.5);
+  const auto revision2 = knowledge.survey_level_revision(7);
+  check(revision2 == revision1 + 1,
+        "dirty marks: level transition must bump the revision");
+  check(knowledge.survey_level_dirty_marks(7).at(revision2) ==
+            std::vector<int>{42},
+        "dirty marks: transition must add a bucket at the new revision");
+
+  // A progress-only advance leaves the level at partially_surveyed, so
+  // neither the revision nor the mark set moves.
+  knowledge.advance_system_survey(7, 42, 0.1);
+  check(knowledge.survey_level_revision(7) == revision2,
+        "dirty marks: progress-only write must not bump the revision");
+  check(knowledge.survey_level_dirty_marks(7).size() == 2,
+        "dirty marks: progress-only write must not add marks");
+
+  // Another system's first reveal marks it in its own revision bucket
+  // without disturbing 42's.
+  knowledge.reveal_system(7, 43);
+  const auto revision3 = knowledge.survey_level_revision(7);
+  check(knowledge.survey_level_dirty_marks(7).at(revision3) ==
+            std::vector<int>{43},
+        "dirty marks: second system must be marked independently");
+  check(knowledge.survey_level_dirty_marks(7).at(revision2) ==
+            std::vector<int>{42},
+        "dirty marks: unrelated buckets must be preserved");
+
+  // A later transition appends a new bucket rather than merging — views
+  // consume buckets above their build revision, so repeats are
+  // idempotent and never stale.
+  knowledge.mark_system_fully_surveyed(7, 42);
+  const auto revision4 = knowledge.survey_level_revision(7);
+  check(knowledge.survey_level_dirty_marks(7).at(revision4) ==
+            std::vector<int>{42},
+        "dirty marks: later transition must append its own bucket");
+  check(knowledge.survey_level_dirty_marks(7).size() == 4,
+        "dirty marks: buckets are append-only within a civilization");
+
+  // Marks and revisions are per-civilization: another civilization's
+  // writes must not invalidate civilization 7's memoized views.
+  knowledge.reveal_system(8, 42);
+  check(knowledge.survey_level_revision(8) == 1,
+        "dirty marks: civilizations must have independent revisions");
+  check(knowledge.survey_level_revision(7) == revision4,
+        "dirty marks: other civilizations must not bump this revision");
+  check(knowledge.survey_level_dirty_marks(7).size() == 4,
+        "dirty marks: other civilizations must not add marks");
+  std::cout << "knowledge_tests: survey-level dirty mark contract passed\n";
+}
 } // namespace
 
 int main(int argc, char **argv) {
@@ -544,6 +611,7 @@ int main(int argc, char **argv) {
     for (const auto &test : fixture.at("Cases"))
       run_case(test, observer_universe, system_universe);
     run_sensor_sweep_coverage_contract();
+    run_dirty_mark_contract();
     std::cout << "knowledge_tests: passed " << fixture.at("Cases").size()
               << " actual-C# cases\n";
     return 0;

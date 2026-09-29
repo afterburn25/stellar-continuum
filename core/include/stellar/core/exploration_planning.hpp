@@ -86,11 +86,45 @@ struct ExplorationPlanningSharedIndex {
   struct SurveyWorkList {
     std::uint64_t level_revision{};
     bool valid{};
-    // (system, priority band) pairs in catalog order — identical to the
-    // per-call filter output.
+    // (system, priority band) pairs — catalog order after a full build;
+    // dirty-mark patching can reorder, which is safe because consumers
+    // are order-free: the select heap ranks by (band, distance, id), a
+    // total order independent of push order, and the existence probe
+    // only asks whether any entry is supported.
     std::vector<std::pair<const StellarSystem *, int>> entries;
+    // system id -> index into entries, so a level change patches the one
+    // entry instead of rescanning the catalog.
+    std::unordered_map<int, std::size_t> positions;
   };
-  std::unordered_map<std::int64_t, SurveyWorkList> survey_work;
+  // The lists store pointers into the systems span, so a store must be
+  // revalidated on the span identity (data, size) before use — the same
+  // contract as SurveyCatalogIndex. A host may point
+  // survey_work_override at a campaign-lived store so lists persist
+  // across advances and patch incrementally instead of rescanning the
+  // catalog on the first query of every tick.
+  struct SurveyWorkStore {
+    std::unordered_map<std::int64_t, SurveyWorkList> &
+        for_span(std::span<const StellarSystem> systems) {
+      if (systems.data() != systems_data_ ||
+          systems.size() != systems_size_) {
+        lists_.clear();
+        systems_data_ = systems.data();
+        systems_size_ = systems.size();
+      }
+      return lists_;
+    }
+
+  private:
+    const StellarSystem *systems_data_{};
+    std::size_t systems_size_{};
+    std::unordered_map<std::int64_t, SurveyWorkList> lists_;
+  };
+  SurveyWorkStore &survey_work_store() noexcept {
+    return survey_work_override ? *survey_work_override
+                                : owned_survey_work;
+  }
+  SurveyWorkStore *survey_work_override{};
+  SurveyWorkStore owned_survey_work;
   // One lazily-prepared OperationalReachBatch per civilization. Colonies
   // cannot change while a planning index is alive, so the batch's
   // refueling snapshot stays correct for its scope.
@@ -168,6 +202,15 @@ public:
   static int survey_priority(FleetRole role, SystemSurveyLevel level);
 
 private:
+  // Builds the (civilization, role) survey-work list or, when the
+  // civilization's level revision moved, patches just the systems whose
+  // level changed since the list's revision — identical membership and
+  // bands to a full catalog rescan (entry order may differ, which the
+  // order-free consumers do not observe).
+  static void refresh_survey_work(
+      ExplorationPlanningWorldView world, const FleetState &fleet,
+      ExplorationPlanningSharedIndex::SurveyWorkList &entry,
+      SurveyCatalogIndex &catalog);
   ExplorationMissionCandidate
   build_candidate(ExplorationPlanningWorldView world, const FleetState &fleet,
                   const StellarSystem &system,OperationalReachBatch *batch=nullptr,

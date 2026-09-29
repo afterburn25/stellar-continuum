@@ -75,15 +75,28 @@ std::string target_ordinal(int system_id) {
 // O(bodies) per fleet per tick — identical results, just indexed.
 class AdvanceIndex {
 public:
-  explicit AdvanceIndex(std::span<const StellarSystem> systems) {
-    systems_by_id_.reserve(systems.size());
-    for (const auto &system : systems)
-      systems_by_id_.emplace(system.id, &system);
+  explicit AdvanceIndex(std::span<const StellarSystem> systems,
+                        PhenomenonContextIndex *shared_phenomena = nullptr,
+                        SurveyCatalogIndex *shared_catalog = nullptr)
+      : systems_(systems), shared_phenomena_(shared_phenomena),
+        shared_catalog_(shared_catalog) {
+    if (!shared_catalog_) {
+      systems_by_id_.reserve(systems.size());
+      for (const auto &system : systems)
+        systems_by_id_.emplace(system.id, &system);
+    }
+  }
+
+  const std::unordered_map<int, const StellarSystem *> &systems_map() const {
+    if (shared_catalog_)
+      return shared_catalog_->systems_index_for(systems_);
+    return systems_by_id_;
   }
 
   const StellarSystem *system(int id) const {
-    const auto found = systems_by_id_.find(id);
-    return found == systems_by_id_.end() ? nullptr : found->second;
+    const auto &index = systems_map();
+    const auto found = index.find(id);
+    return found == index.end() ? nullptr : found->second;
   }
 
   const StellarSystem &required_system(int id) const {
@@ -95,12 +108,17 @@ public:
 
   const std::vector<const PlanetaryBody *> &
   bodies_for(std::span<const PlanetaryBody> bodies, int system_id) {
+    static const std::vector<const PlanetaryBody *> empty;
+    if (shared_catalog_) {
+      const auto &by_system = shared_catalog_->bodies_index_for(bodies);
+      const auto found = by_system.find(system_id);
+      return found == by_system.end() ? empty : found->second;
+    }
     if (!bodies_ready_) {
       for (const auto &body : bodies)
         bodies_by_system_[body.system_id].push_back(&body);
       bodies_ready_ = true;
     }
-    static const std::vector<const PlanetaryBody *> empty;
     const auto found = bodies_by_system_.find(system_id);
     return found == bodies_by_system_.end() ? empty : found->second;
   }
@@ -125,10 +143,31 @@ public:
   }
 
   // Per-system phenomenon context — pure in (regions, system id +
-  // static position), so the all-regions sample/sort is paid once per
-  // system per advance instead of once per transit hop or survey tick.
+  // static position). With a shared index the all-regions sample/sort
+  // is paid once per system per campaign instead of once per advance;
+  // the (regions, systems span) guard clears on a reloaded world view.
   const SystemPhenomenonContext &
   phenomena(const GalaxyPhenomena *regions, int system_id) {
+    if (shared_phenomena_) {
+      auto &shared = *shared_phenomena_;
+      if (regions != shared.regions ||
+          systems_.data() != shared.systems_data ||
+          systems_.size() != shared.systems_size) {
+        shared.contexts.clear();
+        shared.regions = regions;
+        shared.systems_data = systems_.data();
+        shared.systems_size = systems_.size();
+      }
+      const auto found = shared.contexts.find(system_id);
+      if (found != shared.contexts.end())
+        return found->second;
+      const auto &system = required_system(system_id);
+      return shared.contexts
+          .emplace(system_id,
+                   phenomenon_context(regions, system.position.x,
+                                      system.position.y, system_id))
+          .first->second;
+    }
     if (regions != phenomena_source_) {
       phenomena_.clear();
       phenomena_source_ = regions;
@@ -175,6 +214,9 @@ private:
            static_cast<std::uint32_t>(system_id);
   }
 
+  std::span<const StellarSystem> systems_;
+  PhenomenonContextIndex *shared_phenomena_{};
+  SurveyCatalogIndex *shared_catalog_{};
   std::unordered_map<int, const StellarSystem *> systems_by_id_;
   const GalaxyPhenomena *phenomena_source_{};
   std::unordered_map<int, SystemPhenomenonContext> phenomena_;
@@ -383,7 +425,10 @@ bool process_local_survey(AdvanceIndex &index,
             ExplorationSimulation::scout_reconnaissance_progress))
       return false;
     const auto &system = first_system(index, system_id);
-    const auto profile = surveys.build(system_id);
+    const auto profile = [&] {
+      EXPL_PROF(survey_build_ns)
+      return surveys.build(system_id);
+    }();
     events.push_back({
         ExplorationEventType::SystemReconnoitered, fleet.civilization_id,
         fleet.id, system_id,
@@ -405,10 +450,16 @@ bool process_local_survey(AdvanceIndex &index,
       world.knowledge.system_survey_level(fleet.civilization_id, system_id);
   const auto previous_progress =
       world.knowledge.system_survey_progress(fleet.civilization_id, system_id);
-  const auto profile = surveys.build(system_id);
-  const auto completed = world.knowledge.advance_system_survey(
-      fleet.civilization_id, system_id,
-      profile.progress_per_day() * simulation_delta);
+  const auto profile = [&] {
+    EXPL_PROF(survey_build_ns)
+    return surveys.build(system_id);
+  }();
+  const auto completed = [&] {
+    EXPL_PROF(survey_adv_ns)
+    return world.knowledge.advance_system_survey(
+        fleet.civilization_id, system_id,
+        profile.progress_per_day() * simulation_delta);
+  }();
   const auto current_progress =
       world.knowledge.system_survey_progress(fleet.civilization_id, system_id);
   const auto current_level =
@@ -615,15 +666,17 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
     return {};
 
   std::vector<ExplorationEvent> events;
-  AdvanceIndex index(world.systems);
+  AdvanceIndex index(world.systems, &campaign_phenomena_,
+                     &campaign_catalog_);
   // One planning index for the whole advance: the catalog spans are
-  // immutable here and its survey-work lists revalidate through the
-  // knowledge survey-level revision when a survey completes mid-tick. The
-  // catalog index itself is generation-static, so it is shared campaign-
-  // wide — it still revalidates on the source spans, covering a reloaded
-  // or replaced world view.
+  // immutable here and its reach batches are advance-scoped. The
+  // catalog index and survey-work store are generation-static, so both
+  // are shared campaign-wide — they revalidate on the systems span and
+  // the per-civilization survey-level revision respectively, covering a
+  // reloaded world view and mid-tick survey completions.
   ExplorationPlanningSharedIndex planning_shared;
   planning_shared.catalog_override = &campaign_catalog_;
+  planning_shared.survey_work_override = &campaign_survey_work_;
   SurveyOperationsBatch surveys(world.systems, world.bodies,
                                 planning_shared.catalog_override);
   ContactPresenceIndex presence;
@@ -665,6 +718,9 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
       if (process_local_survey(index, world, fleet, *fleet.current_system_id,
                                simulation_delta * capacity, surveys,
                                events)) {
+        std::optional<detail::ExplProfScope> detect_scope;
+        if (detail::expl_prof().enabled.load(std::memory_order_relaxed))
+          detect_scope.emplace(detail::expl_prof().survey_detect_ns);
         detect_civilization_contacts(world, fleet, events, presence);
         continue;
       }

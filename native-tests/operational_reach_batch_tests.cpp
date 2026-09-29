@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <limits>
+#include <unordered_set>
 #include <vector>
 using namespace stellar::core;
 void check(bool ok,const char *message){if(!ok)throw std::runtime_error(message);}
@@ -165,5 +166,45 @@ int main(int argc,char **argv)try{
   {std::vector<double> d{1.,2.};std::vector<int> p{3};
    lanes.route_tree_toward(world.systems[0].id,0.0,{},d,p);
    check(d.empty()&&p.empty(),"route_tree_toward kept outputs on a non-positive range.");}
+  // Survey-work dirty-patch parity: after survey-level writes, the
+  // patched shared (civilization, role) list must drive the identical
+  // select and existence answers a fresh index's full rebuild produces.
+  // The mutations cover removal (level exits the scout work set) and
+  // band update (unknown -> detected keeps membership but reprioritizes).
+  fleet.fuel_remaining_light_years=fleet.fuel_capacity_light_years;
+  {
+    ExplorationMissionPlanner planner;
+    ExplorationPlanningSharedIndex shared;
+    std::unordered_set<int> reservations;
+    bool fallback=false;
+    planner.select_supported_candidate(planning,fleet,
+        MissionFuelPolicy::ReachDestination,reservations,fallback,&shared);
+    (void)planner.has_supported_mission_target(planning,fleet.id,
+        MissionFuelPolicy::ReachDestination,&shared);
+    world.knowledge.mark_system_fully_surveyed(fleet.civilization_id,
+                                               world.systems[40].id);
+    world.knowledge.advance_system_survey(fleet.civilization_id,
+                                          world.systems[41].id,0.5);
+    world.knowledge.reveal_system(fleet.civilization_id,
+                                  world.systems[42].id);
+    // Another civilization's write must not invalidate this list at all.
+    world.knowledge.mark_system_fully_surveyed(fleet.civilization_id+1,
+                                               world.systems[43].id);
+    bool patched_fallback=false;
+    const auto patched=planner.select_supported_candidate(planning,fleet,
+        MissionFuelPolicy::ReachDestination,reservations,patched_fallback,&shared);
+    const auto patched_has=planner.has_supported_mission_target(planning,fleet.id,
+        MissionFuelPolicy::ReachDestination,&shared);
+    ExplorationPlanningSharedIndex fresh;
+    bool rebuilt_fallback=false;
+    const auto rebuilt=planner.select_supported_candidate(planning,fleet,
+        MissionFuelPolicy::ReachDestination,reservations,rebuilt_fallback,&fresh);
+    const auto rebuilt_has=planner.has_supported_mission_target(planning,fleet.id,
+        MissionFuelPolicy::ReachDestination,&fresh);
+    check(patched.has_value()==rebuilt.has_value(),"Dirty-patch changed select emptiness.");
+    if(patched)check(patched->system_id==rebuilt->system_id,"Dirty-patch changed the selected system.");
+    check(patched_fallback==rebuilt_fallback,"Dirty-patch changed the shared-fallback flag.");
+    check(patched_has==rebuilt_has,"Dirty-patch changed the existence verdict.");
+  }
   std::cout<<"operational reach batch tests passed\n";return 0;
 }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

@@ -64,6 +64,21 @@ public:
     const auto found = survey_level_revisions_.find(civilization_id);
     return found == survey_level_revisions_.end() ? 0 : found->second;
   }
+  // Transient per-(civilization, revision) buckets of the systems whose
+  // survey LEVEL changed at that revision — recorded at the same bump
+  // sites as survey_level_revision, in ascending revision order.
+  // Memoized level-derived views keyed per civilization patch just the
+  // buckets above their build revision, so each mark is consumed once
+  // per view instead of rescanning the catalog or every lifetime mark.
+  // A re-marked system appears in each of its buckets; consumers re-read
+  // the live level so repeats are idempotent. Not serialized; restores
+  // re-mark through the mutators.
+  const std::map<std::uint64_t, std::vector<int>> &
+      survey_level_dirty_marks(int civilization_id) const {
+    static const std::map<std::uint64_t, std::vector<int>> empty;
+    const auto found = survey_level_dirty_.find(civilization_id);
+    return found == survey_level_dirty_.end() ? empty : found->second;
+  }
   // Transient per-(civilization, system) record of the widest sensor
   // sweep radius already performed this session. A repeat sweep with an
   // equal-or-smaller radius can only re-encounter already-known systems
@@ -82,6 +97,7 @@ public:
 private:
   struct Survey { SystemSurveyLevel level{SystemSurveyLevel::detected}; double progress{}; };
   Survey &ensure_survey(int civilization_id, int system_id);
+  void note_level_change(int civilization_id, int system_id);
   std::map<int, std::set<int>> systems_;
   std::vector<int> system_observer_order_;
   std::set<int> core_access_, core_explored_;
@@ -89,6 +105,8 @@ private:
   std::vector<int> civilization_observer_order_;
   std::map<int, std::map<int, Survey>> surveys_;
   std::unordered_map<int, std::uint64_t> survey_level_revisions_;
+  std::unordered_map<int, std::map<std::uint64_t, std::vector<int>>>
+      survey_level_dirty_;
   // Transient sensor-sweep coverage: (civ << 32 | system) -> widest
   // radius swept. Derived runtime state only — see sensor_sweep_needed.
   std::unordered_map<std::int64_t, double> sensor_coverage_;

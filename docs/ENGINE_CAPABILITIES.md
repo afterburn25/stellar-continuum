@@ -80,8 +80,11 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `record_reconnaissance` / `advance_system_survey` /
   `mark_system_fully_surveyed`); progress-only writes do not bump it,
   and one civilization's writes do not invalidate another's memoized
-  level-derived views. It is not serialized; restores rebuild through
-  the mutators.
+  level-derived views. `survey_level_dirty_marks(civilization)` exposes
+  the same bump sites as per-system marks (system id -> recording
+  revision), so memoized views can patch just the changed systems
+  instead of rescanning the catalog. Neither is serialized; restores
+  rebuild through the mutators.
   `survey_operations.hpp` / `survey_operations.cpp` — `SurveyCatalogIndex`
   (`systems_by_id` + `bodies_by_system`, both lazily populated and
   revalidated against the source spans by (data, size) so an index held
@@ -92,9 +95,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `exploration_planning.cpp` — `ExplorationPlanningSharedIndex` references
   the catalog index (`catalog()` defaults to an owned per-index instance;
   `catalog_override` can point at a longer-lived one) plus
-  per-(civilization, fleet role) survey-work lists memoized in catalog
-  order and keyed on that civilization's `survey_level_revision`;
-  optional `shared` parameters
+  per-(civilization, fleet role) survey-work lists keyed on that
+  civilization's `survey_level_revision` and refreshed by
+  `refresh_survey_work`: the first build scans the catalog, and later
+  refreshes patch only the systems in `survey_level_dirty_marks` —
+  revision-ordered buckets replayed from `upper_bound(list revision)`
+  so each mark is consumed once per list — via a `positions`
+  side-index. The lists live in a `SurveyWorkStore` (override like
+  `catalog_override`; `ExplorationSimulation` holds a campaign-wide
+  one) revalidated on the systems span (data, size), so a tick with no
+  level changes for a civilization costs a revision compare and a
+  revision decrease (replaced knowledge) forces a rescan — identical
+  membership and bands either way (entry order may differ; both
+  consumers are order-free). Optional `shared` parameters
   on `select_supported_candidate` and
   `ExplorationAiMissionCoordinator::select_mission` keep the original
   per-call scans when absent. `exploration_advance.cpp` —
@@ -110,14 +123,22 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   distance evaluation (same float/double expression order as
   `interstellar_distance_from_fleet`), and defers the lane-slot lookup
   to pop time so only assessed candidates pay the id→slot probe.
-- Semantics: unchanged — the memoized (system, band) lists are produced
-  by the same `needs_survey_work` + `survey_priority` calls in catalog
-  order; per-fleet distance ranking and lazy reach assessment are
-  unchanged; a mid-advance survey level transition bumps the revision so
-  the next query rebuilds exactly once. `SurveyOperationsBatch` profiles
-  for queried ids are identical (same `finish()` on the same per-system
-  `SurveySummary`, bodies in catalog order); the unknown-system error is
-  preserved.
+  `galaxy_phenomena.hpp` adds `PhenomenonContextIndex`, a
+  campaign-scoped per-system context memo (pure in regions pointer,
+  position, id; cleared on a reloaded world via the (regions, systems
+  span) guard) — `ExplorationSimulation` holds it as
+  `campaign_phenomena_` and `AdvanceIndex` resolves system/body lookups
+  and phenomenon contexts through the campaign indexes, so the per-tick
+  catalog and context generation costs are paid once per campaign.
+- Semantics: unchanged — the memoized (system, band) sets are produced
+  by the same `needs_survey_work` + `survey_priority` calls; per-fleet
+  distance ranking and lazy reach assessment are unchanged; a
+  mid-advance survey level transition marks the system so the next
+  query patches exactly that entry (both consumers heap-rank or
+  existence-check, so entry order is unobservable). `SurveyOperationsBatch`
+  profiles for queried ids are identical (same `finish()` on the same
+  per-system `SurveySummary`, bodies in catalog order); the
+  unknown-system error is preserved.
 - Save/performance impact: no persisted state. Measured (2500 systems,
   seed 8374837, 10k ticks x2 + continuation): final hash bit-identical
   `8b6963c2...`, repeat + continuation deterministic. Timing deltas were
@@ -653,11 +674,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   touching each candidate once per changed fleet state;
   `has_return_service_route` still probes the colony set per
   outward-feasible pop on fuel-constrained fleets (now cheap borrowed-
-  tree walks, but K probes per candidate); the survey phase (~15
-  s/campaign-unit after the persistent catalog index), the select
-  work-list build (~16 s/unit — `survey_level_revision` bumps on most
-  survey completions, forcing full-catalog rescans), and the select
-  loop remain the next attribution targets; the queued-return pick is
+  tree walks, but K probes per candidate); the survey phase (~1.1 s/run)
+  and work-list build (~11 s/run) are largely closed — the select loop
+  (~53 s/run: heap push/pop + per-pop reach probes across ~3.7 k-entry
+  work lists), the queued-return pick (~20 s/run partial Dijkstras),
+  and inbound reveal/transit (~15+38 s/run) are the remaining
+  attribution targets; the queued-return pick is
   bounded now but still pays a per-hop partial Dijkstra (~200 µs);
   the prune only applies on the canonical reach path (injected
   providers keep the un-pruned loop); `SettlementPlanningSharedIndex`

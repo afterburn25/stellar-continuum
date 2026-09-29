@@ -543,3 +543,47 @@ Canonical verification (exact documented flags, clean machine):
   the full build, (distance, id) settle order, early-accept stop,
   unknown-origin throw, invalid-range clear) and a verdict-carried
   route parity check against the explain reach.
+
+Follow-up pass 7 (same canonical flags, `--repeat 2`):
+
+- `survey_level_revision` is now per-civilization
+  (`CivilizationKnowledgeState` indexes revisions and dirty marks by
+  civilization id) — one civ's survey write no longer invalidates every
+  civilization's work lists and drain verdicts. Pops fell 38.25 M →
+  7.26 M (−81%), drains 9,378 → 1,455 (−84%) — committed `3a42b1b8`.
+- `PhenomenonContextIndex` (`galaxy_phenomena.hpp`) memoizes per-system
+  phenomenon contexts campaign-wide — pure in (regions, position, id),
+  guarded by (regions pointer, systems span identity). `AdvanceIndex`
+  also resolves system/body lookups through the campaign
+  `SurveyCatalogIndex` instead of rebuilding per-tick maps. The survey
+  phase collapsed from ~43 s to ~1 s (−98%): the residual was
+  per-advance context regeneration, not survey logic (inner split:
+  build 93 ms / advance 3 ms / detect 126 ms of 966 ms).
+- Survey-work refresh is incremental and campaign-persistent:
+  `survey_level_dirty_marks` records revision-bucketed system lists at
+  each level-change site, `refresh_survey_work` patches only buckets
+  newer than the list's build revision via a `positions` side-index,
+  and the lists live in a span-guarded `SurveyWorkStore` that
+  `ExplorationSimulation` holds campaign-wide — a tick with no level
+  change for a civilization costs a revision compare instead of a
+  catalog rescan. A revision decrease (replaced knowledge) or
+  duplicate catalog ids fall back to the rescan path.
+
+Canonical verification (exact documented flags, clean machine):
+
+- `finalStateHash e5a1d5bf…` — bit-identical across three binaries
+  (flat marks, revision-bucketed marks, persistent store);
+  `repeatFinalStatesDeterministic` and `continuationDeterministic`
+  true; save 149,969,876 bytes; metrics unchanged (25 civs / 78
+  colonies / 264 fleets / 0 wars / 4 definitions / 128 journal
+  entries).
+- `EXPL-PROF` (final binary): survey 43.2 s → 1.09 s (−97%),
+  select `build` 38.0 s → 11.1 s (−71%; ~63 k refresh events, now
+  amortized patches instead of per-tick catalog rescans), select
+  loop ~53.2 s and queued-return `pick` ~20.0 s unchanged, step mean
+  18.20 ms (vs 74.2 ms at the dense-route baseline, −75%), peak
+  working set ~2.85 GB.
+- Focused coverage extended: `knowledge_tests` gains a dirty-mark
+  contract (insert/transition/progress-only/per-civ isolation), and
+  `operational_reach_batch` gains a dirty-patch parity check against a
+  full rescan.
