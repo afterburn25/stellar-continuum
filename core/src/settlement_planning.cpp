@@ -217,10 +217,10 @@ ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
   if (shared) {
     auto &entry = shared->suitability[{f->civilization_id, sp->id}];
     if (!entry.valid ||
-        entry.level_revision != w.knowledge.survey_level_revision()) {
+        entry.level_revision != w.knowledge.survey_level_revision(f->civilization_id)) {
       entry.values = build_known_suitability_for_species(
           w.knowledge_view(), f->civilization_id, sp->id, bodies_index);
-      entry.level_revision = w.knowledge.survey_level_revision();
+      entry.level_revision = w.knowledge.survey_level_revision(f->civilization_id);
       entry.valid = true;
     }
     views = &entry.values;
@@ -408,10 +408,10 @@ ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
   if (shared) {
     auto &entry = shared->suitability[{f->civilization_id, sp->id}];
     if (!entry.valid ||
-        entry.level_revision != w.knowledge.survey_level_revision()) {
+        entry.level_revision != w.knowledge.survey_level_revision(f->civilization_id)) {
       entry.values = build_known_suitability_for_species(
           w.knowledge_view(), f->civilization_id, sp->id);
-      entry.level_revision = w.knowledge.survey_level_revision();
+      entry.level_revision = w.knowledge.survey_level_revision(f->civilization_id);
       entry.valid = true;
     }
     views = &entry.values;

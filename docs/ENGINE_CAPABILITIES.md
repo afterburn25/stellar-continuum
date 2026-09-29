@@ -74,11 +74,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   query even though callers resolve a single system.
 - Modules: `core/include/stellar/core/knowledge.hpp` /
   `core/src/knowledge.cpp` — `CivilizationKnowledgeState::survey_level_revision`
-  is a transient counter bumped only when a survey LEVEL can change (new
-  detected entry via `ensure_survey` insert, or a level transition in
+  is a transient per-civilization counter bumped only when that
+  civilization's survey LEVEL can change (new detected entry via
+  `ensure_survey` insert, or a level transition in
   `record_reconnaissance` / `advance_system_survey` /
-  `mark_system_fully_surveyed`); progress-only writes do not bump it. It
-  is not serialized; restores rebuild through the mutators.
+  `mark_system_fully_surveyed`); progress-only writes do not bump it,
+  and one civilization's writes do not invalidate another's memoized
+  level-derived views. It is not serialized; restores rebuild through
+  the mutators.
   `survey_operations.hpp` / `survey_operations.cpp` — `SurveyCatalogIndex`
   (`systems_by_id` + `bodies_by_system`, both lazily populated and
   revalidated against the source spans by (data, size) so an index held
@@ -90,7 +93,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   the catalog index (`catalog()` defaults to an owned per-index instance;
   `catalog_override` can point at a longer-lived one) plus
   per-(civilization, fleet role) survey-work lists memoized in catalog
-  order and keyed on `survey_level_revision`; optional `shared` parameters
+  order and keyed on that civilization's `survey_level_revision`;
+  optional `shared` parameters
   on `select_supported_candidate` and
   `ExplorationAiMissionCoordinator::select_mission` keep the original
   per-call scans when absent. `exploration_advance.cpp` —
@@ -447,7 +451,8 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `SettlementPlanningSharedIndex` is a caller-owned per-step read model
   shared across repeated `build_plan` calls: a
   (civilization, species) suitability memo gated by
-  `CivilizationKnowledgeState::survey_level_revision`, plus per-
+  `CivilizationKnowledgeState::survey_level_revision(civilization)`, plus
+  per-
   civilization `OperationalReachBatch` instances whose cached colonies
   span is invalidated by a colony-count guard (colony foundings grow
   `world.colonies` mid-step and can reallocate the underlying vector).

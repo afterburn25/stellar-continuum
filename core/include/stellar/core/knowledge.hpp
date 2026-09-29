@@ -54,12 +54,15 @@ public:
   int reveal_within_sensor_range(int civilization_id, int origin_system_id,
                                  std::span<const StellarSystem> systems,
                                  float range);
-  // Transient query hint: bumped whenever any civilization's survey LEVEL
-  // can change (new detected entry, or a level transition). Progress-only
-  // writes do not bump it, so callers may memoize level-derived views per
-  // revision. Not serialized; restores rebuild through the mutators.
-  std::uint64_t survey_level_revision() const noexcept {
-    return survey_level_revision_;
+  // Transient query hint: bumped whenever that civilization's survey
+  // LEVEL can change (new detected entry, or a level transition).
+  // Progress-only writes do not bump it, so callers may memoize
+  // level-derived views per revision. Writes against one civilization
+  // do not invalidate another's memoized views. Not serialized;
+  // restores rebuild through the mutators.
+  std::uint64_t survey_level_revision(int civilization_id) const noexcept {
+    const auto found = survey_level_revisions_.find(civilization_id);
+    return found == survey_level_revisions_.end() ? 0 : found->second;
   }
   // Transient per-(civilization, system) record of the widest sensor
   // sweep radius already performed this session. A repeat sweep with an
@@ -85,7 +88,7 @@ private:
   std::map<int, std::set<int>> civilizations_;
   std::vector<int> civilization_observer_order_;
   std::map<int, std::map<int, Survey>> surveys_;
-  std::uint64_t survey_level_revision_{};
+  std::unordered_map<int, std::uint64_t> survey_level_revisions_;
   // Transient sensor-sweep coverage: (civ << 32 | system) -> widest
   // radius swept. Derived runtime state only — see sensor_sweep_needed.
   std::unordered_map<std::int64_t, double> sensor_coverage_;

@@ -133,7 +133,8 @@ bool ExplorationMissionPlanner::DrainVerdict::matches(
          fuel_capacity == fleet.fuel_capacity_light_years &&
          leg_range == fleet.maximum_leg_range_light_years &&
          fuel_policy == policy &&
-         survey_level_revision == world.knowledge.survey_level_revision() &&
+         survey_level_revision ==
+             world.knowledge.survey_level_revision(fleet.civilization_id) &&
          refuel_sites == sites;
 }
 
@@ -396,7 +397,7 @@ ExplorationMissionPlanner::select_supported_candidate(
         static_cast<std::uint32_t>(static_cast<int>(subject.role));
     auto &entry = shared->survey_work[key];
     if (!entry.valid ||
-        entry.level_revision != world.knowledge.survey_level_revision()) {
+        entry.level_revision != world.knowledge.survey_level_revision(subject.civilization_id)) {
       if (profiling)
         ++prof.work_rebuilds;
       entry.entries.clear();
@@ -407,7 +408,7 @@ ExplorationMissionPlanner::select_supported_candidate(
           entry.entries.push_back(
               {&system, survey_priority(subject.role, level)});
       }
-      entry.level_revision = world.knowledge.survey_level_revision();
+      entry.level_revision = world.knowledge.survey_level_revision(subject.civilization_id);
       entry.valid = true;
     }
     work = &entry.entries;
@@ -562,7 +563,7 @@ ExplorationMissionPlanner::select_supported_candidate(
             subject.fuel_capacity_light_years,
             subject.maximum_leg_range_light_years,
             fuel_policy,
-            world.knowledge.survey_level_revision(),
+            world.knowledge.survey_level_revision(subject.civilization_id),
             std::move(drain_sites)};
       return std::nullopt;
     }
@@ -633,7 +634,7 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
         static_cast<std::uint32_t>(static_cast<int>(subject.role));
     auto &entry = shared->survey_work[key];
     if (!entry.valid ||
-        entry.level_revision != world.knowledge.survey_level_revision()) {
+        entry.level_revision != world.knowledge.survey_level_revision(subject.civilization_id)) {
       entry.entries.clear();
       for (const auto &system : world.systems)
         if (needs_survey_work(world.knowledge, subject, system.id))
@@ -642,7 +643,7 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
                survey_priority(subject.role,
                                world.knowledge.system_survey_level(
                                    subject.civilization_id, system.id))});
-      entry.level_revision = world.knowledge.survey_level_revision();
+      entry.level_revision = world.knowledge.survey_level_revision(subject.civilization_id);
       entry.valid = true;
     }
     work = &entry.entries;
@@ -694,7 +695,7 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
         subject.fuel_capacity_light_years,
         subject.maximum_leg_range_light_years,
         fuel_policy,
-        world.knowledge.survey_level_revision(),
+        world.knowledge.survey_level_revision(subject.civilization_id),
         std::move(drain_sites)};
   return false;
 }
