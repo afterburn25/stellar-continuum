@@ -365,6 +365,9 @@ ExplorationMissionPlanner::select_supported_candidate(
     const StellarSystem *system;
     int priority_band;
     double distance;
+    // Lane slot resolved once per candidate on the canonical path —
+    // lets the pop loop probe by slot instead of re-hashing the id.
+    int lane_slot;
   };
   const auto ranked_less = [](const RankedTarget &left,
                               const RankedTarget &right) {
@@ -447,7 +450,8 @@ ExplorationMissionPlanner::select_supported_candidate(
       continue;
     targets.push_back({system, band,
                        indexed_distance_from_fleet(*systems_index, subject,
-                                                   *system)});
+                                                   *system),
+                       batch ? world.lanes.slot_of_system(system->id) : 0});
   }
   // The (band, distance-with-NaN-last, id) order is total — heap pops yield
   // exactly the stable_sort sequence, but only the handful of entries the
@@ -474,16 +478,23 @@ ExplorationMissionPlanner::select_supported_candidate(
     if (profiling)
       ++prof.pops;
     // Verdict-only on the canonical path — the loop discards everything
-    // but is_supported, so skipping reason materialization and sharing
-    // memoized route-prefix feasibility cuts the per-pop cost sharply.
-    const auto reach =
-        batch ? batch->assess(subject, target.system->id,
-                              mission_kind(subject.role), fuel_policy,
-                              /*explain=*/false)
-              : assess_operational_reach(world, subject, target.system->id);
+    // but is_supported. Slot probes skip the id lookups entirely; the
+    // lane-unknown fallback keeps find_shortest_route's out_of_range
+    // contract reachable for non-catalog targets.
+    const bool supported =
+        batch ? (target.lane_slot >= 0
+                     ? batch->probe_supported(subject, target.lane_slot,
+                                              fuel_policy)
+                     : batch->assess(subject, target.system->id,
+                                     mission_kind(subject.role),
+                                     fuel_policy, /*explain=*/false)
+                         .is_supported)
+              : assess_operational_reach(world, subject,
+                                         target.system->id)
+                    .is_supported;
     if (profiling)
       ++prof.assess_calls;
-    if (!reach.is_supported)
+    if (!supported)
       continue;
     ++supported_seen;
     if (!first_supported)
@@ -612,12 +623,21 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
         !world.lanes.systems_connected(*subject.current_system_id,
                                        system->id, prune_range))
       continue;
-    const auto reach =
-        batch ? batch->assess(subject, system->id,
+    bool supported;
+    if (batch) {
+      const int slot = world.lanes.slot_of_system(system->id);
+      supported =
+          slot >= 0
+              ? batch->probe_supported(subject, slot, fuel_policy)
+              : batch->assess(subject, system->id,
                               mission_kind(subject.role), fuel_policy,
                               /*explain=*/false)
-              : assess_operational_reach(world, subject, system->id);
-    if (reach.is_supported)
+                    .is_supported;
+    } else {
+      supported = assess_operational_reach(world, subject, system->id)
+                      .is_supported;
+    }
+    if (supported)
       return true;
   }
   if (memoize_drain)

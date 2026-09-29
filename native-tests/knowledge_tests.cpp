@@ -506,6 +506,27 @@ void run_case(const Json &test, const std::vector<int> &observer_universe,
   equal_json(observe(knowledge, observer_universe, system_universe),
              expected_after, name + ".After");
 }
+
+void run_sensor_sweep_coverage_contract() {
+  CivilizationKnowledgeState knowledge;
+  check(knowledge.sensor_sweep_needed(7, 42, 10.0),
+        "sweep coverage: first sweep must be needed");
+  knowledge.record_sensor_sweep(7, 42, 10.0);
+  check(!knowledge.sensor_sweep_needed(7, 42, 10.0),
+        "sweep coverage: identical radius must be covered");
+  check(!knowledge.sensor_sweep_needed(7, 42, 9.5),
+        "sweep coverage: smaller radius must be covered");
+  check(knowledge.sensor_sweep_needed(7, 42, 10.5),
+        "sweep coverage: wider radius must rescan");
+  check(knowledge.sensor_sweep_needed(8, 42, 5.0),
+        "sweep coverage: other civilization must be isolated");
+  check(knowledge.sensor_sweep_needed(7, 43, 5.0),
+        "sweep coverage: other system must be isolated");
+  knowledge.record_sensor_sweep(7, 42, 12.0);
+  check(!knowledge.sensor_sweep_needed(7, 42, 11.0),
+        "sweep coverage: record keeps the widest radius");
+  std::cout << "knowledge_tests: sensor sweep coverage contract passed\n";
+}
 } // namespace
 
 int main(int argc, char **argv) {
@@ -522,6 +543,7 @@ int main(int argc, char **argv) {
         fixture.at("SystemUniverse").get<std::vector<int>>();
     for (const auto &test : fixture.at("Cases"))
       run_case(test, observer_universe, system_universe);
+    run_sensor_sweep_coverage_contract();
     std::cout << "knowledge_tests: passed " << fixture.at("Cases").size()
               << " actual-C# cases\n";
     return 0;

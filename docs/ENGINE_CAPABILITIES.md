@@ -501,6 +501,17 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `find_shortest_route_into` for the same throw.
   `RetainReturnToService` still runs the full return-hop check on
   outward-feasible candidates using the memoized arrival fuel.
+  The batch additionally pins the borrowed `RouteTreeView` on the
+  feasibility state and revalidates it against a route-cache
+  `routes_revision` counter (bumped on every `routes.clear()`
+  eviction), so a drain pays the route-cache lookup once per fleet
+  state instead of once per pop. `probe_supported(slot, policy)`
+  exposes the same verdict path directly on a pre-resolved lane
+  slot: `ExplorationMissionPlanner::RankedTarget` now carries the
+  slot resolved once when the work list is built, and both the
+  select loop and `has_supported_mission_target`'s existence scan
+  probe by slot — removing the per-pop `systems_.contains`,
+  `RouteKey` hash, and `slot_of_system` lookups entirely.
 - Semantics: unchanged — the prune mirrors Dijkstra reachability
   (same leg-range predicate as the cached trees) and skips only
   candidates that could never be supported; the suitability memo key
@@ -521,11 +532,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   unshared, suitability-memo invalidation across survey-level bumps,
   reach-batch rebuild after colony-vector growth); `operational_reach_batch`
   extended — `explain=false` verdict + arrival-fuel parity across all
-  systems, fuel states, and both fuel policies; `RouteTreeView`
-  contract test — prior-chain reconstruction reproduces
-  `find_shortest_route`'s exact vector, invalid-range/unknown-id
-  contract parity; full native suite
-  291/291 green.
+  systems, fuel states, and both fuel policies, plus `probe_supported`
+  parity against the verdict path; `RouteTreeView` contract test —
+  prior-chain reconstruction reproduces `find_shortest_route`'s exact
+  vector, invalid-range/unknown-id contract parity; `knowledge_parity`
+  gains a sensor-sweep coverage contract (first/wider sweep needed,
+  contained sweep skipped, per-civ/per-system isolation); full native
+  suite 291/291 green.
 - Save/performance impact: none persisted — all structures are
   per-advance or per-query. Colonization-phase suitability lists and
   reach batches are now built once per (civ, species) per level
@@ -542,13 +555,31 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   prefix memo follows with select 236.7 s, step mean 31.3 ms, and the
   slot-indexed tree view cuts select to 155.1 s (loop 109.6 s,
   ~4.3 µs/pop) with step mean 29.1 ms (vs 74.2 ms at the dense-route
-  baseline, −61%).
-- Limitations: `select_mission`'s per-pop `assess` remains the
-  dominant late-game term — the floor is now heap pop + slot lookup +
-  memo probe (~4.3 µs), and verdicts still require touching each
-  candidate once per changed fleet state;
+  baseline, −61%). The pinned view + slot probe trims the loop to
+  ~98 s. The transit phase is profiled (`inbound: prep/reveal/tail`)
+  and reduced in three steps: the phenomenon context is memoized per
+  system per advance (pure in `regions × system`), civilization
+  contact detection early-outs on a two-probe presence check before
+  the per-civilization scan, and `reveal_system` short-circuits on
+  already-known systems. On top of those, a transient sensor-sweep
+  coverage memo in `CivilizationKnowledgeState`
+  (`sensor_sweep_needed`/`record_sensor_sweep`, keyed (civ, system) →
+  widest swept radius) lets `handle_inbound` skip an entire
+  candidate-band scan when a repeat visit is provably contained —
+  reveals are append-only and idempotent, so a covered rescan always
+  yields `revealed=0` and emits no `SensorContact` event; the
+  unconditional `already_known`/`SystemDetected` and contact-detection
+  paths are unaffected. The memo is runtime-only: it is not
+  serialized, so a save/load boundary simply re-runs sweeps (all
+  no-ops) and the trajectory is unchanged.
+- Limitations: `select_mission`'s per-pop probe remains the dominant
+  late-game term — the floor is heap pop + reservation check +
+  slot-indexed memo probe (~1.5–4 µs), and verdicts still require
+  touching each candidate once per changed fleet state;
   `has_return_service_route` still walks the colony set per pop on
-  fuel-constrained fleets; the
+  fuel-constrained fleets; transit `tail` (civilization contact
+  detection on populated systems) and `survey` remain the next
+  attribution targets; the
   prune only applies on the canonical reach path (injected providers
   keep the un-pruned loop); `SettlementPlanningSharedIndex` is manual
   plumbing — callers that omit it keep per-call behavior.

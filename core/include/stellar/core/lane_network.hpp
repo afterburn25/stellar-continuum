@@ -89,6 +89,12 @@ public:
   RouteTreeView route_tree_view(int origin_system_id,
                                 double maximum_leg_range_light_years);
 
+  // Monotonic revision of the route-tree cache — incremented whenever
+  // cached trees are destroyed (capacity eviction or rebuild). Callers
+  // that pin a RouteTreeView across queries must re-validate the
+  // revision; unordered_map insertions alone keep node storage stable.
+  std::uint64_t routes_cache_revision();
+
   // True when the network holds a system with this id — callers that
   // distinguish "unknown system" from "unreachable" can use it before
   // pruning; find_shortest_route still throws on unknown ids.

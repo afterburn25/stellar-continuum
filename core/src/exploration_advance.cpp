@@ -124,6 +124,26 @@ public:
     return found == refueling_.end() ? 0.0 : found->second;
   }
 
+  // Per-system phenomenon context — pure in (regions, system id +
+  // static position), so the all-regions sample/sort is paid once per
+  // system per advance instead of once per transit hop or survey tick.
+  const SystemPhenomenonContext &
+  phenomena(const GalaxyPhenomena *regions, int system_id) {
+    if (regions != phenomena_source_) {
+      phenomena_.clear();
+      phenomena_source_ = regions;
+    }
+    const auto found = phenomena_.find(system_id);
+    if (found != phenomena_.end())
+      return found->second;
+    const auto &system = required_system(system_id);
+    return phenomena_
+        .emplace(system_id,
+                 phenomenon_context(regions, system.position.x,
+                                    system.position.y, system_id))
+        .first->second;
+  }
+
   // Lazily sorted-by-x catalog for sensor-radius queries. Building it
   // validates every catalog position — the same validation the original
   // full-catalog distance scan applied to every system on every call.
@@ -156,6 +176,8 @@ private:
   }
 
   std::unordered_map<int, const StellarSystem *> systems_by_id_;
+  const GalaxyPhenomena *phenomena_source_{};
+  std::unordered_map<int, SystemPhenomenonContext> phenomena_;
   std::unordered_map<int, std::vector<const PlanetaryBody *>>
       bodies_by_system_;
   std::unordered_map<std::int64_t, double> refueling_;
@@ -274,16 +296,7 @@ void emit_confirmed_discoveries(AdvanceIndex &index,
 struct ContactPresenceIndex {
   std::unordered_map<int, std::unordered_map<int, int>> colonies;
   std::unordered_map<int, std::unordered_map<int, int>> fleets;
-  bool colony_present(int system_id, int civilization_id) const {
-    const auto by_civilization = colonies.find(system_id);
-    return by_civilization != colonies.end() &&
-           by_civilization->second.contains(civilization_id);
-  }
-  bool fleet_present(int system_id, int civilization_id) const {
-    const auto by_civilization = fleets.find(system_id);
-    return by_civilization != fleets.end() &&
-           by_civilization->second.contains(civilization_id);
-  }
+
   void record_departure(const FleetState &fleet) {
     if (!fleet.current_system_id)
       return;
@@ -295,6 +308,16 @@ struct ContactPresenceIndex {
     if (fleet.current_system_id)
       ++fleets[*fleet.current_system_id][fleet.civilization_id];
   }
+  // Presence rows resolved once per query — most transit targets hold no
+  // foreign presence at all, letting the contact scan short-circuit.
+  const std::unordered_map<int, int> *colony_row(int system_id) const {
+    const auto found = colonies.find(system_id);
+    return found == colonies.end() ? nullptr : &found->second;
+  }
+  const std::unordered_map<int, int> *fleet_row(int system_id) const {
+    const auto found = fleets.find(system_id);
+    return found == fleets.end() ? nullptr : &found->second;
+  }
 };
 
 void detect_civilization_contacts(ExplorationAdvanceWorldView world,
@@ -303,12 +326,16 @@ void detect_civilization_contacts(ExplorationAdvanceWorldView world,
                                   const ContactPresenceIndex &presence) {
   if (!fleet.current_system_id)
     return;
+  const auto *colonies = presence.colony_row(*fleet.current_system_id);
+  const auto *fleets = presence.fleet_row(*fleet.current_system_id);
+  if (!colonies && !fleets)
+    return;
   for (const auto &other : world.civilizations) {
     if (other.id == fleet.civilization_id ||
         world.knowledge.is_civilization_known(fleet.civilization_id, other.id))
       continue;
-    if (!presence.colony_present(*fleet.current_system_id, other.id) &&
-        !presence.fleet_present(*fleet.current_system_id, other.id))
+    if (!(colonies && colonies->contains(other.id)) &&
+        !(fleets && fleets->contains(other.id)))
       continue;
     world.knowledge.reveal_civilization(fleet.civilization_id, other.id);
     events.push_back({ExplorationEventType::FirstContact,
@@ -335,8 +362,7 @@ bool process_local_survey(AdvanceIndex &index,
                           int system_id, double simulation_delta,
                           SurveyOperationsBatch &surveys,
                           std::vector<ExplorationEvent> &events) {
-  const auto& location=first_system(index,system_id);
-  const auto scan_effort=phenomenon_context(world.phenomena,location.position.x,location.position.y,system_id).effects.scanning;
+  const auto scan_effort=index.phenomena(world.phenomena,system_id).effects.scanning;
   simulation_delta/=scan_effort;
   if (fleet.role == FleetRole::Scout) {
     if (world.knowledge.system_survey_level(fleet.civilization_id, system_id) >=
@@ -415,6 +441,11 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
                     FleetState &fleet, const StellarSystem &target,
                     std::vector<ExplorationEvent> &events,
                     const ContactPresenceIndex &presence) {
+  auto &ip = detail::expl_prof();
+  const bool iprof = ip.enabled.load(std::memory_order_relaxed);
+  std::optional<detail::ExplProfScope> iscope;
+  if (iprof)
+    iscope.emplace(ip.inbound_prep_ns);
   const auto service = refueling_service_level(
       index, world, fleet.civilization_id, target.id);
   if (service > 0)
@@ -424,7 +455,7 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
   const auto already_known =
       world.knowledge.is_system_known(fleet.civilization_id, target.id);
   const auto range =
-      fleet.sensor_range*phenomenon_context(world.phenomena,target.position.x,target.position.y,target.id).effects.sensor;
+      fleet.sensor_range*index.phenomena(world.phenomena,target.id).effects.sensor;
   // Same contract as reveal_within_sensor_range: reveal every catalog
   // system whose charted distance is within range, count the new reveals.
   // The x-sorted index only prefilters candidates; acceptance still uses
@@ -432,7 +463,16 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
   // band is widened slightly because the 2-D distance is evaluated in
   // float math and |dx| can round across the radius boundary.
   int revealed = 0;
-  {
+  // Sweeps are pure reveals of static geometry — a repeat visit with an
+  // equal-or-smaller effective radius can only re-encounter known
+  // systems, so the per-candidate scan is skipped entirely once this
+  // civilization has covered this system at this radius.
+  if (world.knowledge.sensor_sweep_needed(fleet.civilization_id, target.id,
+                                          range)) {
+    if (iprof) {
+      iscope.reset();
+      iscope.emplace(ip.inbound_reveal_ns);
+    }
     const double range_squared = static_cast<double>(range) * range;
     const double band =
         std::fabs(static_cast<double>(range)) * 1.0001 + 0.001;
@@ -449,11 +489,24 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
         [](double bound, const StellarSystem *system) {
           return bound < static_cast<double>(system->position.x);
         });
+    long long attempts = 0;
     for (auto it = first; it != last; ++it)
       if (squared_distance_light_years(target.position, (*it)->position) <=
-              range_squared &&
-          world.knowledge.reveal_system(fleet.civilization_id, (*it)->id))
-        ++revealed;
+              range_squared) {
+        ++attempts;
+        if (world.knowledge.reveal_system(fleet.civilization_id, (*it)->id))
+          ++revealed;
+      }
+    if (iprof) {
+      ip.band_candidates += static_cast<long long>(last - first);
+      ip.reveal_attempts += attempts;
+    }
+    world.knowledge.record_sensor_sweep(fleet.civilization_id, target.id,
+                                        range);
+  }
+  if (iprof) {
+    iscope.reset();
+    iscope.emplace(ip.inbound_tail_ns);
   }
   if (!already_known)
     events.push_back({ExplorationEventType::SystemDetected,

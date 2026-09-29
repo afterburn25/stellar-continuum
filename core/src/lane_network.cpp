@@ -161,6 +161,10 @@ struct InterstellarLaneNetwork::Impl {
   // System id -> index into systems (the route-tree slot).
   std::unordered_map<int, int> slot_of;
   std::unordered_map<RouteKey, RouteTree, RouteKeyHash> routes;
+  // Bumped whenever routes destroys cached trees (capacity eviction or
+  // rebuild) — unordered_map inserts keep node references stable, so this
+  // is the only invalidation a borrowed RouteTreeView can suffer.
+  std::uint64_t routes_revision{};
   // Connected components per distinct leg-range: unreachable-pair queries
   // resolve here without building a route tree at all.
   std::unordered_map<std::uint64_t, std::vector<int>> component_membership;
@@ -346,6 +350,7 @@ struct InterstellarLaneNetwork::Impl {
     adjacency = std::move(next_adjacency);
     slot_of = std::move(next_slot_of);
     routes.clear();
+    ++routes_revision;
     component_membership.clear();
     built = true;
   }
@@ -603,8 +608,10 @@ void InterstellarLaneNetwork::find_shortest_route_into(
     auto built = impl_->build_route_tree(origin_system_id,
                                        maximum_leg_range_light_years,
                                        nullptr);
-    if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096))
+    if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096)) {
       impl_->routes.clear();
+      ++impl_->routes_revision;
+    }
     found = impl_->routes.emplace(key, std::move(built)).first;
   }
   const RouteTree &tree = found->second;
@@ -653,11 +660,19 @@ InterstellarLaneNetwork::route_tree_view(
     auto built = impl_->build_route_tree(origin_system_id,
                                        maximum_leg_range_light_years,
                                        nullptr);
-    if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096))
+    if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096)) {
       impl_->routes.clear();
+      ++impl_->routes_revision;
+    }
     found = impl_->routes.emplace(key, std::move(built)).first;
   }
   return {found->second.distance, found->second.prior};
+}
+
+std::uint64_t InterstellarLaneNetwork::routes_cache_revision() {
+  impl_->require_owner();
+  impl_->ensure_built();
+  return impl_->routes_revision;
 }
 
 bool InterstellarLaneNetwork::has_system(int system_id) {

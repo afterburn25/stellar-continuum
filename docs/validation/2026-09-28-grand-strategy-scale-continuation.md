@@ -412,3 +412,54 @@ Canonical verification:
 - `operational_reach_batch` extended with a `RouteTreeView` contract
   test (prior-chain reconstruction reproduces `find_shortest_route`'s
   exact vector; invalid-range and unknown-id contract parity).
+
+Follow-up pass 4 (same canonical flags, `--repeat 2` this time so the
+profiler accumulates two campaigns plus the tick-7300 continuation
+re-run — per-campaign workload is confirmed identical at 237,934
+transit hops by difference of the two runs' accumulators):
+
+- The select loop no longer resolves lane state per pop:
+  `OperationalReachBatch` pins the borrowed `RouteTreeView` on the
+  feasibility state and revalidates it against the lane network's new
+  `routes_revision` counter (bumped on every `routes.clear()`), and
+  `probe_supported(lane_slot, policy)` runs the same verdict path on a
+  pre-resolved slot. `RankedTarget` carries the slot resolved once
+  when the work list is built; both the select loop and
+  `has_supported_mission_target`'s existence scan probe by slot.
+  `probe_supported` ≡ `assess(..., explain=false)` is pinned by the
+  extended `operational_reach_batch` test.
+- Transit inbound is reduced in three steps, all state-neutral:
+  `handle_inbound` hoists a two-probe `ContactPresenceIndex` check
+  ahead of the per-civilization contact scan (empty systems skip the
+  civ loop entirely), the phenomenon sensor context is memoized per
+  system per advance (pure in regions × system), and
+  `reveal_system` short-circuits on already-known systems. New
+  `inbound: prep/reveal/tail | band/attempts` counters attribute the
+  remaining cost.
+- A transient sensor-sweep coverage memo in
+  `CivilizationKnowledgeState` (`sensor_sweep_needed` /
+  `record_sensor_sweep`, keyed (civ, system) → widest swept radius)
+  lets `handle_inbound` skip an entire x-band candidate scan when a
+  repeat visit is provably contained. Reveals are append-only and
+  idempotent, so a covered rescan always yields `revealed=0` and no
+  `SensorContact` event; the `already_known`/`SystemDetected` and
+  contact-detection paths are untouched. The memo is not serialized:
+  a save/load boundary re-runs sweeps as no-ops and the trajectory is
+  unchanged.
+
+Canonical verification (exact documented flags, clean machine):
+
+- `finalStateHash e5a1d5bf…` — bit-identical again;
+  `repeatFinalStatesDeterministic` and `continuationDeterministic`
+  true; save 149,969,876 bytes; metrics unchanged (25 civs / 78
+  colonies / 264 fleets / 0 wars / 4 definitions / 128 journal
+  entries).
+- `EXPL-PROF` (2.5 campaign-units accumulated): select 209.5 s
+  (~83.8 s/unit vs ~100.3 s/unit on the pinned-view-only binary),
+  transit 96.3 s (~38.5 s/unit vs ~58.0 s/unit, −34%), inbound
+  reveal 12.7 s (−73% per unit; band 349M→109M, attempts
+  133M→41.6M), inbound tail 82.6 s (−14% per unit — now the dominant
+  inbound term), step mean 25.97 ms (vs 26.33 ms), peak working set
+  2.87 GB.
+- `knowledge_parity` gains a sensor-sweep coverage contract case;
+  focused batch green.

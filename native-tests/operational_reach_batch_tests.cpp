@@ -39,6 +39,14 @@ int main(int argc,char **argv)try{
       const auto kept_quick=batch.assess(fleet,target.id,InterstellarMissionKind::ScoutReconnaissance,
           MissionFuelPolicy::RetainReturnToService,false);
       check(kept.is_supported==kept_quick.is_supported,"Verdict-only assess changed return-service gating.");
+      // Slot probes must return the identical is_supported verdict —
+      // they are the scan loop's replacement for full assess calls.
+      const int slot=lanes.slot_of_system(target.id);
+      check(slot>=0,"Catalog system missing from lane slot table.");
+      check(batch.probe_supported(fleet,slot,MissionFuelPolicy::ReachDestination)==quick.is_supported,
+          "Slot probe changed support verdict.");
+      check(batch.probe_supported(fleet,slot,MissionFuelPolicy::RetainReturnToService)==kept_quick.is_supported,
+          "Slot probe changed return-service gating.");
     }
     fleet.fuel_remaining_light_years=0;
     for(int i=0;i<20;++i)check(same(assess_operational_reach(view,fleet.civilization_id,fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey),

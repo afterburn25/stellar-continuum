@@ -2,9 +2,11 @@
 
 #include <stellar/core/civilization_catalog.hpp>
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <span>
+#include <unordered_map>
 #include <vector>
 
 namespace stellar::core {
@@ -59,6 +61,16 @@ public:
   std::uint64_t survey_level_revision() const noexcept {
     return survey_level_revision_;
   }
+  // Transient per-(civilization, system) record of the widest sensor
+  // sweep radius already performed this session. A repeat sweep with an
+  // equal-or-smaller radius can only re-encounter already-known systems
+  // — reveals are idempotent and the reveal count drives events — so
+  // callers may skip them outright. Not serialized; after a load the map
+  // is empty and sweeps simply re-run, producing identical state.
+  bool sensor_sweep_needed(int civilization_id, int system_id,
+                           double range) const;
+  void record_sensor_sweep(int civilization_id, int system_id,
+                           double range);
   KnowledgeSnapshot snapshot() const;
   static CivilizationKnowledgeState
   create_initial(std::span<const StellarSystem> systems,
@@ -74,5 +86,8 @@ private:
   std::vector<int> civilization_observer_order_;
   std::map<int, std::map<int, Survey>> surveys_;
   std::uint64_t survey_level_revision_{};
+  // Transient sensor-sweep coverage: (civ << 32 | system) -> widest
+  // radius swept. Derived runtime state only — see sensor_sweep_needed.
+  std::unordered_map<std::int64_t, double> sensor_coverage_;
 };
 } // namespace stellar::core

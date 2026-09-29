@@ -245,12 +245,34 @@ MissionReachAssessment OperationalReachBatch::evaluate_route_verdict(
   // find_shortest_route_into call the explain path performs. Acquired
   // before the memo seed below so slot_of_system(origin) is guaranteed
   // non-negative there.
-  const auto tree =
-      world_.lanes.route_tree_view(origin, range);
+  ensure_feasibility_state(fleet);
+  const int target_slot = world_.lanes.slot_of_system(target_system_id);
+  if (target_slot < 0) {
+    // Preserve the out_of_range contract for lane-unknown targets.
+    world_.lanes.find_shortest_route_into(origin, target_system_id, range,
+                                          route_scratch_);
+    return {false, true, {}, std::nullopt, 0.0};
+  }
+  return verdict_for_slot(fleet, target_slot);
+}
+
+// Ensures the pinned route tree and slot-indexed memo match the fleet's
+// (origin, fuel, capacity, leg range) state. The tree view is re-borrowed
+// whenever the lane cache revision moves — inserts keep node storage
+// stable, so only capacity eviction (which bumps the revision) can
+// invalidate the spans. Rebuilt trees are deterministic per key, so the
+// memo arrays remain valid across eviction; only the spans refresh.
+void OperationalReachBatch::ensure_feasibility_state(
+    const FleetState &fleet) {
+  const int origin = *fleet.current_system_id;
+  const double range = fleet.maximum_leg_range_light_years;
   if (!feas_key_valid_ || feas_origin_ != origin ||
       feas_fuel_ != fleet.fuel_remaining_light_years ||
       feas_capacity_ != fleet.fuel_capacity_light_years ||
       feas_leg_range_ != range) {
+    feas_tree_ =
+        world_.lanes.route_tree_view(origin, range);
+    feas_tree_revision_ = world_.lanes.routes_cache_revision();
     feas_origin_ = origin;
     feas_fuel_ = fleet.fuel_remaining_light_years;
     feas_capacity_ = fleet.fuel_capacity_light_years;
@@ -266,14 +288,18 @@ MissionReachAssessment OperationalReachBatch::evaluate_route_verdict(
       fuel = feas_capacity_ * factor;
     feas_state_[origin_slot] = 1;
     feas_fuel_after_[origin_slot] = fuel;
+    return;
   }
-  const int target_slot = world_.lanes.slot_of_system(target_system_id);
-  if (target_slot < 0) {
-    // Preserve the out_of_range contract for lane-unknown targets.
-    world_.lanes.find_shortest_route_into(origin, target_system_id, range,
-                                          route_scratch_);
-    return {false, true, {}, std::nullopt, 0.0};
+  if (world_.lanes.routes_cache_revision() != feas_tree_revision_) {
+    feas_tree_ =
+        world_.lanes.route_tree_view(origin, range);
+    feas_tree_revision_ = world_.lanes.routes_cache_revision();
   }
+}
+
+MissionReachAssessment OperationalReachBatch::verdict_for_slot(
+    const FleetState &, int target_slot) {
+  const auto &tree = feas_tree_;
   if (!std::isfinite(tree.distance[target_slot]))
     return {false, true, {}, std::nullopt, 0.0};
   feas_walk_.clear();
@@ -307,6 +333,40 @@ MissionReachAssessment OperationalReachBatch::evaluate_route_verdict(
   if (feas_state_[target_slot] != 1)
     return {false, true, {}, std::nullopt, 0.0};
   return {true, true, {}, std::nullopt, 0.0, feas_fuel_after_[target_slot]};
+}
+
+bool OperationalReachBatch::probe_supported(
+    const FleetState &fleet, int target_slot,
+    MissionFuelPolicy fuel_policy) {
+  if (fleet.civilization_id != civilization_id_ || !fleet.current_system_id)
+    return false;
+  prepare();
+  const double range = fleet.maximum_leg_range_light_years;
+  if (range <= 0.0 || std::isnan(range))
+    return false;
+  if (feas_factor_.empty()) {
+    const auto slots = world_.lanes.route_slots();
+    feas_slots_ = slots;
+    feas_factor_.assign(slots.size(), 0.0);
+    for (const auto &[id, factor] : refueling_) {
+      const int slot = world_.lanes.slot_of_system(id);
+      if (slot >= 0)
+        feas_factor_[slot] = factor;
+    }
+  }
+  // Same unknown-origin throw contract as the assess path.
+  ensure_feasibility_state(fleet);
+  const auto reach = verdict_for_slot(fleet, target_slot);
+  if (!reach.is_supported)
+    return false;
+  if (fuel_policy == MissionFuelPolicy::RetainReturnToService) {
+    auto projected = fleet;
+    projected.current_system_id = feas_slots_[target_slot].id;
+    projected.fuel_remaining_light_years =
+        *reach.arrival_fuel_light_years;
+    return has_return_service_route(projected);
+  }
+  return true;
 }
 
 MissionReachAssessment OperationalReachBatch::evaluate_route(

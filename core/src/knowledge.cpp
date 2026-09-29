@@ -112,10 +112,35 @@ bool CivilizationKnowledgeState::is_civilization_known(int observer_id,
           civilizations_.at(observer_id).contains(target_id));
 }
 
+bool CivilizationKnowledgeState::sensor_sweep_needed(
+    int civilization_id, int system_id, double range) const {
+  const auto found =
+      sensor_coverage_.find((static_cast<std::int64_t>(civilization_id)
+                             << 32) |
+                            static_cast<std::uint32_t>(system_id));
+  return found == sensor_coverage_.end() || found->second < range;
+}
+
+void CivilizationKnowledgeState::record_sensor_sweep(
+    int civilization_id, int system_id, double range) {
+  auto &widest =
+      sensor_coverage_[(static_cast<std::int64_t>(civilization_id) << 32) |
+                       static_cast<std::uint32_t>(system_id)];
+  if (widest < range)
+    widest = range;
+}
+
 bool CivilizationKnowledgeState::reveal_system(int civilization_id,
                                                 int system_id) {
-  ensure_survey(civilization_id, system_id);
+  // Already-known fast path: systems_ membership implies the survey
+  // entry exists (every systems_ insertion goes through this function,
+  // which ensures first), so ensure_survey and set::insert would both
+  // be no-ops — skip the extra tree walks the sensor-reveal scan would
+  // otherwise pay per in-range candidate per hop.
   auto found = systems_.find(civilization_id);
+  if (found != systems_.end() && found->second.contains(system_id))
+    return false;
+  ensure_survey(civilization_id, system_id);
   if (found == systems_.end()) {
     system_observer_order_.push_back(civilization_id);
     found = systems_.emplace(civilization_id, std::set<int>{}).first;

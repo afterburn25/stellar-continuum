@@ -71,11 +71,22 @@ public:
   MissionReachAssessment assess(const FleetState &,int target_system_id,InterstellarMissionKind,
       MissionFuelPolicy = MissionFuelPolicy::ReachDestination,
       bool explain = true);
+  // Scan-loop verdict for a lane-slot candidate — identical
+  // is_supported semantics to assess(..., fuel_policy, explain=false)
+  // for catalog systems, but the caller resolves the slot (via
+  // InterstellarLaneNetwork::slot_of_system) so the probe pays no
+  // id-lookup or route-query cost. Contract: target_slot must be a
+  // valid lane slot for a catalog system — lane-unknown targets must
+  // go through assess so the out_of_range contract is preserved.
+  bool probe_supported(const FleetState &,int target_slot,
+      MissionFuelPolicy fuel_policy);
   std::optional<RefuelingReach> nearest_refueling(const FleetState &,InterstellarMissionKind);
 private:
   void prepare();
   MissionReachAssessment evaluate_route(const FleetState &,std::span<const int> route);
   MissionReachAssessment evaluate_route_verdict(const FleetState &,int target_system_id);
+  void ensure_feasibility_state(const FleetState &);
+  MissionReachAssessment verdict_for_slot(const FleetState &,int target_slot);
   bool has_return_service_route(const FleetState &);
   OperationalReachWorldView world_;
   int civilization_id_{};
@@ -104,6 +115,12 @@ private:
   std::vector<double> feas_factor_;
   std::vector<int> feas_walk_; // ancestor-path scratch
   std::span<const InterstellarLaneNetwork::RouteSlot> feas_slots_;
+  // Route tree pinned per fleet-state key — re-acquired when the lane
+  // cache revision moves (capacity eviction). Rebuilt trees are
+  // deterministic per (origin, range), so the slot memo above survives
+  // eviction; only the borrowed spans need re-borrowing.
+  InterstellarLaneNetwork::RouteTreeView feas_tree_{};
+  std::uint64_t feas_tree_revision_{};
 };
 
 MissionReachAssessment
