@@ -131,29 +131,6 @@ FALLBACK IF NOT AVAILABLE:
   `apply_color_blind` keeps covering the 2D chrome only — the 3D scene
   gap is documented in the function's comment.
 
-### REQUEST: Nullable `SurfaceEffect3D::next_texture` for single-texture effects
-Status:        OPEN
-Requested:    2026-09-28
-WHY NEEDED:
-  Any `surface_effect` — including the nebula emission volume, which only
-  uses the volume fields — fails validation without a bound secondary
-  texture (`Invalid surface effect sequence or occlusion sphere`), so the
-  game binds the same composite twice as a no-op `blend=0` pair. The
-  second bind is harmless but misleading: readers assume a two-image
-  sequence where none exists.
-CURRENT GAME SCREEN:
-  `app/native_client/native_phenomena.cpp` — the local-nebula emission
-  volume binds `surface_effect.next_texture = composite` purely to
-  satisfy validation.
-DESIRED PUBLIC API:
-  Permit `next_texture == nullptr` whenever `blend <= 0`, keeping the
-  sequence validation only for actual two-image blends.
-PERFORMANCE CONSTRAINT:
-  Validation-only change; no render-path cost.
-FALLBACK IF NOT AVAILABLE:
-  The double-bind workaround stays — it is cheap and validated, just
-  obscure. Documented as a limitation in the ledger.
-
 ### REQUEST: Flared / non-coplanar annulus geometry for protoplanetary discs
 Status:        OPEN
 Requested:    2026-09-28
@@ -241,4 +218,18 @@ FALLBACK IF NOT AVAILABLE:
 
 ## Delivered
 
-(none yet)
+### REQUEST: Nullable `SurfaceEffect3D::next_texture` for single-texture effects
+Status:        DELIVERED
+Requested:    2026-09-28
+Delivered:    2026-09-29 on `game/ui-visual-overhaul` — validation now
+requires `next_texture` only when `blend > 0` (`native_scene3d.cpp`);
+the header documents the nullable contract. The local-nebula emission
+volume (`native_phenomena.cpp`) no longer double-binds its composite.
+All downstream consumers were already null-safe (`texture()`/`mip_for`/
+`stream_request` fall back to the white placeholder;
+`texture_mip_layout3d` accounts a null as 1×1); the shader still samples
+the sequence slot but `mix(texel, next, 0)` discards it. Tests:
+`native_scene3d_tests` rejects null+blend>0 and accepts null+blend=0.
+Verified: `stellar_scene3d_tests`, `stellar_scene3d_gpu_tests`, and
+`--developer-smoke` seed 1701 at 1920×1080 all green with
+`local_nebula=emission_volume_submitted_passed`.

@@ -186,7 +186,6 @@ void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w
       material.linear_light=true;
       material.tint={255,255,255,opacity};
       auto& volume=material.surface_effect.emplace();
-      volume.next_texture=local_volume_; // blend 0 samples the primary map only
       volume.volume_depth=.6f;
       volume.volume_density=4.f;
       volume.volume_seed=static_cast<float>(nebula.unit_double()*4096.);

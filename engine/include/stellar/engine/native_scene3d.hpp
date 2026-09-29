@@ -123,6 +123,8 @@ struct AnalyticShadow3D {
 // Reusable emissive image sequence on surface-attached geometry. A camera-space
 // sphere masks fragments behind an existing photosphere, including its limb.
 struct SurfaceEffect3D {
+  // Second frame of a two-image blend; may be null when `blend <= 0` for
+  // single-texture effects (the emission volume uses only the volume fields).
   std::shared_ptr<const RgbaImage> next_texture;
   float blend{},flow_phase{},distortion{};
   // Marched-filament churn rate: the volume's flow phase advances by

@@ -199,7 +199,10 @@ int main()try{
    rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=70.f;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
    plasma.material.surface_effect->flow_rate=.5f;
-   check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");}
+   check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");
+   rejects([&]{auto i=plasma;i.material.surface_effect->next_texture.reset();i.material.surface_effect->blend=.5f;(void)Scene3D::create(camera,{i});});
+   {auto i=plasma;i.material.surface_effect->next_texture.reset();i.material.surface_effect->blend=0;
+    check(Scene3D::create(camera,{i})!=nullptr,"Single-texture volume effect rejected without next_texture");}}
   rejects([&]{(void)star_photosphere3d(50);});
   rejects([&]{(void)star_photosphere3d(2e5);});
   rejects([&]{(void)star_photosphere3d(std::numeric_limits<double>::quiet_NaN());});

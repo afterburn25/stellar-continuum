@@ -235,14 +235,16 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 
 ## Known limitations
 
-- Four renderer requests remain filed on the engine lane
-  (`GAME_VISUAL_ENGINE_REQUESTS.md`): color-blind channel matrix
-  (color-blind simulation stays CPU/2D-only — documented in
-  `apply_color_blind`), nullable `SurfaceEffect3D::next_texture`,
-  flared/non-coplanar annulus geometry, time-evolved differential
-  accretion shear. Three core-lane projections remain open: fleet
-  composition, interstellar logistics route graph, per-action diplomacy
-  blockers.
+- Four renderer requests remain filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
+  color-blind channel matrix (color-blind simulation stays CPU/2D-only —
+  documented in `apply_color_blind`), flared/non-coplanar annulus
+  geometry, time-evolved differential accretion shear, and Scene3DView
+  render-scale under budget pressure. Nullable
+  `SurfaceEffect3D::next_texture` was delivered 2026-09-29 (validation
+  requires it only when `blend > 0`; the nebula volume's double-bind is
+  removed; `native_scene3d_tests` covers both branches). Three core-lane
+  projections remain open: fleet composition, interstellar logistics
+  route graph, per-action diplomacy blockers.
 - `irregular_rock_mesh`/`card:` spec docs are uncommitted in the
   `sc-integration-merge` worktree; `billboard_card` is committed
   engine-side but intentionally unused game-side (CPU projected-size

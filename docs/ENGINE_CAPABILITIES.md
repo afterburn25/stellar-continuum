@@ -62,6 +62,32 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## SurfaceEffect3D nullable `next_texture` (2026-09-29)
+
+- **Purpose:** single-texture effects — the nebula emission volume uses
+  only the `volume_*` fields — had to bind a meaningless second texture
+  to pass `Scene3D::create` validation, reading as a two-image sequence
+  where none exists.
+- **Modules:** `engine/src/native_scene3d.cpp` (validation),
+  `engine/include/stellar/engine/native_scene3d.hpp` (field contract).
+- **Public interface:** `next_texture` may be null whenever `blend <= 0`;
+  a non-blended effect never samples it. `blend > 0` still requires the
+  texture — the two-image sequence contract is unchanged for actual
+  blends. All downstream consumers were already null-safe: `texture()`,
+  `mip_for`, `stream_request` fall back to the white placeholder and
+  `texture_mip_layout3d` accounts a null as 1×1.
+- **Consumers:** `native_phenomena.cpp` local-nebula emission volume
+  (double-bind removed). `runtime_host.cpp`/`engine_main.cpp` still
+  assign `next_texture` for their authored blends.
+- **Tests:** `native_scene3d_tests` rejects `null + blend>0` and accepts
+  `null + blend=0`; GPU suite unchanged. `--developer-smoke` verifies
+  `local_nebula=emission_volume_submitted_passed`.
+- **Save/performance impact:** none — validation-only change; the bound
+  slot was already the white placeholder at `blend=0`.
+- **Limitations:** `effect_options.x>0.5` still gates the margin taper
+  and occlusion sphere on the primary texel — intended, since those
+  apply to the emitted image regardless of blending.
+
 ## Scene3D screen-space mesh LOD chains (2026-09-25)
 
 - **Purpose:** strategy fleets need vertex throughput to scale with
