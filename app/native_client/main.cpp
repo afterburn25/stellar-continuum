@@ -21,6 +21,7 @@
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_voice_settings_smoke.hpp"
+#include "native_general_settings_smoke.hpp"
 #include "native_settings_hub_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
@@ -11389,14 +11390,14 @@ int main(int argc,char **argv){
               throw std::runtime_error("General settings escaped the paused campaign menu.");
           };
           ensure_paused_menu("General settings",width,height);
-          settings_hub.close();
-          route({InputEventType::LeftPressed,center(NativeUiLayout::for_viewport(width,height).settings_button)});
-          route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
-          if(!general_settings.visible())throw std::runtime_error("General settings did not open from the pause settings hub.");
-          window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-general-settings"));
-          route({InputEventType::LeftPressed,center(stellar::native_general::GeneralSettingsLayout::for_viewport(width,height).cancel)});
-          if(general_settings.visible())throw std::runtime_error("General settings did not close on Cancel.");
-          std::cout<<"general_settings_check={\"location\":\"pause\",\"opened\":true,\"capture\":true,\"cancel\":true}\n";
+          stellar::native_general::check_general_settings(
+              general_settings,general_settings_path,width,height,"pause",
+              [&]{
+                settings_hub.close();
+                route({InputEventType::LeftPressed,center(NativeUiLayout::for_viewport(width,height).settings_button)});
+                route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
+              },route,
+              [&]{window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-general-settings"));});
           settings_hub.close();
         }
         if(options.controls_settings_check&&!options.new_game_smoke){

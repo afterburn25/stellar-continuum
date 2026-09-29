@@ -9,6 +9,7 @@
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "native_voice_settings_smoke.hpp"
+#include "native_general_settings_smoke.hpp"
 #include "native_settings_hub_smoke.hpp"
 
 #include <algorithm>
@@ -335,22 +336,19 @@ StartupEntryResult run_native_startup_entry(Window &window,
       const auto route=[&](const InputEvent& event){
         if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
       };
-      config.settings_hub->close();
-      route({InputEventType::LeftPressed,center(entry_layout.settings)});
-      route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
-      if(!config.general_settings->visible())
-        throw std::runtime_error("General settings did not open from the startup settings hub.");
-      {
-        DrawList draw;
-        workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
-        config.general_settings->render(draw,width,height);
-        window.draw(draw,automation->general_settings_screenshot);
-      }
-      const auto cancel=stellar::native_general::GeneralSettingsLayout::for_viewport(width,height).cancel;
-      route({InputEventType::LeftPressed,center(cancel)});
-      if(config.general_settings->visible())
-        throw std::runtime_error("General settings did not close on Cancel.");
-      std::cout<<"general_settings_check={\"location\":\"startup\",\"opened\":true,\"capture\":true,\"cancel\":true}\n";
+      stellar::native_general::check_general_settings(
+          *config.general_settings,config.general_settings->path(),width,height,"startup",
+          [&]{
+            config.settings_hub->close();
+            route({InputEventType::LeftPressed,center(entry_layout.settings)});
+            route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
+          },route,
+          [&]{
+            DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.general_settings->render(draw,width,height);
+            window.draw(draw,automation->general_settings_screenshot);
+          });
     }
     if(config.settings_hub)config.settings_hub->close();
     if (automation->action != StartupEntryAutomationAction::Create) {
