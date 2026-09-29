@@ -319,8 +319,9 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   exceeded the visible page (UB — a non-finite row rect tripped the
   text-bounds guard); the loop now iterates the clipped page.
   `NativeSettingsHub::control_row_bounds` exposes row hitboxes for the
-  harness. Green under `--load --smoke` at 1280×720 on both
-  fresh-file and pre-existing `galaxy-controls.json` paths.
+  harness. Green under `--load --smoke` at 640×360, 1280×720, and
+  2560×1440 on both fresh-file and pre-existing `galaxy-controls.json`
+  paths.
   Follow-up: the page clip also made the three `GALAXY_PAD` axis rows
   unreachable — the shipped map's 15 rows exceed the ~12-row page at
   every viewport, and no scroll path existed. The list now scrolls on
