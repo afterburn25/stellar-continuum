@@ -301,6 +301,25 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   fraction of exactly 0/1 lands on the track's half-open bounds and is
   clamped). Green at both harness locations at 2560×1440 and 1920×1080
   (`pause` under `--load --smoke`, `startup` under `--new-game-smoke`).
+- Controls-settings check: `--controls-settings-check` +
+  `check_controls_settings` cover the hub's in-view rebind list — the
+  last settings surface without end-to-end coverage (pause location
+  only; the input mapper is wired to the hub once the campaign exists).
+  The check snapshots every binding in both contexts, arms capture on a
+  row, verifies Escape cancels without changing bindings, installs an
+  unbound probe key as the primary binding, presses a sibling's bound
+  key to exercise the steal (victim binding verified removed — the
+  "reassigned from" notice is drained into the a11y announcer inside
+  `update`, so the check asserts the binding change, not the text),
+  then restores every snapshot through `rebind()` + persist and proves
+  the file round-trips through a fresh `InputMapper`. The first live
+  run caught a real defect: the controls view's render loop indexed
+  `control_row_rects` past its clipped size whenever the action list
+  exceeded the visible page (UB — a non-finite row rect tripped the
+  text-bounds guard); the loop now iterates the clipped page.
+  `NativeSettingsHub::control_row_bounds` exposes row hitboxes for the
+  harness. Green under `--load --smoke` at 1280×720 on both
+  fresh-file and pre-existing `galaxy-controls.json` paths.
 
 ## Known limitations
 
@@ -336,9 +355,12 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `sc-integration-merge` worktree; `billboard_card` is committed
   engine-side but intentionally unused game-side (CPU projected-size
   culling owns the distant-body contract).
-- `Window::set_scene3d_texture_budget` intentionally unwired — 192 MiB
-  default vs. ~45 MB measured scene-texture demand; no settings consumer
-  exists (audit closure ledger row, `24385dd2`).
+- `Window::set_scene3d_texture_budget` is live: the video-settings apply
+  callback retunes the streamer budget per STARFIELD QUALITY tier
+  (Low 48 / Medium 96 / High+ 192 MiB) and a pre-renderer request persists
+  on `Window::Storage` until the renderer is lazily created
+  (`371efc07`); `Scene3DStatistics::texture_budget_bytes` reports the
+  effective live budget for memory attribution (`a839c4fc`).
 - `--diplomacy-smoke` authors its proposal fixture per run inside the
   validator (green above). `test_galaxy_asset_import` still needs the
   un-vendored `assets/source/galaxies-16x9/` PNGs (pre-existing gap).

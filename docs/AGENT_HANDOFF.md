@@ -1464,6 +1464,18 @@ and capturing an axis row accepts a stick deflection past a 0.5 dead
 zone or a wheel scroll (discrete keys are swallowed — they cannot drive
 an axis). Startup workspace tests cover the axis ring, deflection
 capture, cross-context steal and wheel binding.
+`--controls-settings-check` (pause-location smoke) exercises the live
+view end-to-end: snapshot every GALAXY/GALAXY_PAD binding, arm row
+capture, Escape-cancel, probe-key rebind, sibling steal, then restore
+through `rebind()` + persist and verify `galaxy-controls.json`
+round-trips through a fresh `InputMapper` (`save_contexts`
+canonicalizes — semantics, not bytes, are asserted). Its first live run
+caught the render loop indexing `control_row_rects` past the clipped
+page (UB when the action list overflows the view); the loop now bounds
+on the page, and `NativeSettingsHub::control_row_bounds` exposes row
+hitboxes to the harness. Pause location only — the mapper binds to the
+hub once the campaign exists, so a startup run would see the static
+help card.
 Multi-pad is plumbed end-to-end: the platform opens up to four pads into
 stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry
 the slot, and `InputBinding.device` pins a binding to one pad via the

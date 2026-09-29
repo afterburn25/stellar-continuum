@@ -103,6 +103,16 @@ public:
     if(focus_==5)return l.back;
     return focus_<5?std::optional<UiRect>{l.categories[static_cast<std::size_t>(focus_)]}:std::nullopt;
   }
+  // Client-pixel rect of rebind row `index` in the controls view —
+  // nullopt while the categories view or a child panel is up, or the index
+  // is off the list. Smoke harnesses need the same hitboxes clicks use.
+  [[nodiscard]] std::optional<UiRect>
+  control_row_bounds(int index,int width,int height)const{
+    if(!visible_||!controls_)return std::nullopt;
+    const auto rows=control_row_rects(HubLayout::for_viewport(width,height));
+    if(index<0||index>=static_cast<int>(rows.size()))return std::nullopt;
+    return rows[static_cast<std::size_t>(index)];
+  }
   bool handle(const InputEvent&e,int width,int height){
     if(!showing_categories())return false;
     if(e.type==InputEventType::PointerMove)pointer_=e.position;
@@ -218,7 +228,7 @@ public:
         for(int i=0;i<static_cast<int>(lines.size());++i)text(out,{l.categories[0].x,l.categories[0].y+i*39*s,l.categories[0].width,35*s},tr(keys[i],lines[i]),static_cast<int>(16*s));
       }else{
         const auto rects=control_row_rects(l);
-        for(std::size_t i=0;i<rows.size();++i){
+        for(std::size_t i=0;i<rects.size();++i){
           const bool hot=rects[i].contains(pointer_)||focus_==static_cast<int>(i);
           const auto bindings=mapper_->bindings(rows[i]->name);
           const std::string value=capture_==static_cast<int>(i)

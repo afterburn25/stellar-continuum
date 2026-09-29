@@ -21,6 +21,7 @@
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_voice_settings_smoke.hpp"
+#include "native_settings_hub_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "map_interaction.hpp"
 #include "native_audio_settings.hpp"
@@ -373,7 +374,7 @@ struct Options {
   std::optional<FirstSurveyMode> first_survey_mode;
   enum class SettlementCompletionMode { Resume, Paused };
   std::optional<SettlementCompletionMode> settlement_completion_mode;
-  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},general_settings_check{},voice_check{},voice_settings_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
+  bool campaign_profile{},menu_smoke{},audio_check{},audio_settings_check{},video_settings_check{},general_settings_check{},voice_check{},voice_settings_check{},controls_settings_check{},inspection_check{},logistics_check{},economy_check{},military_check{};
   bool save_path_overridden{},devtools{},dev_game{},smoke_full_exploration{};
   std::optional<int> profile_frames;
   // Deterministic replay: --record captures the GALAXY command stream and a
@@ -413,6 +414,7 @@ struct Options {
     else if(arg==L"--support-failure-check"){result.support_check=true;result.support_failure_check=true;}
     else if(arg==L"--voice-check") result.voice_check=true;
     else if(arg==L"--voice-settings-check") result.voice_settings_check=true;
+    else if(arg==L"--controls-settings-check") result.controls_settings_check=true;
     else if(arg==L"--audio-settings-check") result.audio_settings_check=true;
     else if(arg==L"--video-settings-check") result.video_settings_check=true;
     else if(arg==L"--general-settings-check") result.general_settings_check=true;
@@ -477,6 +479,7 @@ struct Options {
     else if(arg=="--support-failure-check"){result.support_check=true;result.support_failure_check=true;}
     else if(arg=="--voice-check") result.voice_check=true;
     else if(arg=="--voice-settings-check") result.voice_settings_check=true;
+    else if(arg=="--controls-settings-check") result.controls_settings_check=true;
     else if(arg=="--audio-settings-check") result.audio_settings_check=true;
     else if(arg=="--video-settings-check") result.video_settings_check=true;
     else if(arg=="--general-settings-check") result.general_settings_check=true;
@@ -540,6 +543,7 @@ struct Options {
   if(result.video_settings_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--video-settings-check requires an isolated new-game or reload smoke.");
   if(result.general_settings_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--general-settings-check requires an isolated new-game or reload smoke.");
   if(result.voice_settings_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--voice-settings-check requires an isolated new-game or reload smoke.");
+  if(result.controls_settings_check&&(!result.smoke_screenshot||!result.menu_smoke||!result.load))throw std::invalid_argument("--controls-settings-check requires an isolated --load --smoke run (the rebind mapper exists only in-campaign).");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
   if(result.smoke_full_exploration&&!result.developer_smoke)throw std::invalid_argument("--smoke-full-exploration requires --developer-smoke; the setup checkbox only exists in developer mode.");
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
@@ -10864,13 +10868,14 @@ int main(int argc,char **argv){
       const auto names=window.gamepad_names();
       return slot>=0&&slot<static_cast<int>(names.size())?names[static_cast<std::size_t>(slot)]:std::string{};
     });
-    settings_hub.set_bindings_persist([&campaign,&controls_path]{
+    const auto persist_controls=[&campaign,&controls_path]{
       const auto text=campaign.input_mapper().save_contexts();
       try {
         stellar::engine::write_file_atomically(controls_path,
           std::span{reinterpret_cast<const std::byte*>(text.data()),text.size()});
       } catch(const std::exception& error){std::cerr<<"Input bindings save failed: "<<error.what()<<'\n';}
-    });
+    };
+    settings_hub.set_bindings_persist(persist_controls);
     active_voice_playback=campaign.voice_playback();
     campaign.configure_support(window.gpu_driver(),window.presentation_mode());
     std::cout<<"renderer="<<window.gpu_driver()<<" presentation="<<window.presentation_mode()<<" drawable="<<window.drawable_width()<<'x'<<window.drawable_height()<<'\n';
@@ -11349,6 +11354,22 @@ int main(int argc,char **argv){
           route({InputEventType::LeftPressed,center(stellar::native_general::GeneralSettingsLayout::for_viewport(width,height).cancel)});
           if(general_settings.visible())throw std::runtime_error("General settings did not close on Cancel.");
           std::cout<<"general_settings_check={\"opened\":true,\"capture\":true,\"cancel\":true}\n";
+          settings_hub.close();
+        }
+        if(options.controls_settings_check&&!options.new_game_smoke){
+          const int width=window.drawable_width(),height=window.drawable_height();
+          const auto route=[&](const InputEvent& event){
+            InputSnapshot input;input.drawable_width=width;input.drawable_height=height;
+            input.events.push_back(event);input.pointer=event.position;
+            if(!campaign.update(input,width,height,0.,false)||!campaign.paused_menu_visible())
+              throw std::runtime_error("Controls settings escaped the paused campaign menu.");
+          };
+          ensure_paused_menu("Controls settings",width,height);
+          stellar::native_settings::check_controls_settings(settings_hub,campaign.input_mapper(),"GALAXY","GALAXY_PAD",
+            persist_controls,controls_path,width,height,"pause",
+            [&]{settings_hub.close();route({InputEventType::LeftPressed,center(NativeUiLayout::for_viewport(width,height).settings_button)});
+                route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[4])});},
+            route,[&]{window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-controls-settings"));});
           settings_hub.close();
         }
         if(options.audio_check){

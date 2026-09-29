@@ -361,6 +361,41 @@ void menu_hover_feedback(){
             "wheel scroll did not capture on an axis row");
     DrawList draw;hub.render(draw,w,h);
   }
+  // Clipped controls page: more actions than fit must render only the
+  // visible page — the row loop once indexed past the clipped rect vector
+  // (UB; the live smoke caught a garbage non-finite rect tripping the
+  // platform's text-bounds guard).
+  {
+    const int w=1280,h=720;
+    stellar::engine::InputMapper mapper;
+    stellar::engine::InputContext context;
+    context.name="GALAXY";
+    for(int i=0;i<20;++i){
+      stellar::engine::InputAction action;
+      action.name="action_"+std::to_string(i);
+      action.type=stellar::engine::InputAction::Type::Button;
+      action.bindings={stellar::engine::InputBinding{
+          stellar::engine::RawInputEvent::Kind::KeyPress,65+i}};
+      context.actions.push_back(std::move(action));
+    }
+    mapper.add_context(std::move(context));
+    mapper.push_context("GALAXY");
+    stellar::native_settings::NativeSettingsHub hub;
+    hub.set_input_mapper(&mapper);
+    hub.open();
+    const auto l=stellar::native_settings::HubLayout::for_viewport(w,h);
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    int visible=0;
+    while(hub.control_row_bounds(visible,w,h).has_value())++visible;
+    require(visible>0&&visible<20,"controls page did not clip the row list");
+    DrawList draw;hub.render(draw,w,h);
+    for(const auto& command:draw.overlay)
+      if(const auto* label=std::get_if<Text>(&command))
+        require(std::isfinite(label->at.x)&&std::isfinite(label->at.y)&&
+                (!label->clip||(std::isfinite(label->clip->x)&&std::isfinite(label->clip->y)&&
+                                std::isfinite(label->clip->width)&&std::isfinite(label->clip->height))),
+                "controls page render emitted a text with non-finite bounds");
+  }
 }
 }
 int main()try{menu_hover_feedback();keyboard_focus_traversal();responsive();entry_setup_create();load_and_failure();long_load_list_scrolls();live_campaign_return_lifecycle();continue_and_development();std::cout<<"native startup workspace tests passed\n";return 0;}catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
