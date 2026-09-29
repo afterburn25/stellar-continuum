@@ -296,6 +296,14 @@ issue_civilian_return_to_base_order(
   [[nodiscard]] CombatSimulation &combat_simulation() noexcept;
   [[nodiscard]] const CombatSimulation &combat_simulation() const noexcept;
 
+  // Tick-shared body-catalog index. The catalog is immutable during a
+  // campaign; the index is rebuilt only when the bodies span identity (or
+  // its edge ids) changes. Sibling subsystems driven outside the phase
+  // tasks (e.g. the adaptive research advance) may reuse it for the same
+  // catalog instead of rescanning world.bodies.
+  [[nodiscard]] const SettlementBodyIndex &
+  catalog_body_index(FreshCampaignState &campaign);
+
 private:
   // Engine-level phase pipeline: every strategic step runs the 12
   // coordinator phases as SimulationExecutor tasks (Active tier,
@@ -330,14 +338,13 @@ private:
   ScriptedEventCoordinator scripted_events_;
   std::variant<CombatCommandRuntime, CombatSimulation> combat_;
   CampaignSubsystemRuntime subsystems_;
-  // Tick-shared body-catalog index for the automatic_orders phase. The
+  // Tick-shared body-catalog index backing catalog_body_index(). The
   // catalog is immutable during a campaign; the index is rebuilt only when
   // the bodies span identity (or its edge ids) changes.
   std::optional<SettlementBodyIndex> body_index_;
   const PlanetaryBody *body_index_data_{};
   std::size_t body_index_size_{};
   int body_index_front_id_{}, body_index_back_id_{};
-  const SettlementBodyIndex &catalog_body_index(FreshCampaignState &campaign);
 };
 
 } // namespace stellar::core

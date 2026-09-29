@@ -216,7 +216,8 @@ void milestones(FreshCampaignState &w, AdaptiveResearchCampaignState &campaign, 
 }
 } // namespace
 std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::advance(
-    FreshCampaignState &w, AdaptiveResearchCampaignState &campaign, double days, double now) const {
+    FreshCampaignState &w, AdaptiveResearchCampaignState &campaign, double days, double now,
+    const SettlementBodyIndex *shared_body_index) const {
   if (!std::isfinite(days) || days < 0)
     throw std::out_of_range(
         "Specified argument was out of the range of valid values. (Parameter 'elapsedDays')");
@@ -238,7 +239,13 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
   const auto ec = economic_construction_projection(w.construction);
   const auto ef = economic_fleet_projection(w.fleets);
   const EconomyWorldView ew{w.civilizations, w.bodies, ec, ef};
-  const SettlementBodyIndex body_index(w.colonies, w.bodies);
+  // Colony->body lookups resolve through a caller-shared catalog index when
+  // one is provided; otherwise build the request-scoped index for the call.
+  std::optional<SettlementBodyIndex> local_body_index;
+  if (!shared_body_index)
+    local_body_index.emplace(w.colonies, w.bodies);
+  const SettlementBodyIndex &body_index =
+      shared_body_index ? *shared_body_index : *local_body_index;
   for (auto *c : civs) {
     auto &state = detail::AdaptiveResearchCampaignStateAccess::get_civilization(campaign, c->id);
     facilities(w, c->id, campaign, state);

@@ -276,7 +276,8 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[1]);
   result.research_events = storage_->research_simulation.advance(
       storage_->world.campaign(), storage_->research, elapsed_days,
-      absolute_end_day);
+      absolute_end_day,
+      &storage_->core.catalog_body_index(storage_->world.campaign()));
   timing.finish(storage_->performance[2]);
   if (trace)
     trace->research_events = result.research_events;
