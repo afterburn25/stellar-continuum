@@ -966,6 +966,9 @@ class NativeCampaign final {
   }
   // Live mapper — the settings hub's Controls view binds against it.
   stellar::engine::InputMapper& input_mapper()noexcept{return input_mapper_;}
+  // Pending a11y announcements — smoke harnesses peek at notices the
+  // update loop routed here (steal/device-pin confirmations).
+  const stellar::engine::AccessibilityAnnouncer& announcer()const noexcept{return announcer_;}
 
   // Maps the persisted UI voice preferences onto the playback controller's
   // settings record (stellar::native_voice::NativeVoiceSettings).
@@ -11369,7 +11372,14 @@ int main(int argc,char **argv){
             persist_controls,controls_path,width,height,"pause",
             [&]{settings_hub.close();route({InputEventType::LeftPressed,center(NativeUiLayout::for_viewport(width,height).settings_button)});
                 route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[4])});},
-            route,[&]{window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-controls-settings"));});
+            route,[&]{window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-controls-settings"));},
+            [&]() -> std::optional<std::string> {
+              const auto* item = campaign.announcer().latest();
+              if (item && item->kind == stellar::engine::AnnouncementKind::Status &&
+                  !item->text.empty())
+                return item->text;
+              return std::nullopt;
+            });
           settings_hub.close();
         }
         if(options.audio_check){

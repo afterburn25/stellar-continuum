@@ -31,7 +31,7 @@
 
 namespace stellar::native_settings {
 
-template <class Open, class Route, class Capture>
+template <class Open, class Route, class Capture, class Peek>
 void check_controls_settings(NativeSettingsHub& hub,
                              stellar::engine::InputMapper& mapper,
                              std::string_view button_context,
@@ -39,7 +39,8 @@ void check_controls_settings(NativeSettingsHub& hub,
                              const std::function<void()>& persist,
                              const std::filesystem::path& controls_path,
                              int width, int height, std::string_view location,
-                             Open open_controls, Route route, Capture capture) {
+                             Open open_controls, Route route, Capture capture,
+                             Peek notice) {
   using namespace stellar::native_map;
   using stellar::engine::InputBinding;
   const auto require = [](bool ok,
@@ -157,6 +158,8 @@ void check_controls_settings(NativeSettingsHub& hub,
         break;
       }
   bool stole = false;
+  bool noticed = false;
+  std::optional<std::string> steal_notice;
   if (victim_row >= 0) {
     click(first);
     require(hub.capturing());
@@ -169,11 +172,15 @@ void check_controls_settings(NativeSettingsHub& hub,
                      stellar::engine::RawInputEvent::Kind::KeyPress &&
                  binding.code == victim_code;
         });
-    // The steal notice itself is drained into the a11y announcer inside
-    // campaign.update the moment the keypress routes — not observable here;
-    // the binding removal is the verifiable steal evidence.
+    // The steal notice drains into the a11y announcer inside
+    // campaign.update — it stays pending until the next scene() caption
+    // drain, so the newest Status announcement is observable here.
     require(!still_bound,
             "Rebinding a bound key did not steal it from the sibling row.");
+    steal_notice = notice();
+    require(steal_notice && !steal_notice->empty(),
+            "The steal did not surface an accessibility announcement.");
+    noticed = true;
     stole = true;
   }
 
@@ -243,6 +250,11 @@ void check_controls_settings(NativeSettingsHub& hub,
       };
       key('d');
       require(device_of() == 0, "D did not pin the axis binding to pad 1.");
+      // Each pin step announces the new device through the a11y queue.
+      const auto pin_notice = notice();
+      require(pin_notice && !pin_notice->empty() &&
+                  (!steal_notice || *pin_notice != *steal_notice),
+              "The device pin did not surface an accessibility announcement.");
       key('d');
       require(device_of() == 1, "D did not advance the pin to pad 2.");
       for (int step = 0; step < 3; ++step) key('d');
@@ -326,6 +338,7 @@ void check_controls_settings(NativeSettingsHub& hub,
             << ",\"scrolled\":" << (scrolled ? "true" : "false")
             << ",\"axis_captured\":" << (scrolled ? "true" : "false")
             << ",\"pinned\":" << (scrolled ? "true" : "false")
+            << ",\"noticed\":" << (noticed ? "true" : "false")
             << ",\"stole\":" << (stole ? "true" : "false")
             << ",\"file_preexisted\":" << (file_preexisted ? "true" : "false")
             << ",\"restored\":true}\n";

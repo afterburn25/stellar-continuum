@@ -308,9 +308,10 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   The check snapshots every binding in both contexts, arms capture on a
   row, verifies Escape cancels without changing bindings, installs an
   unbound probe key as the primary binding, presses a sibling's bound
-  key to exercise the steal (victim binding verified removed — the
-  "reassigned from" notice is drained into the a11y announcer inside
-  `update`, so the check asserts the binding change, not the text),
+  key to exercise the steal (victim binding verified removed, and the
+  "reassigned from" notice is peeked in the a11y announcer — `update`
+  drains `take_notice()` into pending Status announcements that the
+  check observes through `NativeCampaign::announcer()`),
   then restores every snapshot through `rebind()` + persist and proves
   the file round-trips through a fresh `InputMapper`. The first live
   run caught a real defect: the controls view's render loop indexed
@@ -336,9 +337,14 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   zone) through `campaign.update`, asserting the live capture lands a
   `GamepadAxis` binding, plus a cross-row axis steal. The focused row
   then exercises the D-key pad-pin cycle live (any → pad 1 → pad 2 →
-  wrap to any, asserted through `InputBinding::device`). Pad-axis
-  capture and device pinning are now exercised end-to-end, not just
-  unit-tested.
+  wrap to any, asserted through `InputBinding::device`). The notices
+  are peeked through `NativeCampaign::announcer()` — `update` drains
+  `take_notice()` into `AccessibilityAnnouncer` as Status items that
+  stay pending until `scene()`'s caption pass, so the check asserts a
+  non-empty announcement follows the steal and a *different* one
+  follows each pin step (content stays locale-agnostic). Pad-axis
+  capture, device pinning, and the a11y notice path are now exercised
+  end-to-end, not just unit-tested.
 
 ## Known limitations
 
