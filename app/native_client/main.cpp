@@ -1175,13 +1175,18 @@ class NativeCampaign final {
         });
   }
 
-  [[nodiscard]] std::string_view first_galaxy_action_pressed()const{
+  // Resolves the action that the just-fed event triggered. Press edges
+  // accumulate for the whole frame, so scanning just_pressed() after a
+  // second event in the same frame would re-report an earlier press —
+  // last_press_action() names this event's binding instead.
+  [[nodiscard]] std::string_view galaxy_action_from_last_press()const{
     static constexpr std::string_view actions[]={
         "toggle_pause","speed_normal","speed_fast","speed_very_fast",
         "speed_maximum","speed_demo","cycle_research","start_research",
         "cycle_construction","start_construction","new_campaign","quicksave"};
+    const auto triggered=input_mapper_.last_press_action();
     for(const auto name:actions)
-      if(input_mapper_.just_pressed(name))return name;
+      if(name==triggered)return name;
     return {};
   }
 
@@ -6755,7 +6760,7 @@ class NativeCampaign final {
         if(parsed.ec!=std::errc{})continue;
         raw.code=code;
         (void)input_mapper_.feed(raw);
-        const auto action=first_galaxy_action_pressed();
+        const auto action=galaxy_action_from_last_press();
         if(!action.empty())dispatch_galaxy_action(action,width,height);
         // Replayed presses are edge-triggered: release immediately so the next
         // recorded press of the same input fires like real input does.
@@ -7487,7 +7492,7 @@ class NativeCampaign final {
         raw.code=event.key;
         bool handled=input_mapper_.feed(raw);
         if(handled){
-          const auto action=first_galaxy_action_pressed();
+          const auto action=galaxy_action_from_last_press();
           if(action.empty())handled=false;
           else{
             if(replay_&&replay_->recorder)
@@ -7550,7 +7555,7 @@ class NativeCampaign final {
         }
         bool handled=input_mapper_.feed(raw);
         if(handled){
-          const auto action=first_galaxy_action_pressed();
+          const auto action=galaxy_action_from_last_press();
           if(action.empty())handled=false;
           else{
             // Right-clicks already journal as pointer_button events at the

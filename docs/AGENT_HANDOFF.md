@@ -177,6 +177,18 @@ preserve:
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
   smoke/check/profile combination and the fixture each needs.
+  Recordable journal = input-path commands only. Checkpoints are emitted by
+  the save-capture observer, so the recorded session must reach its save via
+  a recorded input (F6/`key_press`) — `--navigation-smoke` qualifies (it
+  presses real F6); `--fleet-smoke` does not (it calls
+  `session_->request_save()` internally, the save is unrecorded, and replay
+  reports "skipped recorded checkpoint"/stall). Replay at the recorded
+  drawable size (`--width/--height`) against the pre-run anchor — restore
+  the anchor and clear `save.*` sidecars first, exactly like the travel
+  validator's mid-chain rewrite. `InputMapper::last_press_action()` gives
+  per-event resolution for batched dispatch (scanning `just_pressed` after
+  a second same-frame press re-reports the first event's action — the bug
+  that masked replayed F6 as `toggle_pause`).
 - Draw-list test hazard: elements of `DrawList::overlay`/`world` are
   vector-backed — a held `Text*`/`UiRect*` dangles after the next
   `draw={}`/render. Copy `->at`/rects before re-rendering (the
