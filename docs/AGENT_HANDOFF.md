@@ -150,6 +150,9 @@ preserve:
   `--system-travel-smoke`/`--system-travel-reload-smoke` need a fleet in
   LocalDeparture/Arrival transit — `work/travel.json` is that fixture
   (copy it under `build-native/` before use; the run saves over it).
+  The `--smoke`-anchored checks have dedicated 500-system fixtures in
+  `work/` (`c-economy.json`, `c-logistics.json`, `c-inspection.json`,
+  `mil-fixture.json`) — copy before running for the same reason.
 - `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
