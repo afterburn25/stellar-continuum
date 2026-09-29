@@ -263,7 +263,8 @@ ExplorationMissionPlanner::select_supported_candidate(
     ExplorationPlanningWorldView world, const FleetState &fleet,
     MissionFuelPolicy fuel_policy,
     const std::unordered_set<int> &reservation_set,
-    bool &used_shared_fallback) const {
+    bool &used_shared_fallback,
+    ExplorationPlanningSharedIndex *shared) const {
   used_shared_fallback = false;
   if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
     throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
@@ -278,10 +279,19 @@ ExplorationMissionPlanner::select_supported_candidate(
       (stored->role != FleetRole::Scout && stored->role != FleetRole::Science))
     return std::nullopt;
   const auto &subject = *stored;
-  std::unordered_map<int, const StellarSystem *> systems_index;
-  systems_index.reserve(world.systems.size());
-  for (const auto &system : world.systems)
-    systems_index.emplace(system.id, &system);
+  std::unordered_map<int, const StellarSystem *> local_systems_index;
+  const std::unordered_map<int, const StellarSystem *> *systems_index;
+  if (shared) {
+    if (shared->catalog.systems_by_id.empty())
+      for (const auto &system : world.systems)
+        shared->catalog.systems_by_id.emplace(system.id, &system);
+    systems_index = &shared->catalog.systems_by_id;
+  } else {
+    local_systems_index.reserve(world.systems.size());
+    for (const auto &system : world.systems)
+      local_systems_index.emplace(system.id, &system);
+    systems_index = &local_systems_index;
+  }
   std::optional<OperationalReachBatch> batch;
   if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},subject.civilization_id);
 
@@ -292,19 +302,46 @@ ExplorationMissionPlanner::select_supported_candidate(
     int priority_band;
     double distance;
   };
-  std::vector<RankedTarget> targets;
-  targets.reserve(world.systems.size());
-  for (const auto &system : world.systems) {
-    if (!needs_survey_work(world.knowledge, subject, system.id))
-      continue;
-    targets.push_back(
-        {&system,
-         survey_priority(
-             subject.role,
-             world.knowledge.system_survey_level(subject.civilization_id,
-                                                 system.id)),
-         indexed_distance_from_fleet(systems_index, subject, system)});
+  // The (system, band) filter depends only on the fleet's civilization and
+  // role plus survey LEVELS — memoizable per shared index while the
+  // knowledge survey-level revision is unchanged. Distance stays per-fleet.
+  std::vector<std::pair<const StellarSystem *, int>> local_work;
+  const std::vector<std::pair<const StellarSystem *, int>> *work;
+  if (shared) {
+    const std::int64_t key =
+        (static_cast<std::int64_t>(subject.civilization_id) << 32) |
+        static_cast<std::uint32_t>(static_cast<int>(subject.role));
+    auto &entry = shared->survey_work[key];
+    if (!entry.valid ||
+        entry.level_revision != world.knowledge.survey_level_revision()) {
+      entry.entries.clear();
+      for (const auto &system : world.systems)
+        if (needs_survey_work(world.knowledge, subject, system.id))
+          entry.entries.push_back(
+              {&system,
+               survey_priority(subject.role,
+                               world.knowledge.system_survey_level(
+                                   subject.civilization_id, system.id))});
+      entry.level_revision = world.knowledge.survey_level_revision();
+      entry.valid = true;
+    }
+    work = &entry.entries;
+  } else {
+    for (const auto &system : world.systems)
+      if (needs_survey_work(world.knowledge, subject, system.id))
+        local_work.push_back(
+            {&system,
+             survey_priority(subject.role,
+                             world.knowledge.system_survey_level(
+                                 subject.civilization_id, system.id))});
+    work = &local_work;
   }
+  std::vector<RankedTarget> targets;
+  targets.reserve(work->size());
+  for (const auto &[system, band] : *work)
+    targets.push_back({system, band,
+                       indexed_distance_from_fleet(*systems_index, subject,
+                                                   *system)});
   std::stable_sort(targets.begin(), targets.end(),
                    [](const RankedTarget &left, const RankedTarget &right) {
                      if (left.priority_band != right.priority_band)
@@ -347,9 +384,10 @@ ExplorationMissionPlanner::select_supported_candidate(
     chosen = first_supported;
     used_shared_fallback = true;
   }
-  SurveyOperationsBatch surveys(world.systems, world.bodies);
+  SurveyOperationsBatch surveys(world.systems, world.bodies,
+                                shared ? &shared->catalog : nullptr);
   return build_candidate(world, subject, *chosen, batch ? &*batch : nullptr,
-                         fuel_policy, &surveys, &systems_index);
+                         fuel_policy, &surveys, systems_index);
 }
 
 bool ExplorationMissionPlanner::has_supported_mission_target(
@@ -478,7 +516,8 @@ ExplorationAiMissionCoordinator::ExplorationAiMissionCoordinator(
     : mission_planner_(mission_planner) {}
 
 ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
-    ExplorationPlanningWorldView world, const FleetState &fleet,MissionFuelPolicy fuel_policy) const {
+    ExplorationPlanningWorldView world, const FleetState &fleet,MissionFuelPolicy fuel_policy,
+    ExplorationPlanningSharedIndex *shared) const {
   if (!fleet.is_active ||
       (fleet.role != FleetRole::Scout && fleet.role != FleetRole::Science))
     return {fleet.id,
@@ -502,9 +541,9 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
                                                      *other.current_system_id))
       reservation_set.insert(*other.current_system_id);
   }
-  bool shared = false;
+  bool shared_fallback = false;
   auto selected = mission_planner_.select_supported_candidate(
-      world, fleet, fuel_policy, reservation_set, shared);
+      world, fleet, fuel_policy, reservation_set, shared_fallback, shared);
   if (!selected)
     return {fleet.id,
             std::nullopt,
@@ -513,8 +552,8 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
             "No supported survey work is currently available."};
   std::vector<int> reservations(reservation_set.begin(), reservation_set.end());
   std::sort(reservations.begin(), reservations.end());
-  return {fleet.id, *selected, shared, std::move(reservations),
-          shared
+  return {fleet.id, *selected, shared_fallback, std::move(reservations),
+          shared_fallback
               ? "All supported targets in the bounded planning window are "
                 "already reserved; sharing " +
                     selected->catalog_name + "."

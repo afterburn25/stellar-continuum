@@ -121,6 +121,22 @@ SurveyOperationsProfile SurveyOperationsProfiler::build(
 }
 
 SurveyOperationsProfile SurveyOperationsBatch::build(int system_id) {
+  if(shared_){
+    if(auto it=profiles_.find(system_id);it!=profiles_.end())return it->second;
+    if(shared_->systems_by_id.empty())
+      for(const auto& system:systems_)shared_->systems_by_id.emplace(system.id,&system);
+    const auto found=shared_->systems_by_id.find(system_id);
+    if(found==shared_->systems_by_id.end())
+      throw std::runtime_error("Unknown system "+std::to_string(system_id)+".");
+    if(shared_->bodies_by_system.empty())
+      for(const auto& body:bodies_)shared_->bodies_by_system[body.system_id].push_back(&body);
+    SurveySummary summary;
+    if(const auto bit=shared_->bodies_by_system.find(system_id);bit!=shared_->bodies_by_system.end())
+      for(const auto* body:bit->second)summary.add(*body);
+    const auto profile=finish(found->second,summary);
+    profiles_.emplace(system_id,profile);
+    return profile;
+  }
   if(!prepared_){
     std::unordered_map<int,SurveySummary> summaries;
     summaries.reserve(systems_.size());

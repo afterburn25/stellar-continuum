@@ -30,18 +30,32 @@ public:
                                 int system_id) const;
 };
 
+// Shared catalog lookups for profile builds. Scope to one read-only
+// planning pass while the system/body spans stay immutable — both maps are
+// populated lazily on first use. Callers that omit it keep the original
+// eager whole-catalog preparation.
+struct SurveyCatalogIndex {
+  std::unordered_map<int, const StellarSystem *> systems_by_id;
+  std::unordered_map<int, std::vector<const PlanetaryBody *>>
+      bodies_by_system;
+};
+
 // Read-only scope: systems and bodies must remain unchanged for its lifetime.
-// The first query scans the catalog once; subsequent queries are constant-time.
-// Create a new batch after world edits instead of persisting cached game state.
+// With no shared index the first query scans the catalog once; subsequent
+// queries are constant-time. With one, each build resolves just that
+// system's bodies through the shared maps. Create a new batch after world
+// edits instead of persisting cached game state.
 class SurveyOperationsBatch {
 public:
   SurveyOperationsBatch(std::span<const StellarSystem> systems,
-                        std::span<const PlanetaryBody> bodies)
-      : systems_(systems), bodies_(bodies) {}
+                        std::span<const PlanetaryBody> bodies,
+                        SurveyCatalogIndex *shared = nullptr)
+      : systems_(systems), bodies_(bodies), shared_(shared) {}
   SurveyOperationsProfile build(int system_id);
 private:
   std::span<const StellarSystem> systems_;
   std::span<const PlanetaryBody> bodies_;
+  SurveyCatalogIndex *shared_{};
   std::unordered_map<int, SurveyOperationsProfile> profiles_;
   bool prepared_{};
 };

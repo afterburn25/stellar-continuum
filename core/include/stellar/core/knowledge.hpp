@@ -52,6 +52,13 @@ public:
   int reveal_within_sensor_range(int civilization_id, int origin_system_id,
                                  std::span<const StellarSystem> systems,
                                  float range);
+  // Transient query hint: bumped whenever any civilization's survey LEVEL
+  // can change (new detected entry, or a level transition). Progress-only
+  // writes do not bump it, so callers may memoize level-derived views per
+  // revision. Not serialized; restores rebuild through the mutators.
+  std::uint64_t survey_level_revision() const noexcept {
+    return survey_level_revision_;
+  }
   KnowledgeSnapshot snapshot() const;
   static CivilizationKnowledgeState
   create_initial(std::span<const StellarSystem> systems,
@@ -66,5 +73,6 @@ private:
   std::map<int, std::set<int>> civilizations_;
   std::vector<int> civilization_observer_order_;
   std::map<int, std::map<int, Survey>> surveys_;
+  std::uint64_t survey_level_revision_{};
 };
 } // namespace stellar::core

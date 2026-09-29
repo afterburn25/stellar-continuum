@@ -43,7 +43,11 @@ bool CivilizationKnowledgeState::record_galactic_core_exploration(int id) {
 
 CivilizationKnowledgeState::Survey &
 CivilizationKnowledgeState::ensure_survey(int civilization_id, int system_id) {
-  return surveys_[civilization_id].try_emplace(system_id).first->second;
+  auto &entries = surveys_[civilization_id];
+  const auto [it, inserted] = entries.try_emplace(system_id);
+  if (inserted)
+    ++survey_level_revision_;
+  return it->second;
 }
 
 bool CivilizationKnowledgeState::is_system_known(int civilization_id,
@@ -131,6 +135,8 @@ bool CivilizationKnowledgeState::record_reconnaissance(int civilization_id,
   knowledge.progress =
       std::clamp(source_max(knowledge.progress, progress_floor), 0.0, 0.999999);
   knowledge.level = SystemSurveyLevel::partially_surveyed;
+  if (knowledge.level != old_level)
+    ++survey_level_revision_;
   return knowledge.level != old_level ||
          std::abs(knowledge.progress - old_progress) > 0.0000001;
 }
@@ -144,13 +150,16 @@ bool CivilizationKnowledgeState::advance_system_survey(int civilization_id,
   auto &knowledge = ensure_survey(civilization_id, system_id);
   if (knowledge.level == SystemSurveyLevel::fully_surveyed)
     return false;
+  const auto old_level = knowledge.level;
   const bool was_fully_surveyed =
-      knowledge.level == SystemSurveyLevel::fully_surveyed;
+      old_level == SystemSurveyLevel::fully_surveyed;
   knowledge.progress =
       std::clamp(knowledge.progress + progress_delta, 0.0, 1.0);
   knowledge.level = knowledge.progress >= 1.0
                         ? SystemSurveyLevel::fully_surveyed
                         : SystemSurveyLevel::partially_surveyed;
+  if (knowledge.level != old_level)
+    ++survey_level_revision_;
   return !was_fully_surveyed &&
          knowledge.level == SystemSurveyLevel::fully_surveyed;
 }
@@ -161,6 +170,8 @@ bool CivilizationKnowledgeState::mark_system_fully_surveyed(
   auto &knowledge = ensure_survey(civilization_id, system_id);
   const bool changed = knowledge.level != SystemSurveyLevel::fully_surveyed ||
                        knowledge.progress < 1.0;
+  if (knowledge.level != SystemSurveyLevel::fully_surveyed)
+    ++survey_level_revision_;
   knowledge = {SystemSurveyLevel::fully_surveyed, 1.0};
   return changed;
 }

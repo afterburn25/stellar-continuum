@@ -521,7 +521,12 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
 
   std::vector<ExplorationEvent> events;
   AdvanceIndex index(world.systems);
-  SurveyOperationsBatch surveys(world.systems, world.bodies);
+  // One planning index for the whole advance: the catalog spans are
+  // immutable here and its survey-work lists revalidate through the
+  // knowledge survey-level revision when a survey completes mid-tick.
+  ExplorationPlanningSharedIndex planning_shared;
+  SurveyOperationsBatch surveys(world.systems, world.bodies,
+                                &planning_shared.catalog);
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active)
       continue;
@@ -560,7 +565,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
       const auto selection = coordinator.select_mission(
           {world.systems, world.bodies, world.fleets, world.colonies,
            world.knowledge, world.lanes},
-          fleet,ai_fuel_policy_);
+          fleet,ai_fuel_policy_,&planning_shared);
       if (selection.candidate)
         assign_fleet_route({world.systems, world.colonies, world.lanes}, fleet,
                            selection.candidate->system_id,

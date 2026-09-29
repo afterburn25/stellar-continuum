@@ -64,6 +64,55 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Exploration planning shared index + lazy survey profiles (2026-09-28)
+
+- Purpose: the exploration advance rebuilt per-call structures for every
+  idle AI survey fleet each tick — a fresh systems id map plus an
+  O(systems) `needs_survey_work` + priority-band filter in
+  `select_supported_candidate`, and `SurveyOperationsBatch::build`
+  eagerly profiled every catalog system (O(systems + bodies)) on first
+  query even though callers resolve a single system.
+- Modules: `core/include/stellar/core/knowledge.hpp` /
+  `core/src/knowledge.cpp` — `CivilizationKnowledgeState::survey_level_revision`
+  is a transient counter bumped only when a survey LEVEL can change (new
+  detected entry via `ensure_survey` insert, or a level transition in
+  `record_reconnaissance` / `advance_system_survey` /
+  `mark_system_fully_surveyed`); progress-only writes do not bump it. It
+  is not serialized; restores rebuild through the mutators.
+  `survey_operations.hpp` / `survey_operations.cpp` — `SurveyCatalogIndex`
+  (`systems_by_id` + `bodies_by_system`, both lazily populated) and an
+  optional shared-index parameter on `SurveyOperationsBatch`; with an
+  index, `build(system_id)` resolves just that system's bodies instead of
+  eagerly preparing every system's profile. `exploration_planning.hpp` /
+  `exploration_planning.cpp` — `ExplorationPlanningSharedIndex` embeds the
+  catalog index plus per-(civilization, fleet role) survey-work lists
+  memoized in catalog order and keyed on `survey_level_revision`; optional
+  `shared` parameters on `select_supported_candidate` and
+  `ExplorationAiMissionCoordinator::select_mission` keep the original
+  per-call scans when absent. `exploration_advance.cpp` —
+  `ExplorationSimulation::advance` owns one shared index for the whole
+  advance and passes it to the survey-operations batch and every idle
+  survey-fleet mission selection.
+- Semantics: unchanged — the memoized (system, band) lists are produced
+  by the same `needs_survey_work` + `survey_priority` calls in catalog
+  order; per-fleet distance ranking and lazy reach assessment are
+  unchanged; a mid-advance survey level transition bumps the revision so
+  the next query rebuilds exactly once. `SurveyOperationsBatch` profiles
+  for queried ids are identical (same `finish()` on the same per-system
+  `SurveySummary`, bodies in catalog order); the unknown-system error is
+  preserved.
+- Save/performance impact: no persisted state. Measured (2500 systems,
+  seed 8374837, 10k ticks x2 + continuation): final hash bit-identical
+  `8b6963c2...`, repeat + continuation deterministic. Timing deltas were
+  within run-to-run noise at this scale (the whole-catalog prep only
+  fired on select ticks); the change strictly removes an O(catalog) term
+  per mission resolution and per advance, which matters more at larger
+  catalogs and fleet counts.
+- Tests: `exploration_planning_parity`, `exploration_advance_parity`,
+  `exploration_orders_parity`, `exploration_fuel_safety`, `survey_batch`,
+  `survey_batch_50000`, `survey_operations_parity`, `knowledge_parity`,
+  `knowledge_persistence_parity`; 109-test affected-surface batch green.
+
 ## Research advance + strategic input shared catalog indexes (2026-09-28)
 
 - Purpose: two sibling subsystems outside the phase tasks rebuilt catalog

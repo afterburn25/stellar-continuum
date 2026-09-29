@@ -65,6 +65,25 @@ using ExplorationReachAssessment = std::function<MissionReachAssessment(
     OperationalReachWorldView, int, const FleetState &, int,
     InterstellarMissionKind)>;
 
+// Shared scratch index for one read-only planning pass. Scope it to a
+// single advance (or any span where the system catalog is immutable):
+// systems_by_id is populated lazily once, and the per-(civilization, fleet
+// role) survey-work lists memoize the needs_survey_work + priority-band
+// filter keyed on the knowledge survey-level revision, so a mid-advance
+// survey level change rebuilds exactly once on the next query — never
+// stale. Callers that omit it keep the original per-call scans.
+struct ExplorationPlanningSharedIndex {
+  SurveyCatalogIndex catalog;
+  struct SurveyWorkList {
+    std::uint64_t level_revision{};
+    bool valid{};
+    // (system, priority band) pairs in catalog order — identical to the
+    // per-call filter output.
+    std::vector<std::pair<const StellarSystem *, int>> entries;
+  };
+  std::unordered_map<std::int64_t, SurveyWorkList> survey_work;
+};
+
 class ExplorationMissionPlanner {
 public:
   static constexpr int default_maximum_candidates = 32;
@@ -98,7 +117,9 @@ public:
                              const FleetState &fleet,
                              MissionFuelPolicy fuel_policy,
                              const std::unordered_set<int> &reservation_set,
-                             bool &used_shared_fallback) const;
+                             bool &used_shared_fallback,
+                             ExplorationPlanningSharedIndex *shared =
+                                 nullptr) const;
 
   // Cheaper existence probe matching "the full plan has a supported
   // candidate": supported entries always sort first in build_plan, so any
@@ -136,7 +157,8 @@ public:
   ExplorationAiMissionSelection
   select_mission(ExplorationPlanningWorldView world,
                  const FleetState &fleet,
-                 MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination) const;
+                 MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination,
+                 ExplorationPlanningSharedIndex *shared = nullptr) const;
 
 private:
   const ExplorationMissionPlanner &mission_planner_;
