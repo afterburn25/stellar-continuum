@@ -1033,7 +1033,18 @@ int main(int argc,char** argv)try{
         "Vignette corner was already dark without the option");
     check(std::abs(int(channel(*vig_on,160,160,0))-int(channel(*vig_off,160,160,0)))<=4,
         "Vignette shifted the frame center");
-    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_vignette_passed\n";
+    // Channel matrix: swap red and green on the red-emissive surface; the
+    // post-tonemap remap must move the resolved display color.
+    RenderOptions3D swapped;swapped.color_matrix={0,1,0, 1,0,0, 0,0,1};
+    const auto swap_frame=options_view(colored,swapped,"post-color-matrix.png");
+    const auto swap_neutral=options_view(colored,{},"post-color-matrix-off.png");
+    check(channel(*swap_neutral,160,160,0)>channel(*swap_neutral,160,160,1)+20,
+        "Reference frame lost its red dominance");
+    check(channel(*swap_frame,160,160,1)>channel(*swap_frame,160,160,0)+20,
+        "Color matrix did not swap the resolved channels");
+    check(channel(*swap_frame,160,160,2)==channel(*swap_neutral,160,160,2),
+        "Identity column (blue) was touched by the swap");
+    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_vignette_color_matrix_passed\n";
   }
   {
     // Debug shading views isolate single channels for material review —

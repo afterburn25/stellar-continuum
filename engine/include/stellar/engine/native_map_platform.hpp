@@ -1,4 +1,5 @@
 #pragma once
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -121,6 +122,13 @@ struct RenderOptions3D {
   float saturation{1.f}; // 0..2
   float sharpen{0.f};    // 0..1 unsharp amount
   float vignette{0.f};   // 0..1 post-tonemap corner darkening
+  // Post-tonemap 3x3 channel remap (column-major, c' = M·c) applied to
+  // the resolved display-space color — e.g. a Machado color-blind
+  // simulation matrix. Identity (default) is bit-identical to the old
+  // path; a non-finite element disables the remap entirely. Composes
+  // after contrast/saturation/sharpen and before vignette (a scalar, so
+  // ordering against it is free).
+  std::array<float,9> color_matrix{1.f,0.f,0.f, 0.f,1.f,0.f, 0.f,0.f,1.f};
   DebugView3D debug_view{DebugView3D::Lit};
   // Scene seconds for animated material terms (band_drift, volume
   // flow_rate); the driving host accumulates it per frame. 0 keeps

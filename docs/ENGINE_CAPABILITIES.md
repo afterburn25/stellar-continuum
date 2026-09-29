@@ -62,6 +62,37 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## RenderOptions3D post-tonemap color matrix (2026-09-28)
+
+- **Purpose:** the color-blind accessibility modes remap every CPU-drawn
+  surface through `apply_color_blind`, but GPU-rendered `Scene3DView`
+  content kept its authored channel balance — a low-vision player saw an
+  inconsistent frame. A reusable 3×3 channel-remap matrix closes the gap
+  and serves any caller needing display-space recoloring (per-view color
+  grading, faction tinting, additional accessibility filters).
+- **Modules:** `engine/include/stellar/engine/native_map_platform.hpp`
+  (`RenderOptions3D::color_matrix`), `engine/src/native_scene3d_gpu.cpp`
+  (`PostUniform` fill + gate), `engine/shaders/tonemap.frag` (remap).
+- **Public interface:** `color_matrix` is a column-major 3×3
+  (`c' = M·c`) applied to the resolved LDR display color after
+  contrast/saturation/sharpen and before vignette; alpha is untouched.
+  Identity (default) or any non-finite element disables the multiply —
+  the default path is bit-identical to before.
+- **Consumers:** `native_ui_theme.hpp` `apply_color_blind` composes the
+  same linear map it applies to CPU colors (Machado simulation + error
+  redistribution) onto every `Scene3DView` in `world` and `overlay`.
+- **Tests:** `native_scene3d_gpu_tests` `post_gpu` block verifies a
+  red↔green swap through the real shader; `native_general_settings_tests`
+  asserts the pass sets a non-identity matrix on a view and that `None`
+  leaves it identity. End-to-end `--system-smoke` under `colorBlind:2`
+  remapped 82% of lit 3D-region pixels vs baseline.
+- **Save/performance impact:** none persisted; +48 B uniform and one
+  gated mat3 multiply per resolved fragment when active.
+- **Limitations:** operates in display space post-tonemap, so the matrix
+  sees tonemapped [0,1] rather than HDR values — correct for
+  display-referred accessibility maps; out-of-range results clamp at the
+  output attachment.
+
 ## SurfaceEffect3D nullable `next_texture` (2026-09-29)
 
 - **Purpose:** single-texture effects — the nebula emission volume uses

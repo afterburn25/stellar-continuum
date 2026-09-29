@@ -102,35 +102,6 @@ PERFORMANCE CONSTRAINT:
 FALLBACK IF NOT AVAILABLE:
   Disabled slots keep surfacing the authoritative domain status summary.
 
-### REQUEST: Channel-matrix post-process for color-blind simulation
-Status:        OPEN
-Requested:    2026-09-28
-WHY NEEDED:
-  The color-blind accessibility modes (Protanopia/Deuteranopia/Tritanopia,
-  Machado severity-1) remap every CPU-drawn surface — text, primitives,
-  image and mesh tints — but every rendered 3D scene stays unremapped:
-  planets, ships, eruption ribbons and the nebula emission volume keep
-  their authored channel balance while the surrounding chrome adapts,
-  so a low-vision player sees an inconsistent frame. The high-contrast
-  sibling already adopted `RenderOptions3D::contrast`/`sharpen` for the
-  same surfaces; color-blind simulation needs a 3x3 channel matrix the
-  scalar post-process terms cannot express.
-CURRENT GAME SCREEN:
-  `app/native_client/native_ui_theme.hpp` `apply_color_blind` — the pass
-  walks `DrawList` world+overlay and is the single integration point;
-  it would set a new per-view matrix option on each `Scene3DView`.
-DESIRED PUBLIC API:
-  `RenderOptions3D::color_matrix` (or `colorblind_matrix`) — a 3x3
-  post-tonemap channel-remap matrix applied in display space on the
-  resolved LDR frame (identity default; document whether it composes
-  before or after `contrast`/`saturation`/`sharpen`).
-PERFORMANCE CONSTRAINT:
-  One additional uniform + a 3x3 multiply per resolved fragment; no
-  extra passes, no simulation or save impact.
-FALLBACK IF NOT AVAILABLE:
-  `apply_color_blind` keeps covering the 2D chrome only — the 3D scene
-  gap is documented in the function's comment.
-
 ### REQUEST: Flared / non-coplanar annulus geometry for protoplanetary discs
 Status:        OPEN
 Requested:    2026-09-28
@@ -233,3 +204,24 @@ the sequence slot but `mix(texel, next, 0)` discards it. Tests:
 Verified: `stellar_scene3d_tests`, `stellar_scene3d_gpu_tests`, and
 `--developer-smoke` seed 1701 at 1920×1080 all green with
 `local_nebula=emission_volume_submitted_passed`.
+
+### REQUEST: Channel-matrix post-process for color-blind simulation
+Status:        DELIVERED
+Requested:    2026-09-28
+Delivered:    2026-09-28 on `game/ui-visual-overhaul` —
+`RenderOptions3D::color_matrix` is a column-major 3×3 post-tonemap
+channel remap applied in display space after contrast/saturation/
+sharpen and before vignette (`tonemap.frag`); identity or any
+non-finite element disables the multiply so the default path stays
+bit-identical. `PostUniform` grew to `a,b,c,d,e` (80 B) with the
+uniform-block `static_assert` updated and `post.b.w` carrying the
+enable flag. `apply_color_blind` (`native_ui_theme.hpp`) composes the
+identical linear map it applies to CPU colors — Machado simulation +
+error redistribution — onto every `Scene3DView` in `world` and
+`overlay`, so GPU-rendered 3D content receives the same daltonization
+as the 2D chrome. Tests: `native_scene3d_gpu_tests`
+`post_gpu=…color_matrix_passed` verifies a channel swap through the
+real shader; `native_general_settings_tests` asserts the pass sets a
+non-identity matrix on a view and that `None` leaves it identity.
+End-to-end: `--system-smoke` under `colorBlind:2` remapped 82% of lit
+3D-region pixels vs the `colorBlind:0` baseline capture.

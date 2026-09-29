@@ -5,6 +5,7 @@
 #include <stellar/engine/ui_viewmodels.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <optional>
@@ -120,10 +121,9 @@ inline void for_each_command_color(Command &command, const Fn &fn) {
 // then the standard error redistribution pushes it into the channels the
 // mode still perceives (blue + luminance) — semantic accent hues stay
 // distinguishable instead of merely being simulated away. Covers every
-// CPU-side surface (text, primitives, image tints, mesh tints); GPU-rendered
-// 3D scene content stays unremapped — Machado simulation needs a channel
-// matrix the render post-process does not provide (contrast/saturation/
-// sharpen are scalar).
+// CPU-side surface (text, primitives, image tints, mesh tints) and every
+// GPU-rendered 3D view: Scene3DView options carry the same composed map as
+// RenderOptions3D::color_matrix, applied post-tonemap in display space.
 inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
   if (mode == engine::ColorBlindMode::None) return;
   const float *m;
@@ -149,6 +149,23 @@ inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
   for (auto &text : draw.text) daltonize(text.color);
   for (auto &command : draw.overlay) for_each_command_color(command,daltonize);
   for (auto &command : draw.world) for_each_command_color(command,daltonize);
+  // The CPU daltonizer is linear in float space, so the 3D remap composes
+  // the identical map: e_g = g − sim.row1·c, e_b = b − sim.row2·c, then
+  // c' = c + {.7,.7}·e_g + {.7,.7,1}·e_b per channel. Column-major for
+  // RenderOptions3D::color_matrix.
+  const float er[3]{-m[3],1.f-m[4],-m[5]},eb[3]{-m[6],-m[7],1.f-m[8]};
+  std::array<float,9> remap{};
+  for (int col = 0; col < 3; ++col) {
+    remap[col*3+0] = (col==0?1.f:0.f) + .7f*er[col] + .7f*eb[col];
+    remap[col*3+1] = (col==1?1.f:0.f) +      er[col] + .7f*eb[col];
+    remap[col*3+2] = (col==2?1.f:0.f) + .7f*er[col] +      eb[col];
+  }
+  for (auto &command : draw.overlay)
+    if (auto *view = std::get_if<Scene3DView>(&command))
+      view->options.color_matrix = remap;
+  for (auto &command : draw.world)
+    if (auto *view = std::get_if<Scene3DView>(&command))
+      view->options.color_matrix = remap;
 }
 
 enum class Tone { Neutral, Selected, Success, Caution, Danger, Science, Economy, Construction, Diplomacy, Military, Unknown };

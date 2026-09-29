@@ -89,7 +89,7 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
 struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;std::array<float,4> atmo_sunset;std::array<float,4> env_flags;std::array<float,4> drift_options;std::array<float,4> scatter_options;std::array<float,4> wave_options;};
-struct PostUniform {std::array<float,4> a,b;};
+struct PostUniform {std::array<float,4> a,b,c,d,e;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform, {texel size (>0 enables), PCF radius in
 // texels, strength, bias}, and the world-units normal-offset lift for
@@ -100,7 +100,7 @@ struct PostUniform {std::array<float,4> a,b;};
 // box's centre/depth (one depth-array layer each, options .z carrying
 // each tier's own texel-scaled lift), the omni pair the cube-atlas rows.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;std::array<std::array<float,4>,4> spot_advanced,omni_advanced;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==848&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==848&&sizeof(PostUniform)==80&&sizeof(ViewUniform)==1072);
 // IEEE-754 binary16 -> float for the RGBA16F probe downloads.
 float half_to_float(std::uint16_t h){
   const int e=(h>>10)&0x1f,m=h&0x3ff;
@@ -1337,9 +1337,20 @@ struct Scene3DRenderer::Storage {
       target.hdr&&opt.quality>=RenderQuality3D::Medium?std::clamp(opt.bloom_strength,0.f,8.f):0.f,
       std::clamp(std::isfinite(opt.bloom_threshold)?opt.bloom_threshold:1.f,0.f,8.f),
       std::clamp(std::isfinite(opt.contrast)?opt.contrast:1.f,0.f,2.f)};
+    // Post-tonemap channel remap: active only when every element is
+    // finite and the matrix differs from identity, so the default path
+    // stays bit-identical and never pays the multiply.
+    bool use_matrix=std::ranges::all_of(opt.color_matrix,[](float v){return std::isfinite(v);});
+    if(use_matrix){static constexpr float identity[]{1,0,0,0,1,0,0,0,1};
+      use_matrix=!std::equal(opt.color_matrix.begin(),opt.color_matrix.end(),std::begin(identity));}
+    if(use_matrix){
+      post.c={opt.color_matrix[0],opt.color_matrix[1],opt.color_matrix[2],0.f};
+      post.d={opt.color_matrix[3],opt.color_matrix[4],opt.color_matrix[5],0.f};
+      post.e={opt.color_matrix[6],opt.color_matrix[7],opt.color_matrix[8],0.f};}
     post.b={std::clamp(std::isfinite(opt.saturation)?opt.saturation:1.f,0.f,2.f),
       opt.quality>=RenderQuality3D::High?std::clamp(std::isfinite(opt.sharpen)?opt.sharpen:0.f,0.f,1.f):0.f,
-      std::clamp(std::isfinite(opt.vignette)?opt.vignette:0.f,0.f,1.f),0.f};
+      std::clamp(std::isfinite(opt.vignette)?opt.vignette:0.f,0.f,1.f),
+      use_matrix?1.f:0.f};
     // Disabled shadow passes never reach their resize branch — release a
     // stale map so target memory and bytes() stop charging it.
     if(shadow_res==0&&target.shadow){SDL_ReleaseGPUTexture(device,target.shadow);target.shadow=nullptr;target.shadow_size=0;}

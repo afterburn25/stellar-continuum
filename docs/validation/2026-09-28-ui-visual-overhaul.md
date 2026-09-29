@@ -235,14 +235,19 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
 
 ## Known limitations
 
-- Four renderer requests remain filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
-  color-blind channel matrix (color-blind simulation stays CPU/2D-only —
-  documented in `apply_color_blind`), flared/non-coplanar annulus
-  geometry, time-evolved differential accretion shear, and Scene3DView
-  render-scale under budget pressure. Nullable
-  `SurfaceEffect3D::next_texture` was delivered 2026-09-29 (validation
+- Three renderer requests remain filed (`GAME_VISUAL_ENGINE_REQUESTS.md`):
+  flared/non-coplanar annulus geometry, time-evolved differential
+  accretion shear, and Scene3DView render-scale under budget pressure.
+  Delivered so far: nullable `SurfaceEffect3D::next_texture` (validation
   requires it only when `blend > 0`; the nebula volume's double-bind is
-  removed; `native_scene3d_tests` covers both branches). Three core-lane
+  removed; `native_scene3d_tests` covers both branches) and the
+  color-blind channel matrix (`RenderOptions3D::color_matrix` — a
+  column-major 3×3 post-tonemap remap gated on non-identity finite
+  values, `PostUniform` a..e/80 B, applied in `tonemap.frag`;
+  `apply_color_blind` composes its identical linear map onto every
+  `Scene3DView`; `post_gpu` channel-swap + settings-view assertions
+  green; `--system-smoke` under `colorBlind:2` remapped 82% of lit
+  3D-region pixels vs baseline). Three core-lane
   projections remain open: fleet composition, interstellar logistics
   route graph, per-action diplomacy blockers.
 - `irregular_rock_mesh`/`card:` spec docs are uncommitted in the
