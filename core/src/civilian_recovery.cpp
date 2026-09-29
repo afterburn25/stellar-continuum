@@ -2,6 +2,8 @@
 
 #include <stellar/core/detail/legacy_number_format.hpp>
 
+#include "exploration_prof_internal.hpp"
+
 #include <algorithm>
 #include <optional>
 #include <unordered_set>
@@ -52,8 +54,14 @@ CivilianFleetReturnOrderResult paid_confirmation(const FleetState &fleet) {
 }
 
 std::optional<RefuelingReach> nearest_base(CivilianRecoveryWorldView world,
-                                       const FleetState &fleet) {
+                                       const FleetState &fleet,
+                                       bool verdict_only) {
   OperationalReachBatch batch({world.systems,world.colonies,world.lanes},fleet.civilization_id);
+  if (verdict_only)
+    // Queued at-arrival re-checks discard the result message; the
+    // verdict rank picks the identical base and assign_fleet_route
+    // re-derives the identical route.
+    return batch.nearest_refueling_verdict(fleet);
   return batch.nearest_refueling(fleet,fleet.role==FleetRole::Colony?
       InterstellarMissionKind::Colony:InterstellarMissionKind::ScoutReconnaissance);
 }
@@ -65,7 +73,11 @@ CivilianFleetReturnOrderResult activate(CivilianRecoveryWorldView world,
     return {false, false, fleet.name +
                               " must finish its current lane before return "
                               "routing can be rechecked."};
-  const auto choice = nearest_base(world, fleet);
+  std::optional<detail::ExplProfScope> pick_scope;
+  if (detail::expl_prof().enabled.load(std::memory_order_relaxed))
+    pick_scope.emplace(detail::expl_prof().return_pick_ns);
+  const auto choice = nearest_base(world, fleet, accepted_queued_return);
+  pick_scope.reset();
   if (!choice) {
     if (!accepted_queued_return)
       return {false, false,
@@ -153,7 +165,7 @@ CivilianFleetReturnOrderResult preview_civilian_fleet_return(
     return {true, false,
             "Finish the current lane first; return routing will then be "
             "rechecked using actual fuel."};
-  const auto choice = nearest_base(world, *fleet);
+  const auto choice = nearest_base(world, *fleet, false);
   if (!choice)
     return {false, false,
             "No owned refuelling settlement is reachable with the fleet's "

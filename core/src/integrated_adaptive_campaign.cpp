@@ -1,5 +1,6 @@
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 
+#include <stellar/core/campaign_civilization_control.hpp>
 #include <stellar/core/campaign_event_history.hpp>
 
 #include <algorithm>
@@ -82,7 +83,8 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   // eviction can't re-record already-chronicled entries.
   bool chronicle_diplomacy_backfill_done{};
   bool profiling_enabled{};
-  std::array<stellar::engine::PerformanceCounter,4> performance{};
+  std::array<stellar::engine::PerformanceCounter,5> performance{};
+  WarfareCoordinator warfare{};
 
   Storage(AdaptiveResearchStrategicRuntime runtime, FreshCampaignState campaign,
           DiplomacyState diplomacy_state,
@@ -129,13 +131,24 @@ std::vector<TravelingCmeLaunch> IntegratedAdaptiveCampaignRuntime::advance_stell
 }
 
 CampaignRuntimeContinuation IntegratedAdaptiveCampaignRuntime::continuation() const {
-  return {storage_->core.strategic_runtime().snapshot(),storage_->diplomacy_runtime.schedule()};
+  return {storage_->core.strategic_runtime().snapshot(),storage_->diplomacy_runtime.schedule(),
+          storage_->core.automation().capture_state(),
+          storage_->core.scripted_events().capture_state()};
 }
 void IntegratedAdaptiveCampaignRuntime::restore_continuation(
     const CampaignRuntimeContinuation &state,double day){
   validate_campaign_runtime_continuation(state,storage_->world.campaign(),day);
   storage_->core.strategic_runtime().restore(state.strategic);
   storage_->diplomacy_runtime.restore_schedule(state.diplomacy);
+  storage_->core.automation().restore_state(state.automation);
+  // Scripted-event instances must already have their definitions loaded
+  // (the data set is part of runtime configuration, not the save); an
+  // empty document leaves a fresh coordinator untouched.
+  if(!state.scripted_events.empty()){
+    std::string failure;
+    if(!storage_->core.scripted_events().restore_state(state.scripted_events,&failure))
+      throw std::invalid_argument("Scripted event continuation: "+failure);
+  }
 }
 void IntegratedAdaptiveCampaignRuntime::set_profiling_enabled(bool enabled) noexcept {
   storage_->profiling_enabled=enabled;storage_->core.set_profiling_enabled(enabled);
@@ -147,7 +160,7 @@ std::vector<CampaignPerformanceSample> IntegratedAdaptiveCampaignRuntime::perfor
   std::vector<CampaignPerformanceSample> result;
   for(std::size_t i=0;i<GalaxySimulationStepCoordinator::phase_names.size();++i)
     result.push_back({GalaxySimulationStepCoordinator::phase_names[i],storage_->core.performance_counters()[i]});
-  constexpr std::array<std::string_view,4> names{"core_total","sensor_contacts","adaptive_research","diplomacy"};
+  constexpr std::array<std::string_view,5> names{"core_total","sensor_contacts","adaptive_research","diplomacy","warfare"};
   for(std::size_t i=0;i<names.size();++i)result.push_back({names[i],storage_->performance[i]});
   return result;
 }
@@ -263,7 +276,8 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[1]);
   result.research_events = storage_->research_simulation.advance(
       storage_->world.campaign(), storage_->research, elapsed_days,
-      absolute_end_day);
+      absolute_end_day,
+      &storage_->core.catalog_body_index(storage_->world.campaign()));
   timing.finish(storage_->performance[2]);
   if (trace)
     trace->research_events = result.research_events;
@@ -273,6 +287,20 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;
+  {
+    auto &campaign = storage_->world.campaign();
+    result.warfare = storage_->warfare.advance(
+        {campaign.systems, campaign.civilizations, campaign.colonies,
+         campaign.fleets, campaign.combat_intelligence,
+         storage_->world.lanes(),
+         campaign_civilization_control(campaign)},
+        storage_->diplomacy_runtime, result.diplomacy.tick,
+        DiplomacyCampaignClock::from_simulation_days(
+            std::max(elapsed_days, 0.0)));
+  }
+  timing.finish(storage_->performance[4]);
+  if (trace)
+    trace->warfare = result.warfare;
   // Diplomatic journal entries emitted by this step's process() join
   // the chronicle too — the journal is authoritative, the watermark
   // keeps each entry recorded exactly once across advances and loads.

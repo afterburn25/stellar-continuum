@@ -6,8 +6,11 @@
 #include <stellar/core/survey_operations.hpp>
 
 #include <functional>
+#include <optional>
 #include <span>
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace stellar::core {
@@ -62,6 +65,80 @@ using ExplorationReachAssessment = std::function<MissionReachAssessment(
     OperationalReachWorldView, int, const FleetState &, int,
     InterstellarMissionKind)>;
 
+// Shared scratch index for one read-only planning pass. Scope it to a
+// single advance (or any span where the system catalog is immutable):
+// systems_by_id is populated lazily once, and the per-(civilization, fleet
+// role) survey-work lists memoize the needs_survey_work + priority-band
+// filter keyed on the knowledge survey-level revision, so a mid-advance
+// survey level change rebuilds exactly once on the next query — never
+// stale. reach_batches memoizes the per-civilization O(systems + colonies)
+// OperationalReachBatch::prepare() so every fleet mission selection does
+// not rebuild it. Callers that omit it keep the original per-call scans.
+struct ExplorationPlanningSharedIndex {
+  // Catalog lookups default to owned_catalog's per-index lifetime; a host
+  // may point catalog_override at a longer-lived index — the index
+  // revalidates on the source spans, so stale pointers are never served.
+  SurveyCatalogIndex &catalog() noexcept {
+    return catalog_override ? *catalog_override : owned_catalog;
+  }
+  SurveyCatalogIndex *catalog_override{};
+  SurveyCatalogIndex owned_catalog;
+  struct SurveyWorkList {
+    std::uint64_t level_revision{};
+    bool valid{};
+    // (system, priority band) pairs — catalog order after a full build;
+    // dirty-mark patching can reorder, which is safe because consumers
+    // are order-free: the select heap ranks by (band, distance, id), a
+    // total order independent of push order, and the existence probe
+    // only asks whether any entry is supported.
+    std::vector<std::pair<const StellarSystem *, int>> entries;
+    // system id -> index into entries, so a level change patches the one
+    // entry instead of rescanning the catalog.
+    std::unordered_map<int, std::size_t> positions;
+  };
+  // The lists store pointers into the systems span, so a store must be
+  // revalidated on the span identity (data, size) before use — the same
+  // contract as SurveyCatalogIndex. A host may point
+  // survey_work_override at a campaign-lived store so lists persist
+  // across advances and patch incrementally instead of rescanning the
+  // catalog on the first query of every tick.
+  struct SurveyWorkStore {
+    std::unordered_map<std::int64_t, SurveyWorkList> &
+        for_span(std::span<const StellarSystem> systems) {
+      if (systems.data() != systems_data_ ||
+          systems.size() != systems_size_) {
+        lists_.clear();
+        systems_data_ = systems.data();
+        systems_size_ = systems.size();
+      }
+      return lists_;
+    }
+
+  private:
+    const StellarSystem *systems_data_{};
+    std::size_t systems_size_{};
+    std::unordered_map<std::int64_t, SurveyWorkList> lists_;
+  };
+  SurveyWorkStore &survey_work_store() noexcept {
+    return survey_work_override ? *survey_work_override
+                                : owned_survey_work;
+  }
+  SurveyWorkStore *survey_work_override{};
+  SurveyWorkStore owned_survey_work;
+  // One lazily-prepared OperationalReachBatch per civilization. Colonies
+  // cannot change while a planning index is alive, so the batch's
+  // refueling snapshot stays correct for its scope.
+  OperationalReachBatch &reach_batch(const OperationalReachWorldView &world,
+                                     int civilization_id) {
+    return reach_batches_
+        .try_emplace(civilization_id, world, civilization_id)
+        .first->second;
+  }
+
+private:
+  std::unordered_map<int, OperationalReachBatch> reach_batches_;
+};
+
 class ExplorationMissionPlanner {
 public:
   static constexpr int default_maximum_candidates = 32;
@@ -84,16 +161,93 @@ public:
                            const FleetState &fleet,
                            int destination_system_id) const;
 
+  // AI mission selection fast path: ranks survey targets in the same order
+  // build_plan uses, but defers the route assessment until the selection is
+  // decided. Returns the candidate select_mission would pick from the full
+  // plan — first supported target not present in reservation_set, or the
+  // first supported target overall with used_shared_fallback set when every
+  // supported target is reserved. Null when nothing is supported.
+  std::optional<ExplorationMissionCandidate>
+  select_supported_candidate(ExplorationPlanningWorldView world,
+                             const FleetState &fleet,
+                             MissionFuelPolicy fuel_policy,
+                             const std::unordered_set<int> &reservation_set,
+                             bool &used_shared_fallback,
+                             ExplorationPlanningSharedIndex *shared =
+                                 nullptr) const;
+
+  // Cheaper existence probe matching "the full plan has a supported
+  // candidate": supported entries always sort first in build_plan, so any
+  // supported target is present in every planning window regardless of the
+  // candidate cap. Assesses targets in plan order and stops at the first
+  // supported one instead of building every candidate.
+  [[nodiscard]] bool has_supported_mission_target(
+      ExplorationPlanningWorldView world, int fleet_id,
+      MissionFuelPolicy fuel_policy =
+          MissionFuelPolicy::ReachDestination,
+      ExplorationPlanningSharedIndex *shared = nullptr) const;
+
   static bool needs_survey_work(const CivilizationKnowledgeState &knowledge,
                                 const FleetState &fleet, int system_id);
+  // Level-precomputed variant for scan loops that already fetched the
+  // survey level — identical predicate without the second lookup.
+  static bool needs_survey_work_at_level(const FleetState &fleet,
+                                         SystemSurveyLevel level) {
+    if (fleet.role == FleetRole::Scout)
+      return level < SystemSurveyLevel::partially_surveyed;
+    if (fleet.role == FleetRole::Science)
+      return level < SystemSurveyLevel::fully_surveyed;
+    return false;
+  }
   static int survey_priority(FleetRole role, SystemSurveyLevel level);
 
 private:
+  // Builds the (civilization, role) survey-work list or, when the
+  // civilization's level revision moved, patches just the systems whose
+  // level changed since the list's revision — identical membership and
+  // bands to a full catalog rescan (entry order may differ, which the
+  // order-free consumers do not observe).
+  static void refresh_survey_work(
+      ExplorationPlanningWorldView world, const FleetState &fleet,
+      ExplorationPlanningSharedIndex::SurveyWorkList &entry,
+      SurveyCatalogIndex &catalog);
   ExplorationMissionCandidate
   build_candidate(ExplorationPlanningWorldView world, const FleetState &fleet,
                   const StellarSystem &system,OperationalReachBatch *batch=nullptr,
                   MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination,
-                  SurveyOperationsBatch *surveys=nullptr) const;
+                  SurveyOperationsBatch *surveys=nullptr,
+                  const std::unordered_map<int, const StellarSystem *>
+                      *systems_index = nullptr) const;
+  // Cross-call "nothing reachable" memo for the canonical reach path. A
+  // drained selection depends only on the fleet's civilization, role,
+  // position, fuel and leg range, the fuel policy, the knowledge survey
+  // LEVEL revision, the civ's refueling sites, and the world/lane
+  // identities — reservations cannot manufacture a supported target, so
+  // the verdict is reservation-independent. Every input is compared
+  // exactly; any change just misses and recomputes. Never consulted for
+  // custom reach providers, and never persisted — it is a timing cache.
+  struct DrainVerdict {
+    const StellarSystem *systems_data{};
+    std::size_t systems_size{};
+    const InterstellarLaneNetwork *lanes{};
+    int civilization_id{};
+    FleetRole role{};
+    int origin_system_id{};
+    double fuel_remaining{};
+    double fuel_capacity{};
+    double leg_range{};
+    MissionFuelPolicy fuel_policy{};
+    std::uint64_t survey_level_revision{};
+    // The civ's exact refueling projection at verdict time: sorted
+    // (system_id, service factor) pairs — a colony add/remove/kind change
+    // anywhere in it changes the verdict's inputs.
+    std::vector<std::pair<int, double>> refuel_sites;
+    bool matches(ExplorationPlanningWorldView world, const FleetState &fleet,
+                 MissionFuelPolicy policy,
+                 const std::vector<std::pair<int, double>> &sites) const;
+  };
+  mutable std::unordered_map<int, DrainVerdict> drain_verdicts_;
+
   bool uses_canonical_reach_{};
   ExplorationReachAssessment operational_reach_;
   SurveyOperationsProfiler survey_profiler_;
@@ -108,7 +262,8 @@ public:
   ExplorationAiMissionSelection
   select_mission(ExplorationPlanningWorldView world,
                  const FleetState &fleet,
-                 MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination) const;
+                 MissionFuelPolicy fuel_policy=MissionFuelPolicy::ReachDestination,
+                 ExplorationPlanningSharedIndex *shared = nullptr) const;
 
 private:
   const ExplorationMissionPlanner &mission_planner_;

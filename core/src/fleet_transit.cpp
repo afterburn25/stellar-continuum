@@ -269,6 +269,24 @@ Vec2 interpolate_chart_position(const StellarSystem &origin,
               static_cast<float>(clamp_preserving_nan(progress, 0.0, 1.0)));
 }
 
+double interstellar_distance_from_fleet(const StellarSystem *origin,
+                                        const StellarSystem *waypoint,
+                                        const FleetState &fleet,
+                                        const StellarSystem &target) {
+  if ((!origin || !origin->position.depth_light_years) &&
+      !target.position.depth_light_years)
+    return distance(fleet.position, position(target));
+
+  auto depth = origin ? origin->position.depth_light_years.value_or(0) : 0;
+  if (fleet.transit_phase == FleetTransitPhase::InterstellarWarp && waypoint)
+    depth += (waypoint->position.depth_light_years.value_or(0) - depth) *
+             clamp_preserving_nan(fleet.transit_progress, 0.0, 1.0);
+  const auto dx = static_cast<double>(fleet.position.x) - target.position.x;
+  const auto dy = static_cast<double>(fleet.position.y) - target.position.y;
+  const auto dz = depth - target.position.depth_light_years.value_or(0);
+  return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
 double interstellar_distance_from_fleet(std::span<const StellarSystem> systems,
                                         const FleetState &fleet,
                                         const StellarSystem &target) {
@@ -277,23 +295,14 @@ double interstellar_distance_from_fleet(std::span<const StellarSystem> systems,
           ? fleet.transit_origin_system_id
           : fleet.current_system_id;
   const auto *origin = find_system(systems, origin_id);
-  if ((!origin || !origin->position.depth_light_years) &&
-      !target.position.depth_light_years)
-    return distance(fleet.position, position(target));
-
-  auto depth = origin ? origin->position.depth_light_years.value_or(0) : 0;
+  const StellarSystem *waypoint = nullptr;
   if (fleet.transit_phase == FleetTransitPhase::InterstellarWarp) {
     const auto waypoint_id =
         !fleet.planned_route_system_ids.empty()
             ? std::optional<int>(fleet.planned_route_system_ids.front())
             : fleet.destination_system_id;
-    if (const auto *waypoint = find_system(systems, waypoint_id))
-      depth += (waypoint->position.depth_light_years.value_or(0) - depth) *
-               clamp_preserving_nan(fleet.transit_progress, 0.0, 1.0);
+    waypoint = find_system(systems, waypoint_id);
   }
-  const auto dx = static_cast<double>(fleet.position.x) - target.position.x;
-  const auto dy = static_cast<double>(fleet.position.y) - target.position.y;
-  const auto dz = depth - target.position.depth_light_years.value_or(0);
-  return std::sqrt(dx * dx + dy * dy + dz * dz);
+  return interstellar_distance_from_fleet(origin, waypoint, fleet, target);
 }
 } // namespace stellar::core

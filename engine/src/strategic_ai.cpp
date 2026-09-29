@@ -39,7 +39,8 @@ StrategicMind::action_ids(std::string_view domain) const {
 std::optional<std::string> StrategicMind::decide(std::string_view domain,
                                                  double now_day,
                                                  double min_utility,
-                                                 double hysteresis) {
+                                                 double hysteresis,
+                                                 ActionEligibility eligible) {
     const auto ids = action_ids(domain);
     const auto inc_it = incumbents_.find(std::string(domain));
     const std::string incumbent_id =
@@ -52,6 +53,7 @@ std::optional<std::string> StrategicMind::decide(std::string_view domain,
     for (const auto& id : ids) {
         auto& a = actions_[id];
         if (!a.enabled || !a.score) continue;
+        if (eligible && !eligible(a)) continue;
         // Cooldown on the ACTION, measured from its last commit.
         if (a.cooldown_days > 0.0) {
             const auto lc = last_commit_.find(id);
@@ -82,12 +84,54 @@ std::optional<std::string> StrategicMind::decide(std::string_view domain,
     d.at_day = now_day;
     d.domain = std::string(domain);
     d.action_id = best->id;
+    d.target = best->target;
     d.utility = best_u;
     d.candidates = scored;
     d.switched = switched;
     journal_.push_back(std::move(d));
     if (journal_.size() > journal_capacity_) journal_.pop_front();
     return best->id;
+}
+
+std::vector<RankedCandidate>
+StrategicMind::rank(std::string_view domain, double now_day,
+                    double hysteresis) const {
+    const auto ids = action_ids(domain);
+    const auto inc_it = incumbents_.find(std::string(domain));
+    const std::string incumbent_id =
+        inc_it == incumbents_.end() ? std::string() : inc_it->second;
+
+    std::vector<RankedCandidate> out;
+    out.reserve(ids.size());
+    for (const auto& id : ids) {
+        const auto a_it = actions_.find(id);
+        if (a_it == actions_.end()) continue;
+        const UtilityAction& a = a_it->second;
+        if (!a.enabled || !a.score) continue;
+
+        RankedCandidate r;
+        r.action_id = id;
+        r.target = a.target;
+        r.incumbent = (id == incumbent_id);
+        if (a.cooldown_days > 0.0) {
+            const auto lc = last_commit_.find(id);
+            r.cooldown_active =
+                lc != last_commit_.end() &&
+                now_day - lc->second < a.cooldown_days;
+        }
+        double u = a.score() * a.weight;
+        if (!std::isfinite(u)) u = 0.0;
+        if (r.incumbent) u *= hysteresis;
+        r.utility = u;
+        out.push_back(std::move(r));
+    }
+    // Deterministic order: utility descending, id ascending.
+    std::sort(out.begin(), out.end(), [](const RankedCandidate& x,
+                                         const RankedCandidate& y) {
+        if (x.utility != y.utility) return x.utility > y.utility;
+        return x.action_id < y.action_id;
+    });
+    return out;
 }
 
 std::optional<std::string>

@@ -82,6 +82,32 @@ WarAssessment StrategicDecisionEvaluator::evaluate_war(
     score = dotnet_max(score, .55);
   return {score, ratio, confidence, rejects, score >= .50};
 }
+PeaceAssessment StrategicDecisionEvaluator::evaluate_peace(
+    const CivilizationTraits &t, double own, const KnownCivilization &k,
+    double target_hostility, double target_fear, double war_weariness,
+    bool ceasefire_active) const {
+  const double weariness = clamp(war_weariness, 0, 1);
+  if (!k.has_military_estimate)
+    return {0, 1, weariness, false, false, weariness >= .80};
+  const auto confidence = clamp(k.estimate_confidence, .05, 1);
+  const auto threat =
+      k.estimated_military_midpoint() * (1 + (1 - confidence) * .35);
+  const auto ratio = own / dotnet_max(1., threat);
+  const auto losing = clamp(1 - ratio, 0, 1);
+  const auto winning = clamp(ratio - 1, 0, 2) * .5;
+  // Weariness is the largest single term: an unproductive war that has
+  // outlasted the horizon settles regardless of who appears to be winning.
+  const double score =
+      weariness * .50 + losing * (.30 + t.survival_priority * .20) +
+      clamp(target_fear, 0, 1) * .15 + clamp(k.trust, -1, 1) * .10 +
+      clamp(k.known_trade_dependence, 0, 1) * .15 -
+      winning * (.15 + t.aggression * .20) -
+      clamp(target_hostility, 0, 1) * .15 - t.aggression * .05 -
+      (t.honor_bound ? .10 : 0.);
+  const double peace_threshold = ceasefire_active ? .40 : .85;
+  return {score, ratio, weariness, score >= .45, score >= peace_threshold,
+          score >= .30};
+}
 CivilizationStrategicPlanner::CivilizationStrategicPlanner(
     StrategicDecisionEvaluator evaluator, std::int64_t interval)
     : evaluator_(std::move(evaluator)),

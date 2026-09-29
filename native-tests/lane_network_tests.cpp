@@ -454,8 +454,11 @@ void run_case(const Json &test) {
       } catch (...) { error = std::current_exception(); }
       check_error(classify(error), expected_error, name);
       if (!error) {
-        check(cached_route_count == 3,
-              name + ": exact range cache did not reuse repeated key");
+        // Ranges 10 and 25 leave 9 disconnected from 40, so the
+        // component-membership prune answers them without building trees;
+        // only the Infinity range consumes a route-tree slot.
+        check(cached_route_count == 1,
+              name + ": disconnected ranges must not consume route trees");
         actual = Json::array();
         for (const auto &item : results)
           actual.push_back({{"Range", encoded_number(item.range)},
@@ -528,9 +531,11 @@ void smoke() {
         "smoke: emitted graph is disconnected");
   std::vector<StellarSystem> small(systems.begin(), systems.begin() + 70);
   InterstellarLaneNetwork cache_network(&small);
-  for (int origin = 0; origin < 65; ++origin)
-    (void)cache_network.find_shortest_route(origin, 69, 1000.0 + origin);
-  check(cache_network.cached_route_tree_count() == 1, "smoke: 64-tree clear-before-add policy mismatch");
+  // 70 systems -> 8388608/70 clamped to the 4096-tree ceiling; the
+  // clear-before-add policy still leaves exactly one cached tree.
+  for (int origin = 0; origin < 4097; ++origin)
+    (void)cache_network.find_shortest_route(origin % 70, 69, 1000.0 + origin);
+  check(cache_network.cached_route_tree_count() == 1, "smoke: 4096-tree clear-before-add policy mismatch");
   std::vector<StellarSystem> negative_ids{systems[0], systems[1]};
   negative_ids[0].id = -1;
   negative_ids[1].id = -7;

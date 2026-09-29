@@ -53,6 +53,99 @@ public:
                       const std::unordered_set<int> *permitted_system_ids =
                           nullptr);
 
+  // Same route contract as find_shortest_route but fills a caller-owned
+  // buffer instead of allocating — `out` is cleared on entry, holds the
+  // ordered system ids on success, and stays empty when unreachable.
+  // Reusing one buffer keeps hot polling loops allocation-free.
+  void
+  find_shortest_route_into(int origin_system_id, int destination_system_id,
+                           double maximum_leg_range_light_years,
+                           std::vector<int> &out);
+
+  // Slot table shared by RouteTreeView indices — identical order for the
+  // network's lifetime.
+  struct RouteSlot {
+    int id{};
+    StarPosition position{};
+  };
+  std::span<const RouteSlot> route_slots();
+
+  // Slot index of a system id, or -1 when the network does not hold it.
+  int slot_of_system(int system_id);
+
+  // Borrowed view of the cached slot-indexed shortest-route tree for
+  // (origin, range) — built and cached on miss exactly like
+  // find_shortest_route_into. distance[slot] is the shortest distance
+  // from origin under the leg-range limit (infinity when unreachable);
+  // prior[slot] is the tree predecessor slot (-1 where unset). Re-acquire
+  // for each batch of queries: the view can dangle after any lane query
+  // that inserts into or clears the route cache. Throws out_of_range on
+  // an unknown origin and answers empty spans for a non-positive or NaN
+  // range, matching find_shortest_route_into's contract.
+  struct RouteTreeView {
+    std::span<const double> distance;
+    std::span<const int> prior;
+  };
+  RouteTreeView route_tree_view(int origin_system_id,
+                                double maximum_leg_range_light_years);
+
+  // Caller-owned partial route tree: the same slot-indexed Dijkstra as
+  // route_tree_view, but it halts once every slot in needed_slots is
+  // settled (or the frontier exhausts). Settled distance/prior entries
+  // are bit-identical to the full build's — settlement order is a prefix
+  // of the same (distance, id) pop order — and slots never settled are
+  // exactly those the full build would leave unreachable. When
+  // accept_settled is set it runs on each needed slot in settlement
+  // order and returning true stops the build early — the accepted slot
+  // is then the minimum-(distance, id) candidate the callback approved.
+  // The result is written into caller-owned vectors and never enters the
+  // route cache, so callers that only probe a small target set skip the
+  // full-catalog build. Throws out_of_range on an unknown origin and
+  // clears the outputs for a non-positive or NaN range, matching
+  // find_shortest_route_into's ordering.
+  void route_tree_toward(int origin_system_id,
+                         double maximum_leg_range_light_years,
+                         std::span<const int> needed_slots,
+                         std::vector<double> &distance_out,
+                         std::vector<int> &prior_out,
+                         const std::function<bool(int)> &accept_settled =
+                             nullptr);
+
+  // Monotonic revision of the route-tree cache — incremented whenever
+  // cached trees are destroyed (capacity eviction or rebuild). Callers
+  // that pin a RouteTreeView across queries must re-validate the
+  // revision; unordered_map insertions alone keep node storage stable.
+  std::uint64_t routes_cache_revision();
+
+  // True when the network holds a system with this id — callers that
+  // distinguish "unknown system" from "unreachable" can use it before
+  // pruning; find_shortest_route still throws on unknown ids.
+  bool has_system(int system_id);
+
+  // Reachability without route materialization: true exactly when a lane
+  // route exists between the systems under the given per-leg range limit
+  // (the same connected-component check find_shortest_route performs
+  // internally). Unknown system ids answer false.
+  bool systems_connected(int origin_system_id, int destination_system_id,
+                         double maximum_leg_range_light_years);
+
+  // Number of distinct connected components at the given per-leg range.
+  // Callers pruning many pairs can check this once per range instead of
+  // paying per-pair lookups when the graph is a single component anyway.
+  // Invalid ranges (non-positive or NaN) answer 0.
+  std::size_t connected_component_count(
+      double maximum_leg_range_light_years);
+
+  // Slot-indexed connected-component membership at the given per-leg
+  // range — the same union-find table find_shortest_route consults to
+  // answer unreachable pairs without building a route tree. Two slots in
+  // the same component can route to each other; different components
+  // cannot. Callers probing many pairs against one origin read the span
+  // once and compare entries directly. Invalid ranges (non-positive or
+  // NaN) answer an empty span.
+  std::span<const int> route_components(
+      double maximum_leg_range_light_years);
+
   // Extended routing policy for mission-aware search. `permitted_system_ids`
   // is a whitelist (origin/destination must be members); `blocked_system_ids`
   // is a blacklist whose members are never entered (origin/destination

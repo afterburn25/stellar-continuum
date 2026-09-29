@@ -11,6 +11,8 @@
 
 namespace stellar::core {
 
+struct SettlementBodiesIndex;
+
 struct StrategicInputWorldView {
   std::span<const StellarSystem> systems;
   std::span<const PlanetaryBody> bodies;
@@ -22,6 +24,14 @@ struct StrategicInputWorldView {
   std::span<const ConstructionState> construction;
   const CivilizationKnowledgeState &knowledge;
   InterstellarLaneNetwork &lanes;
+  // Optional caller-shared system->bodies catalog index; when set, the
+  // colonization-opportunity probe iterates surveyed systems instead of
+  // rescanning `bodies`. Must describe the same catalog.
+  const SettlementBodiesIndex *bodies_index{nullptr};
+  // Optional caller-shared exploration planning index; when set, the
+  // supported-mission-target probe reuses its memoized survey-work lists
+  // and per-civilization reach batches instead of rescanning `systems`.
+  ExplorationPlanningSharedIndex *planning_shared{nullptr};
 
   [[nodiscard]] ExplorationPlanningWorldView exploration_view() const {
     return {systems, bodies, fleets, colonies, knowledge, lanes};
@@ -52,6 +62,11 @@ private:
   StrategicLogisticsQuery logistics_;
   StrategicShipbuildingCapabilityQuery shipbuilding_capabilities_;
   StrategicExplorationPlanQuery exploration_;
+  // When a caller injects an exploration query it stays authoritative for the
+  // supported-work check (providers may observe call order or synthesize
+  // plans). The default path answers the same existence question with the
+  // planner's lazy probe instead of building a full plan per fleet.
+  bool exploration_injected_{};
 };
 
 } // namespace stellar::core

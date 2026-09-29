@@ -9,6 +9,8 @@
 
 namespace stellar::core {
 
+class SettlementBodyIndex;
+
 struct AdaptiveResearchCampaignEvent {
   int civilization_id{};
   std::string node_id;
@@ -23,9 +25,13 @@ public:
   // The world and campaign are borrowed and mutated only for this call. The
   // campaign's strategic runtime must remain alive and unmoved. Returned
   // events own their values. A zero-day call performs no lookup or mutation.
+  // `shared_body_index` may carry a caller-built index over world.bodies
+  // (identical first-match (system, body) resolution); when null a local
+  // index is built for the call.
   [[nodiscard]] std::vector<AdaptiveResearchCampaignEvent>
   advance(FreshCampaignState &world, AdaptiveResearchCampaignState &campaign, double elapsed_days,
-          double current_simulation_day) const;
+          double current_simulation_day,
+          const SettlementBodyIndex *shared_body_index = nullptr) const;
 };
 
 class AdaptiveResearchCampaignProgression final {

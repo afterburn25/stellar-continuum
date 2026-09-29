@@ -216,7 +216,8 @@ void milestones(FreshCampaignState &w, AdaptiveResearchCampaignState &campaign, 
 }
 } // namespace
 std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::advance(
-    FreshCampaignState &w, AdaptiveResearchCampaignState &campaign, double days, double now) const {
+    FreshCampaignState &w, AdaptiveResearchCampaignState &campaign, double days, double now,
+    const SettlementBodyIndex *shared_body_index) const {
   if (!std::isfinite(days) || days < 0)
     throw std::out_of_range(
         "Specified argument was out of the range of valid values. (Parameter 'elapsedDays')");
@@ -232,6 +233,19 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     if (!c.is_seeded_ancient)
       civs.push_back(&c);
   std::stable_sort(civs.begin(), civs.end(), [](auto *a, auto *b) { return a->id < b->id; });
+  // Civ-invariant inputs for the per-civ funding pass: construction and
+  // fleet projections plus the colony->body index are built once instead
+  // of inside every civilization's credit-flow call.
+  const auto ec = economic_construction_projection(w.construction);
+  const auto ef = economic_fleet_projection(w.fleets);
+  const EconomyWorldView ew{w.civilizations, w.bodies, ec, ef};
+  // Colony->body lookups resolve through a caller-shared catalog index when
+  // one is provided; otherwise build the request-scoped index for the call.
+  std::optional<SettlementBodyIndex> local_body_index;
+  if (!shared_body_index)
+    local_body_index.emplace(w.colonies, w.bodies);
+  const SettlementBodyIndex &body_index =
+      shared_body_index ? *shared_body_index : *local_body_index;
   for (auto *c : civs) {
     auto &state = detail::AdaptiveResearchCampaignStateAccess::get_civilization(campaign, c->id);
     facilities(w, c->id, campaign, state);
@@ -248,29 +262,75 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     bool allpaused = std::all_of(state.active_projects().begin(), state.active_projects().end(),
                                  [](auto &p) { return p.paused; });
     if (campaign_civilization_uses_ai(w,c->id) && allpaused) {
-      for (auto &candidate : campaign.runtime().agenda().build_visible_shortlist(state)) {
+      const auto &authority_catalog = campaign.runtime().authority().catalog();
+      const auto &program_stage = authority_catalog.get_directed_program_stage(
+          state.directed_program_stage_id());
+      const auto active_directed = std::ranges::count_if(
+          state.active_projects(),
+          [](const auto &project) { return !project.paused; });
+      const bool final_slot =
+          program_stage.directed_program_limit.has_value() &&
+          *program_stage.directed_program_limit - active_directed <= 1;
+      // A program office with a single free directed slot should not commit it
+      // to a project whose estimated horizon dwarfs every bounded alternative:
+      // deep frontier programs otherwise starve the short gateway projects
+      // that unlock new branches. The candidate is deferred while a startable
+      // and affordable alternative fits inside the commitment horizon; when
+      // nothing shorter qualifies, it still starts. Native scheduling policy;
+      // the shared research catalog contract stays untouched.
+      constexpr double final_slot_commitment_floor_years = 2.0;
+      constexpr double final_slot_commitment_ratio = 4.0;
+      constexpr double final_slot_commitment_hard_years = 15.0;
+      const auto shortlist =
+          campaign.runtime().agenda().build_visible_shortlist(state);
+      double shortest_startable_years = std::numeric_limits<double>::infinity();
+      for (const auto &candidate : shortlist)
+        if (candidate.can_start)
+          shortest_startable_years = std::min(
+              shortest_startable_years, candidate.estimated_years_to_mature);
+      const double horizon = std::max(
+          final_slot_commitment_floor_years,
+          std::min(shortest_startable_years * final_slot_commitment_ratio,
+                   final_slot_commitment_hard_years));
+      auto try_start = [&](const ResearchVisibleProjectCandidate &candidate) {
+        auto quote = AdaptiveResearchFundingPolicy::quote(
+            authority_catalog.get_node(candidate.node_id),
+            candidate.requested_effective_labs, authority_catalog);
+        if (economy->credits + .000001 <
+            AdaptiveResearchCampaignCommands::credits_needed_to_start(quote))
+          return false;
+        auto &start = campaign.get_start(c->id);
+        AdaptiveResearchFundingWorldView view{w.civilizations, w.economies};
+        auto result = AdaptiveResearchCampaignCommands::start_directed_research(
+            view, campaign, c->id, candidate.node_id,
+            candidate.requested_effective_labs,
+            start.applicability_context_id);
+        if (!result.accepted)
+          throw AdaptiveResearchCampaignOperationError(
+              "Adaptive Research AI selected invalid project '" +
+              candidate.node_id + "': " + result.message);
+        append(out, c->id, result.events);
+        return true;
+      };
+      const ResearchVisibleProjectCandidate *deferred = nullptr;
+      for (const auto &candidate : shortlist) {
         if (!candidate.can_start)
           continue;
-        auto quote = AdaptiveResearchFundingPolicy::quote(
-            campaign.runtime().authority().catalog().get_node(candidate.node_id),
-            candidate.requested_effective_labs, campaign.runtime().authority().catalog());
-        if (economy->credits + .000001 >=
-            AdaptiveResearchCampaignCommands::credits_needed_to_start(quote)) {
-          auto &start = campaign.get_start(c->id);
-          AdaptiveResearchFundingWorldView view{w.civilizations, w.economies};
-          auto result = AdaptiveResearchCampaignCommands::start_directed_research(
-              view, campaign, c->id, candidate.node_id, candidate.requested_effective_labs,
-              start.applicability_context_id);
-          if (!result.accepted)
-            throw AdaptiveResearchCampaignOperationError(
-                "Adaptive Research AI selected invalid project '" + candidate.node_id +
-                "': " + result.message);
-          append(out, c->id, result.events);
+        if (final_slot && candidate.estimated_years_to_mature > horizon) {
+          if (!deferred)
+            deferred = &candidate;
+          continue;
+        }
+        if (try_start(candidate)) {
+          deferred = nullptr;
           break;
         }
       }
+      if (deferred)
+        (void)try_start(*deferred);
     }
     std::vector<ResearchProjectRuntimeState> active;
+    double fraction = 1.;
     for (auto &p : state.active_projects())
       if (!p.paused)
         active.push_back(p);
@@ -282,16 +342,13 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
                     .operating_credits_per_day;
     double requested = perday * days,
            funded = source_min(source_max(0., economy->credits), requested),
-           fraction = requested <= .0000001 ? 1. : source_clamp(funded / requested, 0., 1.),
            previous = economy->last_research_funding_fraction;
+    fraction = requested <= .0000001 ? 1. : source_clamp(funded / requested, 0., 1.);
     economy->credits = source_max(0., economy->credits - funded);
     economy->last_research_spending_per_day = days <= 0 ? 0 : funded / days;
     economy->last_research_funding_fraction = fraction;
-    auto ec = economic_construction_projection(w.construction);
-    auto ef = economic_fleet_projection(w.fleets);
-    EconomyWorldView ew{w.civilizations, w.bodies, ec, ef};
     economy->last_credits_per_second =
-        economy_credit_flow(ew, w.colonies, w.economies, c->id, false).net_credits_per_day -
+        economy_credit_flow(ew, w.colonies, w.economies, c->id, body_index, false).net_credits_per_day -
         economy->last_research_spending_per_day;
     if (!active.empty() && previous >= .999999 && fraction < .999999)
       for (auto &p : active)

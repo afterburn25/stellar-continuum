@@ -95,7 +95,20 @@ private:
               int destination_system_id, bool require_survey_work) const;
   ExplorationMissionPlanner mission_planner_;
   MissionFuelPolicy ai_fuel_policy_;
-  SurveyOperationsProfiler survey_profiler_;
+  // Generation-static system/body catalog lookups shared across advances.
+  // Revalidates on the source spans, so a reloaded world view rebuilds it.
+  mutable SurveyCatalogIndex campaign_catalog_;
+  // Generation-static per-system phenomenon contexts shared across
+  // advances — pure in (regions, position, id); the (regions, systems
+  // span) guard clears it on a reloaded world view.
+  mutable PhenomenonContextIndex campaign_phenomena_;
+  // Campaign-wide survey-work store: entries reference the systems
+  // span (guarded on data + size like the catalog index) and patch
+  // through the per-civilization dirty marks, so a tick with no level
+  // changes for a civilization costs a revision compare instead of a
+  // catalog rescan.
+  mutable ExplorationPlanningSharedIndex::SurveyWorkStore
+      campaign_survey_work_;
 };
 
 } // namespace stellar::core

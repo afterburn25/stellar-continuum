@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/campaign_economy.hpp>
+#include <stellar/core/civilization_automation.hpp>
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/civilian_recovery.hpp>
 #include <stellar/core/own_combat_fleet_status.hpp>
@@ -11,6 +12,7 @@
 #include <stellar/core/freight.hpp>
 #include <stellar/core/fresh_campaign.hpp>
 #include <stellar/core/legacy_research.hpp>
+#include <stellar/core/scripted_events.hpp>
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/strategic_runtime.hpp>
 #include <stellar/engine/phase_timing.hpp>
@@ -274,8 +276,33 @@ issue_civilian_return_to_base_order(
       noexcept;
   [[nodiscard]] const CivilizationStrategicRuntimeCoordinator &
   strategic_runtime() const noexcept;
+  // The civilization automation coordinator — per-civilization domain
+  // policies, operator locks and the explainable decision journal,
+  // driven by the automatic_orders phase through canonical commands.
+  [[nodiscard]] CivilizationAutomationCoordinator &automation() noexcept;
+  [[nodiscard]] const CivilizationAutomationCoordinator &
+  automation() const noexcept;
+  // Data-authored event chains: step domain events feed
+  // engine::MissionRuntime, stage timers track simulated days and
+  // choice effects apply through canonical commands. Inert until a
+  // definition is loaded.
+  [[nodiscard]] ScriptedEventCoordinator &scripted_events() noexcept;
+  [[nodiscard]] const ScriptedEventCoordinator &
+  scripted_events() const noexcept;
+  // Operator path: resolves a pending stage choice and applies its
+  // authored effects through canonical commands on live state.
+  bool choose_scripted_event(std::uint64_t instance_id,
+                             std::string_view choice_id);
   [[nodiscard]] CombatSimulation &combat_simulation() noexcept;
   [[nodiscard]] const CombatSimulation &combat_simulation() const noexcept;
+
+  // Tick-shared body-catalog index. The catalog is immutable during a
+  // campaign; the index is rebuilt only when the bodies span identity (or
+  // its edge ids) changes. Sibling subsystems driven outside the phase
+  // tasks (e.g. the adaptive research advance) may reuse it for the same
+  // catalog instead of rescanning world.bodies.
+  [[nodiscard]] const SettlementBodyIndex &
+  catalog_body_index(FreshCampaignState &campaign);
 
 private:
   // Engine-level phase pipeline: every strategic step runs the 12
@@ -307,8 +334,17 @@ private:
   std::shared_ptr<CampaignShipbuildingCapabilityQuery>
       shipbuilding_capability_;
   CivilizationStrategicRuntimeCoordinator strategic_;
+  CivilizationAutomationCoordinator automation_;
+  ScriptedEventCoordinator scripted_events_;
   std::variant<CombatCommandRuntime, CombatSimulation> combat_;
   CampaignSubsystemRuntime subsystems_;
+  // Tick-shared body-catalog index backing catalog_body_index(). The
+  // catalog is immutable during a campaign; the index is rebuilt only when
+  // the bodies span identity (or its edge ids) changes.
+  std::optional<SettlementBodyIndex> body_index_;
+  const PlanetaryBody *body_index_data_{};
+  std::size_t body_index_size_{};
+  int body_index_front_id_{}, body_index_back_id_{};
 };
 
 } // namespace stellar::core

@@ -24,4 +24,11 @@ Vec2 interpolate_chart_position(const StellarSystem &origin,
 double interstellar_distance_from_fleet(std::span<const StellarSystem> systems,
                                         const FleetState &fleet,
                                         const StellarSystem &target);
+// Resolved-pointer form for batch planners: the fleet's origin (and current
+// waypoint while warping) is looked up once instead of scanning the system
+// table for every candidate target.
+double interstellar_distance_from_fleet(const StellarSystem *origin,
+                                        const StellarSystem *waypoint,
+                                        const FleetState &fleet,
+                                        const StellarSystem &target);
 } // namespace stellar::core

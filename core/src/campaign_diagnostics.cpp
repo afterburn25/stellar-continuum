@@ -424,7 +424,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
           if(weight==severity_weights.end())continue;
           const std::string action_id=finding.subsystem+"."+finding.event_type+
               "."+std::to_string(finding.entity_id.value_or(-1));
-          mind.add_action({action_id,"spotlight",
+          mind.add_action({action_id,"spotlight","",
               [utility=weight->second]{return utility;},
               [&,finding=finding,utility=weight->second]{
                 if(records.size()>=maximum){truncated=true;return;}

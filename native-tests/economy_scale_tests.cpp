@@ -29,6 +29,18 @@ void body_lookup_contract() {
     try{(void)colony_habitat_support(colonies[1],index.bodies_for(colonies[1]));}catch(const std::invalid_argument&){indexed_error=true;}
     check(legacy_error&&indexed_error,"Missing body no longer raises canonical error");
   }
+  {
+    // Catalog-scoped index: same first-match rule per (system,body) pair,
+    // plus id-only lookups for the scans the colony domain and
+    // construction locks perform.
+    const SettlementBodyIndex catalog(bodies);
+    check(catalog.first_body_with_id(4)==&bodies[0],"Catalog id lookup lost first-match order");
+    check(catalog.last_body_with_id(4)==&bodies[2],"Catalog id lookup lost last-match order");
+    check(catalog.first_body_with_id(88)==&bodies[4]&&catalog.last_body_with_id(88)==&bodies[4],"Unique-id lookups disagree");
+    check(!catalog.first_body_with_id(12345)&&!catalog.last_body_with_id(12345),"Catalog id lookup invented a body");
+    check(catalog.bodies_for(colonies[0]).data()==&bodies[1],"Catalog pair lookup lost first-match order");
+    check(catalog.bodies_for(colonies[1]).empty(),"Catalog pair lookup answered a cross-system pair");
+  }
   colonies[0].system_id=5;colonies[0].planetary_body_id=88;
   const SettlementBodyIndex refreshed(colonies,bodies);
   check(refreshed.bodies_for(colonies[0]).data()==&bodies[4],"New request retained stale body binding");

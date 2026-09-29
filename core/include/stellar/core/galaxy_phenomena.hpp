@@ -5,6 +5,7 @@
 #include <array>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace stellar::core {
@@ -69,6 +70,18 @@ const PhenomenonDefinition& phenomenon_definition(PhenomenonType);
 GalaxyPhenomena generate_galaxy_phenomena(const GalaxyGenerationConfig&,std::span<const StellarSystem>);
 void validate_galaxy_phenomena(const GalaxyPhenomena&,const GalaxyGenerationConfig&,std::span<const StellarSystem>);
 SystemPhenomenonContext phenomenon_context(const GalaxyPhenomena*,double x,double y,int system_id=0);
+// Caller-owned memo for per-system phenomenon contexts — pure in
+// (regions, system position, id), so the all-regions sample/sort is paid
+// once per system for the index's whole life instead of once per query
+// or per advance. Revalidates on the regions pointer and the systems
+// span identity (data + size): a reloaded or replaced world clears the
+// memo rather than serving stale contexts.
+struct PhenomenonContextIndex {
+  const GalaxyPhenomena *regions{};
+  const StellarSystem *systems_data{};
+  std::size_t systems_size{};
+  std::unordered_map<int, SystemPhenomenonContext> contexts;
+};
 std::optional<PhenomenonOverlap> nearest_phenomenon(const GalaxyPhenomena*,double x,double y);
 double phenomenon_footprint_density(const GalaxyGenerationConfig&,double x,double y);
 std::string phenomena_diagnostics(const GalaxyPhenomena*,const SystemPhenomenonContext* = nullptr);

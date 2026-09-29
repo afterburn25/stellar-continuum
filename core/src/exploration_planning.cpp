@@ -1,11 +1,15 @@
 #include <stellar/core/exploration_planning.hpp>
 
+#include "exploration_prof_internal.hpp"
+
 #include <stellar/core/detail/legacy_number_format.hpp>
 
 #include <algorithm>
 #include <cmath>
+#include <queue>
 #include <stdexcept>
 #include <tuple>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace stellar::core {
@@ -97,16 +101,118 @@ ExplorationMissionPlanner::ExplorationMissionPlanner(
     };
 }
 
+// Mirrors OperationalReachBatch::prepare's refueling projection: the
+// civ's (system_id, max service factor) pairs, sorted for a
+// content-exact compare in DrainVerdict::matches.
+static std::vector<std::pair<int, double>>
+drain_refuel_sites(ExplorationPlanningWorldView world, int civilization_id) {
+  std::unordered_map<int, double> refueling;
+  for (const auto &colony : world.colonies) {
+    if (colony.civilization_id != civilization_id)
+      continue;
+    auto &service = refueling[colony.system_id];
+    service = std::max(service,
+                       colony.kind == SettlementKind::Colony ? 1.0 : 0.5);
+  }
+  std::vector<std::pair<int, double>> sites(refueling.begin(),
+                                            refueling.end());
+  std::sort(sites.begin(), sites.end());
+  return sites;
+}
+
+bool ExplorationMissionPlanner::DrainVerdict::matches(
+    ExplorationPlanningWorldView world, const FleetState &fleet,
+    MissionFuelPolicy policy,
+    const std::vector<std::pair<int, double>> &sites) const {
+  return systems_data == world.systems.data() &&
+         systems_size == world.systems.size() && lanes == &world.lanes &&
+         civilization_id == fleet.civilization_id && role == fleet.role &&
+         fleet.current_system_id.has_value() &&
+         origin_system_id == *fleet.current_system_id &&
+         fuel_remaining == fleet.fuel_remaining_light_years &&
+         fuel_capacity == fleet.fuel_capacity_light_years &&
+         leg_range == fleet.maximum_leg_range_light_years &&
+         fuel_policy == policy &&
+         survey_level_revision ==
+             world.knowledge.survey_level_revision(fleet.civilization_id) &&
+         refuel_sites == sites;
+}
+
 bool ExplorationMissionPlanner::needs_survey_work(
     const CivilizationKnowledgeState &knowledge, const FleetState &fleet,
     int system_id) {
-  const auto level =
-      knowledge.system_survey_level(fleet.civilization_id, system_id);
-  if (fleet.role == FleetRole::Scout)
-    return level < SystemSurveyLevel::partially_surveyed;
-  if (fleet.role == FleetRole::Science)
-    return level < SystemSurveyLevel::fully_surveyed;
-  return false;
+  return needs_survey_work_at_level(
+      fleet, knowledge.system_survey_level(fleet.civilization_id, system_id));
+}
+
+void ExplorationMissionPlanner::refresh_survey_work(
+    ExplorationPlanningWorldView world, const FleetState &subject,
+    ExplorationPlanningSharedIndex::SurveyWorkList &entry,
+    SurveyCatalogIndex &catalog) {
+  const int civilization = subject.civilization_id;
+  const auto revision = world.knowledge.survey_level_revision(civilization);
+  // Duplicate catalog ids would leave entries/positions asymmetric —
+  // fall back to a full rescan so pathological catalogs keep the
+  // original iterate-everything behavior. A revision below the list's
+  // means a replaced/rewound knowledge object whose marks cannot
+  // account for the gap — rescan rather than patch.
+  if (!entry.valid || entry.positions.size() != entry.entries.size() ||
+      revision < entry.level_revision) {
+    entry.entries.clear();
+    entry.positions.clear();
+    for (const auto &system : world.systems) {
+      const auto level =
+          world.knowledge.system_survey_level(civilization, system.id);
+      if (needs_survey_work_at_level(subject, level)) {
+        entry.positions[system.id] = entry.entries.size();
+        entry.entries.push_back(
+            {&system, survey_priority(subject.role, level)});
+      }
+    }
+    entry.level_revision = revision;
+    entry.valid = true;
+    return;
+  }
+  if (entry.level_revision == revision)
+    return;
+  // Patch only the systems whose level moved since this list was built —
+  // identical membership and bands to a full rescan. The dirty buckets
+  // are keyed by the revision that recorded them, so buckets at or below
+  // the list's revision were already incorporated and each mark is
+  // visited once per list over the campaign.
+  const auto &buckets =
+      world.knowledge.survey_level_dirty_marks(civilization);
+  const auto &by_id = catalog.systems_index_for(world.systems);
+  for (auto bucket = buckets.upper_bound(entry.level_revision);
+       bucket != buckets.end(); ++bucket) {
+    for (const int system_id : bucket->second) {
+      const auto level =
+          world.knowledge.system_survey_level(civilization, system_id);
+      const auto it = entry.positions.find(system_id);
+      if (needs_survey_work_at_level(subject, level)) {
+        const int band = survey_priority(subject.role, level);
+        if (it != entry.positions.end()) {
+          entry.entries[it->second].second = band;
+        } else {
+          const auto found = by_id.find(system_id);
+          if (found == by_id.end())
+            continue; // known to the civ but not in the catalog
+          entry.positions[system_id] = entry.entries.size();
+          entry.entries.push_back({found->second, band});
+        }
+      } else if (it != entry.positions.end()) {
+        const auto position = it->second;
+        const auto back = entry.entries.size() - 1;
+        if (position != back) {
+          entry.entries[position] = entry.entries[back];
+          entry.positions[entry.entries[position].first->id] = position;
+        }
+        entry.entries.pop_back();
+        entry.positions.erase(it);
+      }
+    }
+  }
+  entry.level_revision = revision;
 }
 
 int ExplorationMissionPlanner::survey_priority(FleetRole role,
@@ -129,10 +235,46 @@ MissionReachAssessment ExplorationMissionPlanner::assess_operational_reach(
                             mission_kind(fleet.role));
 }
 
+namespace {
+const StellarSystem *
+indexed_system(const std::unordered_map<int, const StellarSystem *> &index,
+               std::optional<int> id) {
+  if (!id)
+    return nullptr;
+  const auto found = index.find(*id);
+  return found == index.end() ? nullptr : found->second;
+}
+
+double clamp_preserving_nan(double value, double minimum, double maximum) {
+  if (std::isnan(value))
+    return value;
+  return std::clamp(value, minimum, maximum);
+}
+
+double indexed_distance_from_fleet(
+    const std::unordered_map<int, const StellarSystem *> &index,
+    const FleetState &fleet, const StellarSystem &target) {
+  return interstellar_distance_from_fleet(
+      indexed_system(index,
+                     fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+                         ? fleet.transit_origin_system_id
+                         : fleet.current_system_id),
+      indexed_system(index,
+                     fleet.transit_phase == FleetTransitPhase::InterstellarWarp
+                         ? (!fleet.planned_route_system_ids.empty()
+                                ? std::optional<int>(
+                                      fleet.planned_route_system_ids.front())
+                                : fleet.destination_system_id)
+                         : std::nullopt),
+      fleet, target);
+}
+} // namespace
+
 ExplorationMissionCandidate
 ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
                                            const FleetState &fleet,
-                                           const StellarSystem &system,OperationalReachBatch *batch,MissionFuelPolicy fuel_policy,SurveyOperationsBatch *surveys) const {
+                                           const StellarSystem &system,OperationalReachBatch *batch,MissionFuelPolicy fuel_policy,SurveyOperationsBatch *surveys,
+                                           const std::unordered_map<int, const StellarSystem *> *systems_index) const {
   const auto level =
       world.knowledge.system_survey_level(fleet.civilization_id, system.id);
   const auto progress =
@@ -148,7 +290,9 @@ ExplorationMissionPlanner::build_candidate(ExplorationPlanningWorldView world,
         std::isnan(remaining) ? remaining : std::max(0.0, remaining);
   }
   const auto distance =
-      interstellar_distance_from_fleet(world.systems, fleet, system);
+      systems_index
+          ? indexed_distance_from_fleet(*systems_index, fleet, system)
+          : interstellar_distance_from_fleet(world.systems, fleet, system);
   auto reach = batch?batch->assess(fleet,system.id,mission_kind(fleet.role),fuel_policy):assess_operational_reach(world, fleet, system.id);
   const auto priority = survey_priority(fleet.role, level);
   return {system.id,
@@ -186,11 +330,16 @@ ExplorationMissionPlanner::build_plan(ExplorationPlanningWorldView world,
 
   std::vector<ExplorationMissionCandidate> candidates;
   SurveyOperationsBatch surveys(world.systems,world.bodies);
+  // One id->system index per plan instead of a linear scan per candidate.
+  std::unordered_map<int, const StellarSystem *> systems_index;
+  systems_index.reserve(world.systems.size());
+  for (const auto &system : world.systems)
+    systems_index.emplace(system.id, &system);
   std::optional<OperationalReachBatch> batch;
   if(uses_canonical_reach_)batch.emplace(OperationalReachWorldView{world.systems,world.colonies,world.lanes},fleet->civilization_id);
   for (const auto &system : world.systems)
     if (needs_survey_work(world.knowledge, *fleet, system.id))
-      candidates.push_back(build_candidate(world, *fleet, system,batch?&*batch:nullptr,fuel_policy,&surveys));
+      candidates.push_back(build_candidate(world, *fleet, system,batch?&*batch:nullptr,fuel_policy,&surveys,&systems_index));
   std::stable_sort(
       candidates.begin(), candidates.end(),
       [](const auto &left, const auto &right) {
@@ -218,6 +367,395 @@ ExplorationMissionPlanner::build_plan(ExplorationPlanningWorldView world,
                           " available in the current planning window.";
   return {fleet->id, fleet->name,       fleet->role,
           true,      std::move(status), std::move(candidates)};
+}
+
+std::optional<ExplorationMissionCandidate>
+ExplorationMissionPlanner::select_supported_candidate(
+    ExplorationPlanningWorldView world, const FleetState &fleet,
+    MissionFuelPolicy fuel_policy,
+    const std::unordered_set<int> &reservation_set,
+    bool &used_shared_fallback,
+    ExplorationPlanningSharedIndex *shared) const {
+  used_shared_fallback = false;
+  if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
+    throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
+  // Match build_plan: the stored fleet — not the caller's reference — is the
+  // planning subject, and a missing/inactive/wrong-role fleet has no plan.
+  const auto stored =
+      std::find_if(world.fleets.begin(), world.fleets.end(),
+                   [&fleet](const auto &candidate) {
+                     return candidate.id == fleet.id && candidate.is_active;
+                   });
+  if (stored == world.fleets.end() ||
+      (stored->role != FleetRole::Scout && stored->role != FleetRole::Science))
+    return std::nullopt;
+  const auto &subject = *stored;
+  std::unordered_map<int, const StellarSystem *> local_systems_index;
+  const std::unordered_map<int, const StellarSystem *> *systems_index;
+  if (shared) {
+    systems_index = &shared->catalog().systems_index_for(world.systems);
+  } else {
+    local_systems_index.reserve(world.systems.size());
+    for (const auto &system : world.systems)
+      local_systems_index.emplace(system.id, &system);
+    systems_index = &local_systems_index;
+  }
+  std::optional<OperationalReachBatch> local_batch;
+  OperationalReachBatch *batch = nullptr;
+  if (uses_canonical_reach_)
+    batch = shared ? &shared->reach_batch(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id)
+                   : &local_batch.emplace(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id);
+
+  // Cross-call negative memo: a drained select is a pure function of the
+  // fields DrainVerdict compares — reservations only veto supported
+  // targets and can never create one. Canonical reach path only.
+  std::vector<std::pair<int, double>> drain_sites;
+  const bool memoize_drain =
+      batch != nullptr && subject.current_system_id.has_value();
+  if (memoize_drain) {
+    drain_sites = drain_refuel_sites(world, subject.civilization_id);
+    if (const auto found = drain_verdicts_.find(subject.id);
+        found != drain_verdicts_.end() &&
+        found->second.matches(world, subject, fuel_policy, drain_sites))
+      return std::nullopt;
+  }
+
+  // Light ranking identical to the build_plan comparator restricted to the
+  // supported subsequence: (priority band, distance with NaN last, id).
+  struct RankedTarget {
+    const StellarSystem *system;
+    int priority_band;
+    double distance;
+  };
+  const auto ranked_less = [](const RankedTarget &left,
+                              const RankedTarget &right) {
+    if (left.priority_band != right.priority_band)
+      return left.priority_band < right.priority_band;
+    const bool left_nan = std::isnan(left.distance);
+    const bool right_nan = std::isnan(right.distance);
+    if (left_nan != right_nan)
+      return left_nan;
+    if (!left_nan && left.distance != right.distance)
+      return left.distance < right.distance;
+    return left.system->id < right.system->id;
+  };
+  const auto ranked_greater = [&](const RankedTarget &left,
+                                 const RankedTarget &right) {
+    return ranked_less(right, left);
+  };
+  // The (system, band) filter depends only on the fleet's civilization and
+  // role plus survey LEVELS — memoizable per shared index while the
+  // knowledge survey-level revision is unchanged. Distance stays per-fleet.
+  auto &prof = detail::expl_prof();
+  const bool profiling = prof.enabled.load(std::memory_order_relaxed);
+  std::optional<detail::ExplProfScope> prof_build;
+  if (profiling)
+    prof_build.emplace(prof.select_build_ns);
+  std::vector<std::pair<const StellarSystem *, int>> local_work;
+  const std::vector<std::pair<const StellarSystem *, int>> *work;
+  if (shared) {
+    const std::int64_t key =
+        (static_cast<std::int64_t>(subject.civilization_id) << 32) |
+        static_cast<std::uint32_t>(static_cast<int>(subject.role));
+    auto &entry = shared->survey_work_store()
+                          .for_span(world.systems)[key];
+    if (!entry.valid ||
+        entry.level_revision !=
+            world.knowledge.survey_level_revision(
+                subject.civilization_id)) {
+      if (profiling)
+        ++prof.work_rebuilds;
+      refresh_survey_work(world, subject, entry, shared->catalog());
+    }
+    work = &entry.entries;
+  } else {
+    for (const auto &system : world.systems) {
+      const auto level = world.knowledge.system_survey_level(
+          subject.civilization_id, system.id);
+      if (needs_survey_work_at_level(subject, level))
+        local_work.push_back(
+            {&system, survey_priority(subject.role, level)});
+    }
+    work = &local_work;
+  }
+  if (profiling)
+    prof.work_entries += static_cast<long long>(work->size());
+  // Canonical-reach selects can drop lane-unreachable targets outright:
+  // batch->assess resolves them through find_shortest_route's component
+  // prune, so they can never be supported — removing them shrinks both
+  // the heapify and the pop/assess loop. The reach range is per-fleet
+  // constant, so one leg-range component set covers the whole list; the
+  // component-count gate keeps the common fully-connected graph at zero
+  // per-candidate cost.
+  const double prune_range = subject.maximum_leg_range_light_years;
+  const bool prune_unreachable =
+      batch != nullptr && subject.current_system_id.has_value() &&
+      world.lanes.connected_component_count(prune_range) > 1;
+  // The fleet endpoints and the warp-interpolated depth are invariant
+  // across the whole work list — resolve them once instead of per
+  // candidate (indexed_distance_from_fleet otherwise pays two index
+  // lookups plus the depth arithmetic for every entry).
+  const auto *origin_system = indexed_system(
+      *systems_index,
+      subject.transit_phase == FleetTransitPhase::InterstellarWarp
+          ? subject.transit_origin_system_id
+          : subject.current_system_id);
+  const auto *waypoint_system = indexed_system(
+      *systems_index,
+      subject.transit_phase == FleetTransitPhase::InterstellarWarp
+          ? (!subject.planned_route_system_ids.empty()
+                 ? std::optional<int>(subject.planned_route_system_ids.front())
+                 : subject.destination_system_id)
+          : std::nullopt);
+  const bool flat_origin =
+      !origin_system || !origin_system->position.depth_light_years;
+  // Same expression order as interstellar_distance_from_fleet: the
+  // waypoint interpolation must stay inside the warp branch.
+  auto depth = origin_system
+                   ? origin_system->position.depth_light_years.value_or(0)
+                   : 0;
+  if (subject.transit_phase == FleetTransitPhase::InterstellarWarp &&
+      waypoint_system)
+    depth += (waypoint_system->position.depth_light_years.value_or(0) -
+              depth) *
+             clamp_preserving_nan(subject.transit_progress, 0.0, 1.0);
+  const auto distance_to = [&](const StellarSystem &target) {
+    if (flat_origin && !target.position.depth_light_years) {
+      // Same float arithmetic as fleet_transit.cpp's distance(Vec2,
+      // Vec2): float differences, float sum-of-squares, float sqrt,
+      // widened to double on return.
+      const float dx = subject.position.x - target.position.x;
+      const float dy = subject.position.y - target.position.y;
+      return static_cast<double>(std::sqrt(dx * dx + dy * dy));
+    }
+    const auto dx =
+        static_cast<double>(subject.position.x) - target.position.x;
+    const auto dy =
+        static_cast<double>(subject.position.y) - target.position.y;
+    const auto dz = depth - target.position.depth_light_years.value_or(0);
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+  };
+  std::vector<RankedTarget> targets;
+  targets.reserve(work->size());
+  for (const auto &[system, band] : *work) {
+    // has_system keeps lane-unknown candidates on the assess path so
+    // find_shortest_route's out_of_range contract is preserved exactly.
+    if (prune_unreachable && world.lanes.has_system(system->id) &&
+        !world.lanes.systems_connected(*subject.current_system_id,
+                                       system->id, prune_range))
+      continue;
+    // The lane slot resolves lazily at pop time — the heap only
+    // consumes a fraction of the work list, so probing here would pay
+    // the id->slot lookup for entries that are never assessed.
+    targets.push_back({system, band, distance_to(*system)});
+  }
+  // The (band, distance-with-NaN-last, id) order is total — heap pops yield
+  // exactly the stable_sort sequence, but only the handful of entries the
+  // lazy assessment below actually consumes pay the ordering cost.
+  std::priority_queue<RankedTarget, std::vector<RankedTarget>,
+                      decltype(ranked_greater)>
+      queue(ranked_greater, std::move(targets));
+  if (profiling) {
+    prof_build.reset();
+    prof_build.emplace(prof.select_loop_ns);
+  }
+
+  // Assess lazily in plan order. The plan truncates to
+  // hard_maximum_candidates entries with supported candidates first, so only
+  // the first hard_maximum_candidates supported targets can be selected.
+  const StellarSystem *first_supported = nullptr;
+  const StellarSystem *chosen = nullptr;
+  int supported_seen = 0;
+  while (!queue.empty()) {
+    if (supported_seen >= hard_maximum_candidates)
+      break;
+    const RankedTarget target = queue.top();
+    queue.pop();
+    if (profiling)
+      ++prof.pops;
+    // Verdict-only on the canonical path — the loop discards everything
+    // but is_supported. The lane slot resolves here rather than at
+    // build time: only popped entries pay the id->slot lookup, and the
+    // heap touches a fraction of the work list on most selects. The
+    // lane-unknown fallback keeps find_shortest_route's out_of_range
+    // contract reachable for non-catalog targets.
+    const bool supported = [&] {
+      if (!batch)
+        return assess_operational_reach(world, subject, target.system->id)
+            .is_supported;
+      const int slot = world.lanes.slot_of_system(target.system->id);
+      if (slot >= 0)
+        return batch->probe_supported(subject, slot, fuel_policy);
+      return batch->assess(subject, target.system->id,
+                           mission_kind(subject.role), fuel_policy,
+                           /*explain=*/false)
+          .is_supported;
+    }();
+    if (profiling)
+      ++prof.assess_calls;
+    if (!supported)
+      continue;
+    ++supported_seen;
+    if (!first_supported)
+      first_supported = target.system;
+    if (!reservation_set.contains(target.system->id)) {
+      chosen = target.system;
+      break;
+    }
+  }
+  if (!chosen) {
+    if (!first_supported) {
+      if (profiling)
+        ++prof.drains;
+      if (memoize_drain)
+        drain_verdicts_[subject.id] = DrainVerdict{
+            world.systems.data(),
+            world.systems.size(),
+            &world.lanes,
+            subject.civilization_id,
+            subject.role,
+            *subject.current_system_id,
+            subject.fuel_remaining_light_years,
+            subject.fuel_capacity_light_years,
+            subject.maximum_leg_range_light_years,
+            fuel_policy,
+            world.knowledge.survey_level_revision(subject.civilization_id),
+            std::move(drain_sites)};
+      return std::nullopt;
+    }
+    chosen = first_supported;
+    used_shared_fallback = true;
+  }
+  if (profiling) {
+    prof_build.reset();
+    prof_build.emplace(prof.select_finish_ns);
+  }
+  SurveyOperationsBatch surveys(world.systems, world.bodies,
+                                shared ? &shared->catalog() : nullptr);
+  return build_candidate(world, subject, *chosen, batch,
+                         fuel_policy, &surveys, systems_index);
+}
+
+bool ExplorationMissionPlanner::has_supported_mission_target(
+    ExplorationPlanningWorldView world, int fleet_id,
+    MissionFuelPolicy fuel_policy,
+    ExplorationPlanningSharedIndex *shared) const {
+  if(fuel_policy!=MissionFuelPolicy::ReachDestination&&!uses_canonical_reach_)
+    throw std::invalid_argument("Return fuel planning requires the canonical operational reach provider.");
+  // Same subject selection as build_plan: the stored fleet, not a caller
+  // reference, and unavailable for missing/inactive/non-survey vessels.
+  const auto fleet =
+      std::find_if(world.fleets.begin(), world.fleets.end(),
+                   [fleet_id](const auto &candidate) {
+                     return candidate.id == fleet_id && candidate.is_active;
+                   });
+  if (fleet == world.fleets.end() ||
+      (fleet->role != FleetRole::Scout && fleet->role != FleetRole::Science))
+    return false;
+  const auto &subject = *fleet;
+  std::optional<OperationalReachBatch> local_batch;
+  OperationalReachBatch *batch = nullptr;
+  if (uses_canonical_reach_)
+    batch = shared ? &shared->reach_batch(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id)
+                   : &local_batch.emplace(
+                         OperationalReachWorldView{world.systems,
+                                                   world.colonies,
+                                                   world.lanes},
+                         subject.civilization_id);
+  // Same negative memo as select_supported_candidate — "no supported
+  // target exists" is exactly the drain verdict, and it is
+  // reservation-free by construction here.
+  std::vector<std::pair<int, double>> drain_sites;
+  const bool memoize_drain =
+      batch != nullptr && subject.current_system_id.has_value();
+  if (memoize_drain) {
+    drain_sites = drain_refuel_sites(world, subject.civilization_id);
+    if (const auto found = drain_verdicts_.find(subject.id);
+        found != drain_verdicts_.end() &&
+        found->second.matches(world, subject, fuel_policy, drain_sites))
+      return false;
+  }
+  // The result is existence-only, so the assess order cannot change it —
+  // reuse the memoized (civilization, role) survey-work list and skip the
+  // plan-order sort entirely.
+  std::vector<std::pair<const StellarSystem *, int>> local_work;
+  const std::vector<std::pair<const StellarSystem *, int>> *work;
+  if (shared) {
+    const std::int64_t key =
+        (static_cast<std::int64_t>(subject.civilization_id) << 32) |
+        static_cast<std::uint32_t>(static_cast<int>(subject.role));
+    auto &entry = shared->survey_work_store()
+                          .for_span(world.systems)[key];
+    if (!entry.valid ||
+        entry.level_revision !=
+            world.knowledge.survey_level_revision(
+                subject.civilization_id)) {
+      refresh_survey_work(world, subject, entry, shared->catalog());
+    }
+    work = &entry.entries;
+  } else {
+    for (const auto &system : world.systems)
+      if (needs_survey_work(world.knowledge, subject, system.id))
+        local_work.push_back({&system, 0});
+    work = &local_work;
+  }
+  // Same connectivity pre-prune as select_supported_candidate: on the
+  // canonical reach path an unreachable candidate can never be supported,
+  // so the existence answer is unchanged. The component-count gate keeps
+  // fully-connected graphs at zero per-candidate cost.
+  const double prune_range = subject.maximum_leg_range_light_years;
+  const bool prune_unreachable =
+      batch != nullptr && subject.current_system_id.has_value() &&
+      world.lanes.connected_component_count(prune_range) > 1;
+  for (const auto &[system, ignored_band] : *work) {
+    if (prune_unreachable && world.lanes.has_system(system->id) &&
+        !world.lanes.systems_connected(*subject.current_system_id,
+                                       system->id, prune_range))
+      continue;
+    bool supported;
+    if (batch) {
+      const int slot = world.lanes.slot_of_system(system->id);
+      supported =
+          slot >= 0
+              ? batch->probe_supported(subject, slot, fuel_policy)
+              : batch->assess(subject, system->id,
+                              mission_kind(subject.role), fuel_policy,
+                              /*explain=*/false)
+                    .is_supported;
+    } else {
+      supported = assess_operational_reach(world, subject, system->id)
+                      .is_supported;
+    }
+    if (supported)
+      return true;
+  }
+  if (memoize_drain)
+    drain_verdicts_[subject.id] = DrainVerdict{
+        world.systems.data(),
+        world.systems.size(),
+        &world.lanes,
+        subject.civilization_id,
+        subject.role,
+        *subject.current_system_id,
+        subject.fuel_remaining_light_years,
+        subject.fuel_capacity_light_years,
+        subject.maximum_leg_range_light_years,
+        fuel_policy,
+        world.knowledge.survey_level_revision(subject.civilization_id),
+        std::move(drain_sites)};
+  return false;
 }
 
 ExplorationMissionOrderAssessment
@@ -283,7 +821,8 @@ ExplorationAiMissionCoordinator::ExplorationAiMissionCoordinator(
     : mission_planner_(mission_planner) {}
 
 ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
-    ExplorationPlanningWorldView world, const FleetState &fleet,MissionFuelPolicy fuel_policy) const {
+    ExplorationPlanningWorldView world, const FleetState &fleet,MissionFuelPolicy fuel_policy,
+    ExplorationPlanningSharedIndex *shared) const {
   if (!fleet.is_active ||
       (fleet.role != FleetRole::Scout && fleet.role != FleetRole::Science))
     return {fleet.id,
@@ -292,19 +831,6 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
             {},
             "Only active scout/science fleets participate in AI exploration "
             "coordination."};
-  const auto plan = mission_planner_.build_plan(
-      world, fleet.id, ExplorationMissionPlanner::hard_maximum_candidates,fuel_policy);
-  std::vector<const ExplorationMissionCandidate *> supported;
-  for (const auto &candidate : plan.candidates)
-    if (candidate.reach.is_supported)
-      supported.push_back(&candidate);
-  if (supported.empty())
-    return {fleet.id,
-            std::nullopt,
-            false,
-            {},
-            "No supported survey work is currently available."};
-
   std::unordered_set<int> reservation_set;
   for (const auto &other : world.fleets) {
     if (!other.is_active || other.id == fleet.id ||
@@ -320,16 +846,19 @@ ExplorationAiMissionSelection ExplorationAiMissionCoordinator::select_mission(
                                                      *other.current_system_id))
       reservation_set.insert(*other.current_system_id);
   }
-  const auto unique = std::find_if(
-      supported.begin(), supported.end(), [&](const auto *candidate) {
-        return !reservation_set.contains(candidate->system_id);
-      });
-  const bool shared = unique == supported.end();
-  const auto *selected = shared ? supported.front() : *unique;
+  bool shared_fallback = false;
+  auto selected = mission_planner_.select_supported_candidate(
+      world, fleet, fuel_policy, reservation_set, shared_fallback, shared);
+  if (!selected)
+    return {fleet.id,
+            std::nullopt,
+            false,
+            {},
+            "No supported survey work is currently available."};
   std::vector<int> reservations(reservation_set.begin(), reservation_set.end());
   std::sort(reservations.begin(), reservations.end());
-  return {fleet.id, *selected, shared, std::move(reservations),
-          shared
+  return {fleet.id, *selected, shared_fallback, std::move(reservations),
+          shared_fallback
               ? "All supported targets in the bounded planning window are "
                 "already reserved; sharing " +
                     selected->catalog_name + "."

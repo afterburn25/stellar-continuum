@@ -5,6 +5,7 @@
 #include <stellar/core/campaign_coordinator.hpp>
 #include <stellar/core/diplomacy_runtime.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
+#include <stellar/core/warfare_coordination.hpp>
 #include <stellar/engine/history.hpp>
 
 #include <memory>
@@ -27,6 +28,14 @@ struct CampaignPerformanceSample {
 struct CampaignRuntimeContinuation {
   StrategicRuntimeSnapshot strategic;
   DiplomacyRuntimeSchedule diplomacy;
+  // Civilization automation — per-civilization domain policies, operator
+  // locks, action histories and the explainable decision journal.
+  CivilizationAutomationCoordinator::State automation;
+  // Scripted event chains — running instances, bound trigger contexts,
+  // timers, auto-choice policy and the applied-effects journal, as the
+  // coordinator's serialized document. Empty when no definitions are
+  // loaded or no snapshot exists.
+  std::string scripted_events;
 };
 void validate_campaign_runtime_continuation(const CampaignRuntimeContinuation &,
     const FreshCampaignState &, double simulation_days);
@@ -36,6 +45,7 @@ struct IntegratedAdaptiveCampaignStepResult {
   std::vector<IntegratedSensorContactRecordingResult> sensor_contacts;
   std::vector<AdaptiveResearchCampaignEvent> research_events;
   DiplomacyCampaignRuntimeStepResult diplomacy;
+  WarfareStepResult warfare;
 };
 
 // Retains only phase outputs that completed during the most recent advance.
@@ -46,6 +56,7 @@ struct IntegratedAdaptiveCampaignAdvanceTrace {
   std::vector<IntegratedSensorContactRecordingResult> sensor_contacts;
   std::optional<std::vector<AdaptiveResearchCampaignEvent>> research_events;
   std::optional<DiplomacyCampaignRuntimeStepResult> diplomacy;
+  std::optional<WarfareStepResult> warfare;
 };
 
 // Stable owning composition reconstructed from Main.CoreIntegration.cs. This

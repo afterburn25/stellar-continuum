@@ -34,6 +34,10 @@ CivilizationEconomy *economy_for(ConstructionWorld w, int civ) {
   return p == w.economies.end() ? nullptr : &*p;
 }
 const PlanetaryBody *body_for(ConstructionReadView w, const Colony &c) {
+  if (w.body_index) {
+    const auto found = w.body_index->bodies_for(c);
+    return found.empty() ? nullptr : &found.front();
+  }
   auto p = std::find_if(w.bodies.begin(), w.bodies.end(), [&](const auto &b) {
     return c.planetary_body_id && b.id == *c.planetary_body_id &&
            b.system_id == c.system_id;

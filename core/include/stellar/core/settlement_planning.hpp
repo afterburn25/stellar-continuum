@@ -5,7 +5,13 @@
 #include <stellar/core/settlement_knowledge.hpp>
 #include <stellar/core/sovereign_currency.hpp>
 
+#include <cstdint>
 #include <functional>
+#include <map>
+#include <optional>
+#include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace stellar::core {
 
@@ -26,6 +32,47 @@ struct SettlementPlanningWorldView {
 using SettlementReachAssessment = std::function<MissionReachAssessment(
     OperationalReachWorldView, int, const FleetState &, int,
     InterstellarMissionKind)>;
+
+// Caller-owned per-step index shared across repeated opportunity-plan
+// calls so each idle colony/outpost fleet does not rebuild the same
+// catalogs. Contents are memoized read models — never authoritative state:
+// the suitability list depends only on (civilization, species, survey
+// LEVELS) so it is invalidated by
+// CivilizationKnowledgeState::survey_level_revision, and each
+// OperationalReachBatch is discarded if the colonies span grew mid-step
+// (a colony founding pushes onto the span's source vector).
+struct SettlementPlanningSharedIndex {
+  struct SuitabilityEntry {
+    bool valid{};
+    std::uint64_t level_revision{};
+    std::vector<KnownSpeciesPlanetarySuitability> values;
+  };
+  std::map<std::pair<int, std::string>, SuitabilityEntry> suitability;
+  struct ReachEntry {
+    std::size_t colony_count{};
+    OperationalReachBatch batch;
+    ReachEntry(OperationalReachWorldView view, int civilization_id)
+        : colony_count(view.colonies.size()),
+          batch(std::move(view), civilization_id) {}
+  };
+  std::unordered_map<int, ReachEntry> reach_batches;
+  OperationalReachBatch &reach_batch(OperationalReachWorldView view,
+                                     int civilization_id) {
+    auto it = reach_batches.find(civilization_id);
+    // Colony foundings grow the source vector mid-step — the batch's
+    // span would dangle after a reallocation, so rebuild on growth.
+    if (it != reach_batches.end() &&
+        it->second.colony_count != view.colonies.size()) {
+      reach_batches.erase(it);
+      it = reach_batches.end();
+    }
+    if (it == reach_batches.end())
+      it = reach_batches.try_emplace(civilization_id, std::move(view),
+                                     civilization_id)
+               .first;
+    return it->second.batch;
+  }
+};
 
 struct ColonizationOpportunityCandidate {
   int system_id{};
@@ -106,9 +153,15 @@ public:
   static constexpr int default_maximum_candidates = 32,
                        hard_maximum_candidates = 64;
   explicit ColonizationOpportunityPlanner(SettlementReachAssessment reach = {});
+  // bodies_index (optional) is a caller-shared catalog grouping produced by
+  // build_settlement_bodies_index — repeated plans then reuse its id lookups
+  // instead of rebuilding them per call and only scan the civilization's
+  // surveyed systems instead of the whole body catalog.
   ColonizationOpportunityPlan
   build_plan(SettlementPlanningWorldView, int,
-             int maximum_candidates = default_maximum_candidates) const;
+             int maximum_candidates = default_maximum_candidates,
+             const SettlementBodiesIndex *bodies_index = nullptr,
+             SettlementPlanningSharedIndex *shared = nullptr) const;
   ColonizationOrderAssessment assess_order(SettlementPlanningWorldView, int,
                                            int, int) const;
   MissionReachAssessment assess_operational_reach(SettlementPlanningWorldView,
@@ -125,7 +178,8 @@ public:
       SettlementReachAssessment reach = {});
   ResourceOutpostOpportunityPlan
   build_plan(SettlementPlanningWorldView, int,
-             int maximum_candidates = default_maximum_candidates) const;
+             int maximum_candidates = default_maximum_candidates,
+             SettlementPlanningSharedIndex *shared = nullptr) const;
   ResourceOutpostOrderAssessment assess_order(SettlementPlanningWorldView, int,
                                               int, int) const;
   static bool is_outpost_fleet(const FleetState &);

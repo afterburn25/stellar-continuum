@@ -68,7 +68,7 @@ if(NOT STELLAR_SOURCE_COMMIT)
   set(STELLAR_SOURCE_COMMIT "unknown")
 endif()
 configure_file(app/build_version.hpp.in generated/stellar/build_version.hpp @ONLY)
-add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp engine/src/diagnostic_log.cpp engine/src/sha256.cpp engine/src/diagnostic_bundle.cpp engine/src/profiler.cpp engine/src/memory_tracker.cpp engine/src/event_bus.cpp engine/src/world.cpp engine/src/simulation_scheduler.cpp engine/src/simulation_executor.cpp engine/src/economy_catalog.cpp engine/src/population.cpp engine/src/colony.cpp engine/src/flow_network.cpp engine/src/logistics.cpp engine/src/planetary.cpp engine/src/terraforming.cpp engine/src/strategic_ai.cpp engine/src/warfare.cpp engine/src/history.cpp engine/src/physics.cpp engine/src/localization.cpp engine/src/package.cpp engine/src/project.cpp engine/src/scene_document.cpp engine/src/scene_components.cpp engine/src/content_resolver.cpp engine/src/platform_services.cpp engine/src/mission_graph.cpp engine/src/crash_reporter.cpp engine/src/input_actions.cpp engine/src/resource_economy.cpp engine/src/replay.cpp engine/src/accessibility.cpp engine/src/animation.cpp engine/src/render_graph.cpp engine/src/texture_streaming.cpp engine/src/shader_library.cpp engine/src/vfx.cpp engine/src/save_integrity.cpp engine/src/save_history.cpp engine/src/draw_batcher.cpp engine/src/ui_viewmodels.cpp engine/src/galaxy_map.cpp)
+add_library(stellar_engine STATIC engine/src/foundation.cpp engine/src/runtime_paths.cpp engine/src/atomic_file_write.cpp engine/src/diagnostic_log.cpp engine/src/sha256.cpp engine/src/diagnostic_bundle.cpp engine/src/profiler.cpp engine/src/memory_tracker.cpp engine/src/event_bus.cpp engine/src/world.cpp engine/src/simulation_scheduler.cpp engine/src/simulation_executor.cpp engine/src/economy_catalog.cpp engine/src/population.cpp engine/src/colony.cpp engine/src/flow_network.cpp engine/src/logistics.cpp engine/src/planetary.cpp engine/src/terraforming.cpp engine/src/strategic_ai.cpp engine/src/automation.cpp engine/src/warfare.cpp engine/src/history.cpp engine/src/physics.cpp engine/src/localization.cpp engine/src/package.cpp engine/src/project.cpp engine/src/scene_document.cpp engine/src/scene_components.cpp engine/src/content_resolver.cpp engine/src/platform_services.cpp engine/src/mission_graph.cpp engine/src/crash_reporter.cpp engine/src/input_actions.cpp engine/src/resource_economy.cpp engine/src/replay.cpp engine/src/accessibility.cpp engine/src/animation.cpp engine/src/render_graph.cpp engine/src/texture_streaming.cpp engine/src/shader_library.cpp engine/src/vfx.cpp engine/src/save_integrity.cpp engine/src/save_history.cpp engine/src/draw_batcher.cpp engine/src/ui_viewmodels.cpp engine/src/galaxy_map.cpp)
 target_include_directories(stellar_engine PUBLIC engine/include)
 target_sources(stellar_engine PRIVATE engine/src/native_scene3d.cpp engine/src/json_document.cpp engine/src/product_version.cpp engine/src/runtime_directory_lease.cpp engine/src/runtime_diagnostics.cpp engine/src/mesh3d_loader.cpp)
 target_link_libraries(stellar_engine PUBLIC Threads::Threads)
@@ -197,6 +197,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/combat_simulation.cpp core/src/combat_command_runtime.cpp
   core/src/combat_readiness_detail.cpp core/src/own_combat_fleet_status.cpp
   core/src/campaign_coordinator.cpp core/src/coordinator_commands.cpp
+  core/src/civilization_automation.cpp
   core/src/adaptive_research_catalog.cpp core/src/adaptive_research_applicability_catalog.cpp
   core/src/adaptive_research_facilities.cpp core/src/adaptive_research_progress_policy.cpp
   core/src/adaptive_research_state.cpp core/src/adaptive_research_eligibility.cpp
@@ -228,6 +229,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/diplomacy_observer_commands.cpp
   core/src/diplomacy_runtime.cpp
   core/src/fleet_combat_intelligence.cpp
+  core/src/warfare_coordination.cpp
   core/src/integrated_adaptive_campaign.cpp
   core/src/galaxy_generation_metadata.cpp
   core/src/massive_combat_persistence.cpp
@@ -260,6 +262,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/player_campaign_recovery.cpp
   core/src/player_campaign_save.cpp
   core/src/save_preview.cpp
+  core/src/scripted_events.cpp
   core/src/legacy_campaign_recovery.cpp)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/planets/planet-types-v1.json" "${CMAKE_SOURCE_DIR}/data/planets/planet-art-v1.json")
 file(READ "${CMAKE_SOURCE_DIR}/data/planets/planet-types-v1.json" STELLAR_PLANET_TYPES)
@@ -320,6 +323,10 @@ add_test(NAME native_developer_index COMMAND stellar_native_developer_index_test
 add_executable(stellar_operational_reach_batch_tests native-tests/operational_reach_batch_tests.cpp)
 target_link_libraries(stellar_operational_reach_batch_tests PRIVATE stellar_core)
 add_test(NAME operational_reach_batch COMMAND stellar_operational_reach_batch_tests
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+add_executable(stellar_settlement_shared_index_tests native-tests/settlement_shared_index_tests.cpp)
+target_link_libraries(stellar_settlement_shared_index_tests PRIVATE stellar_core)
+add_test(NAME settlement_shared_index COMMAND stellar_settlement_shared_index_tests
   "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
 add_executable(stellar_exploration_fuel_safety_tests native-tests/exploration_fuel_safety_tests.cpp)
 target_link_libraries(stellar_exploration_fuel_safety_tests PRIVATE stellar_core)
@@ -725,6 +732,15 @@ if(BUILD_TESTING)
   add_executable(stellar_strategic_ai_tests native-tests/strategic_ai_tests.cpp)
   target_link_libraries(stellar_strategic_ai_tests PRIVATE stellar_engine)
   add_test(NAME strategic_ai COMMAND stellar_strategic_ai_tests)
+  add_executable(stellar_automation_tests native-tests/automation_tests.cpp)
+  target_link_libraries(stellar_automation_tests PRIVATE stellar_engine)
+  add_test(NAME automation COMMAND stellar_automation_tests)
+  add_executable(stellar_civilization_automation_tests native-tests/civilization_automation_tests.cpp)
+  target_link_libraries(stellar_civilization_automation_tests PRIVATE stellar_core)
+  add_test(NAME civilization_automation COMMAND stellar_civilization_automation_tests)
+  add_executable(stellar_scripted_events_tests native-tests/scripted_events_tests.cpp)
+  target_link_libraries(stellar_scripted_events_tests PRIVATE stellar_core)
+  add_test(NAME scripted_events COMMAND stellar_scripted_events_tests "${CMAKE_SOURCE_DIR}")
   add_executable(stellar_warfare_tests native-tests/warfare_tests.cpp)
   target_link_libraries(stellar_warfare_tests PRIVATE stellar_engine)
   add_test(NAME warfare COMMAND stellar_warfare_tests)
@@ -1073,6 +1089,20 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/data/research/v1"
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/adaptive-research-campaign-simulation.json")
   set_tests_properties(adaptive_research_campaign_simulation_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_research_ai_scheduling_tests native-tests/adaptive_research_ai_scheduling_tests.cpp)
+  target_link_libraries(stellar_research_ai_scheduling_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME adaptive_research_ai_scheduling COMMAND stellar_research_ai_scheduling_tests
+    "${CMAKE_SOURCE_DIR}/data/research/v1")
+  set_tests_properties(adaptive_research_ai_scheduling PROPERTIES TIMEOUT 60)
+  add_executable(stellar_colonization_ai_settlement_tests native-tests/colonization_ai_settlement_tests.cpp)
+  target_link_libraries(stellar_colonization_ai_settlement_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME colonization_ai_settlement COMMAND stellar_colonization_ai_settlement_tests
+    "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(colonization_ai_settlement PROPERTIES TIMEOUT 60)
+  add_executable(stellar_warfare_coordination_tests native-tests/warfare_coordination_tests.cpp)
+  target_link_libraries(stellar_warfare_coordination_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME warfare_coordination COMMAND stellar_warfare_coordination_tests)
+  set_tests_properties(warfare_coordination PROPERTIES TIMEOUT 60)
   add_executable(stellar_diplomacy_state_tests native-tests/diplomacy_state_tests.cpp)
   target_link_libraries(stellar_diplomacy_state_tests PRIVATE stellar_core stellar_json)
   add_test(NAME diplomacy_state_parity COMMAND stellar_diplomacy_state_tests

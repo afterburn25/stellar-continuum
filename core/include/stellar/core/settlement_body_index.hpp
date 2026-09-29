@@ -23,16 +23,44 @@ public:
             }
         }
     }
+    // Catalog-scoped: indexes every body so arbitrary (system_id, body_id)
+    // pairs and body-id lookups resolve in O(1). Only this constructor
+    // populates the *_body_with_id maps — request-scoped indexes keep them
+    // empty. Catalog body ids are unique (reference validation rejects
+    // duplicates and the settlement indexes throw on them), so first/last
+    // id lookups coincide on canonical data.
+    explicit SettlementBodyIndex(std::span<const PlanetaryBody> bodies) {
+        bodies_.reserve(bodies.size());
+        by_id_first_.reserve(bodies.size());
+        by_id_last_.reserve(bodies.size());
+        for (const auto& body : bodies) {
+            bodies_.try_emplace(key(body.system_id, body.id), &body);
+            by_id_first_.try_emplace(body.id, &body);
+            by_id_last_[body.id] = &body;
+        }
+    }
     std::span<const PlanetaryBody> bodies_for(const Colony& colony) const {
         if (!colony.planetary_body_id) return {};
         const auto found = bodies_.find(key(colony.system_id, *colony.planetary_body_id));
         return found == bodies_.end() || !found->second
             ? std::span<const PlanetaryBody>{} : std::span<const PlanetaryBody>{found->second, 1};
     }
+    // First/last body in catalog order carrying the id (they coincide on
+    // canonical unique-id catalogs).
+    const PlanetaryBody* first_body_with_id(int body_id) const {
+        const auto found = by_id_first_.find(body_id);
+        return found == by_id_first_.end() ? nullptr : found->second;
+    }
+    const PlanetaryBody* last_body_with_id(int body_id) const {
+        const auto found = by_id_last_.find(body_id);
+        return found == by_id_last_.end() ? nullptr : found->second;
+    }
 private:
     static std::uint64_t key(int system, int body) {
         return (std::uint64_t{static_cast<std::uint32_t>(system)} << 32) | static_cast<std::uint32_t>(body);
     }
     std::unordered_map<std::uint64_t, const PlanetaryBody*> bodies_;
+    std::unordered_map<int, const PlanetaryBody*> by_id_first_;
+    std::unordered_map<int, const PlanetaryBody*> by_id_last_;
 };
 } // namespace stellar::core

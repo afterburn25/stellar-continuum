@@ -99,6 +99,11 @@ CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const C
     const SettlementBodyIndex body_index(colonies, world.bodies);
     return credit_flow(world, colonies, economies, civilization_id, include_research, power_days, body_index);
 }
+CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
+    std::span<const CivilizationEconomy> economies, int civilization_id,
+    const SettlementBodyIndex& body_index, bool include_research, double power_days) {
+    return credit_flow(world, colonies, economies, civilization_id, include_research, power_days, body_index);
+}
 double industry_storage_capacity(EconomyWorldView world, std::span<const Colony> colonies, int id) {
     const auto* civilization = civilization_for(world.civilizations, id); if (!civilization) throw std::out_of_range("Civilization is unavailable.");
     if (civilization->is_seeded_ancient) return 50000.0;
@@ -125,6 +130,11 @@ void apply_industry_storage_caps(EconomyWorldView world, std::span<const Colony>
 void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies, std::span<CivilizationEconomy> economies, double days, bool accrue_science) {
     if (days <= 0) return;
     const SettlementBodyIndex body_index(colonies, world.bodies);
+    advance_colony_economies(world, colonies, economies, days, body_index,
+                           accrue_science);
+}
+void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies, std::span<CivilizationEconomy> economies, double days, const SettlementBodyIndex& body_index, bool accrue_science) {
+    if (days <= 0) return;
     for (auto& economy : economies) {
         const auto flow = credit_flow(world, colonies, economies, economy.civilization_id, false, days, body_index);
         const double opening_arrears = std::max(0.0, economy.operating_arrears);

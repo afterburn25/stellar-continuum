@@ -41,9 +41,19 @@ bool CivilizationKnowledgeState::record_galactic_core_exploration(int id) {
   return has_galactic_core_access(id) && core_explored_.insert(id).second;
 }
 
+void CivilizationKnowledgeState::note_level_change(int civilization_id,
+                                                   int system_id) {
+  const auto revision = ++survey_level_revisions_[civilization_id];
+  survey_level_dirty_[civilization_id][revision].push_back(system_id);
+}
+
 CivilizationKnowledgeState::Survey &
 CivilizationKnowledgeState::ensure_survey(int civilization_id, int system_id) {
-  return surveys_[civilization_id].try_emplace(system_id).first->second;
+  auto &entries = surveys_[civilization_id];
+  const auto [it, inserted] = entries.try_emplace(system_id);
+  if (inserted)
+    note_level_change(civilization_id, system_id);
+  return it->second;
 }
 
 bool CivilizationKnowledgeState::is_system_known(int civilization_id,
@@ -108,10 +118,35 @@ bool CivilizationKnowledgeState::is_civilization_known(int observer_id,
           civilizations_.at(observer_id).contains(target_id));
 }
 
+bool CivilizationKnowledgeState::sensor_sweep_needed(
+    int civilization_id, int system_id, double range) const {
+  const auto found =
+      sensor_coverage_.find((static_cast<std::int64_t>(civilization_id)
+                             << 32) |
+                            static_cast<std::uint32_t>(system_id));
+  return found == sensor_coverage_.end() || found->second < range;
+}
+
+void CivilizationKnowledgeState::record_sensor_sweep(
+    int civilization_id, int system_id, double range) {
+  auto &widest =
+      sensor_coverage_[(static_cast<std::int64_t>(civilization_id) << 32) |
+                       static_cast<std::uint32_t>(system_id)];
+  if (widest < range)
+    widest = range;
+}
+
 bool CivilizationKnowledgeState::reveal_system(int civilization_id,
                                                 int system_id) {
-  ensure_survey(civilization_id, system_id);
+  // Already-known fast path: systems_ membership implies the survey
+  // entry exists (every systems_ insertion goes through this function,
+  // which ensures first), so ensure_survey and set::insert would both
+  // be no-ops — skip the extra tree walks the sensor-reveal scan would
+  // otherwise pay per in-range candidate per hop.
   auto found = systems_.find(civilization_id);
+  if (found != systems_.end() && found->second.contains(system_id))
+    return false;
+  ensure_survey(civilization_id, system_id);
   if (found == systems_.end()) {
     system_observer_order_.push_back(civilization_id);
     found = systems_.emplace(civilization_id, std::set<int>{}).first;
@@ -131,6 +166,8 @@ bool CivilizationKnowledgeState::record_reconnaissance(int civilization_id,
   knowledge.progress =
       std::clamp(source_max(knowledge.progress, progress_floor), 0.0, 0.999999);
   knowledge.level = SystemSurveyLevel::partially_surveyed;
+  if (knowledge.level != old_level)
+    note_level_change(civilization_id, system_id);
   return knowledge.level != old_level ||
          std::abs(knowledge.progress - old_progress) > 0.0000001;
 }
@@ -144,13 +181,16 @@ bool CivilizationKnowledgeState::advance_system_survey(int civilization_id,
   auto &knowledge = ensure_survey(civilization_id, system_id);
   if (knowledge.level == SystemSurveyLevel::fully_surveyed)
     return false;
+  const auto old_level = knowledge.level;
   const bool was_fully_surveyed =
-      knowledge.level == SystemSurveyLevel::fully_surveyed;
+      old_level == SystemSurveyLevel::fully_surveyed;
   knowledge.progress =
       std::clamp(knowledge.progress + progress_delta, 0.0, 1.0);
   knowledge.level = knowledge.progress >= 1.0
                         ? SystemSurveyLevel::fully_surveyed
                         : SystemSurveyLevel::partially_surveyed;
+  if (knowledge.level != old_level)
+    note_level_change(civilization_id, system_id);
   return !was_fully_surveyed &&
          knowledge.level == SystemSurveyLevel::fully_surveyed;
 }
@@ -161,6 +201,8 @@ bool CivilizationKnowledgeState::mark_system_fully_surveyed(
   auto &knowledge = ensure_survey(civilization_id, system_id);
   const bool changed = knowledge.level != SystemSurveyLevel::fully_surveyed ||
                        knowledge.progress < 1.0;
+  if (knowledge.level != SystemSurveyLevel::fully_surveyed)
+    note_level_change(civilization_id, system_id);
   knowledge = {SystemSurveyLevel::fully_surveyed, 1.0};
   return changed;
 }

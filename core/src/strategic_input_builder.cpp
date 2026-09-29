@@ -1,5 +1,7 @@
 #include <stellar/core/strategic_input_builder.hpp>
 
+#include <stellar/core/settlement_knowledge.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -51,7 +53,8 @@ CivilizationStrategicInputBuilder::CivilizationStrategicInputBuilder(
     StrategicExplorationPlanQuery exploration)
     : logistics_(std::move(logistics)),
       shipbuilding_capabilities_(std::move(shipbuilding_capabilities)),
-      exploration_(std::move(exploration)) {
+      exploration_(std::move(exploration)),
+      exploration_injected_(static_cast<bool>(exploration_)) {
   if (!logistics_)
     logistics_ = [](const StrategicInputWorldView &world, int civilization_id) {
       std::vector<EconomyConstructionState> construction;
@@ -137,33 +140,72 @@ CivilizationOwnState CivilizationStrategicInputBuilder::build(
                      return left->id < right->id;
                    });
   bool has_supported_exploration_work = false;
+  ExplorationMissionPlanner probe;
   for (const auto *fleet : exploration_fleets) {
-    const auto plan = exploration_(world.exploration_view(), fleet->id,
-                                   ExplorationMissionPlanner::hard_maximum_candidates);
-    if (std::any_of(plan.candidates.begin(), plan.candidates.end(),
-                    [](const auto &candidate) {
-                      return candidate.reach.is_supported;
-                    })) {
+    // Injected providers stay authoritative; the default query answers the
+    // same "any supported candidate in the plan" question — supported
+    // entries always sort first, so the candidate cap can never hide one —
+    // with the planner's lazy first-supported probe instead of building a
+    // full all-systems plan per fleet per review.
+    const bool any_supported = [&] {
+      if (!exploration_injected_)
+        return probe.has_supported_mission_target(
+            world.exploration_view(), fleet->id,
+            MissionFuelPolicy::ReachDestination, world.planning_shared);
+      const auto plan =
+          exploration_(world.exploration_view(), fleet->id,
+                       ExplorationMissionPlanner::hard_maximum_candidates);
+      return std::any_of(plan.candidates.begin(), plan.candidates.end(),
+                         [](const auto &candidate) {
+                           return candidate.reach.is_supported;
+                         });
+    }();
+    if (any_supported) {
       has_supported_exploration_work = true;
       break;
     }
   }
 
   bool has_known_colonization_opportunity = false;
-  for (const auto &body : world.bodies) {
-    if (!world.knowledge.is_system_fully_surveyed(civilization_id,
-                                                   body.system_id) ||
-        colonized_system_ids.contains(body.system_id))
-      continue;
-    for (const auto species_id : population_species_ids) {
+  const auto body_qualifies = [&](const PlanetaryBody &body) {
+    for (const auto species_id : population_species_ids)
       if (species_colonization_assessment(species_id, body)
-              .can_found_current_colony) {
-        has_known_colonization_opportunity = true;
+              .can_found_current_colony)
+        return true;
+    return false;
+  };
+  if (world.bodies_index) {
+    // Only fully-surveyed, uncolonized systems can qualify — walk the
+    // observer's surveyed-system set through the shared index instead of
+    // rescanning the entire catalog. Same existence result; the flag is
+    // order-insensitive.
+    for (const auto &survey :
+         world.knowledge.system_survey_knowledge(civilization_id)) {
+      if (survey.level != SystemSurveyLevel::fully_surveyed ||
+          colonized_system_ids.contains(survey.system_id))
+        continue;
+      const auto found = world.bodies_index->by_system.find(survey.system_id);
+      if (found == world.bodies_index->by_system.end())
+        continue;
+      for (const auto *body : found->second)
+        if (body_qualifies(*body)) {
+          has_known_colonization_opportunity = true;
+          break;
+        }
+      if (has_known_colonization_opportunity)
         break;
-      }
     }
-    if (has_known_colonization_opportunity)
-      break;
+  } else {
+    for (const auto &body : world.bodies) {
+      if (!world.knowledge.is_system_fully_surveyed(civilization_id,
+                                                     body.system_id) ||
+          colonized_system_ids.contains(body.system_id))
+        continue;
+      if (body_qualifies(body))
+        has_known_colonization_opportunity = true;
+      if (has_known_colonization_opportunity)
+        break;
+    }
   }
 
   const bool has_spacecraft_construction = shipbuilding_capabilities_(

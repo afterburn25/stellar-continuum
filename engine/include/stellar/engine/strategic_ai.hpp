@@ -38,21 +38,45 @@ namespace stellar::engine {
 struct UtilityAction {
     std::string id;
     std::string domain; // "economy", "expansion", "military", ...
+    // What the action operates on (colony/fleet/system id as text).
+    // Automation layers key manual-override locks on this; empty means
+    // the action has no lockable target.
+    std::string target;
     std::function<double()> score;
     std::function<void()> commit;
     double cooldown_days{0.0};      // min days between commits
     double weight{1.0};             // caller-side importance scaling
     bool enabled{true};
+    // Routine actions are bounded maintenance operations an "assisted"
+    // automation mode may execute; non-routine (strategic) actions are
+    // reserved for full automatic mode or the human operator.
+    bool routine{false};
 };
 
 struct Decision {
     double at_day{0.0};
     std::string domain;
     std::string action_id;
+    std::string target;
     double utility{0.0};
     std::uint32_t candidates{0};    // how many scored
     bool switched{false};           // displaced the incumbent
 };
+
+// Advisory ranking of a domain's candidates — what decide() would
+// pick and by how much, without committing. Sorted by effective
+// utility descending, action id ascending.
+struct RankedCandidate {
+    std::string action_id;
+    std::string target;
+    double utility{0.0};
+    bool incumbent{false};
+    bool cooldown_active{false};
+};
+
+// Optional decide() filter: return false to exclude an action this
+// evaluation (locks, routine gating, budget reservation).
+using ActionEligibility = std::function<bool(const UtilityAction&)>;
 
 class StrategicMind {
 public:
@@ -71,10 +95,20 @@ public:
     // weight, incumbent × hysteresis), commit if it clears
     // `min_utility`, journal the decision. Returns the committed id or
     // nullopt. `now_day` drives cooldowns — pass the campaign clock.
+    // `eligible` (optional) additionally filters candidates — locks and
+    // mode gates live on the caller's side of the contract.
     std::optional<std::string> decide(std::string_view domain,
                                       double now_day,
                                       double min_utility = 0.0,
-                                      double hysteresis = 1.1);
+                                      double hysteresis = 1.1,
+                                      ActionEligibility eligible = {});
+
+    // Advisory evaluation: score every enabled action in `domain`
+    // (cooldown-blocked actions included, flagged) and return the
+    // deterministic ranking. Nothing commits; the journal is untouched.
+    [[nodiscard]] std::vector<RankedCandidate>
+    rank(std::string_view domain, double now_day,
+         double hysteresis = 1.1) const;
 
     // The last committed action per domain (the hysteresis incumbent).
     [[nodiscard]] std::optional<std::string> incumbent(

@@ -1,0 +1,39 @@
+{
+  "id": "border_unrest",
+  "triggers": [
+    {
+      "event": "colonization.colony_established",
+      "stage": "unrest"
+    }
+  ],
+  "stages": {
+    "unrest": {
+      "title_key": "EV_UNREST_BREWING_TITLE",
+      "body_key": "EV_UNREST_BREWING_BODY",
+      "timer_days": 15,
+      "timeout_stage": "flare"
+    },
+    "flare": {
+      "title_key": "EV_UNREST_FLARE_TITLE",
+      "body_key": "EV_UNREST_FLARE_BODY",
+      "choices": [
+        {
+          "id": "subsidize",
+          "next": "",
+          "effects": [
+            "charge_credits:$civ:75",
+            "adjust_stability:$colony:0.10"
+          ]
+        },
+        {
+          "id": "crackdown",
+          "next": "",
+          "effects": [
+            "damage_building:$colony:0.30",
+            "adjust_stability:$colony:-0.05"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -39,8 +39,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Navigation/logistics | IMPLEMENTED BUT NEEDS POLISH | Core lane network, reach, exploration, freight/logistics | route/reach/freight/exploration parity | Domain-specific rules, not generic Engine route service; combined fleet stress still needed |
 | Knowledge/observation | IMPLEMENTED BUT NEEDS POLISH | Core knowledge, campaign observation, observer commands | knowledge/diplomacy invariants | Game-scoped privacy model; no general fog engine |
 | Economy/production | IMPLEMENTED BUT NEEDS POLISH | Core economy/industry/construction/shipbuilding/biology | economy/production parity, 5k colony scale | Not a generic resource graph; combined late-game load unverified |
-| Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots | native adaptive research parity family | Existing domain runtime, not proof that every advanced research design is fully exposed in UI |
+| Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots; AI final-slot commitment scheduling in `adaptive_research_campaign_simulation.cpp` (over-horizon picks deferred for bounded alternatives at the last free directed slot) | native adaptive research parity family, `adaptive_research_ai_scheduling` | Existing domain runtime, not proof that every advanced research design is fully exposed in UI; AI scheduling bounds commitment size but does not steer toward strategic unlocks |
 | Strategic AI | PARTIALLY IMPLEMENTED | Core strategic intent/planning and fleet intelligence | strategic/campaign/exploration tests | Correctness coverage does not demonstrate effective complete long-game AI |
+| Scripted event chains | PARTIALLY IMPLEMENTED | Engine `mission_graph.hpp` (`MissionRuntime`: JSON definitions, conditional triggers, timed stages, choices, EventBus effects, serialize/restore — previously unconsumed); Core `scripted_events.hpp` (`ScriptedEventCoordinator`: feeds every accepted step's typed domain events as named triggers + scalar JSON payloads, binds trigger context per instance, interprets authored `grant_credits`/`charge_credits`/`adjust_stability`/`damage_building`/`set_building_enabled`/`start_project` effects through canonical commands, AI/headless deterministic auto-choice, pending surface for UI, continuation + developer-save persistence); shipped `data/events/*.json` chains fire on real campaign events | `scripted_events`, `mission_graph`; parity suite unchanged (inert without definitions) | Player-facing chain UI and adaptive-research/diplomacy/sensor event families unfed; effect vocabulary covers treasury/stability/buildings/projects only — no fleet/anomaly spawning yet |
+| Civilization automation | PARTIALLY IMPLEMENTED | Engine `automation.hpp` (`AutomationController`: Off/Advisory/Assisted/Automatic domain modes, policy+constraint knobs, operator override locks, bounded explainable journal, hysteresis/cooldown shared with `StrategicMind`, sorted capture/restore); Core `civilization_automation.hpp` (`CivilizationAutomationCoordinator` — per-civ controllers, colonies + player construction domains, canonical assess→commit surface/industry commands, driven by the `automatic_orders` phase before the legacy AI order helpers, opt-in defaults preserve pre-automation parity); runtime continuation + developer-save JSON carry policies/locks/incumbents/cooldowns/journals + advisory proposal-suppression state (save→continue deterministic) | `automation`, `civilization_automation`; campaign parity suite unchanged under default-off | Colony placements only (repair/enable/hub/placement + empire project queue); economy/logistics/research/fleet/diplomacy automation, player-facing automation UI, and save-path coverage beyond the developer continuation envelope remain open |
 | Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
 | Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
@@ -61,6 +63,957 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Exploration planning shared index + lazy survey profiles (2026-09-28)
+
+- Purpose: the exploration advance rebuilt per-call structures for every
+  idle AI survey fleet each tick — a fresh systems id map plus an
+  O(systems) `needs_survey_work` + priority-band filter in
+  `select_supported_candidate`, and `SurveyOperationsBatch::build`
+  eagerly profiled every catalog system (O(systems + bodies)) on first
+  query even though callers resolve a single system.
+- Modules: `core/include/stellar/core/knowledge.hpp` /
+  `core/src/knowledge.cpp` — `CivilizationKnowledgeState::survey_level_revision`
+  is a transient per-civilization counter bumped only when that
+  civilization's survey LEVEL can change (new detected entry via
+  `ensure_survey` insert, or a level transition in
+  `record_reconnaissance` / `advance_system_survey` /
+  `mark_system_fully_surveyed`); progress-only writes do not bump it,
+  and one civilization's writes do not invalidate another's memoized
+  level-derived views. `survey_level_dirty_marks(civilization)` exposes
+  the same bump sites as per-system marks (system id -> recording
+  revision), so memoized views can patch just the changed systems
+  instead of rescanning the catalog. Neither is serialized; restores
+  rebuild through the mutators.
+  `survey_operations.hpp` / `survey_operations.cpp` — `SurveyCatalogIndex`
+  (`systems_by_id` + `bodies_by_system`, both lazily populated and
+  revalidated against the source spans by (data, size) so an index held
+  across world revisions rebuilds instead of serving stale pointers) and
+  an optional shared-index parameter on `SurveyOperationsBatch`; with an
+  index, `build(system_id)` resolves just that system's bodies instead of
+  eagerly preparing every system's profile. `exploration_planning.hpp` /
+  `exploration_planning.cpp` — `ExplorationPlanningSharedIndex` references
+  the catalog index (`catalog()` defaults to an owned per-index instance;
+  `catalog_override` can point at a longer-lived one) plus
+  per-(civilization, fleet role) survey-work lists keyed on that
+  civilization's `survey_level_revision` and refreshed by
+  `refresh_survey_work`: the first build scans the catalog, and later
+  refreshes patch only the systems in `survey_level_dirty_marks` —
+  revision-ordered buckets replayed from `upper_bound(list revision)`
+  so each mark is consumed once per list — via a `positions`
+  side-index. The lists live in a `SurveyWorkStore` (override like
+  `catalog_override`; `ExplorationSimulation` holds a campaign-wide
+  one) revalidated on the systems span (data, size), so a tick with no
+  level changes for a civilization costs a revision compare and a
+  revision decrease (replaced knowledge) forces a rescan — identical
+  membership and bands either way (entry order may differ; both
+  consumers are order-free). Optional `shared` parameters
+  on `select_supported_candidate` and
+  `ExplorationAiMissionCoordinator::select_mission` keep the original
+  per-call scans when absent. `exploration_advance.cpp` —
+  `ExplorationSimulation::advance` owns one shared index for the whole
+  advance and passes it to the survey-operations batch and every idle
+  survey-fleet mission selection; the catalog index is generation-static,
+  so `ExplorationSimulation` keeps a campaign-wide `campaign_catalog_`
+  that every advance reuses (the span guard covers a reloaded world
+  view). `select_supported_candidate`'s work-list build additionally
+  reads the survey level once per candidate for both the
+  needs-work predicate and the priority band, hoists the fleet's
+  origin/waypoint endpoints and interpolated depth out of the per-entry
+  distance evaluation (same float/double expression order as
+  `interstellar_distance_from_fleet`), and defers the lane-slot lookup
+  to pop time so only assessed candidates pay the id→slot probe.
+  `galaxy_phenomena.hpp` adds `PhenomenonContextIndex`, a
+  campaign-scoped per-system context memo (pure in regions pointer,
+  position, id; cleared on a reloaded world via the (regions, systems
+  span) guard) — `ExplorationSimulation` holds it as
+  `campaign_phenomena_` and `AdvanceIndex` resolves system/body lookups
+  and phenomenon contexts through the campaign indexes, so the per-tick
+  catalog and context generation costs are paid once per campaign.
+- Semantics: unchanged — the memoized (system, band) sets are produced
+  by the same `needs_survey_work` + `survey_priority` calls; per-fleet
+  distance ranking and lazy reach assessment are unchanged; a
+  mid-advance survey level transition marks the system so the next
+  query patches exactly that entry (both consumers heap-rank or
+  existence-check, so entry order is unobservable). `SurveyOperationsBatch`
+  profiles for queried ids are identical (same `finish()` on the same
+  per-system `SurveySummary`, bodies in catalog order); the
+  unknown-system error is preserved.
+- Save/performance impact: no persisted state. Measured (2500 systems,
+  seed 8374837, 10k ticks x2 + continuation): final hash bit-identical
+  `8b6963c2...`, repeat + continuation deterministic. Timing deltas were
+  within run-to-run noise at this scale (the whole-catalog prep only
+  fired on select ticks); the change strictly removes an O(catalog) term
+  per mission resolution and per advance, which matters more at larger
+  catalogs and fleet counts.
+- Tests: `exploration_planning_parity`, `exploration_advance_parity`,
+  `exploration_orders_parity`, `exploration_fuel_safety`, `survey_batch`,
+  `survey_batch_50000`, `survey_operations_parity`, `knowledge_parity`,
+  `knowledge_persistence_parity`; 109-test affected-surface batch green.
+
+## Research advance + strategic input shared catalog indexes (2026-09-28)
+
+- Purpose: two sibling subsystems outside the phase tasks rebuilt catalog
+  structures per call — `AdaptiveResearchCampaignSimulation::advance`
+  constructed a request-scoped `SettlementBodyIndex` over the whole body
+  catalog every tick for its credit-flow calls, and
+  `CivilizationStrategicInputBuilder::build` scanned every body per
+  strategic review to flag colonization opportunities.
+- Modules: `core/include/stellar/core/campaign_coordinator.hpp` —
+  `GalaxySimulationStepCoordinator::catalog_body_index` is now public so
+  subsystems driven outside the phase executor can reuse the cached
+  catalog index. `adaptive_research_campaign_simulation.hpp` /
+  `adaptive_research_campaign_simulation.cpp` — `advance` accepts an
+  optional shared `SettlementBodyIndex`; the integrated runtime
+  (`integrated_adaptive_campaign.cpp`) passes the coordinator's cached
+  one. `strategic_input_builder.hpp` — `StrategicInputWorldView` gains an
+  optional `const SettlementBodiesIndex*`; when set, the
+  colonization-opportunity probe walks the observer's fully-surveyed
+  systems through `by_system` instead of scanning the catalog.
+  `strategic_runtime.hpp` / `strategic_runtime.cpp` —
+  `CivilizationStrategicRuntimeCoordinator` caches a
+  `SettlementBodiesIndex` keyed on system/body span identity + edge ids
+  and attaches it lazily only when a review is actually due.
+- Semantics: unchanged — `bodies_for` resolves colony (system id, body id)
+  keys to the first catalog match under both index constructions; the
+  opportunity flag is an existence check insensitive to evaluation order
+  (catalog order vs surveyed-system order).
+- Save/performance impact: none persisted. Measured (2500 systems, seed
+  8374837, 10,000 ticks x2 + continuation): adaptive_research ~1.4 ms ->
+  ~0.6 ms mean with the shared index; whole step ~8.1 ms -> ~5.0 ms;
+  final hash bit-identical `8b6963c2...` and deterministic continuation.
+
+## Automatic-orders shared settlement body index (2026-09-28)
+
+- Purpose: the automatic-orders phase ran full body-catalog scans per owned
+  colony per tick — `refresh_colony_domain` scanned all ~50k bodies for each
+  colony and `assess_colony_automation` ran a second scan inside
+  `colony_sustenance_capacity` — while construction `lock()` scanned the
+  catalog per candidate project per idle civilization and
+  `surface_construction` re-scanned it per placement assessment. Profiling
+  showed `automation_.advance` at ~2.8 ms/tick and the construction-order
+  pass at ~1.1 ms/tick (~4.1 ms mean for the phase).
+- Modules: `core/include/stellar/core/settlement_body_index.hpp` — new
+  catalog-scoped constructor `SettlementBodyIndex(std::span<const
+  PlanetaryBody>)` that populates the same first-match (system id, body id)
+  map plus `first_body_with_id` / `last_body_with_id` id lookups; the
+  request-scoped (colonies, bodies) constructor keeps its original
+  lightweight key-seeding behavior so its callers are unchanged.
+  `core/src/colony_economy.cpp` — `colony_sustenance_capacity` gains an
+  index-accepting overload sharing one resolved-body core with the original
+  span overload. `core/include/stellar/core/construction_state.hpp` —
+  `ConstructionWorld` and `ConstructionReadView` carry an optional `const
+  SettlementBodyIndex*`; `core/src/construction_projects.cpp` `lock()` and
+  `core/src/surface_construction.cpp` body resolution use it when present
+  and keep the original catalog scan otherwise, so scripted-event and UI
+  consumers need no index. `core/src/civilization_automation.cpp` —
+  `CivilizationAutomationCoordinator::advance` resolves the catalog index
+  once and threads it through `refresh_colony_domain`,
+  `assess_colony_automation` and the construction worlds.
+  `core/src/campaign_coordinator.cpp` — `GalaxySimulationStepCoordinator`
+  caches the catalog index member and rebuilds it only when the body span
+  identity (data pointer, size, front/back ids) changes, since rebuilding
+  ~150k hash entries per tick erased the win. The same cached index is also
+  attached to the `construction` phase's world so `promote`, `lock()` and
+  surface placement checks stop rescanning the catalog there as well
+  (construction phase ~0.9 ms -> ~0.02 ms mean at 2,500 systems).
+- Semantics: unchanged — request-scoped `bodies_for` still resolves colony
+  (system id, body id) keys to the first catalog match; catalog-scoped id
+  lookups expose distinct first/last matches so duplicate-id edge cases stay
+  observable; missing bodies remain missing; canonical missing-body errors,
+  construction lock order, placement assessment order and canonical command
+  paths are preserved. Deferred `commit` lambdas capture `world` by value
+  including the index pointer, but every commit executes inside `decide()`
+  during `advance`, so the index outlives all dereferences.
+- Tests: `economy_scale` / `economy_scale_5000_colonies`
+  `body_lookup_contract` pins request-scoped pair lookup against
+  `std::find_if`, duplicate-id first/last catalog matches, stale-binding
+  refresh, empty-index behavior and canonical missing-body errors at
+  thousands-of-colonies scale.
+- Save/performance impact: none persisted. Measured (2500 systems, seed
+  8374837, 10,000 ticks x 2 repeats, continuation verified at tick 5000):
+  `automatic_orders` mean ~4.1 ms -> ~0.9 ms, `core_total` ~7.9 ms, whole
+  step ~9.5 ms mean; the final campaign hash is bit-identical to the
+  pre-optimization run (`8b6963c2...`) and save/restore/continue stays
+  deterministic.
+
+## Adaptive research shared credit-flow index (2026-09-28)
+
+- Purpose: the adaptive research phase ran `economy_credit_flow` once per
+  civilization per tick, and each call rebuilt `SettlementBodyIndex` — a
+  full scan of the ~50k-body catalog — plus `economic_construction_projection`
+  and `economic_fleet_projection`, all invariant across the whole advance.
+  Profiling showed funding was 87% of the phase (~106.8s of ~123s over
+  20,000 calls; adaptive_research mean ~6.2 ms).
+- Modules: `core/include/stellar/core/campaign_economy.hpp` /
+  `core/src/campaign_economy.cpp` — new overload of `economy_credit_flow`
+  accepting a caller-built `const SettlementBodyIndex&`; the original
+  overload keeps constructing a local index so existing callers are
+  untouched, and both delegate to the same `credit_flow` helper.
+  `core/src/adaptive_research_campaign_simulation.cpp` —
+  `AdaptiveResearchCampaignSimulation::advance` now builds the body
+  index and the construction/fleet economic projections once before the
+  per-civilization loop and passes them through the funding pass.
+- Semantics: unchanged — the index is read-only and civ-invariant, the
+  projections are rebuilt per advance exactly as before, and all credit
+  math, rounding, event emission and economy mutation order are
+  preserved.
+- Save/performance impact: none persisted. Measured (2500 systems, seed
+  8374837, 10,000 ticks x 2 repeats): funding falls from ~106.8s to
+  ~4.95s total (~21x), adaptive_research mean ~6.2 ms to ~1.0 ms, whole
+  step ~17.5 ms to ~12.4 ms mean; the final campaign hash is
+  bit-identical and repeat runs stay deterministic.
+
+## Strategic input lazy exploration probe (2026-09-28)
+
+- Purpose: every strategic review ran the default exploration query — a
+  full all-systems `ExplorationMissionPlanner::build_plan` — for each
+  exploration fleet of the reviewing civilization just to answer "does
+  this fleet have any supported survey work". At canonical scale each
+  call assesses thousands of route targets (~48 ms), and reviews are
+  cadence-gated so the cost arrived as periodic multi-civ spikes
+  (strategic_ai mean 7.1 ms, max ~308 ms).
+- Modules: `core/src/exploration_planning.cpp` — new
+  `ExplorationMissionPlanner::has_supported_mission_target(world,
+  fleet_id, fuel_policy)` enumerates survey targets in the exact
+  `build_plan` comparator order and assesses them lazily through the
+  same `OperationalReachBatch`/injected-provider path, stopping at the
+  first supported target. `core/src/strategic_input_builder.cpp` —
+  `CivilizationStrategicInputBuilder` records whether the exploration
+  query was caller-injected; the injected provider remains authoritative
+  (call order and synthesized plans preserved), while the default path
+  answers the existence question with the probe.
+- Semantics: unchanged — `build_plan` sorts supported candidates first,
+  so "any supported in the truncated window" is exactly "any supported
+  target exists"; subject selection (stored fleet, active, survey role)
+  and the canonical-reach guard match `build_plan`.
+- Save/performance impact: none persisted. Measured (2500 systems, 137
+  simulated years, seed 8374837): `strategic_ai` drops from 7.1 ms to
+  1.2 ms mean (~5.8x) and the whole step to 17.6 ms mean; the campaign's
+  final state hash is bit-identical to the pre-optimization run and
+  save/restore/continue stays byte-identical.
+
+## Colonization settlement catalog indexing (2026-09-28)
+
+- Purpose: remove per-call catalog scans from the colonization phase. Every
+  idle colony ship ran `ColonizationOpportunityPlanner::build_plan` every
+  tick, and each call rebuilt `unique()` hash maps over all systems and
+  bodies twice (planner + caller score pass) plus a full body-catalog scan
+  in `build_known_suitability_for_species` — ~13,600 planning calls at
+  ~4.5 ms each dominated the phase at canonical scale.
+- Modules: `core/include/stellar/core/settlement_knowledge.hpp` /
+  `core/src/settlement_knowledge.cpp` — new `SettlementBodiesIndex`
+  (system id → `const StellarSystem *`, body id → `const PlanetaryBody *`,
+  system id → ordered body pointers) built by
+  `build_settlement_bodies_index(systems, bodies)`; it throws the same
+  duplicate-key `invalid_argument` in the same check order (systems then
+  bodies) as the maps it replaces. `build_known_suitability_for_species`
+  gains an optional index parameter: with it, the suitability gather walks
+  the observer's surveyed-system knowledge and looks bodies up by system
+  instead of scanning the full catalog; without it the original span scan
+  is preserved, and both paths emit the same (system id, body id) ordering.
+  `core/src/settlement_planning.cpp` —
+  `ColonizationOpportunityPlanner::build_plan` accepts the optional index
+  (default `nullptr` keeps the previous per-call `unique()` behavior for
+  one-shot consumers) and forwards it to the suitability gather.
+  `core/src/colonization_runtime.cpp` — `ColonizationSimulation::advance`
+  lazily constructs one index per step on the first idle colony ship,
+  shares it with `build_plan`, and uses its id lookups plus the
+  resolved-pointer `interstellar_distance_from_fleet` overload in the
+  best-candidate score pass.
+- Semantics: unchanged — duplicate-id errors surface identically, body
+  lists preserve catalog order within each system before the existing
+  stable (system id, body id) sort, and one-shot planner entry points
+  (`get_opportunity_plan`, order assessment) keep the original per-call
+  path.
+- Save/performance impact: none persisted — the index lives for one
+  `advance` call. Instrumented profile (2500 systems, 137 simulated years,
+  seed 8374837): planning calls drop from ~4.5 ms to ~0.65 ms each, the
+  colonization phase from ~6.8 ms to 1.1 ms mean (~6×), and total step
+  time to 16.7 ms mean; the campaign's final state hash is bit-identical
+  to the pre-optimization run.
+
+## Exploration advance indexing (2026-09-28)
+
+- Purpose: remove quadratic work from the per-tick exploration phase. The
+  transit loop resolved `first_system` by linear scan over the whole galaxy
+  per fleet per hop, `SurveyOperationsProfiler::build` rescanned the full
+  body catalog for every surveying fleet every tick, and mission planning
+  ran a system lookup per candidate — late-game cost scaled as
+  O(fleets × systems) and O(fleets × bodies) inside the hottest phase of
+  the step (exploration dominated mean step time at canonical scale).
+- Modules: `core/src/exploration_advance.cpp` — a step-local `AdvanceIndex`
+  (system id → `const StellarSystem *`, lazily system id → ordered body
+  pointers, lazily (civilization, system) → refueling service level) is
+  built once per `ExplorationSimulation::advance` and threaded through the
+  transit, arrival, survey and refueling helpers; one
+  `SurveyOperationsBatch` per advance replaces per-fleet profiler calls
+  (the batch lazily prepares all profiles on first query — identical
+  `finish` math and `Unknown system` errors).
+  `core/src/exploration_planning.cpp` — `build_plan` constructs one
+  id→system index per pass and `build_candidate` accepts it explicitly
+  (falling back to the span scan when absent); new
+  `ExplorationMissionPlanner::select_supported_candidate` powers the AI
+  `select_mission` path with lazy route assessment: targets needing survey
+  work are ranked exactly as the plan comparator orders supported
+  candidates (priority band, distance with NaN last, system id), then
+  assessed in order until the first unreserved supported target is found —
+  the same candidate the full sweep selects, without paying an
+  `OperationalReachBatch::assess` for every unsurveyed system every tick.
+  The `hard_maximum_candidates` plan-window bound, the shared-fallback
+  rule, the fuel-policy guard and the stored-fleet (not caller-reference)
+  subject semantics all match `build_plan`.
+  `core/src/fleet_transit.cpp` — new resolved-pointer overload
+  `interstellar_distance_from_fleet(origin, waypoint, fleet, target)`;
+  the original span overload now resolves origin/waypoint once and
+  delegates, preserving its public behavior.
+- Semantics: unchanged by construction — `emplace` keeps the first entry
+  per id (same as `find_if` first-match), body lists preserve source order
+  before the existing stable id sort, refueling is the per-pair max of the
+  same service table (Colony 1.0 / ResourceOutpost 0.5 / else 0), and the
+  waypoint term still applies only in `InterstellarWarp`. Fleet mutation
+  order is untouched and `detect_civilization_contacts` stays a linear
+  scan because fleet positions mutate mid-step.
+- Save/performance impact: none persisted — indexes and batches live for
+  one `advance`/`build_plan` call. Instrumented profile (2500 systems,
+  137 simulated years, seed 8374837): mission selection consumed ~95% of
+  the phase (5,544 selection calls at ~48.6 ms each). After lazy
+  assessment the phase drops from 29.2 ms to 2.6 ms mean (~11×) and total
+  step time from 50.5 ms to 23.1 ms mean (~2.2×); the campaign's final
+  state hash is bit-identical to the pre-optimization run.
+- Tests: `exploration_advance_parity`, `exploration_planning_parity`
+  (including the detached-fleet and injected-reach `Select` fixtures),
+  `exploration_orders_parity`, `exploration_fuel_safety`,
+  `fleet_transit_parity`, `operational_reach_batch`, `survey_batch`,
+  `survey_batch_50000`, `survey_operations_parity`, `lane_network_parity`,
+  `fleet_reach_parity`, `route_policy`, `galaxy_phenomena` — all green;
+  organic campaign hash parity verified against the pre-optimization run.
+- Limitations: when every supported target is reserved or nothing is
+  supported the lazy scan still pays the full assessment sweep (bounded
+  by `hard_maximum_candidates` supported entries); `build_plan` itself —
+  the player/UI planning surface — still assesses every target;
+  `detect_civilization_contacts` remains O(civs × (colonies + fleets))
+  per surveying fleet by design since positions mutate mid-step; the
+  lane route cache still clears wholesale at capacity.
+
+## Dense route trees, reachability pruning, contact-presence index (2026-09-29)
+
+- Purpose: the late-game exploration profile (5,000 systems, ~200
+  simulated years, `STELLAR_EXPL_PROF=1`) showed mission selection
+  spending most of its time building `unordered_map`-keyed Dijkstra
+  route trees that thrashed the (origin, leg-range) cache, and warp
+  arrival re-scanning every civilization's colonies and fleets for
+  first-contact checks.
+- Modules: `core/src/lane_network.cpp` — `RouteTree` is now dense
+  `std::vector<double> distance` / `std::vector<int> prior` storage
+  indexed by stable system slot (`Impl::slot_of`, populated in
+  `ensure_built`), replacing per-node hash maps; the pending queue still
+  orders pops by (distance, system id) so exact-tie predecessor
+  semantics are preserved. A per-leg-range union-find
+  `component_membership` index answers unreachable origin/destination
+  pairs before any tree is built (unreachable queries neither build nor
+  cache a tree), and the plain route cache capacity is
+  `clamp(8388608/systems, 64, 4096)` entries — large enough for the
+  real late-game working set. Policy routing keeps the sparse
+  `PolicyRouteTree`: permission-filtered queries are rare and never
+  share the plain cache. `core/src/exploration_advance.cpp` —
+  `ContactPresenceIndex` (system → civilization → count maps for
+  colonies and fleets, built once per `advance`) replaces the per-call
+  O(civs × (colonies + fleets)) scan inside
+  `detect_civilization_contacts`; fleet counts are maintained at the
+  three transit sites that assign or clear
+  `FleetState::current_system_id`, and colonies are immutable
+  mid-advance. The same file carries the env-gated `STELLAR_EXPL_PROF`
+  sub-timers (off by default, relaxed-atomic reads when enabled).
+- Semantics: unchanged — verified by byte-identical autosave
+  checkpoints at ticks 11,680 and 13,140 and identical 14,600-tick
+  final hashes versus the pre-change binary on identical flags; note
+  `--events-root` changes the campaign trajectory, so A/B hashes must
+  pin it (an events-off run produced a different-but-valid hash
+  `a69d93b6…` that briefly masqueraded as a code regression).
+  Permission-filtered route queries are never written to the shared
+  cache; unreachable-pair queries return before caching, so the
+  diagnostic `cached_route_tree_count` no longer counts unreachable
+  ranges (`lane_network_parity` fixture updated to match).
+- Save/performance impact: none persisted — slot maps, component
+  membership and the presence index live per network/advance. 200-year
+  canonical A/B (5,000 systems / 22+3 civs / stress-fleets 50 /
+  events on, seed 8374837, identical flags): step mean 76.8 → 74.2 ms,
+  exploration phase 46.2 → 43.2 ms, peak step 3,114 → 1,486 ms,
+  working set 3.29 → 2.86 GB; per-warp-hop contact cost 0.67 →
+  0.29 ms and per-selection cost ~24 → ~20 ms under
+  `STELLAR_EXPL_PROF`. Host additions: campaign tick bound raised to
+  100,000 and `--autosave-every N` writes a periodic developer save for
+  checkpoint diffing.
+- Tests: `lane_network_parity` (53 C#-parity cases + capacity smoke),
+  `exploration_advance_parity`, `exploration_planning_parity`,
+  `exploration_orders_parity`, `exploration_fuel_safety`,
+  `operational_reach_batch`, `fleet_reach_parity`,
+  `fleet_transit_parity`, `knowledge_parity`,
+  `settlement_knowledge_parity`, `campaign_frame_parity` — all green;
+  full native suite 290/290.
+- Limitations: `select_mission`'s per-idle-fleet candidate assessment
+  remains the dominant late-game term (its
+  `OperationalReachBatch::assess` route queries are cached but not
+  eliminated); the route cache still clears wholesale at capacity;
+  `component_membership` recomputes per distinct leg-range on first
+  use; `ContactPresenceIndex` is rebuilt each advance (O(colonies +
+  fleets) once per tick instead of once per contact probe).
+
+## Settlement shared index + connectivity-pruned selection (2026-09-29)
+
+- Purpose: sub-select profiling (`STELLAR_EXPL_PROF=1`) showed the
+  per-pop `assess` loop dominating mission selection — 49,974 selects
+  popped 31.5 M candidates (≈630/select; 7,776 full drains of ~4,300
+  entries each) — and colonization planning rebuilding the per-species
+  suitability catalog and `OperationalReachBatch` for every idle colony
+  fleet each tick.
+- Modules: `core/include/stellar/core/settlement_planning.hpp` —
+  `SettlementPlanningSharedIndex` is a caller-owned per-step read model
+  shared across repeated `build_plan` calls: a
+  (civilization, species) suitability memo gated by
+  `CivilizationKnowledgeState::survey_level_revision(civilization)`, plus
+  per-
+  civilization `OperationalReachBatch` instances whose cached colonies
+  span is invalidated by a colony-count guard (colony foundings grow
+  `world.colonies` mid-step and can reallocate the underlying vector).
+  `ColonizationOpportunityPlanner::build_plan` and
+  `ResourceOutpostOpportunityPlanner::build_plan` take an optional
+  shared index; `core/src/colonization_runtime.cpp` scopes one per
+  `ColonizationSimulation::advance`.
+  `core/include/stellar/core/lane_network.hpp` /
+  `core/src/lane_network.cpp` — new public `systems_connected(origin,
+  destination, maximum_leg_range)` query exposes the union-find
+  component index for pre-pruning.
+  `core/src/exploration_planning.cpp` — `select_supported_candidate`
+  and `has_supported_mission_target` skip lane-unreachable candidates
+  on the canonical-reach path (`batch != nullptr`), where the prune is
+  provably result-identical to an `assess` returning unsupported;
+  custom injected reach providers bypass the prune unchanged. The
+  prune engages only when `connected_component_count(range) > 1` — a
+  single lookup per selection — so the common fully-connected late-
+  game graph pays zero per-candidate cost, and `has_system` keeps
+  lane-unknown candidates on the assess path so
+  `find_shortest_route`'s out_of_range contract is preserved.
+  `core/src/exploration_prof_internal.hpp` — the `STELLAR_EXPL_PROF`
+  profiler is now shared across TUs and gains select sub-attribution
+  (build/loop/finish ns, work entries, rebuilds, pops, assesses, drains).
+  `core/src/lane_network.cpp` gains `find_shortest_route_into`, a
+  caller-buffered route query that walks the predecessor chain in slot
+  space (no per-hop hash lookups) — `OperationalReachBatch::assess` and
+  `has_return_service_route` run it into a per-batch scratch vector so
+  the ~630-pop selection loop no longer allocates a route vector per
+  candidate; supported results still copy the route into the returned
+  assessment. `InterstellarLaneNetwork` also exposes the route tree
+  itself for scan loops: `route_slots()` (the slot→system table),
+  `slot_of_system()` (id→slot, −1 when unknown), and
+  `route_tree_view(origin, range)` — a borrowed span pair over the
+  cached `RouteTree` (`distance[]`/`prior[]`) built and cached under
+  the same contract as `find_shortest_route_into` (invalid range →
+  empty view, unknown origin → `out_of_range`). The view is borrowed
+  per query because route-cache eviction clears the underlying map.
+  `core/include/stellar/core/exploration_planning.hpp` —
+  `ExplorationMissionPlanner::DrainVerdict` is a cross-call negative
+  memo: once a fleet's selection drains the entire work list without
+  finding a supported target, the verdict is replayed on later calls
+  while every input is unchanged (civilization, role, origin system,
+  fuel reserve/capacity, leg range, fuel policy, survey-level revision,
+  the civ's exact refueling-site projection, and the systems/lane
+  object identities). Reservations only veto supported targets and can
+  never create one, so the verdict is reservation-independent; it is
+  consulted only on the canonical reach path and is never persisted.
+  `OperationalReachBatch::assess` gains an `explain` flag: the scan
+  loops pass `explain=false`, which skips reason-string materialization
+  and evaluates fuel feasibility through `evaluate_route_verdict`.
+  That path now never materializes a route at all: it borrows the
+  lane network's `route_tree_view` for the fleet's (origin, leg-range),
+  walks `prior[]` in slot space, and memoizes post-arrival fuel in
+  slot-indexed arrays (`feas_state_`/`feas_fuel_after_`) keyed on the
+  full fleet state — so a full work-list drain touches each tree node
+  once instead of re-walking every route. The refueling projection is
+  mirrored into slot space once per batch (`feas_factor_`, derived from
+  the same `refueling_` snapshot `prepare()` freezes). Verdicts
+  replicate `evaluate_route`'s arithmetic in identical order (origin
+  top-up, leg compare against running fuel +1e-9, subtract, refuel
+  top-up), so they are bit-identical; lane-unknown origins keep the
+  `out_of_range` contract and lane-unknown targets route through
+  `find_shortest_route_into` for the same throw.
+  `RetainReturnToService` still runs the full return-hop check on
+  outward-feasible candidates using the memoized arrival fuel.
+  The batch additionally pins the borrowed `RouteTreeView` on the
+  feasibility state and revalidates it against a route-cache
+  `routes_revision` counter (bumped on every `routes.clear()`
+  eviction), so a drain pays the route-cache lookup once per fleet
+  state instead of once per pop. `probe_supported(slot, policy)`
+  exposes the same verdict path directly on a pre-resolved lane
+  slot: `ExplorationMissionPlanner::RankedTarget` now carries the
+  slot resolved once when the work list is built, and both the
+  select loop and `has_supported_mission_target`'s existence scan
+  probe by slot — removing the per-pop `systems_.contains`,
+  `RouteKey` hash, and `slot_of_system` lookups entirely.
+- Semantics: unchanged — the prune mirrors Dijkstra reachability
+  (same leg-range predicate as the cached trees) and skips only
+  candidates that could never be supported; the suitability memo key
+  covers every input (civilization, species, survey levels — body
+  physical state is generation-static); the reach-batch guard rebuilds
+  on any colony-vector growth; the drain verdict compares all
+  verdict-relevant inputs by exact equality so any mutation misses and
+  recomputes. Verified: 4,000-tick 5,000-system
+  events-enabled A/B is bit-identical between the committed and
+  scratch+memo builds
+  (`63ed7d54606173543b2ce99e69352cc5a36c4a947d6c5c14b91207f267ccd385`);
+  canonical 14,600-tick run reproduces `e5a1d5bf…` with deterministic
+  repeat + save/load continuation.
+- Consumers: `ColonizationSimulation::advance` (per-idle-fleet
+  opportunity planning), `ExplorationSimulation::advance` (mission
+  selection and eligibility probes).
+- Tests: `settlement_shared_index` (new — plan parity shared vs
+  unshared, suitability-memo invalidation across survey-level bumps,
+  reach-batch rebuild after colony-vector growth); `operational_reach_batch`
+  extended — `explain=false` verdict + arrival-fuel parity across all
+  systems, fuel states, and both fuel policies, plus `probe_supported`
+  parity against the verdict path; `RouteTreeView` contract test —
+  prior-chain reconstruction reproduces `find_shortest_route`'s exact
+  vector, invalid-range/unknown-id contract parity; `knowledge_parity`
+  gains a sensor-sweep coverage contract (first/wider sweep needed,
+  contained sweep skipped, per-civ/per-system isolation); full native
+  suite 291/291 green.
+- Save/performance impact: none persisted — all structures are
+  per-advance or per-query. Colonization-phase suitability lists and
+  reach batches are now built once per (civ, species) per level
+  revision instead of once per idle fleet per tick (asymptotic win at
+  high fleet counts; ~noise at the canonical 264-fleet scale).
+  On the canonical 200-year workload the lane graph is a single
+  component at fleet leg ranges, so the connectivity gate removed
+  zero candidates — the measured select cost (~630 pops/select) is
+  fuel-policy assessment of connected-but-unaffordable targets, which
+  only a route walk can reject; the prune's value is confined to
+  fragmented-graph workloads (small leg ranges, dense subsets).
+  The drain memo is the first measured win on the canonical run:
+  select 773.6 s → 406.7 s (−47%), pops 31.5M → 25.5M; the verdict
+  prefix memo follows with select 236.7 s, step mean 31.3 ms, and the
+  slot-indexed tree view cuts select to 155.1 s (loop 109.6 s,
+  ~4.3 µs/pop) with step mean 29.1 ms (vs 74.2 ms at the dense-route
+  baseline, −61%). The pinned view + slot probe trims the loop to
+  ~98 s, and the select `build` phase drops ~42% (67.3 s → 38.9 s on
+  the repeat-2 canonical) once the survey level is read once per
+  candidate, the fleet endpoints/depth hoist removes per-entry index
+  lookups, and the lane-slot probe defers to pop time — step mean
+  24.3 ms (bit-identical `e5a1d5bf…`). The transit phase is profiled
+  (`inbound: prep/reveal/tail`)
+  and reduced in three steps: the phenomenon context is memoized per
+  system per advance (pure in `regions × system`), civilization
+  contact detection early-outs on a two-probe presence check before
+  the per-civilization scan, and `reveal_system` short-circuits on
+  already-known systems. On top of those, a transient sensor-sweep
+  coverage memo in `CivilizationKnowledgeState`
+  (`sensor_sweep_needed`/`record_sensor_sweep`, keyed (civ, system) →
+  widest swept radius) lets `handle_inbound` skip an entire
+  candidate-band scan when a repeat visit is provably contained —
+  reveals are append-only and idempotent, so a covered rescan always
+  yields `revealed=0` and emits no `SensorContact` event; the
+  unconditional `already_known`/`SystemDetected` and contact-detection
+  paths are unaffected. The memo is runtime-only: it is not
+  serialized, so a save/load boundary simply re-runs sweeps (all
+  no-ops) and the trajectory is unchanged.
+  The dominant remaining inbound term was the queued civilian-return
+  re-check: every arrival hop while `return_to_base_requested` rebuilt
+  a full `OperationalReachBatch` and ran explain-mode `assess` on every
+  owned refueling site (~850 µs/hop measured). `nearest_refueling` now
+  ranks candidates through the slot-indexed verdict path — which also
+  reproduces `route_distance_light_years` bit-exactly by accumulating
+  leg distances parent-first in `evaluate_route`'s order
+  (`feas_dist_`) — and only the winning site pays route/reason
+  materialization. `activate_queued_civilian_return_at_system` uses a
+  new `nearest_refueling_verdict` that skips the winner's payload
+  entirely (its result message is discarded and `assign_fleet_route`
+  re-derives the identical route when `route_system_ids` is absent).
+  The batch's id→system map is now built lazily (`systems_map()`), so
+  verdict-only batches never pay the catalog map build; the
+  duplicate-id `invalid_argument` still fires on every path that
+  consumes the map. Both "Unknown mission target" catalog gates
+  (`assess` and `nearest_refueling_verdict`) answer through the lane
+  slot map when the id map is unmaterialized — lane membership indexes
+  the whole catalog, so the slot probe replaces a linear catalog scan
+  per checked site. `has_return_service_route` walks each refueling
+  site's borrowed route tree in slot space (same leg-compare /
+  subtract / top-up sequence as `evaluate_route` on the reversed
+  route) instead of materializing the route and running the explain
+  path per service — the dominant per-pop cost for
+  `RetainReturnToService` fleets. `nearest_refueling_verdict` prunes
+  its needed set through `InterstellarLaneNetwork::route_components` —
+  the same union-find membership table `find_shortest_route_into`
+  consults — so unreachable sites leave the needed set instead of
+  forcing the bounded build to exhaust the reachable frontier.
+  `nearest_refueling_verdict` now runs one
+  early-stopped Dijkstra per hop through
+  `InterstellarLaneNetwork::route_tree_toward`: the build halts at the
+  first fuel-feasible refueling slot, which — since settlement order is
+  ascending (distance, id) — is exactly the min-(distance, id)
+  supported pick the full scan made; settled entries are bit-identical
+  to a full tree and the partial tree never enters the route cache.
+  The verdict materializes the winner's route from the settled prior
+  chain (bit-identical to `find_shortest_route`), so
+  `assign_fleet_route` consumes it directly — the apply side no longer
+  re-derives and re-caches a tree rooted at the hop origin.
+  `evaluate_route` itself resolves leg positions through the lane slot
+  table, so explain callers no longer materialize the batch's
+  id→system map at all (the duplicate-id `invalid_argument` survives
+  on the fallback path); the per-select winner explanation dropped
+  from ~227 µs to ~17 µs on the canonical profile.
+  This removes the per-hop full-catalog Dijkstra (attributed ~575 µs,
+  ~99% of the queued-return cost) and the cached-tree eviction churn.
+  The per-advance `SurveyCatalogIndex` rebuild
+  (O(systems + bodies) hash inserts every tick) is eliminated by
+  `ExplorationSimulation`'s campaign-wide `campaign_catalog_` — the
+  index revalidates on the source span (data, size), so a reloaded
+  world view rebuilds once and a stable world builds it once ever.
+- Limitations: `select_mission`'s per-pop probe remains the dominant
+  late-game term — the floor is heap pop + reservation check +
+  slot-indexed memo probe (~1.5–4 µs), and verdicts still require
+  touching each candidate once per changed fleet state;
+  `has_return_service_route` still probes the colony set per
+  outward-feasible pop on fuel-constrained fleets (now cheap borrowed-
+  tree walks, but K probes per candidate); the survey phase (~1.1 s/run)
+  and work-list build (~11 s/run) are largely closed — the select loop
+  (~53 s/run: heap push/pop + per-pop reach probes across ~3.7 k-entry
+  work lists), the queued-return pick (~20 s/run partial Dijkstras),
+  and inbound reveal/transit (~15+38 s/run) are the remaining
+  attribution targets; the queued-return pick is
+  bounded now but still pays a per-hop partial Dijkstra (~200 µs);
+  the prune only applies on the canonical reach path (injected
+  providers keep the un-pruned loop); `SettlementPlanningSharedIndex`
+  is manual plumbing — callers that omit it keep per-call behavior;
+  the batch's id→system duplicate check now surfaces only on the
+  explain failure path rather than at first map materialization.
+
+## Autonomous warfare coordination (2026-09-28)
+
+- Purpose: close the organic-war gap — diplomacy recorded first contacts and
+  combat incidents, but no civilization ever declared war because nothing
+  converted strategic knowledge into canonical diplomacy/military commands.
+- Modules: new `core/src/warfare_coordination.cpp` +
+  `core/include/stellar/core/warfare_coordination.hpp`
+  (`WarfareCoordinator`, `WarfareWorldView`, `WarfareStepResult`), invoked
+  each step by `IntegratedAdaptiveCampaignRuntime::advance` immediately
+  after `DiplomacyCampaignRuntimeCoordinator::process` so decisions observe
+  the freshest contacts and combat-incident relationship changes.
+- Public interfaces:
+  `WarfareCoordinator::advance(WarfareWorldView, DiplomacyCampaignRuntimeCoordinator&, diplomacy_tick)`
+  returning per-step counts (`trespasses_recorded`, `wars_declared`,
+  `belligerent_contacts_reacquired`, `communications_established`,
+  `peace_offers_sent`/`accepted`/`rejected`, `engagement_orders`,
+  `deployment_orders`); the result is surfaced on
+  `IntegratedAdaptiveCampaignStepResult::warfare` and the advance trace.
+- Behavior: for every AI-controlled civilization (player civs excluded via
+  `campaign_civilization_control`), on a per-civ review cadence — each
+  civilization reviews once per 7000-tick interval (~7 days), phase-shifted
+  by `id * 997` so reviews spread across the interval:
+  - Identified foreign military presence inside colony systems records a
+    canonical `record_trespass` diplomatic event.
+  - Offensive review builds `KnownCivilization` knowledge from the
+    diplomacy view (trust, borders measured as colony-system distance ≤
+    120 ly — just under the default 135 ly fleet sensor range — and
+    active peace/non-aggression/cooperation pacts) and fleet-power
+    observations in `combat_intelligence`; unobserved counterparts get a
+    neutral-strength prior at 0.10 confidence so
+    `StrategicDecisionEvaluator::evaluate_war` prices the uncertainty
+    instead of silently skipping war evaluation.
+  - A `recommend_war` result issues `ObserverDiplomacyCommandService::
+    declare_war` — the same command a player issues — terminating
+    agreements, denying access and recording the `war_declared` event.
+    At most one declaration per civilization per review tick.
+  - Belligerent contact reacquisition: an active war or ceasefire is
+    continuing mutual contact, so at review each civilization re-observes
+    every counterpart it shares such a relationship with — through the
+    canonical `process_contact_opportunity` pipeline — when its contact
+    record is missing or `stale_or_lost`. This is what keeps a war
+    settleable: contacts legitimately drift stale mid-conflict, and a
+    civilization that never identified its aggressor would otherwise not
+    even see the war relationship (observer views are knowledge-filtered).
+  - Communication channels are opened with every identified counterpart —
+    `establish_communication` is the canonical command a player uses and no
+    other autonomous consumer called it, so settlement offers (and future
+    agreement proposals) previously had no path to exist.
+  - Settlement review runs before declarations on the same cadence: pending
+    incoming `peace_offer`/`ceasefire_offer` proposals are answered through
+    canonical `respond_to_proposal`, and each at-war or ceasefire
+    counterpart is evaluated by `StrategicDecisionEvaluator::evaluate_peace`
+    (additive scoring — `evaluate_war` weights untouched). A war's weariness
+    is the journal age of its `war_declared` event normalized to ten years;
+    a declaration that has scrolled off the 256-event history counts as
+    fully wearisome. Ceasefires upgrade to `peace_offer` at a lower
+    threshold. One pending offer per pair, and a rejection suppresses
+    re-offers for four review intervals. A ceasefire entered by mutual
+    consent is also respected by the offensive pass — a civilization will
+    not break a ceasefire it accepted within the same window, though the
+    constraint expires and war can legitimately resume afterward.
+  - Every tick, armed fleets of at-war civilizations receive canonical
+    `CombatCommandRuntime::issue_engage_hostiles` orders when a hostile
+    fleet shares their system, and idle armed fleets route toward the
+    nearest hostile-occupied system via `assess_operational_reach` +
+    `assign_fleet_route` (`InterstellarMissionKind::MilitaryDeployment`).
+- Consumers: `IntegratedAdaptiveCampaignRuntime` — the headless campaign
+  host and all adaptive-campaign consumers gain organic wars; downstream
+  `CombatSimulation`/`CombatDiplomacyBridge` handle engagement and the
+  combat→diplomacy incident feedback unchanged.
+- Determinism: civilization, contact, intruder and fleet iteration are all
+  stable-id ordered; target tie-breaks use distance then lowest system id;
+  no unordered iteration reaches decisions or the journal.
+- Save/performance impact: none — the coordinator retains no state between
+  advances; `DiplomacyRuntimeSchedule` already covers diplomacy clocks and
+  combat orders persist in `FleetState::combat`. Per-tick cost is O(civs ×
+  identified contacts + armed fleets); war declaration cadence is bounded.
+- Tests: `warfare_coordination` — eleven scenarios on a synthetic world:
+  aggressive border contact declares war via the observer command and the
+  relationship transitions to `at_war`; a passive contact under identical
+  geometry does not; an identified contact gains a communication channel;
+  a co-located at-war fleet receives an `Attack` order; an idle at-war
+  fleet routes toward the nearest hostile system; foreign military
+  presence records a trespass; a weary losing civilization sends a
+  settlement offer; a weary civilization accepts an incoming peace offer
+  (relationship transitions to `peace`); a fresh winning war offers
+  nothing; a war fought on drifted-stale contacts reacquires both
+  belligerents, opens a channel, and produces a settlement offer; a
+  freshly accepted ceasefire defers redeclaration until the respect
+  window expires.
+- Limitations: war weariness degrades gracefully when the bounded diplomacy
+  journal scrolls (war reads as fully wearisome); military estimates
+  without scanner research use a deliberately uncertain prior rather than
+  real intel; engagements only occur where fleets co-locate — there is no
+  operational war plan (no concentration, retreats, or orbital assault).
+
+## Autonomous colony settlement completion (2026-09-28)
+
+- Purpose: close the last gap in the organic expansion chain — AI colony
+  fleets built by shipbuilding carried embarked population and received
+  planner route orders, but never founded colonies in century-scale runs.
+- Root cause: `ColonizationSimulation::advance` only `continue`d after a
+  settlement tick when the colony was actually created. An in-progress
+  establishment (`advance_establishment` accumulating the 30-day interval)
+  fell through to the AI opportunity planner, which reset
+  `settlement_body_id`/`settlement_days_completed` and re-issued the route
+  order — so settlement progress never survived a second tick and
+  same-system orders deadlocked permanently.
+- Modules: `core/src/colonization_runtime.cpp` — the colony establishment
+  gate is now computed once (`can_establish`) and a valid target consumes
+  the tick whether or not the establishment interval is complete. Invalid
+  or vanished targets still fall through to the planner, which can re-order
+  to a different surveyed body; player-issued colony orders are unchanged
+  (they use the same `destination_planetary_body_id` mission field and the
+  same establishment checks).
+- Public interfaces: none added; `issue_colony_fleet_order`,
+  `issue_transit_order` and the opportunity planner semantics are intact.
+- Consumers: the autonomous planner branch in `ColonizationSimulation::advance`
+  (campaign colonization phase) for civilizations where
+  `civilization_uses_ai` holds.
+- Tests: `colonization_ai_settlement` — seeds a real campaign world, stations
+  an autonomous colony ship in a surveyed system holding an orderable body,
+  then drives the real `ExplorationSimulation` transit +
+  `ColonizationSimulation` establishment phases: asserts the planner issues
+  the order, the transit leg clears `destination_system_id`, settlement
+  days accumulate across ticks, the colony is created on the selected body
+  and the vessel is consumed. Verified to fail against the pre-fix code
+  (settlement never completes).
+- Save/performance impact: none — no new persisted state; the per-tick work
+  is identical (the planner scan is skipped while a settlement is in
+  progress, a minor improvement).
+- Limitations: the same fall-through hazard does not exist for resource
+  outposts (that branch already `continue`s); stale same-system orders still
+  ride one departure/arrival transit leg before clearing, which is harmless
+  but costs a tick.
+
+## Adaptive research AI final-slot scheduling (2026-09-28)
+
+- Purpose: stop a single-slot directed program office from committing its
+  one free slot to a project whose estimated horizon dwarfs every bounded
+  alternative — in the 5000-system/25-civ century campaign every pre-warp
+  civilization matured ~129 nodes yet never reached
+  `experimental_interstellar_transit` because deep frontier picks (e.g.
+  `planetary_deflection_network`, a depth-7 node) kept winning the shortlist
+  while short gateway prerequisites (e.g. `field_theory`, the root of the
+  warp chain) starved investigable for decades.
+- Modules: `core/src/adaptive_research_campaign_simulation.cpp` (selection
+  site only — the shared `research_agenda_runtime_policy.json` contract is
+  untouched so parity fingerprints stay stable).
+- Policy: when the civilization's directed program stage reports a single
+  free slot, the AI computes a commitment horizon
+  `max(2y, min(4x shortest startable estimate, 15y))` over the materialized
+  visible shortlist. Over-horizon candidates are deferred in utility order;
+  the highest-utility deferred candidate still starts when nothing bounded
+  is startable and affordable. Uses only materialized state — no hidden
+  graph lookahead — and only ever fires inside the autonomous selection
+  path, so player command semantics are unchanged.
+- Public interfaces: none added; `ResearchVisibleProjectCandidate::
+  estimated_years_to_mature` (existing shortlist field) is the policy input.
+- Consumers: `AdaptiveResearchCampaignSimulation::advance` AI selection for
+  civilizations where `campaign_civilization_uses_ai` holds.
+- Tests: `adaptive_research_ai_scheduling` — seeds a two-candidate visible
+  shortlist through `AdaptiveResearchStateWriter` on a real
+  `AdaptiveResearchCampaignState` (frontier candidate pressure-boosted to
+  the top, bounded foundation alternative): asserts the deferral picks the
+  bounded candidate and that the fallback still starts the over-horizon
+  candidate when nothing shorter qualifies.
+- Save/performance impact: none — scheduling constants live in code, no new
+  persisted state; one extra O(shortlist) scan per selection.
+- Limitations: the policy bounds commitment size but does not steer toward
+  strategic unlocks — gateway nodes must still win by agenda utility among
+  bounded candidates; whether pre-warp civilizations now reach warp inside
+  a century is measured by the scale-campaign diagnostic rather than
+  assumed.
+
+
+
+## Scripted event chains — campaign consumer for MissionRuntime (2026-09-28)
+
+- Purpose: make data-authored multi-stage event chains first-class
+  campaign content — real domain events trigger chains, timed stages
+  follow the simulation clock, operator or AI choices apply authored
+  effects through the same authoritative state/commands as manual play,
+  and everything persists. Reuses engine::MissionRuntime (previously an
+  unconsumed framework) rather than a second chain engine.
+- Modules: `core/include/stellar/core/scripted_events.hpp` +
+  `core/src/scripted_events.cpp` (coordinator, trigger-name map, effect
+  interpreter, pending surface, continuation codec);
+  `core/src/campaign_coordinator.cpp` end-of-step feed (not a phase —
+  consumes accepted step output, inert without definitions);
+  `data/events/` shipped chains; host options + diagnostic counters.
+- Public interfaces: `ScriptedEventCoordinator::load_definition` /
+  `load_directory` (sorted deterministic registration),
+  `advance(ConstructionWorld&, const SimulationStepResult&, days)`,
+  `choose(world, instance, choice)`, `pending()`, `set_auto_choose_ai` /
+  `set_auto_choose_player`, `capture_state` / `restore_state`, bounded
+  `journal()`; `GalaxySimulationStepCoordinator::scripted_events()` and
+  `choose_scripted_event()`; `AdaptiveCampaignHostOptions::events_root` +
+  `scripted_player_auto_choose`; CLI `--events-root`,
+  `--no-scripted-player-auto-choose`. Trigger names and the effect
+  vocabulary are documented on the header (data contract).
+- Consumers: headless `adaptive_campaign_host` loads `--events-root`
+  and reports definitions/instances/pending/journal counters in the
+  campaign diagnostic; AI civs auto-resolve choice stages (first
+  authored choice), player civs await `choose()` unless the host opts in.
+- Tests: `scripted_events` (embedded + shipped definitions): real
+  `ConstructionWorld` fixture — trigger→auto-choice→timer→effect chain
+  end-to-end, player pending/operator choice, save/restore continuation
+  determinism, unaffordable-charge rejection, player auto-choose opt-in,
+  shipped `data/events` load. Headless campaign verification: 500
+  systems / 5000 days — `infrastructure_breakthrough` chains fired on
+  real `construction.project_completed` events (90 journaled effects),
+  deterministic across `--repeat 2`.
+- Save/performance impact: continuation rides
+  `CampaignRuntimeContinuation::scripted_events` (serialized document
+  validated by `restore_state`; developer save JSON carries it as an
+  optional bounded member). Per-step cost is proportional to emitted
+  domain events + live instances; contexts prune on instance completion;
+  journal caps at 128 entries; decoder bounds contexts/instances at 2048
+  and the document at 4 MiB.
+- Limitations: feeds the core SimulationStepResult families only —
+  adaptive research, diplomacy and sensor-contact events are not yet
+  mission triggers; effect verbs cover treasury/stability/buildings/
+  empire projects (no fleet or anomaly spawning); pending chains have
+  no native UI surface; localization keys are data contract only.
+
+## Civilization automation framework + colony domain (2026-09-28)
+
+- Purpose: reusable, deterministic, explainable automation substrate so
+  civilizations — AI or delegated player — operate real game domains
+  through the same canonical commands a human command uses. No
+  simulation is duplicated: candidates are ordinary
+  `StrategicMind::UtilityAction`s scored from observable state, and
+  commits call the authoritative assess→commit command functions.
+- Modules: `engine/include/stellar/engine/automation.hpp` +
+  `engine/src/automation.cpp` (framework); `core/include/stellar/core/
+  civilization_automation.hpp` + `core/src/civilization_automation.cpp`
+  (domains + coordinator); `strategic_ai.hpp/.cpp` extended with action
+  `target`/`routine` metadata, advisory `rank()` and an `eligible`
+  decision filter.
+- Public interfaces: `AutomationMode` (Off/Advisory/Assisted/Automatic),
+  `AutomationDomainPolicy` (mode, priority, hysteresis, min_utility,
+  sorted policy/constraint knobs), `AutomationController`
+  (`set_domain_policy`, `add_action`, `record_operator_override`,
+  `decide`, `evaluate`, bounded `journal()`, capture/restore `State`);
+  core `AutomationDomain` keys (empire, colonies, construction,
+  economy, logistics, research, exploration, colonization, fleets,
+  military, shipbuilding, diplomacy), `AutomationDefaults`,
+  `ColonyAutomationReport`, `CivilizationAutomationCoordinator`
+  (`advance(ConstructionWorld, days)`, `set_domain_policy`,
+  `record_operator_override`, `capture_state`/`restore_state`);
+  `GalaxySimulationStepCoordinator::automation()` accessor;
+  `IntegratedAdaptiveCampaignRuntime` continuation carries the state;
+  `AdaptiveCampaignHostOptions::civilization_automation` +
+  `--no-automation` CLI toggle.
+- Consumers: `automatic_orders` phase (automation runs first so its
+  placements feed the same tick's industry allocation); headless
+  `adaptive_campaign_host` enables `ai_colonies=Automatic` — the
+  shipped production consumer driving real colonies through canonical
+  commands; native tests exercise every mode.
+- Tests: `automation` (mode gating, advisory journal throttling,
+  assisted routine-only commits, operator locks + expiry, bounded
+  journal, determinism, state round-trip, knobs); `civilization_automation`
+  (real `ConstructionWorld` fixture: AI colony canonical placement,
+  player advisory non-commit, delegation, lock suppress/resume, state
+  continuation determinism, treasury-reserve blocking, domain name
+  round-trip).
+- Save/performance impact: automation state rides
+  `CampaignRuntimeContinuation` (developer-save `RuntimeContinuation`
+  envelope encodes policies, locks, incumbents, cooldowns and the
+  bounded journal; older saves restore an empty automation block).
+  Candidates rebuild per tick as cheap spans+closures; one decide per
+  configured domain per civilization per phase.
+- Limitations: shipped domains are colonies (power/food/water/housing
+  placements, repairs, re-enables, hub upgrades, growth buildings) and
+  player construction-project queueing; other domains intentionally
+  stay with existing subsystem behavior (no policy → Off → no
+  double-run). Player saves do not yet carry continuation state —
+  automation policies/journals restore via the developer envelope;
+  player-facing automation UI, scripted events, and remaining domains
+  are future work.
+
+## Late-game scale campaign + deterministic save/continue (2026-09-28)
+
+- Purpose: prove the integrated campaign supports the target scale
+  class — 5,000 systems, 25 civilizations, century-length advances —
+  with observable survival/colony/fleet/war/event/research/economy
+  metrics, working-set memory, save size and a machine-checked
+  save→restore→continue determinism proof.
+- Modules: `core/src/civilization_catalog.cpp` (pre-warp template pool
+  extended to 25 entries — campaigns requesting ≤ 13 civilizations draw
+  only from the historical first-13 pool so every seeded roster and its
+  C# parity fixtures stay byte-identical; larger campaigns draw the full
+  pool); `app/adaptive_campaign_host.cpp` (system bounds widened to the
+  catalog-supported 250..50000 range, civilization bounds 1..25/0..3,
+  `verify_continuation_tick`, working-set/peak-memory probe, campaign
+  metrics, deterministic-continuation proof); `engine/automation.hpp`
+  `AutomationController::State::last_proposals` — the advisory-mode
+  top-pick suppression is now part of the captured state, closing the
+  last save/continue divergence found by the scale harness.
+- Public interfaces: `--verify-continuation-tick <n>` CLI captures a
+  developer save mid-run, restores a second runtime from it, advances
+  both to the end and compares canonicalized developer-save documents
+  (`continuationDeterministic`, `continuationSaveBytes`,
+  `continuationDiffOffset/Context` diagnostics on mismatch); the report
+  adds `campaignMetrics` (civilizations, colonies, fleets, wars,
+  economy credit/industry totals, scripted event counters),
+  `workingSetBytes`/`peakWorkingSetBytes`, per-phase `phaseTimings`.
+- Consumers: the headless adaptive-campaign benchmark is the shipped
+  consumer; the continuation proof exercises the same developer
+  envelope player/developer tooling uses.
+- Tests: 14/14 campaign parity + automation + scripted-event suites
+  green after the catalog expansion; 5,000-system/25-civ scale smoke
+  (200 ticks, verify at 100) deterministic with
+  `continuationDeterministic: true`; full-century 100-year run
+  (7,300 × 5-day ticks, `--repeats 2`, midpoint save/restore/continue)
+  exercised in the validation run.
+- Save/performance impact: larger pools only engage above the
+  historical 13-civilization bound — seeded rosters are unchanged for
+  all existing saves and fixtures; the continuation check is opt-in
+  and allocates the save document plus one parse tree while verifying.
+- Limitations: comparison canonicalizes only object-member order —
+  the one order-unstable field the C# format itself produces
+  (leadership office ordering is ordinal on restore, founding order on
+  fresh capture; parity-pinned both ways). Organic fleet/war emergence
+  still requires stress-fleet injection at seeded scales; 50k-system
+  headroom exists in the catalog but is unexercised.
 
 ## Scene3D screen-space mesh LOD chains (2026-09-25)
 

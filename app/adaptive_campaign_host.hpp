@@ -22,6 +22,21 @@ struct AdaptiveCampaignHostOptions {
   std::string player_species{"terran_baseline"};
   int autosave_every{0};
   int stress_fleets{0};
+  // When true, AI civilizations run their colonies through the
+  // civilization automation coordinator (canonical construction
+  // commands). Disable for parity-strict comparisons.
+  bool civilization_automation{true};
+  // Data-authored event-chain definitions root (e.g. data/events).
+  // Empty disables the scripted-event feed entirely.
+  std::filesystem::path events_root;
+  // Headless runs resolve player-bound chain choices deterministically;
+  // AI civilizations always auto-resolve.
+  bool scripted_player_auto_choose{true};
+  // Mid-run save→restore→continue determinism check: at this tick a
+  // developer save is captured; after the uninterrupted run completes, a
+  // second runtime restores from it, advances the remaining ticks, and
+  // its final diagnostic hash must match. 0 disables.
+  int verify_continuation_tick{0};
   std::filesystem::path asset_root;
   std::filesystem::path output;
 };

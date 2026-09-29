@@ -263,6 +263,25 @@ const CombatSimulation &simulation(
 
 } // namespace
 
+const SettlementBodyIndex &GalaxySimulationStepCoordinator::catalog_body_index(
+    FreshCampaignState &campaign) {
+  const auto &bodies = campaign.bodies;
+  const auto *data = bodies.data();
+  const auto size = bodies.size();
+  const int front_id = size ? bodies.front().id : 0;
+  const int back_id = size ? bodies.back().id : 0;
+  if (!body_index_ || body_index_data_ != data ||
+      body_index_size_ != size || body_index_front_id_ != front_id ||
+      body_index_back_id_ != back_id) {
+    body_index_.emplace(bodies);
+    body_index_data_ = data;
+    body_index_size_ = size;
+    body_index_front_id_ = front_id;
+    body_index_back_id_ = back_id;
+  }
+  return *body_index_;
+}
+
 double CombatCivilizationOutcomeSummary::total_damage_dealt() const noexcept {
   return shield_damage_dealt + armor_damage_dealt + hull_damage_dealt;
 }
@@ -496,6 +515,7 @@ GalaxySimulationStepCoordinator::GalaxySimulationStepCoordinator(
       construction_capability_(std::move(other.construction_capability_)),
       shipbuilding_capability_(std::move(other.shipbuilding_capability_)),
       strategic_(std::move(other.strategic_)),
+      automation_(std::move(other.automation_)),
       combat_(std::move(other.combat_)),
       subsystems_(std::move(other.subsystems_)) {
   // Rebind phase tasks to this object, then carry the source executor's
@@ -519,6 +539,7 @@ GalaxySimulationStepCoordinator::operator=(
   construction_capability_ = std::move(other.construction_capability_);
   shipbuilding_capability_ = std::move(other.shipbuilding_capability_);
   strategic_ = std::move(other.strategic_);
+  automation_ = std::move(other.automation_);
   combat_ = std::move(other.combat_);
   subsystems_ = std::move(other.subsystems_);
   const auto carried = other.executor_.capture_state();
@@ -544,7 +565,7 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
              economy_world(campaign, step_.economic_construction,
                            step_.economic_fleets),
              campaign.colonies, campaign.economies, phase_days,
-             advance_legacy_research_);
+             catalog_body_index(campaign), advance_legacy_research_);
          timing.finish(performance_[0]);
        },
        .domain = "economy"},
@@ -561,11 +582,23 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          timing.finish(performance_[1]);
        },
        .domain = "strategic_ai"},
-      {.run = [this](const eng::SimulationTickContext &) {
+      {.run = [this](const eng::SimulationTickContext &ctx) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
-         ensure_automatic_construction_orders(
-             construction_world(campaign, construction_capability_));
+         const double phase_days =
+             step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
+         // One catalog index serves both the automation colony refresh and
+         // the construction requirement checks this phase; it is cached
+         // across ticks since the body catalog is immutable mid-campaign.
+         const SettlementBodyIndex &body_index =
+             catalog_body_index(campaign);
+         auto construction =
+             construction_world(campaign, construction_capability_);
+         construction.body_index = &body_index;
+         // Configured automation runs first so its placements feed the
+         // same tick's industry allocation and construction budgets.
+         automation_.advance(construction, phase_days);
+         ensure_automatic_construction_orders(construction);
          ensure_automatic_ship_orders(shipbuilding_world(
              campaign, shipbuilding_capability_, strategic_,
              use_strategic_shipbuilding_preferences_));
@@ -626,8 +659,11 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          auto &campaign = step_.state->campaign();
          const double phase_days =
              step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
+         auto construction =
+             construction_world(campaign, construction_capability_);
+         construction.body_index = &catalog_body_index(campaign);
          step_.result->construction_events = advance_construction(
-             construction_world(campaign, construction_capability_),
+             construction,
              std::span<const ConstructionIndustryBudget>{
                  step_.construction_budgets},
              phase_days);
@@ -827,7 +863,26 @@ SimulationStepResult GalaxySimulationStepCoordinator::advance(
     executor_.consume_tick();
     throw;
   }
+  // Data-authored event chains consume the accepted step's discrete
+  // domain events and apply stage choices through canonical commands.
+  // Host-level consumption of step output rather than a simulation
+  // phase: it integrates no span and stays inert with no definitions
+  // loaded, so the seeded cadence oracle and parity fixtures are
+  // unaffected.
+  if (scripted_events_.definition_count() > 0) {
+    auto world = construction_world(campaign, construction_capability_);
+    (void)scripted_events_.advance(world, result, simulation_days);
+  }
   return result;
+}
+
+bool GalaxySimulationStepCoordinator::choose_scripted_event(
+    std::uint64_t instance_id, std::string_view choice_id) {
+  if (step_.state == nullptr)
+    return false;
+  auto &campaign = step_.state->campaign();
+  auto world = construction_world(campaign, construction_capability_);
+  return scripted_events_.choose(world, instance_id, choice_id);
 }
 
 bool GalaxySimulationStepCoordinator::has_matched_combat_runtime() const
@@ -843,6 +898,26 @@ GalaxySimulationStepCoordinator::strategic_runtime() noexcept {
 const CivilizationStrategicRuntimeCoordinator &
 GalaxySimulationStepCoordinator::strategic_runtime() const noexcept {
   return strategic_;
+}
+
+CivilizationAutomationCoordinator &
+GalaxySimulationStepCoordinator::automation() noexcept {
+  return automation_;
+}
+
+const CivilizationAutomationCoordinator &
+GalaxySimulationStepCoordinator::automation() const noexcept {
+  return automation_;
+}
+
+ScriptedEventCoordinator &
+GalaxySimulationStepCoordinator::scripted_events() noexcept {
+  return scripted_events_;
+}
+
+const ScriptedEventCoordinator &
+GalaxySimulationStepCoordinator::scripted_events() const noexcept {
+  return scripted_events_;
 }
 
 CombatSimulation &

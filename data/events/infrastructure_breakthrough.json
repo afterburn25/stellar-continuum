@@ -1,0 +1,47 @@
+{
+  "id": "infrastructure_breakthrough",
+  "triggers": [
+    {
+      "event": "construction.project_completed",
+      "stage": "breakthrough"
+    }
+  ],
+  "stages": {
+    "breakthrough": {
+      "title_key": "EV_BREAKTHROUGH_TITLE",
+      "body_key": "EV_BREAKTHROUGH_BODY",
+      "choices": [
+        { "id": "publicize", "next": "announce" },
+        { "id": "shelve", "next": "" }
+      ]
+    },
+    "announce": {
+      "title_key": "EV_BREAKTHROUGH_ANNOUNCE_TITLE",
+      "body_key": "EV_BREAKTHROUGH_ANNOUNCE_BODY",
+      "timer_days": 10,
+      "timeout_stage": "reception"
+    },
+    "reception": {
+      "title_key": "EV_BREAKTHROUGH_RECEPTION_TITLE",
+      "body_key": "EV_BREAKTHROUGH_RECEPTION_BODY",
+      "choices": [
+        {
+          "id": "celebrate",
+          "next": "",
+          "effects": [
+            "grant_credits:$civ:120",
+            "adjust_stability:first_of_civ:0.03"
+          ]
+        },
+        {
+          "id": "reinvest",
+          "next": "",
+          "effects": [
+            "charge_credits:$civ:50",
+            "start_project:$civ:research_network"
+          ]
+        }
+      ]
+    }
+  }
+}

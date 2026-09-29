@@ -101,20 +101,59 @@ std::optional<int> reservation_system_id(SettlementKnowledgeWorldView world,
 
 } // namespace
 
+SettlementBodiesIndex
+build_settlement_bodies_index(std::span<const StellarSystem> systems,
+                              std::span<const PlanetaryBody> bodies) {
+  SettlementBodiesIndex index;
+  index.by_system.reserve(bodies.size());
+  index.by_id.reserve(bodies.size());
+  index.systems_by_id.reserve(systems.size());
+  const auto duplicate = [](int id) {
+    return std::invalid_argument(
+        "An item with the same key has already been added. Key: " +
+        std::to_string(id));
+  };
+  for (const auto &system : systems)
+    if (!index.systems_by_id.emplace(system.id, &system).second)
+      throw duplicate(system.id);
+  for (const auto &body : bodies) {
+    index.by_system[body.system_id].push_back(&body);
+    if (!index.by_id.emplace(body.id, &body).second)
+      throw duplicate(body.id);
+  }
+  return index;
+}
+
 std::vector<KnownSpeciesPlanetarySuitability>
-build_known_suitability_for_species(SettlementKnowledgeWorldView world,
-                                    int observer_civilization_id,
-                                    std::string_view species_id) {
+build_known_suitability_for_species(
+    SettlementKnowledgeWorldView world, int observer_civilization_id,
+    std::string_view species_id,
+    const SettlementBodiesIndex *bodies_index) {
   require_species(species_id);
   if (!civilization_exists(world.civilizations, observer_civilization_id))
     throw std::runtime_error("Unknown observer civilization " +
                              std::to_string(observer_civilization_id) + ".");
   std::vector<const PlanetaryBody *> ordered;
-  for (const auto &body : world.bodies)
-    if (world.knowledge.system_survey_level(observer_civilization_id,
-                                            body.system_id) ==
-        SystemSurveyLevel::fully_surveyed)
-      ordered.push_back(&body);
+  if (bodies_index) {
+    for (const auto &view :
+         world.knowledge.system_survey_knowledge(observer_civilization_id)) {
+      if (view.level != SystemSurveyLevel::fully_surveyed)
+        continue;
+      const auto found = bodies_index->by_system.find(view.system_id);
+      if (found == bodies_index->by_system.end())
+        continue;
+      for (const auto *body : found->second)
+        ordered.push_back(body);
+    }
+  } else {
+    for (const auto &body : world.bodies)
+      if (world.knowledge.system_survey_level(observer_civilization_id,
+                                              body.system_id) ==
+          SystemSurveyLevel::fully_surveyed)
+        ordered.push_back(&body);
+  }
+  // Same total order either way it is gathered: sorted by (system_id,
+  // body id), so the resulting suitability list is identical.
   std::stable_sort(ordered.begin(), ordered.end(),
                    [](const auto *left, const auto *right) {
                      if (left->system_id != right->system_id)

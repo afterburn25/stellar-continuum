@@ -2,6 +2,7 @@
 #include <stellar/core/civilization_catalog.hpp>
 
 namespace stellar::core {
+class SettlementBodyIndex;
 enum class SettlementKind { Colony, ResourceOutpost };
 struct SurfaceBuilding {
     int id{}; std::string type_id; float x{},z{},rotation_degrees{};
@@ -44,6 +45,10 @@ struct ColonySustenanceCapacity {
     double supported_population_millions{},support_ratio{}; std::string limiting_supply;
 };
 ColonySustenanceCapacity colony_sustenance_capacity(std::span<const PlanetaryBody> bodies,
+    const Colony& colony,const SurfaceSustenanceCapacity& surface);
+// Caller-shared index form: identical computation, the caller performs the
+// (system_id, planetary_body_id) resolution once for many colonies.
+ColonySustenanceCapacity colony_sustenance_capacity(const SettlementBodyIndex& bodies,
     const Colony& colony,const SurfaceSustenanceCapacity& surface);
 struct ColonySustenanceReserveSnapshot {
     double food_reserve_days{},water_reserve_days{},effective_support_ratio{}; std::string limiting_supply;

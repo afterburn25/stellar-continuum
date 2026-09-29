@@ -63,18 +63,86 @@ class OperationalReachBatch {
 public:
   OperationalReachBatch(OperationalReachWorldView world,int civilization_id)
       :world_(world),civilization_id_(civilization_id){}
+  // `explain` controls payload materialization only — the is_supported
+  // verdict is identical either way. High-volume scan loops that discard
+  // the returned assessment should pass false: the reason strings are
+  // skipped and feasibility verdicts are memoized per system along the
+  // shared route-tree prefix, so sibling candidates reuse the walk.
   MissionReachAssessment assess(const FleetState &,int target_system_id,InterstellarMissionKind,
-      MissionFuelPolicy = MissionFuelPolicy::ReachDestination);
+      MissionFuelPolicy = MissionFuelPolicy::ReachDestination,
+      bool explain = true);
+  // Scan-loop verdict for a lane-slot candidate — identical
+  // is_supported semantics to assess(..., fuel_policy, explain=false)
+  // for catalog systems, but the caller resolves the slot (via
+  // InterstellarLaneNetwork::slot_of_system) so the probe pays no
+  // id-lookup or route-query cost. Contract: target_slot must be a
+  // valid lane slot for a catalog system — lane-unknown targets must
+  // go through assess so the out_of_range contract is preserved.
+  bool probe_supported(const FleetState &,int target_slot,
+      MissionFuelPolicy fuel_policy);
   std::optional<RefuelingReach> nearest_refueling(const FleetState &,InterstellarMissionKind);
+  // Verdict-only variant of nearest_refueling for re-check paths that
+  // discard the reason string: identical winner selection (same
+  // route-distance ranking and id tie-break), decided by one
+  // early-stopped route_tree_toward build rooted at the fleet. The
+  // winner's reach carries the materialized route (the settled prior
+  // chain — bit-identical to find_shortest_route) so assign_fleet_route
+  // consumes it without re-deriving or re-caching a tree, but no reason
+  // payload.
+  std::optional<RefuelingReach> nearest_refueling_verdict(const FleetState &);
 private:
   void prepare();
-  MissionReachAssessment evaluate_route(const FleetState &,std::vector<int> route);
+  // The id->system map is built lazily: verdict probes never need it,
+  // so queued-return re-checks skip the per-call catalog map build.
+  const std::unordered_map<int, const StellarSystem *> &systems_map();
+  MissionReachAssessment evaluate_route(const FleetState &,std::span<const int> route);
+  MissionReachAssessment evaluate_route_verdict(const FleetState &,int target_system_id);
+  void ensure_feasibility_state(const FleetState &);
+  MissionReachAssessment verdict_for_slot(const FleetState &,int target_slot);
   bool has_return_service_route(const FleetState &);
   OperationalReachWorldView world_;
   int civilization_id_{};
   bool prepared_{};
   std::unordered_map<int,const StellarSystem *> systems_;
+  // systems_ is built lazily on first explain-path use — verdict
+  // probes never need the id map.
+  bool systems_built_{};
   std::unordered_map<int,double> refueling_;
+  // Scratch for route materialization across assess calls — keeps the
+  // per-candidate polling loop allocation-free. Reused buffers are never
+  // exposed: supported results copy into the returned assessment.
+  std::vector<int> route_scratch_;
+  // Verdict-only feasibility memo for the explain=false assess path,
+  // slot-indexed over the lane network's shortest-route tree. Routes from
+  // one origin share tree prefixes, so each node's post-arrival fuel is
+  // memoized per slot and sibling candidates reuse the walked prefix.
+  // Entries replicate evaluate_route's fuel arithmetic in the same order,
+  // so verdicts are bit-identical. The whole table resets whenever the
+  // fleet inputs (origin, fuel, capacity, leg range) change. state: 0
+  // unvisited, 1 feasible, 2 infeasible.
+  int feas_origin_{};
+  double feas_fuel_{}, feas_capacity_{}, feas_leg_range_{};
+  bool feas_key_valid_{};
+  std::vector<char> feas_state_;
+  std::vector<double> feas_fuel_after_;
+  // Slot -> refuel service factor (0 = none) — refueling_ projected into
+  // slot space once per batch.
+  std::vector<double> feas_factor_;
+  std::vector<double> feas_dist_; // supported-node route distance
+  std::vector<int> feas_walk_; // ancestor-path scratch
+  std::span<const InterstellarLaneNetwork::RouteSlot> feas_slots_;
+  // Route tree pinned per fleet-state key — re-acquired when the lane
+  // cache revision moves (capacity eviction). Rebuilt trees are
+  // deterministic per (origin, range), so the slot memo above survives
+  // eviction; only the borrowed spans need re-borrowing.
+  InterstellarLaneNetwork::RouteTreeView feas_tree_{};
+  std::uint64_t feas_tree_revision_{};
+  // nearest_refueling scratch: an early-stopped partial route tree rooted
+  // at the fleet's current system — settles only until every refueling
+  // site is resolved instead of paying a full-catalog Dijkstra per hop.
+  std::vector<double> return_dist_;
+  std::vector<int> return_prior_;
+  std::vector<int> return_needed_;
 };
 
 MissionReachAssessment

@@ -40,6 +40,13 @@ struct WarAssessment {
   bool survival_gate_triggered{}, recommend_war{};
 };
 
+struct PeaceAssessment {
+  double score{}, perceived_strength_ratio{}, war_weariness{};
+  // Offer-kind guidance is intentionally coarse: the caller picks the
+  // canonical proposal kind from the current political state.
+  bool offer_ceasefire{}, offer_peace{}, accept_terms{};
+};
+
 class StrategicDecisionEvaluator {
 public:
   WarAssessment evaluate_war(const CivilizationTraits &traits,
@@ -47,6 +54,17 @@ public:
                              const KnownCivilization &target,
                              std::int64_t now_tick,
                              bool honor_compels_battle = false) const;
+  // Willingness to end an active war or ceasefire with `target`.
+  // `war_weariness` is the caller's 0..1 estimate of how long the conflict
+  // has run; `target_hostility`/`target_fear` are the observer's current
+  // relationship sentiments; `ceasefire_active` lowers the peace threshold
+  // because a ceasefire is already a partial settlement.
+  PeaceAssessment
+  evaluate_peace(const CivilizationTraits &traits,
+                 double own_known_military_strength,
+                 const KnownCivilization &target, double target_hostility,
+                 double target_fear, double war_weariness,
+                 bool ceasefire_active = false) const;
 };
 
 class CivilizationStrategicPlanner {

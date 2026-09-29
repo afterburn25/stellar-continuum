@@ -8,6 +8,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 namespace stellar::core {
@@ -47,10 +48,24 @@ struct SettlementKnowledgeWorldView {
   const CivilizationKnowledgeState &knowledge;
 };
 
+// Shared per-step catalog index — groups world.bodies by system_id once so
+// repeated suitability scans only visit the observer's surveyed systems
+// instead of the full catalog, and carries the id lookups planners
+// otherwise rebuild per call.
+struct SettlementBodiesIndex {
+    std::unordered_map<int, std::vector<const PlanetaryBody *>> by_system;
+    std::unordered_map<int, const PlanetaryBody *> by_id;
+    std::unordered_map<int, const StellarSystem *> systems_by_id;
+};
+SettlementBodiesIndex build_settlement_bodies_index(
+    std::span<const StellarSystem> systems,
+    std::span<const PlanetaryBody> bodies);
+
 std::vector<KnownSpeciesPlanetarySuitability>
-build_known_suitability_for_species(SettlementKnowledgeWorldView world,
-                                    int observer_civilization_id,
-                                    std::string_view species_id);
+build_known_suitability_for_species(
+    SettlementKnowledgeWorldView world, int observer_civilization_id,
+    std::string_view species_id,
+    const SettlementBodiesIndex *bodies_index = nullptr);
 
 std::vector<KnownSpeciesPlanetarySuitability>
 build_known_suitability_for_available_populations(
