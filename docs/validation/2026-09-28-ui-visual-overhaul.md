@@ -182,8 +182,10 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   campaign untouched), `--smoke-galaxy-card`/`--smoke-system-count`
   (new-game automation honors both — generated a 1000-system card-3
   galaxy), and `--smoke-full-exploration` under `--developer-smoke`
-  (250 systems fully surveyed, `unexplored:0`). Every flag-legal path
-  in the client binary is now exercised green.
+  (250 systems fully surveyed, `unexplored:0`). `--battle-reload-smoke`
+  green at 2560×1440 on `work/battle-run.json` (reload inspection:
+  `canonical_unchanged`, `day_unchanged`, read-only order rail).
+  Every flag-legal path in the client binary is now exercised green.
 - Record/replay audit: `--record`/`--replay`/`--replay-info` exercised
   on `work/de-travel-r.json`. Found and fixed a real bug
   (`85a27563`): saves authored before `GenerationMetadata` carry the
