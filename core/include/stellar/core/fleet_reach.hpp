@@ -68,13 +68,17 @@ public:
   std::optional<RefuelingReach> nearest_refueling(const FleetState &,InterstellarMissionKind);
 private:
   void prepare();
-  MissionReachAssessment evaluate_route(const FleetState &,std::vector<int> route);
+  MissionReachAssessment evaluate_route(const FleetState &,std::span<const int> route);
   bool has_return_service_route(const FleetState &);
   OperationalReachWorldView world_;
   int civilization_id_{};
   bool prepared_{};
   std::unordered_map<int,const StellarSystem *> systems_;
   std::unordered_map<int,double> refueling_;
+  // Scratch for route materialization across assess calls — keeps the
+  // per-candidate polling loop allocation-free. Reused buffers are never
+  // exposed: supported results copy into the returned assessment.
+  std::vector<int> route_scratch_;
 };
 
 MissionReachAssessment

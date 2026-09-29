@@ -158,6 +158,36 @@ private:
                   SurveyOperationsBatch *surveys=nullptr,
                   const std::unordered_map<int, const StellarSystem *>
                       *systems_index = nullptr) const;
+  // Cross-call "nothing reachable" memo for the canonical reach path. A
+  // drained selection depends only on the fleet's civilization, role,
+  // position, fuel and leg range, the fuel policy, the knowledge survey
+  // LEVEL revision, the civ's refueling sites, and the world/lane
+  // identities — reservations cannot manufacture a supported target, so
+  // the verdict is reservation-independent. Every input is compared
+  // exactly; any change just misses and recomputes. Never consulted for
+  // custom reach providers, and never persisted — it is a timing cache.
+  struct DrainVerdict {
+    const StellarSystem *systems_data{};
+    std::size_t systems_size{};
+    const InterstellarLaneNetwork *lanes{};
+    int civilization_id{};
+    FleetRole role{};
+    int origin_system_id{};
+    double fuel_remaining{};
+    double fuel_capacity{};
+    double leg_range{};
+    MissionFuelPolicy fuel_policy{};
+    std::uint64_t survey_level_revision{};
+    // The civ's exact refueling projection at verdict time: sorted
+    // (system_id, service factor) pairs — a colony add/remove/kind change
+    // anywhere in it changes the verdict's inputs.
+    std::vector<std::pair<int, double>> refuel_sites;
+    bool matches(ExplorationPlanningWorldView world, const FleetState &fleet,
+                 MissionFuelPolicy policy,
+                 const std::vector<std::pair<int, double>> &sites) const;
+  };
+  mutable std::unordered_map<int, DrainVerdict> drain_verdicts_;
+
   bool uses_canonical_reach_{};
   ExplorationReachAssessment operational_reach_;
   SurveyOperationsProfiler survey_profiler_;

@@ -323,3 +323,39 @@ per-idle-fleet mission selection. The remaining term is bounded
 (heap-ordered lazy assessment + revision-gated work memos) but further
 gains need either per-target assess elimination or work-list revision
 buckets per civilization.
+
+Follow-up pass (same canonical flags): `find_shortest_route_into`
+caller-buffered routes into a per-`OperationalReachBatch` scratch
+vector (slot-space predecessor walk, no per-hop hash lookups, no route
+vector allocation per pop) plus `ExplorationMissionPlanner::DrainVerdict`
+— a cross-call negative-selection memo replaying "no supported target"
+verdicts while every verdict input (civ, role, origin, fuel
+reserve/capacity, leg range, fuel policy, survey-level revision,
+exact refueling-site projection, systems/lane identities) is unchanged.
+4,000-tick events-enabled A/B between committed and new binaries is
+bit-identical (`63ed7d54606173543b2ce99e69352cc5a36c4a947d6c5c14b91207f267ccd385`);
+full suite 291/291.
+
+Canonical 200-year verification on the final binary (exact flags:
+`--simulate-adaptive-campaign --events-root data/events --seed 8374837
+--systems 5000 --civilizations 22 --ancients 3 --ticks 14600
+--step-days 5 --repeat 1 --stress-fleets 50
+--verify-continuation-tick 7300` — note `--civilizations 22 --ancients
+3` totals 25 civilizations; `--civilizations 25` alone totals 26 and
+produces the different-but-deterministic `7e32a1a7…` trajectory):
+
+- `finalStateHash e5a1d5bf768174022efc4bbbb7f058dbc2365ce2e448ea739565c2ddf2f4095a`
+  — bit-identical to the dense-route baseline; scratch-buffer routes
+  and the drain memo are simulation-neutral.
+- `repeatFinalStatesDeterministic: true`, `continuationDeterministic:
+  true`; continuation save 149,969,876 bytes (identical size to the
+  baseline — same trajectory).
+- Metrics identical to baseline: 25 civs / 78 colonies / 264 fleets /
+  0 wars; 4 scripted definitions / 128 journal entries.
+- Timing: step mean 42.4 ms (vs 57.6 ms at `4b5619ee`, −26%), step
+  total 619 s (vs 840 s), exploration phase 21.1 ms mean (vs 29.3 ms),
+  step peak 1,271 ms; peak working set 2.85 GB.
+- `EXPL-PROF`: select 406.7 s total (vs 773.6 s, −47%); pops/assesses
+  25.5M (vs 31.5M, −19%); drains 6,252 (vs 7,776) — subsequent selects
+  on unchanged draining fleets replay the memoized verdict instead of
+  re-scanning ~4,300 candidates; transit 112.4 s; survey 54.0 s.

@@ -53,6 +53,15 @@ public:
                       const std::unordered_set<int> *permitted_system_ids =
                           nullptr);
 
+  // Same route contract as find_shortest_route but fills a caller-owned
+  // buffer instead of allocating — `out` is cleared on entry, holds the
+  // ordered system ids on success, and stays empty when unreachable.
+  // Reusing one buffer keeps hot polling loops allocation-free.
+  void
+  find_shortest_route_into(int origin_system_id, int destination_system_id,
+                           double maximum_leg_range_light_years,
+                           std::vector<int> &out);
+
   // True when the network holds a system with this id — callers that
   // distinguish "unknown system" from "unreachable" can use it before
   // pruning; find_shortest_route still throws on unknown ids.

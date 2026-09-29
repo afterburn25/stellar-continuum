@@ -184,17 +184,17 @@ MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
         "The fleet must finish its current lane leg before receiving a new "
         "interstellar route.");
 
-  auto route = world_.lanes.find_shortest_route(
+  world_.lanes.find_shortest_route_into(
       *fleet.current_system_id, target_system_id,
-      fleet.maximum_leg_range_light_years);
-  if (route.empty())
+      fleet.maximum_leg_range_light_years, route_scratch_);
+  if (route_scratch_.empty())
     return unsupported_mission_reach(
         "No connected lane route is available within this fleet's " +
         format_interstellar_metric_primary(
             fleet.maximum_leg_range_light_years) +
         " maximum leg range.");
 
-  auto reach=evaluate_route(fleet,std::move(route));
+  auto reach=evaluate_route(fleet,route_scratch_);
   if(reach.is_supported&&fuel_policy==MissionFuelPolicy::RetainReturnToService){
     auto projected=fleet;
     projected.current_system_id=target_system_id;
@@ -206,7 +206,7 @@ MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
 }
 
 MissionReachAssessment OperationalReachBatch::evaluate_route(
-    const FleetState &fleet,std::vector<int> route) {
+    const FleetState &fleet,std::span<const int> route) {
   prepare();
   auto fuel = fleet.fuel_remaining_light_years;
   if (const auto service = refueling_.find(*fleet.current_system_id);
@@ -242,7 +242,10 @@ MissionReachAssessment OperationalReachBatch::evaluate_route(
                               fleet.maximum_leg_range_light_years) +
                           "; projected fuel reserve " +
                           format_interstellar_metric_primary(fuel) + ".";
-  return {true, true, std::move(reason), std::move(route), distance, fuel};
+  // The span is materialized only into supported results — the caller's
+  // scratch buffer stays reusable for the next probe.
+  return {true, true, std::move(reason),
+          std::vector<int>(route.begin(), route.end()), distance, fuel};
 }
 
 bool OperationalReachBatch::has_return_service_route(const FleetState &fleet) {
@@ -251,10 +254,10 @@ bool OperationalReachBatch::has_return_service_route(const FleetState &fleet) {
     // Lanes are undirected. Query outward from each service and reverse the
     // route so a large target scan reuses the service's cached route tree,
     // rather than constructing one tree per prospective destination.
-    auto route=world_.lanes.find_shortest_route(id,*fleet.current_system_id,fleet.maximum_leg_range_light_years);
-    if(route.empty())continue;
-    std::reverse(route.begin(),route.end());
-    if(evaluate_route(fleet,std::move(route)).is_supported)return true;
+    world_.lanes.find_shortest_route_into(id,*fleet.current_system_id,fleet.maximum_leg_range_light_years,route_scratch_);
+    if(route_scratch_.empty())continue;
+    std::reverse(route_scratch_.begin(),route_scratch_.end());
+    if(evaluate_route(fleet,route_scratch_).is_supported)return true;
   }
   return false;
 }

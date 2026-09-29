@@ -101,6 +101,42 @@ ExplorationMissionPlanner::ExplorationMissionPlanner(
     };
 }
 
+// Mirrors OperationalReachBatch::prepare's refueling projection: the
+// civ's (system_id, max service factor) pairs, sorted for a
+// content-exact compare in DrainVerdict::matches.
+static std::vector<std::pair<int, double>>
+drain_refuel_sites(ExplorationPlanningWorldView world, int civilization_id) {
+  std::unordered_map<int, double> refueling;
+  for (const auto &colony : world.colonies) {
+    if (colony.civilization_id != civilization_id)
+      continue;
+    auto &service = refueling[colony.system_id];
+    service = std::max(service,
+                       colony.kind == SettlementKind::Colony ? 1.0 : 0.5);
+  }
+  std::vector<std::pair<int, double>> sites(refueling.begin(),
+                                            refueling.end());
+  std::sort(sites.begin(), sites.end());
+  return sites;
+}
+
+bool ExplorationMissionPlanner::DrainVerdict::matches(
+    ExplorationPlanningWorldView world, const FleetState &fleet,
+    MissionFuelPolicy policy,
+    const std::vector<std::pair<int, double>> &sites) const {
+  return systems_data == world.systems.data() &&
+         systems_size == world.systems.size() && lanes == &world.lanes &&
+         civilization_id == fleet.civilization_id && role == fleet.role &&
+         fleet.current_system_id.has_value() &&
+         origin_system_id == *fleet.current_system_id &&
+         fuel_remaining == fleet.fuel_remaining_light_years &&
+         fuel_capacity == fleet.fuel_capacity_light_years &&
+         leg_range == fleet.maximum_leg_range_light_years &&
+         fuel_policy == policy &&
+         survey_level_revision == world.knowledge.survey_level_revision() &&
+         refuel_sites == sites;
+}
+
 bool ExplorationMissionPlanner::needs_survey_work(
     const CivilizationKnowledgeState &knowledge, const FleetState &fleet,
     int system_id) {
@@ -309,6 +345,20 @@ ExplorationMissionPlanner::select_supported_candidate(
                                                    world.lanes},
                          subject.civilization_id);
 
+  // Cross-call negative memo: a drained select is a pure function of the
+  // fields DrainVerdict compares — reservations only veto supported
+  // targets and can never create one. Canonical reach path only.
+  std::vector<std::pair<int, double>> drain_sites;
+  const bool memoize_drain =
+      batch != nullptr && subject.current_system_id.has_value();
+  if (memoize_drain) {
+    drain_sites = drain_refuel_sites(world, subject.civilization_id);
+    if (const auto found = drain_verdicts_.find(subject.id);
+        found != drain_verdicts_.end() &&
+        found->second.matches(world, subject, fuel_policy, drain_sites))
+      return std::nullopt;
+  }
+
   // Light ranking identical to the build_plan comparator restricted to the
   // supported subsequence: (priority band, distance with NaN last, id).
   struct RankedTarget {
@@ -443,6 +493,20 @@ ExplorationMissionPlanner::select_supported_candidate(
     if (!first_supported) {
       if (profiling)
         ++prof.drains;
+      if (memoize_drain)
+        drain_verdicts_[subject.id] = DrainVerdict{
+            world.systems.data(),
+            world.systems.size(),
+            &world.lanes,
+            subject.civilization_id,
+            subject.role,
+            *subject.current_system_id,
+            subject.fuel_remaining_light_years,
+            subject.fuel_capacity_light_years,
+            subject.maximum_leg_range_light_years,
+            fuel_policy,
+            world.knowledge.survey_level_revision(),
+            std::move(drain_sites)};
       return std::nullopt;
     }
     chosen = first_supported;
@@ -488,6 +552,19 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
                                                    world.colonies,
                                                    world.lanes},
                          subject.civilization_id);
+  // Same negative memo as select_supported_candidate — "no supported
+  // target exists" is exactly the drain verdict, and it is
+  // reservation-free by construction here.
+  std::vector<std::pair<int, double>> drain_sites;
+  const bool memoize_drain =
+      batch != nullptr && subject.current_system_id.has_value();
+  if (memoize_drain) {
+    drain_sites = drain_refuel_sites(world, subject.civilization_id);
+    if (const auto found = drain_verdicts_.find(subject.id);
+        found != drain_verdicts_.end() &&
+        found->second.matches(world, subject, fuel_policy, drain_sites))
+      return false;
+  }
   // The result is existence-only, so the assess order cannot change it —
   // reuse the memoized (civilization, role) survey-work list and skip the
   // plan-order sort entirely.
@@ -538,6 +615,20 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
     if (reach.is_supported)
       return true;
   }
+  if (memoize_drain)
+    drain_verdicts_[subject.id] = DrainVerdict{
+        world.systems.data(),
+        world.systems.size(),
+        &world.lanes,
+        subject.civilization_id,
+        subject.role,
+        *subject.current_system_id,
+        subject.fuel_remaining_light_years,
+        subject.fuel_capacity_light_years,
+        subject.maximum_leg_range_light_years,
+        fuel_policy,
+        world.knowledge.survey_level_revision(),
+        std::move(drain_sites)};
   return false;
 }
 

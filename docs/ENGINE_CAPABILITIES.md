@@ -459,24 +459,43 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `core/src/exploration_prof_internal.hpp` — the `STELLAR_EXPL_PROF`
   profiler is now shared across TUs and gains select sub-attribution
   (build/loop/finish ns, work entries, rebuilds, pops, assesses, drains).
+  `core/src/lane_network.cpp` gains `find_shortest_route_into`, a
+  caller-buffered route query that walks the predecessor chain in slot
+  space (no per-hop hash lookups) — `OperationalReachBatch::assess` and
+  `has_return_service_route` run it into a per-batch scratch vector so
+  the ~630-pop selection loop no longer allocates a route vector per
+  candidate; supported results still copy the route into the returned
+  assessment.
+  `core/include/stellar/core/exploration_planning.hpp` —
+  `ExplorationMissionPlanner::DrainVerdict` is a cross-call negative
+  memo: once a fleet's selection drains the entire work list without
+  finding a supported target, the verdict is replayed on later calls
+  while every input is unchanged (civilization, role, origin system,
+  fuel reserve/capacity, leg range, fuel policy, survey-level revision,
+  the civ's exact refueling-site projection, and the systems/lane
+  object identities). Reservations only veto supported targets and can
+  never create one, so the verdict is reservation-independent; it is
+  consulted only on the canonical reach path and is never persisted.
 - Semantics: unchanged — the prune mirrors Dijkstra reachability
   (same leg-range predicate as the cached trees) and skips only
   candidates that could never be supported; the suitability memo key
   covers every input (civilization, species, survey levels — body
   physical state is generation-static); the reach-batch guard rebuilds
-  on any colony-vector growth. Verified: 4,000-tick 5,000-system
-  events-enabled A/B is bit-identical
-  (`5af56a5093ecdb755a8ed28275484fdf3b7500a1f4102608309eb9d6c3ce7f25`,
-  on both the ungated and component-count-gated builds); canonical
-  14,600-tick run reproduces `e5a1d5bf…` with deterministic repeat +
-  save/load continuation.
+  on any colony-vector growth; the drain verdict compares all
+  verdict-relevant inputs by exact equality so any mutation misses and
+  recomputes. Verified: 4,000-tick 5,000-system
+  events-enabled A/B is bit-identical between the committed and
+  scratch+memo builds
+  (`63ed7d54606173543b2ce99e69352cc5a36c4a947d6c5c14b91207f267ccd385`);
+  canonical 14,600-tick run reproduces `e5a1d5bf…` with deterministic
+  repeat + save/load continuation.
 - Consumers: `ColonizationSimulation::advance` (per-idle-fleet
   opportunity planning), `ExplorationSimulation::advance` (mission
   selection and eligibility probes).
 - Tests: `settlement_shared_index` (new — plan parity shared vs
   unshared, suitability-memo invalidation across survey-level bumps,
   reach-batch rebuild after colony-vector growth); full native suite
-  290/290 green.
+  291/291 green.
 - Save/performance impact: none persisted — all structures are
   per-advance or per-query. Colonization-phase suitability lists and
   reach batches are now built once per (civ, species) per level
@@ -488,6 +507,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   fuel-policy assessment of connected-but-unaffordable targets, which
   only a route walk can reject; the prune's value is confined to
   fragmented-graph workloads (small leg ranges, dense subsets).
+  The drain memo is the measured win on the canonical run: select
+  total 773.6 s → 406.7 s (−47%), pops 31.5M → 25.5M, drains
+  7,776 → 6,252; step mean 57.6 ms → 42.4 ms.
 - Limitations: `select_mission`'s per-pop `assess` remains the
   dominant late-game term — eliminating it needs an exact fuel-bound
   shortcut that does not yet exist (refuel-at-colony hops make fuel

@@ -536,6 +536,12 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
     int origin_system_id, int destination_system_id,
     double maximum_leg_range_light_years,
     const std::unordered_set<int> *permitted_system_ids) {
+  if (permitted_system_ids == nullptr) {
+    std::vector<int> result;
+    find_shortest_route_into(origin_system_id, destination_system_id,
+                             maximum_leg_range_light_years, result);
+    return result;
+  }
   impl_->require_owner();
   if (maximum_leg_range_light_years <= 0 ||
       std::isnan(maximum_leg_range_light_years))
@@ -546,48 +552,73 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
     throw std::out_of_range(
         "Specified argument was out of the range of valid values. (Parameter "
         "'destinationSystemId')");
-  if (permitted_system_ids != nullptr &&
-      (!permitted_system_ids->contains(origin_system_id) ||
-       !permitted_system_ids->contains(destination_system_id)))
+  if (!permitted_system_ids->contains(origin_system_id) ||
+      !permitted_system_ids->contains(destination_system_id))
     return {};
 
   const int destination_slot = impl_->slot_of.at(destination_system_id);
-  RouteTree temporary;
-  const RouteTree *tree = nullptr;
-  if (permitted_system_ids != nullptr) {
-    temporary = impl_->build_route_tree(origin_system_id,
-                                        maximum_leg_range_light_years,
-                                        permitted_system_ids);
-    tree = &temporary;
-  } else {
-    // Unreachable pairs resolve via union-find membership — no route tree
-    // is built or cached for them.
-    const auto &membership =
-        impl_->components_for(maximum_leg_range_light_years);
-    if (membership[impl_->slot_of.at(origin_system_id)] !=
-        membership[destination_slot])
-      return {};
-    const RouteKey key{origin_system_id,
-                       std::bit_cast<std::uint64_t>(maximum_leg_range_light_years)};
-    auto found = impl_->routes.find(key);
-    if (found == impl_->routes.end()) {
-      auto built = impl_->build_route_tree(origin_system_id,
-                                           maximum_leg_range_light_years,
-                                           nullptr);
-      if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096))
-        impl_->routes.clear();
-      found = impl_->routes.emplace(key, std::move(built)).first;
-    }
-    tree = &found->second;
-  }
+  const RouteTree temporary = impl_->build_route_tree(
+      origin_system_id, maximum_leg_range_light_years, permitted_system_ids);
+  const RouteTree *tree = &temporary;
   if (!std::isfinite(tree->distance[destination_slot]))
     return {};
+  // prior[] is slot-indexed — walk the predecessor chain in slot space
+  // instead of resolving a hash lookup per hop.
+  const int origin_slot = impl_->slot_of.at(origin_system_id);
   std::vector<int> result{destination_system_id};
-  while (result.back() != origin_system_id)
-    result.push_back(
-        impl_->systems[tree->prior[impl_->slot_of.at(result.back())]].id);
+  for (int slot = destination_slot; slot != origin_slot;) {
+    slot = tree->prior[slot];
+    result.push_back(impl_->systems[slot].id);
+  }
   std::reverse(result.begin(), result.end());
   return result;
+}
+
+void InterstellarLaneNetwork::find_shortest_route_into(
+    int origin_system_id, int destination_system_id,
+    double maximum_leg_range_light_years, std::vector<int> &out) {
+  out.clear();
+  impl_->require_owner();
+  if (maximum_leg_range_light_years <= 0 ||
+      std::isnan(maximum_leg_range_light_years))
+    return;
+  impl_->ensure_built();
+  if (!impl_->by_id.contains(origin_system_id) ||
+      !impl_->by_id.contains(destination_system_id))
+    throw std::out_of_range(
+        "Specified argument was out of the range of valid values. (Parameter "
+        "'destinationSystemId')");
+
+  const int destination_slot = impl_->slot_of.at(destination_system_id);
+  // Unreachable pairs resolve via union-find membership — no route tree
+  // is built or cached for them.
+  const auto &membership =
+      impl_->components_for(maximum_leg_range_light_years);
+  const int origin_slot = impl_->slot_of.at(origin_system_id);
+  if (membership[origin_slot] != membership[destination_slot])
+    return;
+  const RouteKey key{origin_system_id,
+                     std::bit_cast<std::uint64_t>(maximum_leg_range_light_years)};
+  auto found = impl_->routes.find(key);
+  if (found == impl_->routes.end()) {
+    auto built = impl_->build_route_tree(origin_system_id,
+                                       maximum_leg_range_light_years,
+                                       nullptr);
+    if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096))
+      impl_->routes.clear();
+    found = impl_->routes.emplace(key, std::move(built)).first;
+  }
+  const RouteTree &tree = found->second;
+  if (!std::isfinite(tree.distance[destination_slot]))
+    return;
+  // prior[] is slot-indexed — walk the predecessor chain in slot space
+  // instead of resolving a hash lookup per hop.
+  out.push_back(destination_system_id);
+  for (int slot = destination_slot; slot != origin_slot;) {
+    slot = tree.prior[slot];
+    out.push_back(impl_->systems[slot].id);
+  }
+  std::reverse(out.begin(), out.end());
 }
 
 bool InterstellarLaneNetwork::has_system(int system_id) {
