@@ -56,6 +56,11 @@ set STELLAR_NATIVE_EXE=%CD%\build-native\preview\stellar-continuum.exe
 python -m unittest discover -s tools/stellar-export -p "test_*.py"
 ```
 
+Run the validator tests with the launcher (`py -3 -m unittest`, resolves
+3.14) — the WindowsApps `python3` stub is 3.10 and lacks
+`hashlib.file_digest`/PIL, silently turning ~145 suite cases into errors
+(`test_native_*_assets`, `test_galaxy_asset_import`).
+
 The normal graphical development preset is `windows-native-preview`
 (RelWithDebInfo, tests enabled). `windows-development` is Debug **without** the
 graphical client by default. `windows-testing` and `windows-headless` provide
