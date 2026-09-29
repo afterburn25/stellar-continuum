@@ -78,13 +78,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `engine/src/native_map_platform.cpp` (`Storage::scene3d_texture_budget`,
   persisted into the lazy `Scene3DRenderer`),
   `engine/include/stellar/engine/native_map_platform.hpp`.
-- **Public interface:** unchanged — `Window::set_scene3d_texture_budget`
-  now persists the request on `Window::Storage` so a renderer created
-  on the first 3D frame inherits the last requested budget;
+- **Public interface:** `Window::set_scene3d_texture_budget` persists
+  the request on `Window::Storage` so a renderer created on the first
+  3D frame inherits the last requested budget;
   `NativeCampaign` re-pushes `RenderQuality3D` to all six 3D consumers
   (system/fleet/battle/globe/phenomena/small-body) whenever
   `video_settings_->active().starfield_quality` drifts from the last
   pushed tier — Apply, preview and Revert all take effect live.
+  `Scene3DStatistics::texture_budget_bytes` reports the live streamer
+  budget so the MemoryTracker overlay attributes texture residency
+  against the active tier's budget, not the hard 192 MiB cache cap.
 - **Consumers:** the video-settings apply callback additionally calls
   `window.set_scene3d_texture_budget` with
   `scene3d_texture_budget_for(quality)` — Low 48 MiB, Medium 96 MiB,
@@ -92,8 +95,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   shed VRAM residency by degrading to coarser mip tails.
 - **Tests:** `native_scene3d_gpu_tests` — a budget set to zero before
   the first 3D frame reaches the lazily created renderer (denied bind
-  serves the pinned fallback); existing streaming-pressure cases still
-  pass. `--video-settings-check` smoke exercises Apply/preview/
+  serves the pinned fallback) and `texture_budget_bytes` reports both
+  the zeroed and restored budgets; existing streaming-pressure cases
+  still pass. `--video-settings-check` smoke exercises Apply/preview/
   Revert/Keep end-to-end.
 - **Save/performance impact:** settings-only; the persisted
   `video-settings.json` schema is unchanged (starfield_quality already

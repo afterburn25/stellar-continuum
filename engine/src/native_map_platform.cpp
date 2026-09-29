@@ -627,7 +627,7 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
       storage_->gpu_target_subsystem=tracker.register_subsystem("scene3d-targets");
     }
     const auto gpu_stats=storage_->scene3d->statistics();
-    tracker.report(storage_->gpu_texture_subsystem,gpu_stats.texture_cache_bytes,maximum_scene3d_texture_cache_bytes);
+    tracker.report(storage_->gpu_texture_subsystem,gpu_stats.texture_cache_bytes,gpu_stats.texture_budget_bytes);
     tracker.report(storage_->gpu_mesh_subsystem,gpu_stats.mesh_cache_bytes,maximum_mesh3d_cache_bytes);
     tracker.report(storage_->gpu_target_subsystem,gpu_stats.target_bytes,0);
   }

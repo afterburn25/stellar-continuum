@@ -44,6 +44,7 @@ int main(int argc,char** argv)try{
     early.material.texture=RgbaImage::create(2,2,{255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255});
     (void)capture({early},"budget-pre-renderer.png");
     check(window.scene3d_statistics().streamed_fallbacks>0,"Pre-renderer texture budget did not reach the lazily created renderer");
+    check(window.scene3d_statistics().texture_budget_bytes==0,"Statistics did not report the live streamer budget");
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
   }
   const auto first=capture({a,b},"depth-forward.png"),second=capture({b,a},"depth-reverse.png");
@@ -222,6 +223,7 @@ int main(int argc,char** argv)try{
      check(channel(*tail,72,160,0)>200&&channel(*tail,72,160,1)>50&&channel(*tail,72,160,1)<200&&channel(*tail,72,160,2)<120,
          "Residency view did not mark the partial tail warm");}
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+    check(window.scene3d_statistics().texture_budget_bytes==maximum_scene3d_texture_cache_bytes,"Statistics did not report the restored streamer budget");
     // The 2x2 texture is upsampled at this footprint, so its demanded
     // tail starts at mip 0 — the resident-bind green case.
     {const auto full=res_capture(textured,"residency-full.png");

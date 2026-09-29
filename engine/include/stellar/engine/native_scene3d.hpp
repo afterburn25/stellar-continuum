@@ -599,6 +599,10 @@ struct Scene3DStatistics {
   std::uint64_t streamed_partial_binds{};
   // Cumulative GPU bytes the TextureStreamer evicted from the texture cache.
   std::uint64_t streamed_evicted_bytes{};
+  // The TextureStreamer's live byte budget — set via
+  // Window::set_scene3d_texture_budget (quality tiers retune it). Zero on a
+  // default instance; diagnostics must not read it before renderer_active.
+  std::uint64_t texture_budget_bytes{};
   // Captured environment probes baked since renderer creation — each
   // counts six face renders for one scene's environmentCapture.
   std::uint64_t probe_bakes{};

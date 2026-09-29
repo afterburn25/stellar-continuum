@@ -1806,7 +1806,7 @@ void Scene3DRenderer::composite(const Scene3DView& view){
   checked(SDL_RenderTexture(s.renderer,s.targets[s.next_view++]->composite,nullptr,&destination),"3D viewport composition failed");
 }
 void Scene3DRenderer::set_texture_budget(std::uint64_t bytes){auto& s=*storage_;s.require_owner();s.streamer.set_budget(bytes);}
-Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.renderer_active=true;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;return result;}
+Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.renderer_active=true;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;result.texture_budget_bytes=storage_->streamer.budget();return result;}
 std::size_t Scene3DRenderer::bytes_per_pixel()const noexcept{return storage_->hdr?16u:8u;}
 } // namespace stellar::native_map
 

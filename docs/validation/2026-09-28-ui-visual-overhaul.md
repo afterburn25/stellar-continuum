@@ -273,8 +273,11 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   tier. `Window::set_scene3d_texture_budget` is now a live consumer
   (Low 48 / Medium 96 / High+ 192 MiB streamer budget) and persists
   through the lazily created renderer instead of silently dropping
-  pre-first-3D calls. Verified: `native_scene3d_gpu` pre-renderer
-  budget test, `--video-settings-check` (Apply/preview/Revert/Keep),
+  pre-first-3D calls. `Scene3DStatistics::texture_budget_bytes` reports
+  the live budget so the memory overlay attributes texture residency
+  against the active tier rather than the hard 192 MiB cap. Verified:
+  `native_scene3d_gpu` pre-renderer budget test + live-budget stat,
+  `--video-settings-check` (Apply/preview/Revert/Keep),
   dev smoke re-run in the ledger.
 
 ## Known limitations
