@@ -2507,6 +2507,7 @@ class NativeCampaign final {
     smoke_system_day_=session_->frame().clock().simulation_days();
     const auto found=session_->cache().systems_by_id.find(sol_system_id);
     if(found==session_->cache().systems_by_id.end())throw std::runtime_error("System smoke lacks Sol.");
+    {const auto &world=session_->frame().runtime().world().campaign();const auto known=world.knowledge.known_systems(world.player_civilization_id);if(std::ranges::find(known,sol_system_id)==known.end())throw std::runtime_error("System smoke observer does not know Sol.");}
     const auto point=expose_smoke_map_point(found->second->position.x,found->second->position.y,width,height);
     InputSnapshot arm;arm.drawable_width=width;arm.drawable_height=height;arm.pointer={static_cast<float>(width)*.5f,static_cast<float>(height)-4.f};arm.events={{InputEventType::LeftPressed,arm.pointer}};(void)update(arm,width,height,0.,false);
     InputSnapshot enter;enter.drawable_width=width;enter.drawable_height=height;enter.pointer=point;
