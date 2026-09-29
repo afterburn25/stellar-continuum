@@ -329,6 +329,12 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   notice/trigger matrix green with German chrome; the notice assertions
   are locale-agnostic by design — presence and difference, not
   literals).
+- General-settings check startup leg: `--general-settings-check`
+  validated under `--new-game-smoke` but only the pause block ran it —
+  a silently no-op invocation. The startup automation now opens the
+  hub's General category, captures the overlay, and Cancel-closes it
+  (`general_settings_screenshot` field; emit gains `"location"`). Every
+  hub category now has coverage at both harness locations.
   Follow-up: the page clip also made the three `GALAXY_PAD` axis rows
   unreachable — the shipped map's 15 rows exceed the ~12-row page at
   every viewport, and no scroll path existed. The list now scrolls on

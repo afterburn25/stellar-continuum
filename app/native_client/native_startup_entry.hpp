@@ -60,6 +60,7 @@ struct StartupEntryAutomation {
   std::filesystem::path video_settings_path, video_settings_screenshot, video_confirm_screenshot;
   std::filesystem::path voice_settings_path, voice_settings_screenshot;
   std::filesystem::path controls_settings_screenshot;
+  std::filesystem::path general_settings_screenshot;
   bool developer_mode{},complete_normal_research{},full_celestial_coverage{};
   int galaxy_card{};
   bool full_exploration{};

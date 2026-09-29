@@ -10831,6 +10831,8 @@ int main(int argc,char **argv){
       }
       if(options.controls_settings_check)
         automation.controls_settings_screenshot=sidecar_path(*options.smoke_screenshot,L"-controls-settings");
+      if(options.general_settings_check)
+        automation.general_settings_screenshot=sidecar_path(*options.smoke_screenshot,L"-general-settings");
       auto result=run_native_startup_entry(window,startup_config(),&automation);
       if(result.exit_requested||!result.session)throw std::runtime_error("Automated new campaign startup did not activate a session.");
       startup_evidence=std::move(result.evidence);generated_save_path=result.session->save_path();
@@ -11358,7 +11360,7 @@ int main(int argc,char **argv){
           window.draw(campaign.scene(width,height),sidecar_path(*options.smoke_screenshot,L"-general-settings"));
           route({InputEventType::LeftPressed,center(stellar::native_general::GeneralSettingsLayout::for_viewport(width,height).cancel)});
           if(general_settings.visible())throw std::runtime_error("General settings did not close on Cancel.");
-          std::cout<<"general_settings_check={\"opened\":true,\"capture\":true,\"cancel\":true}\n";
+          std::cout<<"general_settings_check={\"location\":\"pause\",\"opened\":true,\"capture\":true,\"cancel\":true}\n";
           settings_hub.close();
         }
         if(options.controls_settings_check&&!options.new_game_smoke){

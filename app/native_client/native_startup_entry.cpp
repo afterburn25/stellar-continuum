@@ -329,6 +329,29 @@ StartupEntryResult run_native_startup_entry(Window &window,
             window.draw(draw,automation->controls_settings_screenshot);
           });
     }
+    if (!automation->general_settings_screenshot.empty()) {
+      if (!config.settings_hub || !config.general_settings)
+        throw std::runtime_error("General settings validation requires the settings hub and overlay.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      config.settings_hub->close();
+      route({InputEventType::LeftPressed,center(entry_layout.settings)});
+      route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
+      if(!config.general_settings->visible())
+        throw std::runtime_error("General settings did not open from the startup settings hub.");
+      {
+        DrawList draw;
+        workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+        config.general_settings->render(draw,width,height);
+        window.draw(draw,automation->general_settings_screenshot);
+      }
+      const auto cancel=stellar::native_general::GeneralSettingsLayout::for_viewport(width,height).cancel;
+      route({InputEventType::LeftPressed,center(cancel)});
+      if(config.general_settings->visible())
+        throw std::runtime_error("General settings did not close on Cancel.");
+      std::cout<<"general_settings_check={\"location\":\"startup\",\"opened\":true,\"capture\":true,\"cancel\":true}\n";
+    }
     if(config.settings_hub)config.settings_hub->close();
     if (automation->action != StartupEntryAutomationAction::Create) {
       evidence.setup_opened = workspace.screen() == StartupScreen::Setup;
