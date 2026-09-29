@@ -203,6 +203,18 @@ preserve:
   anchor, replays it, and requires `replay_verified` counts matching the
   recorded journal — travel's moving-fleet leg also covers the
   synthetic-press path for internal saves.
+- Flag-coverage audit closed (`ecd2d310`/`834d110c`): every standalone
+  client smoke/check flag rides `stellar.py` — the once-orphaned
+  `verify_native_restart` (all four lifecycle modes incl.
+  `--new-game-restart-smoke`), `validate_native_quick_find_export`,
+  `validate_native_eruption_export` and `validate_native_developer_export`
+  are wired; the developer leg additionally carries the
+  `--smoke-galaxy-card`/`--smoke-system-count 500`/`--smoke-full-exploration`
+  modifiers (the only legal composite context). Remaining ungated flags
+  are dev tooling covered by CTest (`--dev-game`, `--devtools`) or
+  positional/modifier arguments. `--audio-check` is illegal under
+  `--new-game-restart-smoke`; `--smoke-full-exploration` requires
+  developer mode.
 - Draw-list test hazard: elements of `DrawList::overlay`/`world` are
   vector-backed — a held `Text*`/`UiRect*` dangles after the next
   `draw={}`/render. Copy `->at`/rects before re-rendering (the
