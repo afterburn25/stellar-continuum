@@ -357,7 +357,7 @@ BattleWorkspaceLayout BattleWorkspaceLayout::for_viewport(const int width,
   const auto margin = 12.f * scale;
   BattleWorkspaceLayout layout;
   layout.scale = scale;
-  layout.title_font_pixels = static_cast<int>(17.f * scale);
+  layout.title_font_pixels = stellar::native_ui::type::scaled(17.f, scale);
   layout.body_font_pixels = stellar::native_ui::type::compact_body(scale);
   layout.small_font_pixels = stellar::native_ui::type::compact_small(scale);
   layout.surface = {0.f, 0.f, w, h};

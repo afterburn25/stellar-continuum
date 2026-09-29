@@ -862,7 +862,14 @@ Escape-cancellable). The two failures (`native_developer_diagnostics`,
 diagnostics lane — both binaries were built from their unstaged
 `inspect_diplomacy_invariants` mid-flight changes, not committed code;
 every accessibility suite passes. Remaining accessibility gaps:
-screen-reader contracts and per-surface text scaling.
+screen-reader contracts and per-surface text scaling. [Status update:
+both gaps have since shipped — the UIA bridge answers
+Invoke/Toggle/RangeValue patterns and announcements carry
+control/range state (see row-26 entries below; still open there is a
+full fragment tree and non-Windows backends), and per-surface text
+scaling reached every workspace when the canonical `native_ui::type`
+ramp and bespoke chrome sizes routed through `type::scaled`, which
+carries `NativeUiLayout::text_scale`.]
 Incremental audio streaming (`6c189626`): `AudioStreamDecoder` +
 `open_audio_stream` pull-decode 48 kHz stereo F32 on demand through a
 lazy Media Foundation reader (first `read()` binds COM on the consuming
@@ -1173,7 +1180,10 @@ channel — `render_voice_caption` gained a UI-announcement fallback
 shown only while subtitles are enabled (4s expiry). `economy_animation`
 covers dedup/preemption/eviction/drain order; the client links clean.
 Still open: platform AT bridging (UIA/AT-SPI) and per-surface
-focused-label announcements beyond the menu and HUD chrome.
+focused-label announcements beyond the menu and HUD chrome. [Status
+update: both have since landed — the UIA bridge ships Invoke/Toggle/
+RangeValue providers, and focused announcements classify across the
+workspace surfaces (see the row-26 entries below).]
 Map focus groups + HUD chrome ring (row-26 accessibility): the clean
 map now chains its always-on focus groups — `map_focus_group_` orders
 assets navigator -> fleet outliner -> HUD chrome. A nav key that would
@@ -1494,7 +1504,14 @@ pixel size by `subtitle_scale`; both the in-game and startup call sites
 pass `general_settings.saved().effective()`), and
 `NativeUiLayout::set_text_scale` multiplies only the shared font metrics
 in `for_viewport` — text enlarges without growing chrome geometry.
-`native_ui_layout` verifies fonts scale while rects stay identical.
+The same multiplier now reaches per-surface fonts: every
+`stellar::native_ui::type` rung and `type::scaled` bespoke size carries
+`text_scale`, and the workspace literal derivations (battle title,
+missions, video settings, research body/small) route through it — so
+chrome text on every workspace honors the setting. In-world labels
+(star/system naming contracts, galaxy label LOD) intentionally keep
+their fit-to-field sizes. `native_ui_layout` verifies fonts scale while
+rects stay identical and pins the ramp multiplier.
 In-app rebind UI (row 16): the settings hub Controls view binds against the
 campaign's live `InputMapper` — `context("GALAXY")` enumerates Button actions
 into rows ("Toggle pause — Space, P"), activation captures the next
