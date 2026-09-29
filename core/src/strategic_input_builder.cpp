@@ -1,5 +1,7 @@
 #include <stellar/core/strategic_input_builder.hpp>
 
+#include <stellar/core/settlement_knowledge.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -164,20 +166,45 @@ CivilizationOwnState CivilizationStrategicInputBuilder::build(
   }
 
   bool has_known_colonization_opportunity = false;
-  for (const auto &body : world.bodies) {
-    if (!world.knowledge.is_system_fully_surveyed(civilization_id,
-                                                   body.system_id) ||
-        colonized_system_ids.contains(body.system_id))
-      continue;
-    for (const auto species_id : population_species_ids) {
+  const auto body_qualifies = [&](const PlanetaryBody &body) {
+    for (const auto species_id : population_species_ids)
       if (species_colonization_assessment(species_id, body)
-              .can_found_current_colony) {
-        has_known_colonization_opportunity = true;
+              .can_found_current_colony)
+        return true;
+    return false;
+  };
+  if (world.bodies_index) {
+    // Only fully-surveyed, uncolonized systems can qualify — walk the
+    // observer's surveyed-system set through the shared index instead of
+    // rescanning the entire catalog. Same existence result; the flag is
+    // order-insensitive.
+    for (const auto &survey :
+         world.knowledge.system_survey_knowledge(civilization_id)) {
+      if (survey.level != SystemSurveyLevel::fully_surveyed ||
+          colonized_system_ids.contains(survey.system_id))
+        continue;
+      const auto found = world.bodies_index->by_system.find(survey.system_id);
+      if (found == world.bodies_index->by_system.end())
+        continue;
+      for (const auto *body : found->second)
+        if (body_qualifies(*body)) {
+          has_known_colonization_opportunity = true;
+          break;
+        }
+      if (has_known_colonization_opportunity)
         break;
-      }
     }
-    if (has_known_colonization_opportunity)
-      break;
+  } else {
+    for (const auto &body : world.bodies) {
+      if (!world.knowledge.is_system_fully_surveyed(civilization_id,
+                                                     body.system_id) ||
+          colonized_system_ids.contains(body.system_id))
+        continue;
+      if (body_qualifies(body))
+        has_known_colonization_opportunity = true;
+      if (has_known_colonization_opportunity)
+        break;
+    }
   }
 
   const bool has_spacecraft_construction = shipbuilding_capabilities_(

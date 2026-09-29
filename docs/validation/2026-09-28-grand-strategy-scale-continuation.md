@@ -268,8 +268,8 @@ automatic-orders body index):
   — differs from the header receipt because semantic changes (organic war
   settlement, belligerent contact reacquisition, research scheduling)
   landed since `2af8d120`; this hash is the current-commit baseline.
-- **Step mean 16.03 ms** (was 65.31 ms in the header receipt — ~4.1x),
-  p95 26.36 ms, peak 78.07 ms; working set 520.7 MB / peak 2,263.4 MB.
-- Phase means: construction 6.66 ms (top; pre-indexing), adaptive_research
-  2.67, strategic_ai 2.15, economy 1.67, automatic_orders 1.21,
-  exploration 0.60, core_total 12.92.
+- **Step mean 8.93 ms** (was 65.31 ms in the header receipt — ~7.3x),
+  p95 20.04 ms, peak 56.66 ms; peak working set 2,263.0 MB.
+- Phase means: adaptive_research 2.79 (pre research-index share),
+  strategic_ai 2.27, automatic_orders 1.23, economy 0.77, exploration
+  0.59, construction 0.04, core_total 5.53.

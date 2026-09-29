@@ -11,6 +11,8 @@
 
 namespace stellar::core {
 
+struct SettlementBodiesIndex;
+
 struct StrategicInputWorldView {
   std::span<const StellarSystem> systems;
   std::span<const PlanetaryBody> bodies;
@@ -22,6 +24,10 @@ struct StrategicInputWorldView {
   std::span<const ConstructionState> construction;
   const CivilizationKnowledgeState &knowledge;
   InterstellarLaneNetwork &lanes;
+  // Optional caller-shared system->bodies catalog index; when set, the
+  // colonization-opportunity probe iterates surveyed systems instead of
+  // rescanning `bodies`. Must describe the same catalog.
+  const SettlementBodiesIndex *bodies_index{nullptr};
 
   [[nodiscard]] ExplorationPlanningWorldView exploration_view() const {
     return {systems, bodies, fleets, colonies, knowledge, lanes};

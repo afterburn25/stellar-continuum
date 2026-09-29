@@ -70,9 +70,37 @@ CivilizationStrategicRuntimeCoordinator::advance(StrategicRuntimeWorldView world
   for(const auto id:inactive)remove_civilization(id);
 
   std::vector<CivilizationStrategicReview> reviews;
+  bool bodies_index_attached = false;
   for (const auto *civilization : civilizations) {
     const auto next = next_review_tick_.find(civilization->id);
     if (next != next_review_tick_.end() && now_tick < next->second) continue;
+    if (!bodies_index_attached) {
+      // Lazily (re)build the shared catalog index only when a review is
+      // actually due — ticks with no due reviews pay nothing.
+      const auto systems_data = world.input.systems.data();
+      const auto bodies_data = world.input.bodies.data();
+      const auto bodies_front =
+          world.input.bodies.empty() ? 0 : world.input.bodies.front().id;
+      const auto bodies_back =
+          world.input.bodies.empty() ? 0 : world.input.bodies.back().id;
+      if (!bodies_index_ || systems_index_data_ != systems_data ||
+          bodies_index_data_ != bodies_data ||
+          systems_index_size_ != world.input.systems.size() ||
+          bodies_index_size_ != world.input.bodies.size() ||
+          bodies_index_front_id_ != bodies_front ||
+          bodies_index_back_id_ != bodies_back) {
+        bodies_index_.emplace(build_settlement_bodies_index(
+            world.input.systems, world.input.bodies));
+        systems_index_data_ = systems_data;
+        bodies_index_data_ = bodies_data;
+        systems_index_size_ = world.input.systems.size();
+        bodies_index_size_ = world.input.bodies.size();
+        bodies_index_front_id_ = bodies_front;
+        bodies_index_back_id_ = bodies_back;
+      }
+      world.input.bodies_index = &*bodies_index_;
+      bodies_index_attached = true;
+    }
     auto knowledge = knowledge_(civilization->id, now_tick);
     if (knowledge.observed_at_tick > now_tick)
       throw std::runtime_error("Strategic knowledge provider returned observations from the future.");
@@ -97,6 +125,10 @@ std::optional<std::int64_t> CivilizationStrategicRuntimeCoordinator::campaign_se
 void CivilizationStrategicRuntimeCoordinator::reset() noexcept {
   campaign_seed_.reset(); strategic_days_ = 0.0; next_review_tick_.clear();
   director_.clear(); industry_.clear(); shipbuilding_.clear();
+  bodies_index_.reset();
+  systems_index_data_ = nullptr; bodies_index_data_ = nullptr;
+  systems_index_size_ = bodies_index_size_ = 0;
+  bodies_index_front_id_ = bodies_index_back_id_ = 0;
 }
 
 void CivilizationStrategicRuntimeCoordinator::remove_civilization(int id) noexcept {

@@ -3,6 +3,7 @@
 #include <stellar/core/strategic_input_builder.hpp>
 #include <stellar/core/strategic_planning.hpp>
 #include <stellar/core/civilization_control.hpp>
+#include <stellar/core/settlement_knowledge.hpp>
 
 #include <cstdint>
 #include <functional>
@@ -82,6 +83,14 @@ private:
   std::unordered_map<int, std::int64_t> next_review_tick_;
   std::optional<std::int64_t> campaign_seed_;
   double strategic_days_{};
+  // Reviews share one catalog index so per-civilization input builds can
+  // resolve surveyed systems to bodies without rescanning the catalog;
+  // rebuilt only when the system/body span identity changes.
+  std::optional<SettlementBodiesIndex> bodies_index_;
+  const StellarSystem *systems_index_data_{};
+  const PlanetaryBody *bodies_index_data_{};
+  std::size_t systems_index_size_{}, bodies_index_size_{};
+  int bodies_index_front_id_{}, bodies_index_back_id_{};
 };
 
 } // namespace stellar::core

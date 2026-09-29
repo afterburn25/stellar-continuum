@@ -64,6 +64,38 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Research advance + strategic input shared catalog indexes (2026-09-28)
+
+- Purpose: two sibling subsystems outside the phase tasks rebuilt catalog
+  structures per call — `AdaptiveResearchCampaignSimulation::advance`
+  constructed a request-scoped `SettlementBodyIndex` over the whole body
+  catalog every tick for its credit-flow calls, and
+  `CivilizationStrategicInputBuilder::build` scanned every body per
+  strategic review to flag colonization opportunities.
+- Modules: `core/include/stellar/core/campaign_coordinator.hpp` —
+  `GalaxySimulationStepCoordinator::catalog_body_index` is now public so
+  subsystems driven outside the phase executor can reuse the cached
+  catalog index. `adaptive_research_campaign_simulation.hpp` /
+  `adaptive_research_campaign_simulation.cpp` — `advance` accepts an
+  optional shared `SettlementBodyIndex`; the integrated runtime
+  (`integrated_adaptive_campaign.cpp`) passes the coordinator's cached
+  one. `strategic_input_builder.hpp` — `StrategicInputWorldView` gains an
+  optional `const SettlementBodiesIndex*`; when set, the
+  colonization-opportunity probe walks the observer's fully-surveyed
+  systems through `by_system` instead of scanning the catalog.
+  `strategic_runtime.hpp` / `strategic_runtime.cpp` —
+  `CivilizationStrategicRuntimeCoordinator` caches a
+  `SettlementBodiesIndex` keyed on system/body span identity + edge ids
+  and attaches it lazily only when a review is actually due.
+- Semantics: unchanged — `bodies_for` resolves colony (system id, body id)
+  keys to the first catalog match under both index constructions; the
+  opportunity flag is an existence check insensitive to evaluation order
+  (catalog order vs surveyed-system order).
+- Save/performance impact: none persisted. Measured (2500 systems, seed
+  8374837, 10,000 ticks x2 + continuation): adaptive_research ~1.4 ms ->
+  ~0.6 ms mean with the shared index; whole step ~8.1 ms -> ~5.0 ms;
+  final hash bit-identical `8b6963c2...` and deterministic continuation.
+
 ## Automatic-orders shared settlement body index (2026-09-28)
 
 - Purpose: the automatic-orders phase ran full body-catalog scans per owned
