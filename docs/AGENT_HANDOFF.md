@@ -1144,7 +1144,13 @@ returns the first visible row. The diagnostics panel's `scroll_window`
 helper, both developer indexes, the empire monitor's two lists, and
 the phenomena dump all delegate to it, deleting five copies of the
 same arithmetic. `batcher_ui` covers snap-to-edge, stale-offset
-tail clamp, and empty-list reset.
+tail clamp, and empty-list reset. Follow-up fix: an offset pinned
+at `max_scroll` stays unsnapped through `sync_rows` — floor-snapping
+stranded up to one row-height of the final entry whenever the
+viewport was not a whole-row multiple (absolute `i*stride-offset`
+consumers like the diagnostics panes; fixed-slot consumers were
+immune since their `first` index floors either way). `batcher_ui`
+pins the general-remainder case plus mid-list snapping.
 VirtualizedList configure/set_row_count (row 24): the fractional-scroll
 consumers (colony roster, editor system/detail/picker lists,
 engine-shell asset/key/project/entity/scene lists) cannot snap to row

@@ -62,7 +62,11 @@ void VirtualizedList::set_row_count(std::size_t rows) {
 std::size_t VirtualizedList::sync_rows(std::size_t rows, float new_row_height,
                                        float new_viewport_height) {
   configure(rows, new_row_height, new_viewport_height);
-  if (row_height > 0.0f)
+  // A tail-pinned offset keeps max_scroll unsnapped: when the viewport
+  // is not a whole-row multiple, snapping down would strand up to one
+  // row-height of the final row permanently out of reach. Mid-list
+  // offsets still snap to whole-row boundaries.
+  if (row_height > 0.0f && scroll_offset < max_scroll())
     scroll_offset =
         std::floor(scroll_offset / row_height + 1e-3f) * row_height;
   return row_height > 0.0f

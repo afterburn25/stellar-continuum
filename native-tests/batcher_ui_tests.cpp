@@ -103,6 +103,24 @@ int main() {
         "a boundary-adjacent max scroll must expose the final row");
   check(tail.visible_range().last == 16,
         "the final row must be inside the visible range");
+  // A tail-pinned offset keeps the unsnapped max_scroll: snapping down
+  // to a row edge would strand a fractional remainder of the final row
+  // (104.48 floors to 91.12, hiding ~13.4px of row 15 forever).
+  VirtualizedList stranded;
+  stranded.configure(16, 22.78f, 260.0f);
+  stranded.scroll_to(stranded.max_scroll());
+  check(stranded.sync_rows(16, 22.78f, 260.0f) == 4,
+        "tail-pinned offset reports the floored first row");
+  check(stranded.scroll_offset == stranded.max_scroll(),
+        "tail-pinned offset keeps the unsnapped max_scroll");
+  check(stranded.visible_range().last == 16,
+        "the final row's full height is inside the visible range");
+  // Mid-list offsets still snap to whole-row boundaries.
+  stranded.scroll_to(100.0f);
+  check(stranded.sync_rows(16, 22.78f, 260.0f) == 4,
+        "mid-list offset still snaps down to a row edge");
+  check(stranded.scroll_offset == 4.0f * 22.78f,
+        "mid-list snap lands on the row boundary");
 
   // --- Scroll view (variable-height content) ---
   ScrollView view;

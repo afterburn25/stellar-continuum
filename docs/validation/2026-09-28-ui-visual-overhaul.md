@@ -369,6 +369,18 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   Pad-axis capture, device pinning, the a11y notice path, and every
   capture/cancel trigger kind are now exercised end-to-end, not just
   unit-tested.
+- `VirtualizedList::sync_rows` tail-pin fix: the per-frame
+  floor-to-row-edge snap made every row-snapped consumer strand up to
+  one row-height of its final entry whenever `max_scroll` had a
+  fractional remainder (the `1e-3` tolerance only rescued
+  boundary-adjacent remainders). An offset pinned at `max_scroll` now
+  stays unsnapped — mid-list offsets still snap — so the diagnostics
+  panels' absolute `i*stride - offset` rows can fully reach the tail.
+  Fixed-slot consumers (celestial index, empire monitor, save-slot
+  list) are unaffected: their `first` index is floored either way.
+  `batcher_ui` pins both cases (general remainder keeps `max_scroll`
+  and exposes row 15 fully; mid-list offsets still snap), and the
+  header contract documents the behavior.
 
 ## Known limitations
 
