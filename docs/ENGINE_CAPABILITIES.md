@@ -98,10 +98,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   serves the pinned fallback) and `texture_budget_bytes` reports both
   the zeroed and restored budgets; existing streaming-pressure cases
   still pass. `--video-settings-check` smoke exercises Apply/preview/
-  Revert/Keep end-to-end and now cycles the STARFIELD QUALITY row in
-  both harness locations: `startup` (pre-renderer budget persistence)
-  and `pause` (live `sync_scene3d_quality` drift through a real
-  campaign scene capture).
+  Revert/Keep end-to-end and cycles every non-display choice row —
+  V-Sync, Frame Cap, EDGE SMOOTHING/SCENE RESOLUTION (the
+  `set_scene_quality` reallocation path), STARFIELD QUALITY and
+  STARFIELD DENSITY — in both harness locations: `startup`
+  (pre-renderer budget persistence) and `pause` (live
+  `sync_scene3d_quality` drift through a real campaign scene capture).
 - **Save/performance impact:** settings-only; the persisted
   `video-settings.json` schema is unchanged (starfield_quality already
   serialized). Lower tiers trade texture residency for VRAM.
