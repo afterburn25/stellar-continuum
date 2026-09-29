@@ -129,6 +129,12 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
         else:
             observer["SystemSurveys"].append({"SystemId": first_hop, "Level": 2, "Progress": .35})
         save.write_text(json.dumps(prepared, ensure_ascii=False), encoding="utf-8")
+        # The fleet-smoke save left atomic-save sidecars (.bak/.integrity and
+        # deeper history) beside the primary. This rewrite intentionally
+        # replaces the payload, so a mismatched sidecar must not make the
+        # loader restore the pre-route backup — clear them before relaunch.
+        for sidecar in work.glob(save.name + ".*"):
+            sidecar.unlink()
 
         stdout, moved = launch("--system-travel-smoke", "moved", check_voice=voice_check)
         moved_audio = parse_native_audio_check(stdout, fresh=False) if voice_check else None

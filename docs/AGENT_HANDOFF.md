@@ -134,7 +134,10 @@ preserve:
   fallback only when quarter-scale genuinely cannot fit.
 - Fixture hazards for smoke runs: stale `.bak`/`.integrity` sidecars beside
   `--save-path` make the loader silently recover the previous save — delete
-  them when swapping fixtures; saves authored before `GenerationMetadata`
+  them when swapping fixtures (packaged validators that rewrite a save
+  mid-chain must clear `save.name.*` sidecars too; the system-travel
+  validator does this after authoring the recon edit on the fleet-smoke
+  save); saves authored before `GenerationMetadata`
   carry the key as null (the replay observer guards `is_object()`).
 - Save-anchored smokes F6-save back over their own fixture, so they
   self-mutate between runs: `--battle-smoke` must run on a freshly authored
