@@ -1483,7 +1483,10 @@ wheel is an axis trigger), keyboard focus-follow uses `ensure_visible`,
 offsets stay unsnapped (row-snapping strands the tail under a
 fractional viewport remainder), and rows are intersect-clipped so
 partial slivers stay clickable — the same convention as the startup
-load list.
+load list. The check's scroll leg also closes live axis coverage: a
+synthetic GamepadAxis deflection past the dead zone captures a real
+axis binding on the paged-in tail row, and feeding a sibling-owned axis
+exercises the steal end-to-end.
 Multi-pad is plumbed end-to-end: the platform opens up to four pads into
 stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry
 the slot, and `InputBinding.device` pins a binding to one pad via the

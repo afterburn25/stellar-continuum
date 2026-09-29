@@ -201,14 +201,75 @@ void check_controls_settings(NativeSettingsHub& hub,
       const auto tail_rect = hub.control_row_bounds(tail, width, height);
       require(tail_rect.has_value(),
               "Wheel scrolling did not reach the last rebind row.");
+      // The tail rows are the axis rows — feed a synthetic stick
+      // deflection at an unbound axis code; the axis-capture branch
+      // accepts only continuous triggers past the 0.5 dead zone.
+      int probe_axis = -1;
+      for (int candidate = 0; candidate < 16 && probe_axis < 0;
+           ++candidate) {
+        const bool taken =
+            std::ranges::any_of(snapshot, [&](const auto& pair) {
+              return std::ranges::any_of(
+                  pair.second, [&](const InputBinding& binding) {
+                    return binding.kind ==
+                               stellar::engine::RawInputEvent::Kind::
+                                   GamepadAxis &&
+                           binding.code == candidate;
+                  });
+            });
+        if (!taken) probe_axis = candidate;
+      }
+      require(probe_axis >= 0, "No spare pad axis for the capture probe.");
       click(*tail_rect);
       require(hub.capturing(),
               "Scrolled tail row did not arm rebind capture.");
-      route(InputEvent{InputEventType::EscapePressed});
-      require(!hub.capturing());
-      require(same_bindings(mapper.bindings(rows[static_cast<std::size_t>(tail)]),
-                            snapshot[rows[static_cast<std::size_t>(tail)]]),
-              "Scrolled-row capture cancel changed bindings.");
+      const std::string tail_name = rows[static_cast<std::size_t>(tail)];
+      InputEvent deflect{};
+      deflect.type = InputEventType::GamepadAxis;
+      deflect.gamepad_axis = static_cast<std::uint8_t>(probe_axis);
+      deflect.gamepad_axis_value = .9f;
+      route(deflect);
+      const auto axis_bound = mapper.bindings(tail_name);
+      require(!axis_bound.empty() &&
+                  axis_bound.front().kind ==
+                      stellar::engine::RawInputEvent::Kind::GamepadAxis &&
+                  axis_bound.front().code == probe_axis,
+              "Stick deflection did not capture on the scrolled axis row.");
+      // Axis steal: recapture the row with an axis a sibling already owns.
+      int victim_axis_row = -1, victim_axis = 0;
+      for (std::size_t i = 0; i < rows.size() &&
+                              victim_axis_row < 0; ++i) {
+        if (static_cast<int>(i) == tail) continue;
+        for (const auto& binding : snapshot[rows[i]])
+          if (binding.kind ==
+              stellar::engine::RawInputEvent::Kind::GamepadAxis) {
+            victim_axis_row = static_cast<int>(i);
+            victim_axis = binding.code;
+            break;
+          }
+      }
+      if (victim_axis_row >= 0) {
+        click(*tail_rect);
+        require(hub.capturing());
+        InputEvent steal_axis{};
+        steal_axis.type = InputEventType::GamepadAxis;
+        steal_axis.gamepad_axis =
+            static_cast<std::uint8_t>(victim_axis);
+        steal_axis.gamepad_axis_value = .9f;
+        route(steal_axis);
+        const auto victim_bound =
+            mapper.bindings(rows[static_cast<std::size_t>(victim_axis_row)]);
+        require(!std::ranges::any_of(
+                    victim_bound,
+                    [&](const InputBinding& binding) {
+                      return binding.kind ==
+                                 stellar::engine::RawInputEvent::Kind::
+                                     GamepadAxis &&
+                             binding.code == victim_axis;
+                    }),
+                "Rebinding a bound axis did not steal it from the sibling "
+                "row.");
+      }
       scrolled = true;
     }
   }
@@ -251,6 +312,7 @@ void check_controls_settings(NativeSettingsHub& hub,
   std::cout << "controls_settings_check={\"location\":\"" << location
             << "\",\"opened\":true,\"capture_cancel\":true,\"rebound\":true"
             << ",\"scrolled\":" << (scrolled ? "true" : "false")
+            << ",\"axis_captured\":" << (scrolled ? "true" : "false")
             << ",\"stole\":" << (stole ? "true" : "false")
             << ",\"file_preexisted\":" << (file_preexisted ? "true" : "false")
             << ",\"restored\":true}\n";

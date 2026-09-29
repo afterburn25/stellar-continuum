@@ -331,7 +331,11 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   scroll offset would strand the tail row under the fractional
   viewport remainder. Scroll resets on open/close and category entry.
   The smoke's scroll leg verifies the tail row is hitbox-free until
-  paged in, then arms and cancels capture on it.
+  paged in — and, since the tail rows are the pad-axis rows, it feeds a
+  synthetic `GamepadAxis` deflection (unbound axis code, 0.9 > dead
+  zone) through `campaign.update`, asserting the live capture lands a
+  `GamepadAxis` binding, plus a cross-row axis steal. Pad-axis capture
+  is now exercised end-to-end, not just unit-tested.
 
 ## Known limitations
 
