@@ -34,6 +34,8 @@ class GalaxyAssetTests(unittest.TestCase):
         self.assertEqual(seen,{(m,None,v) for m in MORPHOLOGIES for v in ('stars_included','gas_dust_only')})
         packaged=native_galaxy_art_asset_files(ROOT)
         self.assertTrue(all(a['path'] in packaged for a in assets))
+    @unittest.skipUnless((ROOT/'assets/source/galaxies-16x9').is_dir(),
+        "assets/source provenance art is not checked out on this machine")
     def test_widescreen_revisions_keep_both_variants(self):
         manifest=json.loads((ROOT/'data/stellar/galaxy-visuals-v1.json').read_text())
         edits=json.loads((ROOT/'export/galaxy-asset-edits.json').read_text())['edits']

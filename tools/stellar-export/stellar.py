@@ -120,20 +120,9 @@ def native_build(preset, env):
     # unset runs every test.  unittest -k cannot express exclusion, so the
     # filtered runner drops exactly the named tests.
     unittest_exclude = env.get("STELLAR_UNITTEST_EXCLUDE", "").split()
-    for test_file in [
-        "test_export.py", "test_native_client_runtime.py",
-        "test_native_audio_assets.py", "test_native_audio_runtime.py",
-        "test_native_fleet_runtime.py", "test_native_military_runtime.py",
-        "test_native_production_runtime.py", "test_native_system_runtime.py",
-        "test_native_system_travel_runtime.py", "test_native_colony_runtime.py",
-        "test_native_freight_runtime.py", "test_native_settlement_runtime.py",
-        "test_native_navigation_assets.py", "test_native_navigation_runtime.py",
-        "test_native_support_runtime.py", "test_native_battle_runtime.py",
-        "test_native_new_game_runtime.py", "test_native_galaxy_runtime.py",
-        "test_native_ship_art_runtime.py", "test_native_diplomacy_runtime.py",
-        "test_native_frame_profile.py", "test_native_campaign_profile.py",
-        "test_native_moon_assets.py",
-    ]:
+    for test_file in sorted(
+        path.name for path in (ROOT / "tools/stellar-export").glob("test_*.py")
+    ):
         if unittest_exclude:
             run([sys.executable, ROOT / "tools/stellar-export/filtered_test_runner.py",
                  ROOT / "tools/stellar-export" / test_file, *unittest_exclude], env=test_env)
