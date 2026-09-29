@@ -75,7 +75,7 @@ public:
 private:
   void prepare();
   MissionReachAssessment evaluate_route(const FleetState &,std::span<const int> route);
-  MissionReachAssessment evaluate_route_verdict(const FleetState &,std::span<const int> route);
+  MissionReachAssessment evaluate_route_verdict(const FleetState &,int target_system_id);
   bool has_return_service_route(const FleetState &);
   OperationalReachWorldView world_;
   int civilization_id_{};
@@ -86,21 +86,24 @@ private:
   // per-candidate polling loop allocation-free. Reused buffers are never
   // exposed: supported results copy into the returned assessment.
   std::vector<int> route_scratch_;
-  // Verdict-only feasibility memo for the explain=false assess path.
-  // Routes from one origin share shortest-tree prefixes, so each node's
-  // post-arrival fuel is memoized per system id and sibling candidates
-  // reuse the walked prefix. Entries replicate evaluate_route's fuel
-  // arithmetic in the same order, so verdicts are bit-identical. The
-  // whole map resets whenever the fleet inputs (origin, fuel, capacity,
-  // leg range) change.
-  struct FeasibilityNode {
-    double fuel_after{}; // post-arrival fuel incl. refuel top-up (arrival fuel)
-    bool feasible{};
-  };
+  // Verdict-only feasibility memo for the explain=false assess path,
+  // slot-indexed over the lane network's shortest-route tree. Routes from
+  // one origin share tree prefixes, so each node's post-arrival fuel is
+  // memoized per slot and sibling candidates reuse the walked prefix.
+  // Entries replicate evaluate_route's fuel arithmetic in the same order,
+  // so verdicts are bit-identical. The whole table resets whenever the
+  // fleet inputs (origin, fuel, capacity, leg range) change. state: 0
+  // unvisited, 1 feasible, 2 infeasible.
   int feas_origin_{};
   double feas_fuel_{}, feas_capacity_{}, feas_leg_range_{};
   bool feas_key_valid_{};
-  std::unordered_map<int, FeasibilityNode> feas_memo_;
+  std::vector<char> feas_state_;
+  std::vector<double> feas_fuel_after_;
+  // Slot -> refuel service factor (0 = none) — refueling_ projected into
+  // slot space once per batch.
+  std::vector<double> feas_factor_;
+  std::vector<int> feas_walk_; // ancestor-path scratch
+  std::span<const InterstellarLaneNetwork::RouteSlot> feas_slots_;
 };
 
 MissionReachAssessment

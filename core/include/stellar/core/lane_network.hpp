@@ -62,6 +62,33 @@ public:
                            double maximum_leg_range_light_years,
                            std::vector<int> &out);
 
+  // Slot table shared by RouteTreeView indices — identical order for the
+  // network's lifetime.
+  struct RouteSlot {
+    int id{};
+    StarPosition position{};
+  };
+  std::span<const RouteSlot> route_slots();
+
+  // Slot index of a system id, or -1 when the network does not hold it.
+  int slot_of_system(int system_id);
+
+  // Borrowed view of the cached slot-indexed shortest-route tree for
+  // (origin, range) — built and cached on miss exactly like
+  // find_shortest_route_into. distance[slot] is the shortest distance
+  // from origin under the leg-range limit (infinity when unreachable);
+  // prior[slot] is the tree predecessor slot (-1 where unset). Re-acquire
+  // for each batch of queries: the view can dangle after any lane query
+  // that inserts into or clears the route cache. Throws out_of_range on
+  // an unknown origin and answers empty spans for a non-positive or NaN
+  // range, matching find_shortest_route_into's contract.
+  struct RouteTreeView {
+    std::span<const double> distance;
+    std::span<const int> prior;
+  };
+  RouteTreeView route_tree_view(int origin_system_id,
+                                double maximum_leg_range_light_years);
+
   // True when the network holds a system with this id — callers that
   // distinguish "unknown system" from "unreachable" can use it before
   // pruning; find_shortest_route still throws on unknown ids.

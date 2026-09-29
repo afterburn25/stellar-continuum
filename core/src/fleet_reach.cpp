@@ -185,20 +185,21 @@ MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
         "The fleet must finish its current lane leg before receiving a new "
         "interstellar route.");
 
-  world_.lanes.find_shortest_route_into(
-      *fleet.current_system_id, target_system_id,
-      fleet.maximum_leg_range_light_years, route_scratch_);
-  if (route_scratch_.empty())
-    return explain
-               ? unsupported_mission_reach(
-                     "No connected lane route is available within this fleet's " +
-                     format_interstellar_metric_primary(
-                         fleet.maximum_leg_range_light_years) +
-                     " maximum leg range.")
-               : MissionReachAssessment{false, true, {}, std::nullopt, 0.0};
-
-  auto reach = explain ? evaluate_route(fleet, route_scratch_)
-                       : evaluate_route_verdict(fleet, route_scratch_);
+  MissionReachAssessment reach;
+  if (explain) {
+    world_.lanes.find_shortest_route_into(
+        *fleet.current_system_id, target_system_id,
+        fleet.maximum_leg_range_light_years, route_scratch_);
+    if (route_scratch_.empty())
+      return unsupported_mission_reach(
+          "No connected lane route is available within this fleet's " +
+          format_interstellar_metric_primary(
+              fleet.maximum_leg_range_light_years) +
+          " maximum leg range.");
+    reach = evaluate_route(fleet, route_scratch_);
+  } else {
+    reach = evaluate_route_verdict(fleet, target_system_id);
+  }
   if(reach.is_supported&&fuel_policy==MissionFuelPolicy::RetainReturnToService){
     auto projected=fleet;
     projected.current_system_id=target_system_id;
@@ -212,66 +213,100 @@ MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
 }
 
 // Verdict-only evaluation for the scan loops: identical is_supported
-// semantics to evaluate_route, but skips reason/route materialization and
-// memoizes each node's post-arrival fuel per system id. Because every
-// candidate route is a path in the same cached shortest tree, sibling
-// targets share ancestors — a drain visits each tree node once instead of
-// re-walking every full route. The fuel arithmetic below is applied in the
-// same order as evaluate_route (leg compare against running fuel, subtract,
-// then refuel top-up), so boundary verdicts are bit-identical.
+// semantics to evaluate_route, but no reason/route materialization and no
+// per-candidate route query — feasibility walks the lane network's cached
+// slot-indexed route tree directly and memoizes each node's post-arrival
+// fuel per slot. Since every candidate route is a path in the same tree,
+// sibling targets share ancestors: a drain visits each tree node once
+// instead of re-walking every route. The fuel arithmetic below is applied
+// in the same order as evaluate_route (leg compare against running fuel,
+// subtract, then refuel top-up), so boundary verdicts are bit-identical.
 MissionReachAssessment OperationalReachBatch::evaluate_route_verdict(
-    const FleetState &fleet, std::span<const int> route) {
+    const FleetState &fleet, int target_system_id) {
   prepare();
   const int origin = *fleet.current_system_id;
+  const double range = fleet.maximum_leg_range_light_years;
+  // find_shortest_route_into answers unreachable before any id
+  // validation — mirror that so a lane-unknown target under an invalid
+  // range reports unsupported instead of throwing.
+  if (range <= 0.0 || std::isnan(range))
+    return {false, true, {}, std::nullopt, 0.0};
+  if (feas_factor_.empty()) {
+    const auto slots = world_.lanes.route_slots();
+    feas_slots_ = slots;
+    feas_factor_.assign(slots.size(), 0.0);
+    for (const auto &[id, factor] : refueling_) {
+      const int slot = world_.lanes.slot_of_system(id);
+      if (slot >= 0)
+        feas_factor_[slot] = factor;
+    }
+  }
+  // Throws out_of_range on a lane-unknown origin, same as the
+  // find_shortest_route_into call the explain path performs. Acquired
+  // before the memo seed below so slot_of_system(origin) is guaranteed
+  // non-negative there.
+  const auto tree =
+      world_.lanes.route_tree_view(origin, range);
   if (!feas_key_valid_ || feas_origin_ != origin ||
       feas_fuel_ != fleet.fuel_remaining_light_years ||
       feas_capacity_ != fleet.fuel_capacity_light_years ||
-      feas_leg_range_ != fleet.maximum_leg_range_light_years) {
-    feas_memo_.clear();
+      feas_leg_range_ != range) {
     feas_origin_ = origin;
     feas_fuel_ = fleet.fuel_remaining_light_years;
     feas_capacity_ = fleet.fuel_capacity_light_years;
-    feas_leg_range_ = fleet.maximum_leg_range_light_years;
+    feas_leg_range_ = range;
     feas_key_valid_ = true;
+    feas_state_.assign(feas_slots_.size(), 0);
+    feas_fuel_after_.assign(feas_slots_.size(), 0.0);
+    // The origin node carries evaluate_route's own top-up: the running
+    // fuel after origin refuel, in identical expression order.
+    const int origin_slot = world_.lanes.slot_of_system(origin);
+    auto fuel = feas_fuel_;
+    if (const double factor = feas_factor_[origin_slot]; factor != 0.0)
+      fuel = feas_capacity_ * factor;
+    feas_state_[origin_slot] = 1;
+    feas_fuel_after_[origin_slot] = fuel;
   }
-  auto fuel = fleet.fuel_remaining_light_years;
-  if (const auto service = refueling_.find(origin); service != refueling_.end())
-    fuel = fleet.fuel_capacity_light_years * service->second;
-  double arrival_fuel = fuel;
-  bool feasible = true;
-  for (std::size_t index = 1; index < route.size(); ++index) {
-    const int next_id = route[index];
-    if (const auto memo = feas_memo_.find(next_id); memo != feas_memo_.end()) {
-      if (!memo->second.feasible) {
-        feasible = false;
-        break;
-      }
-      fuel = memo->second.fuel_after;
-      arrival_fuel = fuel;
+  const int target_slot = world_.lanes.slot_of_system(target_system_id);
+  if (target_slot < 0) {
+    // Preserve the out_of_range contract for lane-unknown targets.
+    world_.lanes.find_shortest_route_into(origin, target_system_id, range,
+                                          route_scratch_);
+    return {false, true, {}, std::nullopt, 0.0};
+  }
+  if (!std::isfinite(tree.distance[target_slot]))
+    return {false, true, {}, std::nullopt, 0.0};
+  feas_walk_.clear();
+  int slot = target_slot;
+  while (feas_state_[slot] == 0) {
+    feas_walk_.push_back(slot);
+    slot = tree.prior[slot];
+  }
+  bool feasible = feas_state_[slot] == 1;
+  double fuel = feas_fuel_after_[slot];
+  for (auto it = feas_walk_.rbegin(); it != feas_walk_.rend(); ++it) {
+    const int s = *it;
+    const int p = tree.prior[s];
+    if (!feasible) {
+      feas_state_[s] = 2;
       continue;
     }
-    const auto first = systems_.at(route[index - 1]);
-    const auto second = systems_.at(next_id);
-    const auto leg = distance_light_years(first->position, second->position);
-    FeasibilityNode node{};
-    if (leg <= fuel + 1e-9) {
-      fuel -= leg;
-      if (const auto service = refueling_.find(second->id);
-          service != refueling_.end())
-        fuel = fleet.fuel_capacity_light_years * service->second;
-      node.fuel_after = fuel;
-      node.feasible = true;
-      arrival_fuel = fuel;
-    } else {
+    const double leg = distance_light_years(feas_slots_[p].position,
+                                            feas_slots_[s].position);
+    if (leg > fuel + 1e-9) {
+      feas_state_[s] = 2;
       feasible = false;
+      continue;
     }
-    feas_memo_.emplace(second->id, node);
-    if (!feasible)
-      break;
+    fuel -= leg;
+    if (const double factor = feas_factor_[s]; factor != 0.0)
+      fuel = feas_capacity_ * factor;
+    feas_fuel_after_[s] = fuel;
+    feas_state_[s] = 1;
   }
-  if (!feasible)
+  if (feas_state_[target_slot] != 1)
     return {false, true, {}, std::nullopt, 0.0};
-  return {true, true, {}, std::nullopt, 0.0, arrival_fuel};
+  return {true, true, {}, std::nullopt, 0.0, feas_fuel_after_[target_slot]};
 }
 
 MissionReachAssessment OperationalReachBatch::evaluate_route(

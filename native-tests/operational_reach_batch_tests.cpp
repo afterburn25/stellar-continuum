@@ -1,7 +1,11 @@
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/exploration_planning.hpp>
+#include <algorithm>
+#include <cmath>
 #include <iostream>
+#include <limits>
+#include <vector>
 using namespace stellar::core;
 void check(bool ok,const char *message){if(!ok)throw std::runtime_error(message);}
 bool same(const MissionReachAssessment &a,const MissionReachAssessment &b){
@@ -60,5 +64,42 @@ int main(int argc,char **argv)try{
   world.colonies.clear();OperationalReachWorldView changed{world.systems,world.colonies,lanes};OperationalReachBatch batch(changed,fleet.civilization_id);
   check(same(batch.assess(fleet,world.systems[0].id,InterstellarMissionKind::Colony),
       assess_operational_reach(changed,fleet.civilization_id,fleet,world.systems[0].id,InterstellarMissionKind::Colony)),"New scope retained old refueling state.");
+  check(batch.assess(fleet,world.systems[0].id,InterstellarMissionKind::Colony,
+      MissionFuelPolicy::ReachDestination,false).is_supported==
+      assess_operational_reach(changed,fleet.civilization_id,fleet,world.systems[0].id,InterstellarMissionKind::Colony).is_supported,
+      "New scope retained old refueling state in verdict path.");
+  // RouteTreeView contract: prior-chain reconstruction must reproduce
+  // find_shortest_route's exact vector; invalid range and unknown ids
+  // mirror the route-query contract.
+  const auto slots=lanes.route_slots();
+  check(slots.size()==world.systems.size(),"RouteSlot table size diverged from systems.");
+  for(std::size_t i=0;i<world.systems.size();i+=17){
+    const int origin=world.systems[i].id;
+    const double range=300.0+static_cast<double>(i%5)*100.0;
+    const auto tree=lanes.route_tree_view(origin,range);
+    check(tree.distance.size()==slots.size()&&tree.prior.size()==slots.size(),"RouteTreeView size mismatch.");
+    const int origin_slot=lanes.slot_of_system(origin);
+    check(origin_slot>=0&&tree.distance[origin_slot]==0.0,"RouteTreeView origin slot/distance wrong.");
+    for(std::size_t j=1;j<world.systems.size();j+=29){
+      const int target=world.systems[j].id;
+      const auto expected=lanes.find_shortest_route(origin,target,range);
+      const int target_slot=lanes.slot_of_system(target);
+      check(target_slot>=0&&slots[target_slot].id==target,"slot_of_system round-trip failed.");
+      if(expected.empty()){
+        check(!std::isfinite(tree.distance[target_slot]),"RouteTreeView marked an unreachable target finite.");
+        continue;
+      }
+      std::vector<int> walked{target};
+      for(int s=target_slot;s!=origin_slot;){s=tree.prior[s];walked.push_back(slots[s].id);}
+      std::reverse(walked.begin(),walked.end());
+      check(walked==expected,"RouteTreeView prior chain diverged from find_shortest_route.");
+    }
+  }
+  check(lanes.route_tree_view(world.systems[0].id,0.0).distance.empty()&&
+      lanes.route_tree_view(world.systems[0].id,std::numeric_limits<double>::quiet_NaN()).prior.empty(),
+      "RouteTreeView accepted a non-positive or NaN range.");
+  check(lanes.slot_of_system(999999)==-1,"slot_of_system accepted an unknown id.");
+  {bool threw=false;try{lanes.route_tree_view(999999,500.0);}catch(const std::out_of_range&){threw=true;}
+   check(threw,"RouteTreeView accepted an unknown origin.");}
   std::cout<<"operational reach batch tests passed\n";return 0;
 }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

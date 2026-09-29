@@ -383,3 +383,32 @@ memoized arrival fuel. Canonical verification:
 - `operational_reach_batch` test extended: `explain=false` verdict +
   arrival-fuel parity across all systems, three fuel states, and both
   fuel policies; full suite 291/291.
+
+Follow-up pass 3 (same canonical flags): the verdict path no longer
+queries routes at all — `InterstellarLaneNetwork` exposes
+`route_slots()`/`slot_of_system()`/`route_tree_view(origin, range)`
+(borrowed spans over the cached slot-indexed `RouteTree`), and
+`evaluate_route_verdict` walks `prior[]` in slot space, memoizing
+post-arrival fuel in slot-indexed arrays keyed on the full fleet state.
+The refueling projection is mirrored into slot space once per batch.
+Unknown-origin `out_of_range` and invalid-range empty-verdict contracts
+are preserved exactly (the tree view is acquired before any slot
+indexing, so lane-unknown origins still throw before the memo seed).
+Canonical verification:
+
+- `finalStateHash e5a1d5bf…` — bit-identical again on the final
+  binary; `repeatFinalStatesDeterministic` and
+  `continuationDeterministic` true; save 149,969,876 bytes; metrics
+  unchanged (25 civs / 78 colonies / 264 fleets / 0 wars / 4
+  definitions / 128 journal entries). Pop/assess/drain counts
+  identical (25,502,374 / 25,502,374 / 6,252) — the same workload,
+  resolved through slot-array probes instead of per-pop route queries.
+- Clean-machine `EXPL-PROF` on the same hot path: select total
+  155.1 s (vs 236.7 s at pass 2, −34%; vs 773.6 s pre-memo, −80%),
+  select loop 109.6 s (vs 196.6 s, −44%), ~4.3 µs/pop; step mean
+  29.1 ms (vs 31.3 ms; vs 74.2 ms at the dense-route baseline, −61%),
+  step total 425.5 s, exploration phase 11.75 ms mean; peak working
+  set 2.87 GB.
+- `operational_reach_batch` extended with a `RouteTreeView` contract
+  test (prior-chain reconstruction reproduces `find_shortest_route`'s
+  exact vector; invalid-range and unknown-id contract parity).

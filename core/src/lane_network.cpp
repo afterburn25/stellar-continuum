@@ -154,10 +154,9 @@ measure_remaining_fleet_route(const std::vector<StellarSystem> *systems,
 }
 
 struct InterstellarLaneNetwork::Impl {
-  struct LaneSystem { int id{}; StarPosition position; };
-  std::vector<LaneSystem> systems;
+  std::vector<RouteSlot> systems;
   std::vector<InterstellarLane> lanes;
-  std::unordered_map<int, const LaneSystem *> by_id;
+  std::unordered_map<int, const RouteSlot *> by_id;
   std::unordered_map<int, std::vector<InterstellarLane>> adjacency;
   // System id -> index into systems (the route-tree slot).
   std::unordered_map<int, int> slot_of;
@@ -184,7 +183,7 @@ struct InterstellarLaneNetwork::Impl {
     if (source_is_null)
       throw std::invalid_argument("Value cannot be null. (Parameter 'systems')");
     std::vector<InterstellarLane> next_lanes;
-    std::unordered_map<int, const LaneSystem *> next_by_id;
+    std::unordered_map<int, const RouteSlot *> next_by_id;
     std::unordered_map<int, std::vector<InterstellarLane>> next_adjacency;
     std::unordered_map<int, int> next_slot_of;
     next_slot_of.reserve(systems.size());
@@ -192,7 +191,7 @@ struct InterstellarLaneNetwork::Impl {
       next_slot_of.emplace(systems[index].id, static_cast<int>(index));
 
     if (systems.size() >= 2) {
-      std::vector<const LaneSystem *> ordered;
+      std::vector<const RouteSlot *> ordered;
       ordered.reserve(systems.size());
       for (const auto &system : systems)
         ordered.push_back(&system);
@@ -275,7 +274,7 @@ struct InterstellarLaneNetwork::Impl {
       }
 
       for (const auto *system : ordered) {
-        std::vector<const LaneSystem *> neighbours;
+        std::vector<const RouteSlot *> neighbours;
         for (const auto *candidate : ordered)
           if (candidate->id != system->id)
             neighbours.push_back(candidate);
@@ -619,6 +618,46 @@ void InterstellarLaneNetwork::find_shortest_route_into(
     out.push_back(impl_->systems[slot].id);
   }
   std::reverse(out.begin(), out.end());
+}
+
+std::span<const InterstellarLaneNetwork::RouteSlot>
+InterstellarLaneNetwork::route_slots() {
+  impl_->require_owner();
+  impl_->ensure_built();
+  return impl_->systems;
+}
+
+int InterstellarLaneNetwork::slot_of_system(int system_id) {
+  impl_->require_owner();
+  impl_->ensure_built();
+  const auto found = impl_->slot_of.find(system_id);
+  return found == impl_->slot_of.end() ? -1 : found->second;
+}
+
+InterstellarLaneNetwork::RouteTreeView
+InterstellarLaneNetwork::route_tree_view(
+    int origin_system_id, double maximum_leg_range_light_years) {
+  impl_->require_owner();
+  if (maximum_leg_range_light_years <= 0 ||
+      std::isnan(maximum_leg_range_light_years))
+    return {};
+  impl_->ensure_built();
+  if (!impl_->by_id.contains(origin_system_id))
+    throw std::out_of_range(
+        "Specified argument was out of the range of valid values. (Parameter "
+        "'destinationSystemId')");
+  const RouteKey key{origin_system_id,
+                     std::bit_cast<std::uint64_t>(maximum_leg_range_light_years)};
+  auto found = impl_->routes.find(key);
+  if (found == impl_->routes.end()) {
+    auto built = impl_->build_route_tree(origin_system_id,
+                                       maximum_leg_range_light_years,
+                                       nullptr);
+    if (impl_->routes.size() >= std::clamp<std::size_t>(8388608 / std::max<std::size_t>(1,impl_->systems.size()),64,4096))
+      impl_->routes.clear();
+    found = impl_->routes.emplace(key, std::move(built)).first;
+  }
+  return {found->second.distance, found->second.prior};
 }
 
 bool InterstellarLaneNetwork::has_system(int system_id) {

@@ -465,7 +465,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `has_return_service_route` run it into a per-batch scratch vector so
   the ~630-pop selection loop no longer allocates a route vector per
   candidate; supported results still copy the route into the returned
-  assessment.
+  assessment. `InterstellarLaneNetwork` also exposes the route tree
+  itself for scan loops: `route_slots()` (the slot→system table),
+  `slot_of_system()` (id→slot, −1 when unknown), and
+  `route_tree_view(origin, range)` — a borrowed span pair over the
+  cached `RouteTree` (`distance[]`/`prior[]`) built and cached under
+  the same contract as `find_shortest_route_into` (invalid range →
+  empty view, unknown origin → `out_of_range`). The view is borrowed
+  per query because route-cache eviction clears the underlying map.
   `core/include/stellar/core/exploration_planning.hpp` —
   `ExplorationMissionPlanner::DrainVerdict` is a cross-call negative
   memo: once a fleet's selection drains the entire work list without
@@ -478,12 +485,22 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   consulted only on the canonical reach path and is never persisted.
   `OperationalReachBatch::assess` gains an `explain` flag: the scan
   loops pass `explain=false`, which skips reason-string materialization
-  and evaluates fuel feasibility through `evaluate_route_verdict` — a
-  per-(origin, fuel, capacity, leg-range) memo of post-arrival fuel per
-  system id along the shared shortest-tree prefixes. Verdicts replicate
-  `evaluate_route`'s arithmetic in identical order, so they are
-  bit-identical; `RetainReturnToService` still runs the full return-hop
-  check on outward-feasible candidates using the memoized arrival fuel.
+  and evaluates fuel feasibility through `evaluate_route_verdict`.
+  That path now never materializes a route at all: it borrows the
+  lane network's `route_tree_view` for the fleet's (origin, leg-range),
+  walks `prior[]` in slot space, and memoizes post-arrival fuel in
+  slot-indexed arrays (`feas_state_`/`feas_fuel_after_`) keyed on the
+  full fleet state — so a full work-list drain touches each tree node
+  once instead of re-walking every route. The refueling projection is
+  mirrored into slot space once per batch (`feas_factor_`, derived from
+  the same `refueling_` snapshot `prepare()` freezes). Verdicts
+  replicate `evaluate_route`'s arithmetic in identical order (origin
+  top-up, leg compare against running fuel +1e-9, subtract, refuel
+  top-up), so they are bit-identical; lane-unknown origins keep the
+  `out_of_range` contract and lane-unknown targets route through
+  `find_shortest_route_into` for the same throw.
+  `RetainReturnToService` still runs the full return-hop check on
+  outward-feasible candidates using the memoized arrival fuel.
 - Semantics: unchanged — the prune mirrors Dijkstra reachability
   (same leg-range predicate as the cached trees) and skips only
   candidates that could never be supported; the suitability memo key
@@ -504,7 +521,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   unshared, suitability-memo invalidation across survey-level bumps,
   reach-batch rebuild after colony-vector growth); `operational_reach_batch`
   extended — `explain=false` verdict + arrival-fuel parity across all
-  systems, fuel states, and both fuel policies; full native suite
+  systems, fuel states, and both fuel policies; `RouteTreeView`
+  contract test — prior-chain reconstruction reproduces
+  `find_shortest_route`'s exact vector, invalid-range/unknown-id
+  contract parity; full native suite
   291/291 green.
 - Save/performance impact: none persisted — all structures are
   per-advance or per-query. Colonization-phase suitability lists and
@@ -519,12 +539,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   fragmented-graph workloads (small leg ranges, dense subsets).
   The drain memo is the first measured win on the canonical run:
   select 773.6 s → 406.7 s (−47%), pops 31.5M → 25.5M; the verdict
-  prefix memo follows with select 236.7 s, step mean 31.3 ms (vs
-  74.2 ms at the dense-route baseline, −58%).
+  prefix memo follows with select 236.7 s, step mean 31.3 ms, and the
+  slot-indexed tree view cuts select to 155.1 s (loop 109.6 s,
+  ~4.3 µs/pop) with step mean 29.1 ms (vs 74.2 ms at the dense-route
+  baseline, −61%).
 - Limitations: `select_mission`'s per-pop `assess` remains the
-  dominant late-game term even after prefix memoization — the heap pop
-  itself and the route-cache lookup are now the floor, and verdicts
-  still require touching each candidate once per changed fleet state;
+  dominant late-game term — the floor is now heap pop + slot lookup +
+  memo probe (~4.3 µs), and verdicts still require touching each
+  candidate once per changed fleet state;
   `has_return_service_route` still walks the colony set per pop on
   fuel-constrained fleets; the
   prune only applies on the canonical reach path (injected providers
