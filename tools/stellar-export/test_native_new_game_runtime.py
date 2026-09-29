@@ -44,7 +44,7 @@ class VideoDiagnosticTests(unittest.TestCase):
     location = "startup"
 
     def stdout(self, **overrides):
-        report = {"location": self.location, "opened": True, "four_rows": True,
+        report = {"location": self.location, "opened": True, "choice_rows": True,
                   "previewed": True, "normal_capture": True, "confirm_capture": True,
                   "escape_reverted": True, "kept": True, "restored": True}
         report.update(overrides)
@@ -74,7 +74,7 @@ class VideoDiagnosticTests(unittest.TestCase):
 
     def test_duplicate_video_key_is_rejected(self):
         duplicate = ('video_settings_check={"location":"startup","opened":true,'
-                     '"opened":true,"four_rows":true,"previewed":true,'
+                     '"opened":true,"choice_rows":true,"previewed":true,'
                      '"normal_capture":true,"confirm_capture":true,'
                      '"escape_reverted":true,"kept":true,"restored":true}')
         with self.assertRaises(RuntimeError):

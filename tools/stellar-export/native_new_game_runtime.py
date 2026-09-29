@@ -92,7 +92,7 @@ def _video_diagnostic(stdout: str, location: str) -> dict:
         report = json.loads(rows[0], object_pairs_hook=unique_object)
     except (TypeError, ValueError, json.JSONDecodeError) as error:
         raise RuntimeError("Video settings diagnostic was not valid unique-key JSON") from error
-    flags = ("opened", "four_rows", "previewed", "normal_capture",
+    flags = ("opened", "choice_rows", "previewed", "normal_capture",
              "confirm_capture", "escape_reverted", "kept", "restored")
     expected_keys = {"location", *flags}
     if (not isinstance(report, dict) or set(report) != expected_keys or
