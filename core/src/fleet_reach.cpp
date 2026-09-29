@@ -153,14 +153,6 @@ std::string format_interstellar_metric_speed(double light_years_per_day) {
 
 void OperationalReachBatch::prepare() {
   if(prepared_)return;
-  std::unordered_map<int, const StellarSystem *> systems;
-  systems.reserve(world_.systems.size());
-  for (const auto &system : world_.systems)
-    if (!systems.emplace(system.id, &system).second)
-      throw std::invalid_argument(
-          "An item with the same key has already been added. Key: " +
-          std::to_string(system.id));
-
   std::unordered_map<int, double> refueling;
   for (const auto &colony : world_.colonies) {
     if (colony.civilization_id != civilization_id_)
@@ -169,7 +161,23 @@ void OperationalReachBatch::prepare() {
     service =
         std::max(service, colony.kind == SettlementKind::Colony ? 1.0 : 0.5);
   }
-  systems_=std::move(systems);refueling_=std::move(refueling);prepared_=true;
+  refueling_=std::move(refueling);prepared_=true;
+}
+
+const std::unordered_map<int, const StellarSystem *> &
+OperationalReachBatch::systems_map() {
+  if (!systems_built_) {
+    std::unordered_map<int, const StellarSystem *> systems;
+    systems.reserve(world_.systems.size());
+    for (const auto &system : world_.systems)
+      if (!systems.emplace(system.id, &system).second)
+        throw std::invalid_argument(
+            "An item with the same key has already been added. Key: " +
+            std::to_string(system.id));
+    systems_ = std::move(systems);
+    systems_built_ = true;
+  }
+  return systems_;
 }
 
 MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
@@ -178,7 +186,7 @@ MissionReachAssessment OperationalReachBatch::assess(const FleetState &fleet,
   if (fleet.civilization_id != civilization_id_)
     return unsupported_mission_reach(
         "That fleet is not controlled by this civilization.");
-  if (prepared_?!systems_.contains(target_system_id):!find_system(world_.systems, target_system_id))
+  if (systems_built_?!systems_.contains(target_system_id):!find_system(world_.systems, target_system_id))
     return unsupported_mission_reach("Unknown mission target.");
   if (!fleet.current_system_id)
     return unsupported_mission_reach(
@@ -280,6 +288,7 @@ void OperationalReachBatch::ensure_feasibility_state(
     feas_key_valid_ = true;
     feas_state_.assign(feas_slots_.size(), 0);
     feas_fuel_after_.assign(feas_slots_.size(), 0.0);
+    feas_dist_.assign(feas_slots_.size(), 0.0);
     // The origin node carries evaluate_route's own top-up: the running
     // fuel after origin refuel, in identical expression order.
     const int origin_slot = world_.lanes.slot_of_system(origin);
@@ -325,6 +334,11 @@ MissionReachAssessment OperationalReachBatch::verdict_for_slot(
       continue;
     }
     fuel -= leg;
+    // Accumulate parent-first in the same association order as
+    // evaluate_route's `distance += leg` walk, so route distances —
+    // including nearest_refueling's exact-equality tie-break — are
+    // bit-identical.
+    feas_dist_[s] = feas_dist_[p] + leg;
     if (const double factor = feas_factor_[s]; factor != 0.0)
       fuel = feas_capacity_ * factor;
     feas_fuel_after_[s] = fuel;
@@ -332,7 +346,8 @@ MissionReachAssessment OperationalReachBatch::verdict_for_slot(
   }
   if (feas_state_[target_slot] != 1)
     return {false, true, {}, std::nullopt, 0.0};
-  return {true, true, {}, std::nullopt, 0.0, feas_fuel_after_[target_slot]};
+  return {true, true, {}, std::nullopt, feas_dist_[target_slot],
+          feas_fuel_after_[target_slot]};
 }
 
 bool OperationalReachBatch::probe_supported(
@@ -378,9 +393,10 @@ MissionReachAssessment OperationalReachBatch::evaluate_route(
     fuel = fleet.fuel_capacity_light_years * service->second;
 
   double distance = 0.0;
+  const auto &systems = systems_map();
   for (std::size_t index = 1; index < route.size(); ++index) {
-    const auto first = systems_.at(route[index - 1]);
-    const auto second = systems_.at(route[index]);
+    const auto first = systems.at(route[index - 1]);
+    const auto second = systems.at(route[index]);
     const auto leg = distance_light_years(first->position, second->position);
     if (leg > fuel + 1e-9)
       return unsupported_mission_reach(
@@ -428,11 +444,26 @@ bool OperationalReachBatch::has_return_service_route(const FleetState &fleet) {
 
 std::optional<RefuelingReach> OperationalReachBatch::nearest_refueling(
     const FleetState &fleet,InterstellarMissionKind kind) {
+  const auto verdict = nearest_refueling_verdict(fleet);
+  if (!verdict)
+    return std::nullopt;
+  // The winner alone pays the explain path so the returned reach
+  // carries the same route and reason payload as a full scan.
+  return RefuelingReach{verdict->system_id,
+                        assess(fleet, verdict->system_id, kind)};
+}
+
+std::optional<RefuelingReach> OperationalReachBatch::nearest_refueling_verdict(
+    const FleetState &fleet) {
   if(fleet.civilization_id!=civilization_id_||!fleet.current_system_id)return std::nullopt;
   prepare();
   std::optional<RefuelingReach> nearest;
   for(const auto &[id,service]:refueling_){
-    auto reach=assess(fleet,id,kind);
+    // Mirror assess's "Unknown mission target" gate before the verdict
+    // probe so a non-catalog colony site skips instead of throwing.
+    if (systems_built_?!systems_.contains(id):!find_system(world_.systems,id))
+      continue;
+    auto reach=evaluate_route_verdict(fleet,id);
     if(!reach.is_supported)continue;
     if(!nearest||reach.route_distance_light_years<nearest->reach.route_distance_light_years||
         (reach.route_distance_light_years==nearest->reach.route_distance_light_years&&id<nearest->system_id))

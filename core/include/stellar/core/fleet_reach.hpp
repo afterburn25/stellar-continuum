@@ -81,8 +81,18 @@ public:
   bool probe_supported(const FleetState &,int target_slot,
       MissionFuelPolicy fuel_policy);
   std::optional<RefuelingReach> nearest_refueling(const FleetState &,InterstellarMissionKind);
+  // Verdict-only variant of nearest_refueling for re-check paths that
+  // discard the reason string: identical winner selection (same
+  // route-distance ranking and id tie-break), but candidates are
+  // ranked through the slot-indexed feasibility memo and the winner's
+  // reach carries no route/reason payload — assign_fleet_route
+  // re-derives the identical route when route_system_ids is nullopt.
+  std::optional<RefuelingReach> nearest_refueling_verdict(const FleetState &);
 private:
   void prepare();
+  // The id->system map is built lazily: verdict probes never need it,
+  // so queued-return re-checks skip the per-call catalog map build.
+  const std::unordered_map<int, const StellarSystem *> &systems_map();
   MissionReachAssessment evaluate_route(const FleetState &,std::span<const int> route);
   MissionReachAssessment evaluate_route_verdict(const FleetState &,int target_system_id);
   void ensure_feasibility_state(const FleetState &);
@@ -92,6 +102,9 @@ private:
   int civilization_id_{};
   bool prepared_{};
   std::unordered_map<int,const StellarSystem *> systems_;
+  // systems_ is built lazily on first explain-path use — verdict
+  // probes never need the id map.
+  bool systems_built_{};
   std::unordered_map<int,double> refueling_;
   // Scratch for route materialization across assess calls — keeps the
   // per-candidate polling loop allocation-free. Reused buffers are never
@@ -113,6 +126,7 @@ private:
   // Slot -> refuel service factor (0 = none) — refueling_ projected into
   // slot space once per batch.
   std::vector<double> feas_factor_;
+  std::vector<double> feas_dist_; // supported-node route distance
   std::vector<int> feas_walk_; // ancestor-path scratch
   std::span<const InterstellarLaneNetwork::RouteSlot> feas_slots_;
   // Route tree pinned per fleet-state key — re-acquired when the lane

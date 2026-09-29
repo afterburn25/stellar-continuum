@@ -572,14 +572,29 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   paths are unaffected. The memo is runtime-only: it is not
   serialized, so a save/load boundary simply re-runs sweeps (all
   no-ops) and the trajectory is unchanged.
+  The dominant remaining inbound term was the queued civilian-return
+  re-check: every arrival hop while `return_to_base_requested` rebuilt
+  a full `OperationalReachBatch` and ran explain-mode `assess` on every
+  owned refueling site (~850 µs/hop measured). `nearest_refueling` now
+  ranks candidates through the slot-indexed verdict path — which also
+  reproduces `route_distance_light_years` bit-exactly by accumulating
+  leg distances parent-first in `evaluate_route`'s order
+  (`feas_dist_`) — and only the winning site pays route/reason
+  materialization. `activate_queued_civilian_return_at_system` uses a
+  new `nearest_refueling_verdict` that skips the winner's payload
+  entirely (its result message is discarded and `assign_fleet_route`
+  re-derives the identical route when `route_system_ids` is absent).
+  The batch's id→system map is now built lazily (`systems_map()`), so
+  verdict-only batches never pay the catalog map build; the
+  duplicate-id `invalid_argument` still fires on every path that
+  consumes the map.
 - Limitations: `select_mission`'s per-pop probe remains the dominant
   late-game term — the floor is heap pop + reservation check +
   slot-indexed memo probe (~1.5–4 µs), and verdicts still require
   touching each candidate once per changed fleet state;
   `has_return_service_route` still walks the colony set per pop on
-  fuel-constrained fleets; transit `tail` (civilization contact
-  detection on populated systems) and `survey` remain the next
-  attribution targets; the
+  fuel-constrained fleets; `survey` (~30 s/campaign-unit) and select
+  `build` (~27 s/unit) remain the next attribution targets; the
   prune only applies on the canonical reach path (injected providers
   keep the un-pruned loop); `SettlementPlanningSharedIndex` is manual
   plumbing — callers that omit it keep per-call behavior.

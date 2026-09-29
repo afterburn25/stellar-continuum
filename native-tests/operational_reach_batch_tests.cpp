@@ -48,6 +48,19 @@ int main(int argc,char **argv)try{
       check(batch.probe_supported(fleet,slot,MissionFuelPolicy::RetainReturnToService)==kept_quick.is_supported,
           "Slot probe changed return-service gating.");
     }
+    // nearest_refueling_verdict must pick the identical base with an
+    // identical distance/arrival fuel — only the reason/route payload
+    // is omitted for the winner.
+    const auto rich=batch.nearest_refueling(fleet,InterstellarMissionKind::ScoutReconnaissance);
+    const auto lean=batch.nearest_refueling_verdict(fleet);
+    check(rich.has_value()==lean.has_value(),"nearest_refueling_verdict diverged on emptiness.");
+    if(rich){
+      check(rich->system_id==lean->system_id,"nearest_refueling_verdict picked a different base.");
+      check(lean->reach.route_distance_light_years==rich->reach.route_distance_light_years,
+          "nearest_refueling_verdict distance diverged.");
+      check(lean->reach.arrival_fuel_light_years==rich->reach.arrival_fuel_light_years,
+          "nearest_refueling_verdict arrival fuel diverged.");
+    }
     fleet.fuel_remaining_light_years=0;
     for(int i=0;i<20;++i)check(same(assess_operational_reach(view,fleet.civilization_id,fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey),
         batch.assess(fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey)),"Batch reused stale fleet fuel.");

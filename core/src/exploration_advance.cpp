@@ -520,9 +520,19 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
                       "Sensors added " + std::to_string(revealed) + " system" +
                           (revealed == 1 ? "" : "s") +
                           " to the local chart."});
-  detect_civilization_contacts(world, fleet, events, presence);
+  {
+    std::optional<detail::ExplProfScope> cscope;
+    if (iprof)
+      cscope.emplace(ip.inbound_contacts_ns);
+    detect_civilization_contacts(world, fleet, events, presence);
+  }
   if (!fleet.return_to_base_requested)
     return false;
+  if (iprof) {
+    iscope.reset();
+    iscope.emplace(ip.inbound_return_ns);
+    ++ip.return_hops;
+  }
   (void)activate_queued_civilian_return_at_system(
       {world.systems, world.colonies, world.fleets, world.lanes}, fleet);
   return true;

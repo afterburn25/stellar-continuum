@@ -29,6 +29,8 @@ struct ExplProf {
   // handle_inbound internals (exploration_advance.cpp)
   std::atomic<long long> inbound_prep_ns{0}, inbound_reveal_ns{0},
       inbound_tail_ns{0};
+  std::atomic<long long> inbound_contacts_ns{0}, inbound_return_ns{0},
+      return_hops{0};
   std::atomic<long long> band_candidates{0}, reveal_attempts{0};
   ~ExplProf() {
     if (!enabled.load()) return;
@@ -56,6 +58,11 @@ struct ExplProf {
                  inbound_reveal_ns.load() / 1000000,
                  inbound_tail_ns.load() / 1000000, band_candidates.load(),
                  reveal_attempts.load());
+    std::fprintf(stderr,
+                 "EXPL-PROF inbound-tail: contacts=%lldms return=%lldms "
+                 "| return_hops=%lld\n",
+                 inbound_contacts_ns.load() / 1000000,
+                 inbound_return_ns.load() / 1000000, return_hops.load());
   }
 };
 
