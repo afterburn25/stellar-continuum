@@ -132,6 +132,7 @@ def native_build(preset, env):
         "test_native_new_game_runtime.py", "test_native_galaxy_runtime.py",
         "test_native_ship_art_runtime.py", "test_native_diplomacy_runtime.py",
         "test_native_frame_profile.py", "test_native_campaign_profile.py",
+        "test_native_moon_assets.py",
     ]:
         if unittest_exclude:
             run([sys.executable, ROOT / "tools/stellar-export/filtered_test_runner.py",

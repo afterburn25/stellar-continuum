@@ -24,6 +24,7 @@ from native_audio_assets import native_audio_asset_files
 from native_navigation_assets import native_navigation_asset_files
 from native_research_assets import native_research_asset_files
 from native_voice_runtime import native_voice_asset_files
+from native_moon_assets import native_moon_asset_files
 
 
 def _verified_file(path: Path, expected_hash: str) -> Path:
@@ -63,6 +64,7 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files.update(native_celestial_asset_files(root))
     files.update(native_small_body_asset_files(root))
     files.update(native_planet_asset_files(root))
+    files.update(native_moon_asset_files(root))
     files.update(native_environment_asset_files(root))
     files.update(native_species_asset_files(root))
     files.update(native_startup_art_asset_files(root))
@@ -111,6 +113,16 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     files["Documentation/Stellar-generation.md"]=root/"docs/stellar-generation-validation.md"
     files["Documentation/Stellar-population-profiles.md"]=root/"docs/stellar-population-profiles.md"
     files.update(native_voice_asset_files(root))
+    # The client discovers shipped Data/locale/<id>.json tables at startup and
+    # feeds them to the engine localization service; package every reviewed
+    # catalog present in the tree.
+    locale_root = root / "data/locale"
+    if not locale_root.is_dir():
+        raise RuntimeError(f"Missing locale catalog directory: {locale_root}")
+    for table in sorted(locale_root.glob("*.json")):
+        files[f"Data/locale/{table.name}"] = table
+    if not any(name == "Data/locale/en.json" for name in files):
+        raise RuntimeError("Native client locale packaging must ship the English catalog")
     for relative, source in files.items():
         destination = output / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
