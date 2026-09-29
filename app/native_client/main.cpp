@@ -5359,8 +5359,14 @@ class NativeCampaign final {
         const auto result =
             frame.advance(step_days / frame.clock().days_per_second());
         if (result.route != CampaignFrameRoute::Strategic || result.completed_substeps != std::vector<double>{step_days} ||
-            frame.clock().simulation_days() - before != step_days || frame.clock().backlog_days() != 0.)
-          throw std::runtime_error("Settlement completion left exact 1/64-day stepping.");
+            frame.clock().simulation_days() - before != step_days || frame.clock().backlog_days() != 0.) {
+          std::string sub;
+          for (const auto v : result.completed_substeps) sub += std::format("{:.17g},", v);
+          throw std::runtime_error(std::format(
+              "Settlement completion left exact 1/64-day stepping. route={} substeps={{{}}} day_delta={:.17g} backlog={:.17g} step={}",
+              static_cast<int>(result.route), sub,
+              frame.clock().simulation_days() - before, frame.clock().backlog_days(), steps));
+        }
         publish_feedback(result);
         const auto vessel = std::ranges::find(world.fleets, fleet_id, &FleetState::id);
         // Core clears the consumed vessel's route once, incrementing revision.

@@ -153,6 +153,23 @@ preserve:
   The `--smoke`-anchored checks have dedicated 500-system fixtures in
   `work/` (`c-economy.json`, `c-logistics.json`, `c-inspection.json`,
   `mil-fixture.json`) — copy before running for the same reason.
+  `--settlement-completion-smoke`/`--settlement-founded-smoke` add a
+  timing contract on top: they assert `simulation_days()` advances by
+  exactly `1/64` per step, which requires the source save's sim day to
+  keep that increment exactly representable in double precision. A save
+  whose sim day carries a full mantissa (arbitrary fractional residue)
+  trips the check once accumulated days pass ~255.5 (`before + 1/64`
+  rounds at the ULP boundary — the diagnostic now prints route/substeps/
+  day_delta/backlog). The packaged path is the maintained fixture:
+  `stellar_native_earned_settlement_tests.exe <research-v1> <catalog>
+  --earned <first-survey-save> --output-dir <dir>` stages the
+  eligible-site/populated-vessel/partial-establishment/founded
+  checkpoints (its source must have the scout+science pair idle in a
+  fully-surveyed non-colony system), then `--settlement-smoke` on the
+  populated-vessel save yields the active expedition the completion
+  smoke consumes — `validate_native_earned_settlement_export` in
+  `tools/stellar-export` runs that whole chain including both
+  completion modes and binds every checkpoint.
 - `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
