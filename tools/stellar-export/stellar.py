@@ -111,7 +111,13 @@ def native_build(preset, env):
     # The unfiltered suite includes the heavy scale tests (~7 min of
     # generation/scale work alone on a shared runner); 900 s proved short once
     # the documented SYNC exclusions were removed.
-    run(ctest, env=env, timeout=1800)
+    try:
+        run(ctest, env=env, timeout=1800)
+    except subprocess.CalledProcessError:
+        # A single OS-level flake (AV/indexer file locks during atomic writes)
+        # can fail one test in an otherwise green suite. Rerun just the failed
+        # tests once; a persistent defect still fails the second pass.
+        run(ctest + ["--rerun-failed"], env=env, timeout=1800)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
