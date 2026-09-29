@@ -237,6 +237,10 @@ ColonizationSimulation::advance(ColonizationWorldView world,
   // bodies by system and carries the id lookups the planner would otherwise
   // rebuild on every call.
   std::optional<SettlementBodiesIndex> bodies_index;
+  // Shared per-advance read models for the opportunity planners; colony
+  // foundings below grow world.colonies, which the shared index observes
+  // via its colony-count guard.
+  SettlementPlanningSharedIndex planning_shared;
   std::vector<ColonizationEvent> events;
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active || fleet.role != FleetRole::Colony ||
@@ -407,7 +411,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
       const auto plan = opportunity_planner_.build_plan(
           world.planning(), fleet.id,
           ColonizationOpportunityPlanner::hard_maximum_candidates,
-          &*bodies_index);
+          &*bodies_index, &planning_shared);
       const ColonizationOpportunityCandidate *best = nullptr;
       double best_score{};
       for (const auto &candidate : plan.candidates) {

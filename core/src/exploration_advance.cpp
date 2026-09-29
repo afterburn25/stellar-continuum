@@ -1,5 +1,7 @@
 #include <stellar/core/exploration_advance.hpp>
 
+#include "exploration_prof_internal.hpp"
+
 #include <stellar/core/civilian_recovery.hpp>
 #include <stellar/core/detail/legacy_number_format.hpp>
 #include <stellar/core/fleet_transit.hpp>
@@ -473,45 +475,7 @@ bool handle_inbound(AdvanceIndex &index, ExplorationAdvanceWorldView world,
   return true;
 }
 
-// Temporary exploration-phase sub-timers for late-game profiling. Enabled
-// with STELLAR_EXPL_PROF=1; prints a totals summary on process exit.
-struct ExplProf {
-  ExplProf() : enabled(std::getenv("STELLAR_EXPL_PROF") != nullptr) {}
-  std::atomic<bool> enabled;
-  std::atomic<long long> svc_ns{0}, survey_ns{0}, select_ns{0},
-      recovery_ns{0}, transit_ns{0}, hops{0}, selects{0}, surveys{0};
-  ~ExplProf() {
-    if (!enabled.load()) return;
-    std::fprintf(stderr,
-                 "EXPL-PROF svc=%lldms survey=%lldms select=%lldms "
-                 "recovery=%lldms transit=%lldms | hops=%lld selects=%lld "
-                 "surveys=%lld\n",
-                 svc_ns.load() / 1000000, survey_ns.load() / 1000000,
-                 select_ns.load() / 1000000, recovery_ns.load() / 1000000,
-                 transit_ns.load() / 1000000, hops.load(), selects.load(),
-                 surveys.load());
-  }
-};
-ExplProf &expl_prof() {
-  static ExplProf prof;
-  return prof;
-}
-struct ExplProfScope {
-  std::atomic<long long> &slot;
-  std::chrono::steady_clock::time_point t0;
-  explicit ExplProfScope(std::atomic<long long> &slot) : slot(slot) {
-    t0 = std::chrono::steady_clock::now();
-  }
-  ~ExplProfScope() {
-    slot += std::chrono::duration_cast<std::chrono::nanoseconds>(
-                std::chrono::steady_clock::now() - t0)
-                .count();
-  }
-};
-#define EXPL_PROF(slot)                                                  \
-  std::optional<ExplProfScope> expl_scope_;                              \
-  if (expl_prof().enabled.load(std::memory_order_relaxed))               \
-    expl_scope_.emplace(expl_prof().slot);
+using detail::expl_prof;
 
 } // namespace
 

@@ -422,6 +422,81 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   use; `ContactPresenceIndex` is rebuilt each advance (O(colonies +
   fleets) once per tick instead of once per contact probe).
 
+## Settlement shared index + connectivity-pruned selection (2026-09-29)
+
+- Purpose: sub-select profiling (`STELLAR_EXPL_PROF=1`) showed the
+  per-pop `assess` loop dominating mission selection — 49,974 selects
+  popped 31.5 M candidates (≈630/select; 7,776 full drains of ~4,300
+  entries each) — and colonization planning rebuilding the per-species
+  suitability catalog and `OperationalReachBatch` for every idle colony
+  fleet each tick.
+- Modules: `core/include/stellar/core/settlement_planning.hpp` —
+  `SettlementPlanningSharedIndex` is a caller-owned per-step read model
+  shared across repeated `build_plan` calls: a
+  (civilization, species) suitability memo gated by
+  `CivilizationKnowledgeState::survey_level_revision`, plus per-
+  civilization `OperationalReachBatch` instances whose cached colonies
+  span is invalidated by a colony-count guard (colony foundings grow
+  `world.colonies` mid-step and can reallocate the underlying vector).
+  `ColonizationOpportunityPlanner::build_plan` and
+  `ResourceOutpostOpportunityPlanner::build_plan` take an optional
+  shared index; `core/src/colonization_runtime.cpp` scopes one per
+  `ColonizationSimulation::advance`.
+  `core/include/stellar/core/lane_network.hpp` /
+  `core/src/lane_network.cpp` — new public `systems_connected(origin,
+  destination, maximum_leg_range)` query exposes the union-find
+  component index for pre-pruning.
+  `core/src/exploration_planning.cpp` — `select_supported_candidate`
+  and `has_supported_mission_target` skip lane-unreachable candidates
+  on the canonical-reach path (`batch != nullptr`), where the prune is
+  provably result-identical to an `assess` returning unsupported;
+  custom injected reach providers bypass the prune unchanged. The
+  prune engages only when `connected_component_count(range) > 1` — a
+  single lookup per selection — so the common fully-connected late-
+  game graph pays zero per-candidate cost, and `has_system` keeps
+  lane-unknown candidates on the assess path so
+  `find_shortest_route`'s out_of_range contract is preserved.
+  `core/src/exploration_prof_internal.hpp` — the `STELLAR_EXPL_PROF`
+  profiler is now shared across TUs and gains select sub-attribution
+  (build/loop/finish ns, work entries, rebuilds, pops, assesses, drains).
+- Semantics: unchanged — the prune mirrors Dijkstra reachability
+  (same leg-range predicate as the cached trees) and skips only
+  candidates that could never be supported; the suitability memo key
+  covers every input (civilization, species, survey levels — body
+  physical state is generation-static); the reach-batch guard rebuilds
+  on any colony-vector growth. Verified: 4,000-tick 5,000-system
+  events-enabled A/B is bit-identical
+  (`5af56a5093ecdb755a8ed28275484fdf3b7500a1f4102608309eb9d6c3ce7f25`,
+  on both the ungated and component-count-gated builds); canonical
+  14,600-tick run reproduces `e5a1d5bf…` with deterministic repeat +
+  save/load continuation.
+- Consumers: `ColonizationSimulation::advance` (per-idle-fleet
+  opportunity planning), `ExplorationSimulation::advance` (mission
+  selection and eligibility probes).
+- Tests: `settlement_shared_index` (new — plan parity shared vs
+  unshared, suitability-memo invalidation across survey-level bumps,
+  reach-batch rebuild after colony-vector growth); full native suite
+  290/290 green.
+- Save/performance impact: none persisted — all structures are
+  per-advance or per-query. Colonization-phase suitability lists and
+  reach batches are now built once per (civ, species) per level
+  revision instead of once per idle fleet per tick (asymptotic win at
+  high fleet counts; ~noise at the canonical 264-fleet scale).
+  On the canonical 200-year workload the lane graph is a single
+  component at fleet leg ranges, so the connectivity gate removed
+  zero candidates — the measured select cost (~630 pops/select) is
+  fuel-policy assessment of connected-but-unaffordable targets, which
+  only a route walk can reject; the prune's value is confined to
+  fragmented-graph workloads (small leg ranges, dense subsets).
+- Limitations: `select_mission`'s per-pop `assess` remains the
+  dominant late-game term — eliminating it needs an exact fuel-bound
+  shortcut that does not yet exist (refuel-at-colony hops make fuel
+  reachability non-monotone in distance); `has_return_service_route`
+  still walks the colony set per pop on fuel-constrained fleets; the
+  prune only applies on the canonical reach path (injected providers
+  keep the un-pruned loop); `SettlementPlanningSharedIndex` is manual
+  plumbing — callers that omit it keep per-call behavior.
+
 ## Autonomous warfare coordination (2026-09-28)
 
 - Purpose: close the organic-war gap — diplomacy recorded first contacts and

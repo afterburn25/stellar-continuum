@@ -1,5 +1,7 @@
 #include <stellar/core/exploration_planning.hpp>
 
+#include "exploration_prof_internal.hpp"
+
 #include <stellar/core/detail/legacy_number_format.hpp>
 
 #include <algorithm>
@@ -333,6 +335,11 @@ ExplorationMissionPlanner::select_supported_candidate(
   // The (system, band) filter depends only on the fleet's civilization and
   // role plus survey LEVELS — memoizable per shared index while the
   // knowledge survey-level revision is unchanged. Distance stays per-fleet.
+  auto &prof = detail::expl_prof();
+  const bool profiling = prof.enabled.load(std::memory_order_relaxed);
+  std::optional<detail::ExplProfScope> prof_build;
+  if (profiling)
+    prof_build.emplace(prof.select_build_ns);
   std::vector<std::pair<const StellarSystem *, int>> local_work;
   const std::vector<std::pair<const StellarSystem *, int>> *work;
   if (shared) {
@@ -342,6 +349,8 @@ ExplorationMissionPlanner::select_supported_candidate(
     auto &entry = shared->survey_work[key];
     if (!entry.valid ||
         entry.level_revision != world.knowledge.survey_level_revision()) {
+      if (profiling)
+        ++prof.work_rebuilds;
       entry.entries.clear();
       for (const auto &system : world.systems)
         if (needs_survey_work(world.knowledge, subject, system.id))
@@ -364,18 +373,42 @@ ExplorationMissionPlanner::select_supported_candidate(
                                  subject.civilization_id, system.id))});
     work = &local_work;
   }
+  if (profiling)
+    prof.work_entries += static_cast<long long>(work->size());
+  // Canonical-reach selects can drop lane-unreachable targets outright:
+  // batch->assess resolves them through find_shortest_route's component
+  // prune, so they can never be supported — removing them shrinks both
+  // the heapify and the pop/assess loop. The reach range is per-fleet
+  // constant, so one leg-range component set covers the whole list; the
+  // component-count gate keeps the common fully-connected graph at zero
+  // per-candidate cost.
+  const double prune_range = subject.maximum_leg_range_light_years;
+  const bool prune_unreachable =
+      batch != nullptr && subject.current_system_id.has_value() &&
+      world.lanes.connected_component_count(prune_range) > 1;
   std::vector<RankedTarget> targets;
   targets.reserve(work->size());
-  for (const auto &[system, band] : *work)
+  for (const auto &[system, band] : *work) {
+    // has_system keeps lane-unknown candidates on the assess path so
+    // find_shortest_route's out_of_range contract is preserved exactly.
+    if (prune_unreachable && world.lanes.has_system(system->id) &&
+        !world.lanes.systems_connected(*subject.current_system_id,
+                                       system->id, prune_range))
+      continue;
     targets.push_back({system, band,
                        indexed_distance_from_fleet(*systems_index, subject,
                                                    *system)});
+  }
   // The (band, distance-with-NaN-last, id) order is total — heap pops yield
   // exactly the stable_sort sequence, but only the handful of entries the
   // lazy assessment below actually consumes pay the ordering cost.
   std::priority_queue<RankedTarget, std::vector<RankedTarget>,
                       decltype(ranked_greater)>
       queue(ranked_greater, std::move(targets));
+  if (profiling) {
+    prof_build.reset();
+    prof_build.emplace(prof.select_loop_ns);
+  }
 
   // Assess lazily in plan order. The plan truncates to
   // hard_maximum_candidates entries with supported candidates first, so only
@@ -388,10 +421,14 @@ ExplorationMissionPlanner::select_supported_candidate(
       break;
     const RankedTarget target = queue.top();
     queue.pop();
+    if (profiling)
+      ++prof.pops;
     const auto reach =
         batch ? batch->assess(subject, target.system->id,
                               mission_kind(subject.role), fuel_policy)
               : assess_operational_reach(world, subject, target.system->id);
+    if (profiling)
+      ++prof.assess_calls;
     if (!reach.is_supported)
       continue;
     ++supported_seen;
@@ -403,10 +440,17 @@ ExplorationMissionPlanner::select_supported_candidate(
     }
   }
   if (!chosen) {
-    if (!first_supported)
+    if (!first_supported) {
+      if (profiling)
+        ++prof.drains;
       return std::nullopt;
+    }
     chosen = first_supported;
     used_shared_fallback = true;
+  }
+  if (profiling) {
+    prof_build.reset();
+    prof_build.emplace(prof.select_finish_ns);
   }
   SurveyOperationsBatch surveys(world.systems, world.bodies,
                                 shared ? &shared->catalog : nullptr);
@@ -474,7 +518,19 @@ bool ExplorationMissionPlanner::has_supported_mission_target(
         local_work.push_back({&system, 0});
     work = &local_work;
   }
+  // Same connectivity pre-prune as select_supported_candidate: on the
+  // canonical reach path an unreachable candidate can never be supported,
+  // so the existence answer is unchanged. The component-count gate keeps
+  // fully-connected graphs at zero per-candidate cost.
+  const double prune_range = subject.maximum_leg_range_light_years;
+  const bool prune_unreachable =
+      batch != nullptr && subject.current_system_id.has_value() &&
+      world.lanes.connected_component_count(prune_range) > 1;
   for (const auto &[system, ignored_band] : *work) {
+    if (prune_unreachable && world.lanes.has_system(system->id) &&
+        !world.lanes.systems_connected(*subject.current_system_id,
+                                       system->id, prune_range))
+      continue;
     const auto reach =
         batch ? batch->assess(subject, system->id,
                               mission_kind(subject.role), fuel_policy)

@@ -590,6 +590,45 @@ std::vector<int> InterstellarLaneNetwork::find_shortest_route(
   return result;
 }
 
+bool InterstellarLaneNetwork::has_system(int system_id) {
+  impl_->require_owner();
+  impl_->ensure_built();
+  return impl_->by_id.contains(system_id);
+}
+
+bool InterstellarLaneNetwork::systems_connected(
+    int origin_system_id, int destination_system_id,
+    double maximum_leg_range_light_years) {
+  impl_->require_owner();
+  if (maximum_leg_range_light_years <= 0 ||
+      std::isnan(maximum_leg_range_light_years))
+    return false;
+  impl_->ensure_built();
+  const auto origin = impl_->slot_of.find(origin_system_id);
+  const auto destination = impl_->slot_of.find(destination_system_id);
+  if (origin == impl_->slot_of.end() || destination == impl_->slot_of.end())
+    return false;
+  const auto &membership =
+      impl_->components_for(maximum_leg_range_light_years);
+  return membership[origin->second] == membership[destination->second];
+}
+
+std::size_t InterstellarLaneNetwork::connected_component_count(
+    double maximum_leg_range_light_years) {
+  impl_->require_owner();
+  if (maximum_leg_range_light_years <= 0 ||
+      std::isnan(maximum_leg_range_light_years))
+    return 0;
+  impl_->ensure_built();
+  const auto &membership =
+      impl_->components_for(maximum_leg_range_light_years);
+  std::size_t count = 0;
+  for (std::size_t slot = 0; slot < membership.size(); ++slot)
+    if (membership[slot] == static_cast<int>(slot))
+      ++count;
+  return count;
+}
+
 std::vector<int> InterstellarLaneNetwork::find_shortest_route(
     int origin_system_id, int destination_system_id,
     const RoutePolicy &policy) {

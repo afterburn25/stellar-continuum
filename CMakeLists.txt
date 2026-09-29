@@ -324,6 +324,10 @@ add_executable(stellar_operational_reach_batch_tests native-tests/operational_re
 target_link_libraries(stellar_operational_reach_batch_tests PRIVATE stellar_core)
 add_test(NAME operational_reach_batch COMMAND stellar_operational_reach_batch_tests
   "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+add_executable(stellar_settlement_shared_index_tests native-tests/settlement_shared_index_tests.cpp)
+target_link_libraries(stellar_settlement_shared_index_tests PRIVATE stellar_core)
+add_test(NAME settlement_shared_index COMMAND stellar_settlement_shared_index_tests
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
 add_executable(stellar_exploration_fuel_safety_tests native-tests/exploration_fuel_safety_tests.cpp)
 target_link_libraries(stellar_exploration_fuel_safety_tests PRIVATE stellar_core)
 add_test(NAME exploration_fuel_safety COMMAND stellar_exploration_fuel_safety_tests)

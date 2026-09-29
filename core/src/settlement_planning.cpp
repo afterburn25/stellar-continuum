@@ -177,7 +177,8 @@ ColonizationOpportunityPlanner::ColonizationOpportunityPlanner(
 ColonizationOpportunityPlan
 ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
                                            int id, int maximum,
-                                           const SettlementBodiesIndex *bodies_index) const {
+                                           const SettlementBodiesIndex *bodies_index,
+                                           SettlementPlanningSharedIndex *shared) const {
   maximum = std::clamp(maximum, 1, 64);
   const auto *f = colony_fleet(w, id);
   if (!f)
@@ -209,21 +210,46 @@ ColonizationOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
   const auto &systems =
       bodies_index ? bodies_index->systems_by_id : owned_systems;
   const auto &bodies = bodies_index ? bodies_index->by_id : owned_bodies;
-  auto views = build_known_suitability_for_species(w.knowledge_view(),
-                                                   f->civilization_id, sp->id,
-                                                   bodies_index);
+  // The fully-surveyed suitability list depends only on (civilization,
+  // species, survey levels) — memoizable while the level revision holds.
+  std::vector<KnownSpeciesPlanetarySuitability> local_views;
+  const std::vector<KnownSpeciesPlanetarySuitability> *views;
+  if (shared) {
+    auto &entry = shared->suitability[{f->civilization_id, sp->id}];
+    if (!entry.valid ||
+        entry.level_revision != w.knowledge.survey_level_revision()) {
+      entry.values = build_known_suitability_for_species(
+          w.knowledge_view(), f->civilization_id, sp->id, bodies_index);
+      entry.level_revision = w.knowledge.survey_level_revision();
+      entry.valid = true;
+    }
+    views = &entry.values;
+  } else {
+    local_views = build_known_suitability_for_species(
+        w.knowledge_view(), f->civilization_id, sp->id, bodies_index);
+    views = &local_views;
+  }
   auto reservations =
       build_friendly_colony_mission_reservations(w.knowledge_view(), *f);
-  std::optional<OperationalReachBatch> batch;
-  if(!reach_)batch.emplace(OperationalReachWorldView{w.systems,w.colonies,w.lanes},f->civilization_id);
+  std::optional<OperationalReachBatch> local_batch;
+  OperationalReachBatch *batch = nullptr;
+  if (!reach_)
+    batch = shared ? &shared->reach_batch(
+                         OperationalReachWorldView{w.systems, w.colonies,
+                                                   w.lanes},
+                         f->civilization_id)
+                   : &local_batch.emplace(
+                         OperationalReachWorldView{w.systems, w.colonies,
+                                                   w.lanes},
+                         f->civilization_id);
   std::unordered_map<int, MissionReachAssessment> reaches;
   std::vector<ColonizationOpportunityCandidate> c;
-  for (const auto &v : views) {
+  for (const auto &v : *views) {
     if (!systems.contains(v.system_id) || !bodies.contains(v.planetary_body_id))
       continue;
     auto [it, added] = reaches.try_emplace(v.system_id);
     if (added)
-      it->second = reach(reach_, w, *f, v.system_id,batch?&*batch:nullptr);
+      it->second = reach(reach_, w, *f, v.system_id,batch);
     c.push_back(colony_candidate(w, *f, *systems.at(v.system_id),
                                  *bodies.at(v.planetary_body_id), v, it->second,
                                  sp->display_name, reservations));
@@ -346,7 +372,8 @@ bool ResourceOutpostOpportunityPlanner::is_outpost_fleet(const FleetState &f) {
 }
 ResourceOutpostOpportunityPlan
 ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
-                                              int id, int maximum) const {
+                                              int id, int maximum,
+                                              SettlementPlanningSharedIndex *shared) const {
   maximum = std::clamp(maximum, 1, 64);
   const auto *f = outpost_fleet(w, id);
   if (!f)
@@ -374,14 +401,41 @@ ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
             {}};
   auto systems = unique(w.systems);
   auto bodies = unique(w.bodies);
-  auto views = build_known_suitability_for_species(w.knowledge_view(),
-                                                   f->civilization_id, sp->id);
+  // Same (civilization, species, survey-level) memoization as the colony
+  // planner — the suitability list is read-only here.
+  std::vector<KnownSpeciesPlanetarySuitability> local_views;
+  const std::vector<KnownSpeciesPlanetarySuitability> *views;
+  if (shared) {
+    auto &entry = shared->suitability[{f->civilization_id, sp->id}];
+    if (!entry.valid ||
+        entry.level_revision != w.knowledge.survey_level_revision()) {
+      entry.values = build_known_suitability_for_species(
+          w.knowledge_view(), f->civilization_id, sp->id);
+      entry.level_revision = w.knowledge.survey_level_revision();
+      entry.valid = true;
+    }
+    views = &entry.values;
+  } else {
+    local_views = build_known_suitability_for_species(w.knowledge_view(),
+                                                    f->civilization_id,
+                                                    sp->id);
+    views = &local_views;
+  }
   std::unordered_map<int, KnownSpeciesPlanetarySuitability> suit;
-  for (auto &v : views)
+  for (auto &v : *views)
     if (!suit.emplace(v.planetary_body_id, v).second)
       throw std::invalid_argument(duplicate(v.planetary_body_id));
-  std::optional<OperationalReachBatch> batch;
-  if(!reach_)batch.emplace(OperationalReachWorldView{w.systems,w.colonies,w.lanes},f->civilization_id);
+  std::optional<OperationalReachBatch> local_batch;
+  OperationalReachBatch *batch = nullptr;
+  if (!reach_)
+    batch = shared ? &shared->reach_batch(
+                         OperationalReachWorldView{w.systems, w.colonies,
+                                                   w.lanes},
+                         f->civilization_id)
+                   : &local_batch.emplace(
+                         OperationalReachWorldView{w.systems, w.colonies,
+                                                   w.lanes},
+                         f->civilization_id);
   std::unordered_map<int, MissionReachAssessment> reaches;
   std::vector<ResourceOutpostOpportunityCandidate> c;
   for (const auto &body : w.bodies) {
@@ -391,7 +445,7 @@ ResourceOutpostOpportunityPlanner::build_plan(SettlementPlanningWorldView w,
       continue;
     auto [it, a] = reaches.try_emplace(body.system_id);
     if (a)
-      it->second = reach(reach_, w, *f, body.system_id,batch?&*batch:nullptr);
+      it->second = reach(reach_, w, *f, body.system_id,batch);
     const auto &s = *systems.at(body.system_id);
     const auto &v = suit.at(body.id);
     auto dep = resource_deposit_profile(body);

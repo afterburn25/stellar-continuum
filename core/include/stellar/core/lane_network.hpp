@@ -53,6 +53,25 @@ public:
                       const std::unordered_set<int> *permitted_system_ids =
                           nullptr);
 
+  // True when the network holds a system with this id — callers that
+  // distinguish "unknown system" from "unreachable" can use it before
+  // pruning; find_shortest_route still throws on unknown ids.
+  bool has_system(int system_id);
+
+  // Reachability without route materialization: true exactly when a lane
+  // route exists between the systems under the given per-leg range limit
+  // (the same connected-component check find_shortest_route performs
+  // internally). Unknown system ids answer false.
+  bool systems_connected(int origin_system_id, int destination_system_id,
+                         double maximum_leg_range_light_years);
+
+  // Number of distinct connected components at the given per-leg range.
+  // Callers pruning many pairs can check this once per range instead of
+  // paying per-pair lookups when the graph is a single component anyway.
+  // Invalid ranges (non-positive or NaN) answer 0.
+  std::size_t connected_component_count(
+      double maximum_leg_range_light_years);
+
   // Extended routing policy for mission-aware search. `permitted_system_ids`
   // is a whitelist (origin/destination must be members); `blocked_system_ids`
   // is a blacklist whose members are never entered (origin/destination
