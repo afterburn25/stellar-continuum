@@ -192,7 +192,10 @@ preserve:
   travel validator's mid-chain rewrite. `InputMapper::last_press_action()`
   gives per-event resolution for batched dispatch (scanning `just_pressed`
   after a second same-frame press re-reports the first event's action —
-  the bug that masked replayed F6 as `toggle_pause`).
+  the bug that masked replayed F6 as `toggle_pause`). The packaged
+  navigation validator gates this contract: `replay_check=True` records a
+  navigation journal, restores the anchor, replays it, and requires
+  `replay_verified` counts matching the recorded journal.
 - Draw-list test hazard: elements of `DrawList::overlay`/`world` are
   vector-backed — a held `Text*`/`UiRect*` dangles after the next
   `draw={}`/render. Copy `->at`/rects before re-rendering (the

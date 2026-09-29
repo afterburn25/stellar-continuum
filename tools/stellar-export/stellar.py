@@ -490,7 +490,8 @@ def export(preset_name):
         smoke = relocated_smoke(output)
         if native_client:
             smoke.update(validate_native_client_export(output, env))
-            smoke.update(validate_native_navigation_export(output, env))
+            smoke.update(validate_native_navigation_export(output, env,
+                                                           replay_check=True))
             smoke.update(validate_native_support_export(output, env))
             smoke.update(validate_native_battle_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))

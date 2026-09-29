@@ -37,7 +37,22 @@ def navigation_proof(stdout):
     return proof
 
 
-def validate_native_navigation_export(folder: Path, env: dict[str, str]):
+def _replay_verified(stdout: str) -> dict:
+    match = re.search(r"(?:^|\s)replay_verified=(\{[^{}]*\})(?:\s|$)", stdout)
+    if not match:
+        raise RuntimeError("Native navigation replay did not report replay_verified")
+    try:
+        proof = json.loads(match.group(1))
+    except ValueError as error:
+        raise RuntimeError("Native navigation replay_verified is malformed") from error
+    if (type(proof.get("commands")) is not int or proof["commands"] <= 0 or
+            type(proof.get("checkpoints")) is not int or proof["checkpoints"] <= 0):
+        raise RuntimeError("Native navigation replay verified no commands or checkpoints")
+    return proof
+
+
+def validate_native_navigation_export(folder: Path, env: dict[str, str],
+                                      *, replay_check: bool = False):
     folder = folder.resolve()
     with tempfile.TemporaryDirectory(prefix="stellar-native-navigation-") as temporary:
         work = Path(temporary)
@@ -75,5 +90,49 @@ def validate_native_navigation_export(folder: Path, env: dict[str, str]):
             shutil.copy2(capture, evidence)
             captures.append(str(evidence))
             diagnostics.append(result.stdout.strip())
+        if not replay_check:
+            return {"nativeNavigationInput": True, "nativeNavigationPausedReload": True,
+                    "navigationCaptures": captures, "navigationDiagnostics": diagnostics}
+        # Record the same smoke on the loaded anchor, restore the anchor, then
+        # replay the journal — the recorded F6 must reproduce every save
+        # section checkpoint through the real input path.
+        journal = work / "navigation.replay"
+        anchor = save.read_bytes()
+        record = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                                 "--asset-root", str(folder),
+                                 "--save-path", str(save), "--load",
+                                 "--width", "1280", "--height", "720",
+                                 "--navigation-smoke", str(work / "recorded.bmp"),
+                                 "--record", str(journal)],
+                                cwd=work, env=clean_env, capture_output=True,
+                                text=True, timeout=90)
+        if record.returncode:
+            raise RuntimeError(f"Native navigation record failed ({record.returncode}): {record.stderr}")
+        navigation_proof(record.stdout)
+        recorded = re.search(r"(?:^|\s)replay=(\{[^{}]*\})(?:\s|$)", record.stdout)
+        if not recorded:
+            raise RuntimeError("Native navigation record did not report its journal")
+        recorded = json.loads(recorded.group(1))
+        # The recorded F6 rewrote the anchor's atomic sidecars — restore the
+        # pre-run primary and clear them so replay loads the recorded start.
+        save.write_bytes(anchor)
+        for sidecar in save.parent.glob(save.name + ".*"):
+            sidecar.unlink()
+        replay = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                                 "--asset-root", str(folder),
+                                 "--save-path", str(save), "--load",
+                                 "--width", "1280", "--height", "720",
+                                 "--replay", str(journal), "--replay-exit"],
+                                cwd=work, env=clean_env, capture_output=True,
+                                text=True, timeout=90)
+        if replay.returncode:
+            raise RuntimeError(f"Native navigation replay failed ({replay.returncode}): {replay.stderr}")
+        verified = _replay_verified(replay.stdout)
+        if (verified["commands"] != recorded.get("commands") or
+                verified["checkpoints"] != recorded.get("checkpoints")):
+            raise RuntimeError(
+                "Native navigation replay verified a different journal than recorded")
         return {"nativeNavigationInput": True, "nativeNavigationPausedReload": True,
+                "nativeNavigationReplayVerified": True,
+                "nativeNavigationReplay": verified,
                 "navigationCaptures": captures, "navigationDiagnostics": diagnostics}
