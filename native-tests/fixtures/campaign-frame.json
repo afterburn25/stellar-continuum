@@ -12744,8 +12744,8 @@
                   "Armor": 45,
                   "Hull": 95,
                   "WeaponCooldownRemainingDays": 0,
-                  "Order": 0,
-                  "TargetFleetId": null,
+                  "Order": 2,
+                  "TargetFleetId": 1,
                   "DefendSystemId": null,
                   "RetreatProgressDays": 0,
                   "RetreatStarted": false,
@@ -14972,12 +14972,24 @@
                 "ContactId": "gate097-contact",
                 "TargetCivilizationId": 2,
                 "FirstObservedTick": 0,
-                "LastObservedTick": 0,
+                "LastObservedTick": 2000,
                 "LastObservedSystemId": 7,
                 "Awareness": 5,
                 "Condition": 0,
                 "CommunicationAvailable": true,
                 "Confidence": 0.9
+              },
+              {
+                "ObserverCivilizationId": 2,
+                "ContactId": "civilization:1",
+                "TargetCivilizationId": 1,
+                "FirstObservedTick": 2000,
+                "LastObservedTick": 2000,
+                "LastObservedSystemId": null,
+                "Awareness": 5,
+                "Condition": 0,
+                "CommunicationAvailable": true,
+                "Confidence": 1.0
               }
             ],
             "Relationships": [
@@ -15010,7 +15022,20 @@
             "Claims": [],
             "ClaimResponses": [],
             "Agreements": [],
-            "Proposals": [],
+            "Proposals": [
+              {
+                "ProposalId": 1,
+                "ProposerCivilizationId": 2,
+                "RecipientCivilizationId": 1,
+                "Kind": 5,
+                "AgreementType": null,
+                "Status": 0,
+                "CreatedAtTick": 2000,
+                "ResolvedAtTick": null,
+                "Summary": "Offers a ceasefire to halt active hostilities.",
+                "ExternalTermsReference": null
+              }
+            ],
             "RecentHistory": [
               {
                 "EventId": 1,
@@ -15035,12 +15060,61 @@
                 "KnownToCivilizationIds": [
                   1
                 ]
+              },
+              {
+                "EventId": 3,
+                "Tick": 2000,
+                "Kind": 0,
+                "PrimaryCivilizationId": 2,
+                "SecondaryCivilizationId": 1,
+                "SystemId": null,
+                "Summary": "Observer 2 recorded civilization 1 as Identified (Active, confidence 1.00).",
+                "KnownToCivilizationIds": [
+                  2
+                ]
+              },
+              {
+                "EventId": 4,
+                "Tick": 2000,
+                "Kind": 2,
+                "PrimaryCivilizationId": 2,
+                "SecondaryCivilizationId": 1,
+                "SystemId": null,
+                "Summary": "Observer 2 recorded civilization 1 as CommunicationAvailable (Active, confidence 1.00).",
+                "KnownToCivilizationIds": [
+                  2
+                ]
+              },
+              {
+                "EventId": 5,
+                "Tick": 2000,
+                "Kind": 2,
+                "PrimaryCivilizationId": 1,
+                "SecondaryCivilizationId": 2,
+                "SystemId": 7,
+                "Summary": "Observer 1 recorded civilization 2 as CommunicationAvailable (Active, confidence 0.90).",
+                "KnownToCivilizationIds": [
+                  1
+                ]
+              },
+              {
+                "EventId": 6,
+                "Tick": 2000,
+                "Kind": 10,
+                "PrimaryCivilizationId": 2,
+                "SecondaryCivilizationId": 1,
+                "SystemId": null,
+                "Summary": "Proposal 1: Offers a ceasefire to halt active hostilities.",
+                "KnownToCivilizationIds": [
+                  1,
+                  2
+                ]
               }
             ],
             "NextClaimId": 1,
             "NextAgreementId": 1,
-            "NextProposalId": 1,
-            "NextEventId": 3
+            "NextProposalId": 2,
+            "NextEventId": 7
           }
         }
       },
