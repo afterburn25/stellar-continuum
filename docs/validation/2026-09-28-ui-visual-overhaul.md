@@ -321,7 +321,10 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   `NativeSettingsHub::control_row_bounds` exposes row hitboxes for the
   harness. Green under `--load --smoke` at 640×360, 1280×720, and
   2560×1440 on both fresh-file and pre-existing `galaxy-controls.json`
-  paths.
+  paths — and under `locale:de` (full rebind/steal/scroll/axis/pin/
+  notice/trigger matrix green with German chrome; the notice assertions
+  are locale-agnostic by design — presence and difference, not
+  literals).
   Follow-up: the page clip also made the three `GALAXY_PAD` axis rows
   unreachable — the shipped map's 15 rows exceed the ~12-row page at
   every viewport, and no scroll path existed. The list now scrolls on
