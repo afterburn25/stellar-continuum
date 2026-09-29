@@ -46,7 +46,11 @@ def copy_native_client_runtime(root, build, output, inspect_dependencies):
     # Media Foundation is the application's Windows audio decoder. Keep these
     # reviewed system imports separate from the pinned SDL dependency policy.
     audio_windows = {"mfplat.dll", "mfreadwrite.dll"}
-    imports = inspect_dependencies(client, {"sdl3.dll"}, windows | audio_windows)
+    # UIAutomationCore hosts the UIA provider interfaces the accessibility
+    # bridge exposes (Invoke/Toggle/RangeValue patterns and announcements).
+    accessibility_windows = {"uiautomationcore.dll"}
+    imports = inspect_dependencies(client, {"sdl3.dll"},
+                                   windows | audio_windows | accessibility_windows)
     if "sdl3.dll" not in {name.lower() for name in imports}:
         raise RuntimeError("Native client does not import its declared SDL runtime")
     library_imports = inspect_dependencies(library, set(), windows)
