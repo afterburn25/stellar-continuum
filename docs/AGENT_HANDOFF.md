@@ -147,6 +147,9 @@ preserve:
   `validate_native_diplomacy_export(folder, env,
   native-tests/fixtures/player-campaign-json.json)` authors its proposal
   fixture in a temp dir per run rather than consuming a checked-in save.
+  `--system-travel-smoke`/`--system-travel-reload-smoke` need a fleet in
+  LocalDeparture/Arrival transit — `work/travel.json` is that fixture
+  (copy it under `build-native/` before use; the run saves over it).
 - `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
