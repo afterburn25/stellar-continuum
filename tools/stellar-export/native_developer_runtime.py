@@ -11,8 +11,13 @@ import tempfile
 
 from native_client_runtime import _validate_capture
 from native_eruption_runtime import _proof as _eruption_proof
-from native_new_game_runtime import _source_payload, _SEED, _COUNT, _SPECIES
+from native_new_game_runtime import _source_payload, _SEED, _SPECIES
 from native_support_runtime import _clean_environment
+
+# The developer leg also exercises the new-game-smoke modifiers: a non-default
+# galaxy card and system count, plus the developer-only full-exploration setup
+# checkbox (the only context where --smoke-full-exploration is legal).
+_SYSTEM_COUNT = 500
 
 # Index/panel/reveal surfaces every replay must produce; the remaining catalog
 # captures are validated in place but not copied as packaged evidence.
@@ -35,7 +40,9 @@ def validate_native_developer_export(folder: Path, env: dict[str, str], fixture:
         args = [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
                 "--save-path", str(anchor), "--seed", _SEED, "--width", "1280",
                 "--height", "720", "--windowed", "--devtools",
-                "--developer-smoke", str(capture)]
+                "--developer-smoke", str(capture),
+                "--smoke-galaxy-card", "2", "--smoke-system-count",
+                str(_SYSTEM_COUNT), "--smoke-full-exploration"]
         result = subprocess.run(args, cwd=work, env=_clean_environment(env),
                                 capture_output=True, text=True, encoding="utf-8",
                                 errors="replace", timeout=600)
@@ -45,6 +52,9 @@ def validate_native_developer_export(folder: Path, env: dict[str, str], fixture:
             raise RuntimeError(
                 f"Native developer smoke failed ({result.returncode}): {result.stderr}")
         eruption = _eruption_proof(result.stdout)
+        counts = re.findall(r'new_game=\{[^{}]*"system_count":(\d+)', result.stdout)
+        if len(counts) != 1 or int(counts[0]) != _SYSTEM_COUNT:
+            raise RuntimeError("Developer replay did not honor the smoke system count")
         territories = re.findall(r'"unexplored":(\d+)', result.stdout)
         if len(territories) != 1 or int(territories[0]) != 0:
             raise RuntimeError("Developer replay did not reveal the entire galaxy")
@@ -59,7 +69,8 @@ def validate_native_developer_export(folder: Path, env: dict[str, str], fixture:
                 payload.get("DeveloperSession") is not True or
                 campaign.get("FormatVersion") != 17 or
                 galaxy.get("Seed") != int(_SEED) or
-                len(galaxy.get("Systems", [])) != _COUNT or
+                len(galaxy.get("Systems", [])) != _SYSTEM_COUNT or
+                metadata.get("SystemCount") != _SYSTEM_COUNT or
                 metadata.get("PlayerSpeciesId") != _SPECIES):
             raise RuntimeError("Developer save is not the requested campaign")
         if anchor.read_bytes() != anchor_bytes:
