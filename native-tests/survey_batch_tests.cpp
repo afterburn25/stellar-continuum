@@ -45,6 +45,21 @@ int main(int argc,char**)try{
   SurveyOperationsBatch changed(systems,bodies);
   for(const auto id:{systems.front().id,systems[count-1].id})check(same(reference.build(systems,bodies,id),changed.build(id)),"Batch stale or changed first-match semantics");
   SurveyOperationsBatch empty(systems,{});check(same(reference.build(systems,{},systems.front().id),empty.build(systems.front().id)),"Empty system mismatch");
+  // A shared catalog index reused across batches revalidates on the source
+  // spans: serving a different span rebuilds instead of returning stale
+  // pointers.
+  {
+    SurveyCatalogIndex shared_index;
+    SurveyOperationsBatch first(systems,bodies,&shared_index);
+    for(const auto id:{systems.front().id,systems[count-1].id})check(same(reference.build(systems,bodies,id),first.build(id)),"Shared index changed profile");
+    // The catalog appended a duplicate system above — unique ids only.
+    check(shared_index.systems_by_id.size()==systems.size()-1,"Shared systems index incomplete");
+    std::vector<StellarSystem> fewer{systems.front()};
+    SurveyOperationsBatch second(fewer,{},&shared_index);
+    check(same(reference.build(fewer,{},fewer.front().id),second.build(fewer.front().id)),"Shared index stale after span change");
+    check(shared_index.systems_by_id.size()==1,"Shared systems index not rebuilt");
+    bool rejected=false;try{(void)second.build(systems[1].id);}catch(const std::runtime_error&){rejected=true;}check(rejected,"Shared index served stale system");
+  }
   std::cout<<"{\"systems\":"<<count<<",\"bodies\":"<<count*7<<",\"queries\":"<<queries
     <<",\"referenceMilliseconds\":"<<std::chrono::duration<double,std::milli>(reference_end-start).count()
     <<",\"batchMilliseconds\":"<<std::chrono::duration<double,std::milli>(batch_end-reference_end).count()<<",\"exactMatch\":true}\n";

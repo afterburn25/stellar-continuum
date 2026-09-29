@@ -13,6 +13,7 @@
 #include <stdexcept>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 namespace stellar::core {
@@ -669,6 +670,64 @@ InterstellarLaneNetwork::route_tree_view(
   return {found->second.distance, found->second.prior};
 }
 
+void InterstellarLaneNetwork::route_tree_toward(
+    int origin_system_id, double maximum_leg_range_light_years,
+    std::span<const int> needed_slots, std::vector<double> &distance_out,
+    std::vector<int> &prior_out,
+    const std::function<bool(int)> &accept_settled) {
+  impl_->require_owner();
+  distance_out.clear();
+  prior_out.clear();
+  if (maximum_leg_range_light_years <= 0 ||
+      std::isnan(maximum_leg_range_light_years))
+    return;
+  impl_->ensure_built();
+  if (!impl_->by_id.contains(origin_system_id))
+    throw std::out_of_range(
+        "Specified argument was out of the range of valid values. (Parameter "
+        "'destinationSystemId')");
+  const auto size = impl_->systems.size();
+  distance_out.assign(size, std::numeric_limits<double>::infinity());
+  prior_out.assign(size, -1);
+  const int origin_slot = impl_->slot_of.at(origin_system_id);
+  distance_out[origin_slot] = 0;
+  std::unordered_set<int> needed(needed_slots.begin(), needed_slots.end());
+  // Same (distance, id) priority queue as build_route_tree — settled
+  // entries are a prefix of the full build, so callers observe identical
+  // distances and predecessors for every requested slot.
+  using Pending = std::pair<double, int>;
+  std::priority_queue<Pending, std::vector<Pending>, std::greater<Pending>>
+      pending;
+  pending.emplace(0., origin_system_id);
+  std::vector<char> settled(size, 0);
+  while (!pending.empty() && !needed.empty()) {
+    const auto [current_distance, current_id] = pending.top();
+    pending.pop();
+    const int current = impl_->slot_of.at(current_id);
+    if (settled[current] || current_distance != distance_out[current])
+      continue;
+    settled[current] = 1;
+    if (needed.erase(current) != 0 && accept_settled &&
+        accept_settled(current))
+      return;
+    for (const auto &lane : impl_->adjacency.at(current_id)) {
+      if (lane.length_light_years >
+          maximum_leg_range_light_years + tie_tolerance)
+        continue;
+      const int next_id = lane.other(current_id);
+      const int next = impl_->slot_of.at(next_id);
+      if (settled[next])
+        continue;
+      const auto candidate = current_distance + lane.length_light_years;
+      if (candidate < distance_out[next] - tie_tolerance) {
+        distance_out[next] = candidate;
+        prior_out[next] = current;
+        pending.emplace(candidate, next_id);
+      }
+    }
+  }
+}
+
 std::uint64_t InterstellarLaneNetwork::routes_cache_revision() {
   impl_->require_owner();
   impl_->ensure_built();
@@ -712,6 +771,16 @@ std::size_t InterstellarLaneNetwork::connected_component_count(
     if (membership[slot] == static_cast<int>(slot))
       ++count;
   return count;
+}
+
+std::span<const int> InterstellarLaneNetwork::route_components(
+    double maximum_leg_range_light_years) {
+  impl_->require_owner();
+  if (maximum_leg_range_light_years <= 0 ||
+      std::isnan(maximum_leg_range_light_years))
+    return {};
+  impl_->ensure_built();
+  return impl_->components_for(maximum_leg_range_light_years);
 }
 
 std::vector<int> InterstellarLaneNetwork::find_shortest_route(

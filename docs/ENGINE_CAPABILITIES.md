@@ -80,19 +80,32 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `mark_system_fully_surveyed`); progress-only writes do not bump it. It
   is not serialized; restores rebuild through the mutators.
   `survey_operations.hpp` / `survey_operations.cpp` — `SurveyCatalogIndex`
-  (`systems_by_id` + `bodies_by_system`, both lazily populated) and an
-  optional shared-index parameter on `SurveyOperationsBatch`; with an
+  (`systems_by_id` + `bodies_by_system`, both lazily populated and
+  revalidated against the source spans by (data, size) so an index held
+  across world revisions rebuilds instead of serving stale pointers) and
+  an optional shared-index parameter on `SurveyOperationsBatch`; with an
   index, `build(system_id)` resolves just that system's bodies instead of
   eagerly preparing every system's profile. `exploration_planning.hpp` /
-  `exploration_planning.cpp` — `ExplorationPlanningSharedIndex` embeds the
-  catalog index plus per-(civilization, fleet role) survey-work lists
-  memoized in catalog order and keyed on `survey_level_revision`; optional
-  `shared` parameters on `select_supported_candidate` and
+  `exploration_planning.cpp` — `ExplorationPlanningSharedIndex` references
+  the catalog index (`catalog()` defaults to an owned per-index instance;
+  `catalog_override` can point at a longer-lived one) plus
+  per-(civilization, fleet role) survey-work lists memoized in catalog
+  order and keyed on `survey_level_revision`; optional `shared` parameters
+  on `select_supported_candidate` and
   `ExplorationAiMissionCoordinator::select_mission` keep the original
   per-call scans when absent. `exploration_advance.cpp` —
   `ExplorationSimulation::advance` owns one shared index for the whole
   advance and passes it to the survey-operations batch and every idle
-  survey-fleet mission selection.
+  survey-fleet mission selection; the catalog index is generation-static,
+  so `ExplorationSimulation` keeps a campaign-wide `campaign_catalog_`
+  that every advance reuses (the span guard covers a reloaded world
+  view). `select_supported_candidate`'s work-list build additionally
+  reads the survey level once per candidate for both the
+  needs-work predicate and the priority band, hoists the fleet's
+  origin/waypoint endpoints and interpolated depth out of the per-entry
+  distance evaluation (same float/double expression order as
+  `interstellar_distance_from_fleet`), and defers the lane-slot lookup
+  to pop time so only assessed candidates pay the id→slot probe.
 - Semantics: unchanged — the memoized (system, band) lists are produced
   by the same `needs_survey_work` + `survey_priority` calls in catalog
   order; per-fleet distance ranking and lazy reach assessment are
@@ -556,7 +569,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   slot-indexed tree view cuts select to 155.1 s (loop 109.6 s,
   ~4.3 µs/pop) with step mean 29.1 ms (vs 74.2 ms at the dense-route
   baseline, −61%). The pinned view + slot probe trims the loop to
-  ~98 s. The transit phase is profiled (`inbound: prep/reveal/tail`)
+  ~98 s, and the select `build` phase drops ~42% (67.3 s → 38.9 s on
+  the repeat-2 canonical) once the survey level is read once per
+  candidate, the fleet endpoints/depth hoist removes per-entry index
+  lookups, and the lane-slot probe defers to pop time — step mean
+  24.3 ms (bit-identical `e5a1d5bf…`). The transit phase is profiled
+  (`inbound: prep/reveal/tail`)
   and reduced in three steps: the phenomenon context is memoized per
   system per advance (pure in `regions × system`), civilization
   contact detection early-outs on a two-probe presence check before
@@ -587,17 +605,60 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   The batch's id→system map is now built lazily (`systems_map()`), so
   verdict-only batches never pay the catalog map build; the
   duplicate-id `invalid_argument` still fires on every path that
-  consumes the map.
+  consumes the map. Both "Unknown mission target" catalog gates
+  (`assess` and `nearest_refueling_verdict`) answer through the lane
+  slot map when the id map is unmaterialized — lane membership indexes
+  the whole catalog, so the slot probe replaces a linear catalog scan
+  per checked site. `has_return_service_route` walks each refueling
+  site's borrowed route tree in slot space (same leg-compare /
+  subtract / top-up sequence as `evaluate_route` on the reversed
+  route) instead of materializing the route and running the explain
+  path per service — the dominant per-pop cost for
+  `RetainReturnToService` fleets. `nearest_refueling_verdict` prunes
+  its needed set through `InterstellarLaneNetwork::route_components` —
+  the same union-find membership table `find_shortest_route_into`
+  consults — so unreachable sites leave the needed set instead of
+  forcing the bounded build to exhaust the reachable frontier.
+  `nearest_refueling_verdict` now runs one
+  early-stopped Dijkstra per hop through
+  `InterstellarLaneNetwork::route_tree_toward`: the build halts at the
+  first fuel-feasible refueling slot, which — since settlement order is
+  ascending (distance, id) — is exactly the min-(distance, id)
+  supported pick the full scan made; settled entries are bit-identical
+  to a full tree and the partial tree never enters the route cache.
+  The verdict materializes the winner's route from the settled prior
+  chain (bit-identical to `find_shortest_route`), so
+  `assign_fleet_route` consumes it directly — the apply side no longer
+  re-derives and re-caches a tree rooted at the hop origin.
+  `evaluate_route` itself resolves leg positions through the lane slot
+  table, so explain callers no longer materialize the batch's
+  id→system map at all (the duplicate-id `invalid_argument` survives
+  on the fallback path); the per-select winner explanation dropped
+  from ~227 µs to ~17 µs on the canonical profile.
+  This removes the per-hop full-catalog Dijkstra (attributed ~575 µs,
+  ~99% of the queued-return cost) and the cached-tree eviction churn.
+  The per-advance `SurveyCatalogIndex` rebuild
+  (O(systems + bodies) hash inserts every tick) is eliminated by
+  `ExplorationSimulation`'s campaign-wide `campaign_catalog_` — the
+  index revalidates on the source span (data, size), so a reloaded
+  world view rebuilds once and a stable world builds it once ever.
 - Limitations: `select_mission`'s per-pop probe remains the dominant
   late-game term — the floor is heap pop + reservation check +
   slot-indexed memo probe (~1.5–4 µs), and verdicts still require
   touching each candidate once per changed fleet state;
-  `has_return_service_route` still walks the colony set per pop on
-  fuel-constrained fleets; `survey` (~30 s/campaign-unit) and select
-  `build` (~27 s/unit) remain the next attribution targets; the
-  prune only applies on the canonical reach path (injected providers
-  keep the un-pruned loop); `SettlementPlanningSharedIndex` is manual
-  plumbing — callers that omit it keep per-call behavior.
+  `has_return_service_route` still probes the colony set per
+  outward-feasible pop on fuel-constrained fleets (now cheap borrowed-
+  tree walks, but K probes per candidate); the survey phase (~15
+  s/campaign-unit after the persistent catalog index), the select
+  work-list build (~16 s/unit — `survey_level_revision` bumps on most
+  survey completions, forcing full-catalog rescans), and the select
+  loop remain the next attribution targets; the queued-return pick is
+  bounded now but still pays a per-hop partial Dijkstra (~200 µs);
+  the prune only applies on the canonical reach path (injected
+  providers keep the un-pruned loop); `SettlementPlanningSharedIndex`
+  is manual plumbing — callers that omit it keep per-call behavior;
+  the batch's id→system duplicate check now surfaces only on the
+  explain failure path rather than at first map materialization.
 
 ## Autonomous warfare coordination (2026-09-28)
 

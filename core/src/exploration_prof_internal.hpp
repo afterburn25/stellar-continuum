@@ -31,6 +31,8 @@ struct ExplProf {
       inbound_tail_ns{0};
   std::atomic<long long> inbound_contacts_ns{0}, inbound_return_ns{0},
       return_hops{0};
+  // activate() split: nearest-base pick vs route assignment + message.
+  std::atomic<long long> return_pick_ns{0};
   std::atomic<long long> band_candidates{0}, reveal_attempts{0};
   ~ExplProf() {
     if (!enabled.load()) return;
@@ -60,9 +62,10 @@ struct ExplProf {
                  reveal_attempts.load());
     std::fprintf(stderr,
                  "EXPL-PROF inbound-tail: contacts=%lldms return=%lldms "
-                 "| return_hops=%lld\n",
+                 "| return_hops=%lld pick=%lldms\n",
                  inbound_contacts_ns.load() / 1000000,
-                 inbound_return_ns.load() / 1000000, return_hops.load());
+                 inbound_return_ns.load() / 1000000, return_hops.load(),
+                 return_pick_ns.load() / 1000000);
   }
 };
 

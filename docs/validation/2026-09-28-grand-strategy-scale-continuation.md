@@ -463,3 +463,83 @@ Canonical verification (exact documented flags, clean machine):
   2.87 GB.
 - `knowledge_parity` gains a sensor-sweep coverage contract case;
   focused batch green.
+
+Follow-up pass 5 (same canonical flags, `--repeat 2`):
+
+- Queued civilian return no longer rebuilds per hop:
+  `OperationalReachBatch::nearest_refueling` ranks refueling sites
+  through the slot-indexed verdict path (`evaluate_route_verdict` also
+  accumulates `route_distance_light_years` in `evaluate_route`'s exact
+  association order via `feas_dist_`), so only the winning site pays
+  route/reason materialization; the queued-return hop uses
+  `nearest_refueling_verdict` and lets `assign_fleet_route` re-derive
+  the identical route. The batch's id→system map is lazy
+  (`systems_map()`), so verdict-only batches skip the O(systems) build.
+- Select-build reduced by three loop-invariant cuts: the survey level
+  is read once per candidate for both the needs-work predicate and the
+  priority band (`needs_survey_work_at_level`), the fleet's
+  origin/waypoint endpoints and interpolated depth hoist out of the
+  per-entry distance evaluation (same float/double expression order as
+  `interstellar_distance_from_fleet`), and the lane-slot probe defers
+  to pop time so only assessed candidates pay it.
+- `SurveyCatalogIndex` revalidates against its source spans by
+  (data, size) — `ExplorationSimulation` now owns a campaign-wide
+  `campaign_catalog_` that every advance reuses instead of rebuilding
+  O(systems + bodies) maps per tick; a reloaded world view triggers
+  exactly one rebuild.
+
+Canonical verification (exact documented flags, clean machine):
+
+- `finalStateHash e5a1d5bf…` — bit-identical;
+  `repeatFinalStatesDeterministic` and `continuationDeterministic`
+  true; save 149,969,876 bytes; metrics unchanged.
+- `EXPL-PROF` (2.5 campaign-units): select build 67.2 s → 40.1 s
+  (−40%), survey 74.3 s → 37.3 s (−50%, the per-tick catalog rebuild
+  removed), inbound `return` 84.4 s → 50.9 s vs the pre-fix
+  attribution (−40%), step mean 23.88 ms (vs 74.2 ms at the
+  dense-route baseline, −68%), peak working set 2.87 GB.
+- Focused coverage extended: `survey_batch` gains a shared-index
+  revalidation case (stale-span rebuild + absent-system rejection).
+
+Follow-up pass 6 (same canonical flags, `--repeat 2`):
+
+- Queued civilian return no longer builds a full-catalog Dijkstra per
+  hop: `InterstellarLaneNetwork::route_tree_toward` runs the same
+  slot-indexed build into caller-owned buffers but halts once every
+  `needed_slots` entry is settled (or the frontier exhausts), and an
+  `accept_settled` callback lets the caller stop at the first approved
+  settlement. `nearest_refueling_verdict` gathers the refueling slots
+  once, prunes them through `route_components` (the union-find table
+  `find_shortest_route_into` consults) so unreachable sites cannot
+  force frontier exhaustion, then settles in ascending (distance, id)
+  order — the first fuel-feasible site is exactly the
+  min-(distance, id) pick the exhaustive scan made. The winner's route
+  materializes from the settled prior chain (bit-identical to
+  `find_shortest_route`), so `assign_fleet_route` consumes it directly
+  instead of re-deriving and re-caching a hop-origin tree.
+- `evaluate_route` resolves leg positions through the lane slot table,
+  so explain callers no longer materialize the batch's id→system map;
+  the failure-path name lookup uses `find_system`, and the
+  duplicate-id `invalid_argument` survives on the unreachable fallback.
+- `has_return_service_route` keeps the service-rooted borrowed-tree
+  slot walk; a membership prune was tried and reverted — in the common
+  connected case it added probes without saving a borrow.
+
+Canonical verification (exact documented flags, clean machine):
+
+- `finalStateHash e5a1d5bf…` — bit-identical;
+  `repeatFinalStatesDeterministic` and `continuationDeterministic`
+  true; save 149,969,876 bytes; metrics unchanged (25 civs / 78
+  colonies / 264 fleets / 0 wars / 4 definitions / 128 journal
+  entries).
+- `EXPL-PROF` (2.5 campaign-units): queued-return `pick` 38.2 s →
+  20.2–28.7 s across runs (early-stopped tree + verdict-carried
+  route), select `finish` 17.0 s → 1.3–2.0 s (the id→system map
+  build eliminated from explain), step mean 20.6–23.8 ms depending
+  on machine load (vs 74.2 ms dense-route baseline, −68–72%), peak
+  working set ~2.84 GB.
+- Focused coverage extended: `operational_reach_batch` gains a
+  `route_tree_toward` contract pin (settled entries bit-identical to
+  the full build, (distance, id) settle order, early-accept stop,
+  unknown-origin throw, invalid-range clear) and a verdict-carried
+  route parity check against the explain reach.

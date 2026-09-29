@@ -83,10 +83,12 @@ public:
   std::optional<RefuelingReach> nearest_refueling(const FleetState &,InterstellarMissionKind);
   // Verdict-only variant of nearest_refueling for re-check paths that
   // discard the reason string: identical winner selection (same
-  // route-distance ranking and id tie-break), but candidates are
-  // ranked through the slot-indexed feasibility memo and the winner's
-  // reach carries no route/reason payload — assign_fleet_route
-  // re-derives the identical route when route_system_ids is nullopt.
+  // route-distance ranking and id tie-break), decided by one
+  // early-stopped route_tree_toward build rooted at the fleet. The
+  // winner's reach carries the materialized route (the settled prior
+  // chain — bit-identical to find_shortest_route) so assign_fleet_route
+  // consumes it without re-deriving or re-caching a tree, but no reason
+  // payload.
   std::optional<RefuelingReach> nearest_refueling_verdict(const FleetState &);
 private:
   void prepare();
@@ -135,6 +137,12 @@ private:
   // eviction; only the borrowed spans need re-borrowing.
   InterstellarLaneNetwork::RouteTreeView feas_tree_{};
   std::uint64_t feas_tree_revision_{};
+  // nearest_refueling scratch: an early-stopped partial route tree rooted
+  // at the fleet's current system — settles only until every refueling
+  // site is resolved instead of paying a full-catalog Dijkstra per hop.
+  std::vector<double> return_dist_;
+  std::vector<int> return_prior_;
+  std::vector<int> return_needed_;
 };
 
 MissionReachAssessment

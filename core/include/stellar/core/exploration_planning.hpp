@@ -75,7 +75,14 @@ using ExplorationReachAssessment = std::function<MissionReachAssessment(
 // OperationalReachBatch::prepare() so every fleet mission selection does
 // not rebuild it. Callers that omit it keep the original per-call scans.
 struct ExplorationPlanningSharedIndex {
-  SurveyCatalogIndex catalog;
+  // Catalog lookups default to owned_catalog's per-index lifetime; a host
+  // may point catalog_override at a longer-lived index — the index
+  // revalidates on the source spans, so stale pointers are never served.
+  SurveyCatalogIndex &catalog() noexcept {
+    return catalog_override ? *catalog_override : owned_catalog;
+  }
+  SurveyCatalogIndex *catalog_override{};
+  SurveyCatalogIndex owned_catalog;
   struct SurveyWorkList {
     std::uint64_t level_revision{};
     bool valid{};
@@ -148,6 +155,16 @@ public:
 
   static bool needs_survey_work(const CivilizationKnowledgeState &knowledge,
                                 const FleetState &fleet, int system_id);
+  // Level-precomputed variant for scan loops that already fetched the
+  // survey level — identical predicate without the second lookup.
+  static bool needs_survey_work_at_level(const FleetState &fleet,
+                                         SystemSurveyLevel level) {
+    if (fleet.role == FleetRole::Scout)
+      return level < SystemSurveyLevel::partially_surveyed;
+    if (fleet.role == FleetRole::Science)
+      return level < SystemSurveyLevel::fully_surveyed;
+    return false;
+  }
   static int survey_priority(FleetRole role, SystemSurveyLevel level);
 
 private:

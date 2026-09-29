@@ -2,6 +2,8 @@
 
 #include <stellar/core/detail/legacy_number_format.hpp>
 
+#include "exploration_prof_internal.hpp"
+
 #include <algorithm>
 #include <optional>
 #include <unordered_set>
@@ -71,7 +73,11 @@ CivilianFleetReturnOrderResult activate(CivilianRecoveryWorldView world,
     return {false, false, fleet.name +
                               " must finish its current lane before return "
                               "routing can be rechecked."};
+  std::optional<detail::ExplProfScope> pick_scope;
+  if (detail::expl_prof().enabled.load(std::memory_order_relaxed))
+    pick_scope.emplace(detail::expl_prof().return_pick_ns);
   const auto choice = nearest_base(world, fleet, accepted_queued_return);
+  pick_scope.reset();
   if (!choice) {
     if (!accepted_queued_return)
       return {false, false,

@@ -120,18 +120,42 @@ SurveyOperationsProfile SurveyOperationsProfiler::build(
   return finish(&*system,summary);
 }
 
+const std::unordered_map<int, const StellarSystem *> &
+SurveyCatalogIndex::systems_index_for(std::span<const StellarSystem> systems) {
+  if (systems_source_ != systems.data() || systems_size_ != systems.size()) {
+    systems_by_id.clear();
+    systems_source_ = systems.data();
+    systems_size_ = systems.size();
+  }
+  if (systems_by_id.empty())
+    for (const auto &system : systems)
+      systems_by_id.emplace(system.id, &system);
+  return systems_by_id;
+}
+
+const std::unordered_map<int, std::vector<const PlanetaryBody *>> &
+SurveyCatalogIndex::bodies_index_for(std::span<const PlanetaryBody> bodies) {
+  if (bodies_source_ != bodies.data() || bodies_size_ != bodies.size()) {
+    bodies_by_system.clear();
+    bodies_source_ = bodies.data();
+    bodies_size_ = bodies.size();
+  }
+  if (bodies_by_system.empty())
+    for (const auto &body : bodies)
+      bodies_by_system[body.system_id].push_back(&body);
+  return bodies_by_system;
+}
+
 SurveyOperationsProfile SurveyOperationsBatch::build(int system_id) {
   if(shared_){
     if(auto it=profiles_.find(system_id);it!=profiles_.end())return it->second;
-    if(shared_->systems_by_id.empty())
-      for(const auto& system:systems_)shared_->systems_by_id.emplace(system.id,&system);
-    const auto found=shared_->systems_by_id.find(system_id);
-    if(found==shared_->systems_by_id.end())
+    const auto &systems_by_id=shared_->systems_index_for(systems_);
+    const auto found=systems_by_id.find(system_id);
+    if(found==systems_by_id.end())
       throw std::runtime_error("Unknown system "+std::to_string(system_id)+".");
-    if(shared_->bodies_by_system.empty())
-      for(const auto& body:bodies_)shared_->bodies_by_system[body.system_id].push_back(&body);
+    const auto &bodies_by_system=shared_->bodies_index_for(bodies_);
     SurveySummary summary;
-    if(const auto bit=shared_->bodies_by_system.find(system_id);bit!=shared_->bodies_by_system.end())
+    if(const auto bit=bodies_by_system.find(system_id);bit!=bodies_by_system.end())
       for(const auto* body:bit->second)summary.add(*body);
     const auto profile=finish(found->second,summary);
     profiles_.emplace(system_id,profile);

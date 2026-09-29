@@ -140,13 +140,8 @@ bool ExplorationMissionPlanner::DrainVerdict::matches(
 bool ExplorationMissionPlanner::needs_survey_work(
     const CivilizationKnowledgeState &knowledge, const FleetState &fleet,
     int system_id) {
-  const auto level =
-      knowledge.system_survey_level(fleet.civilization_id, system_id);
-  if (fleet.role == FleetRole::Scout)
-    return level < SystemSurveyLevel::partially_surveyed;
-  if (fleet.role == FleetRole::Science)
-    return level < SystemSurveyLevel::fully_surveyed;
-  return false;
+  return needs_survey_work_at_level(
+      fleet, knowledge.system_survey_level(fleet.civilization_id, system_id));
 }
 
 int ExplorationMissionPlanner::survey_priority(FleetRole role,
@@ -177,6 +172,12 @@ indexed_system(const std::unordered_map<int, const StellarSystem *> &index,
     return nullptr;
   const auto found = index.find(*id);
   return found == index.end() ? nullptr : found->second;
+}
+
+double clamp_preserving_nan(double value, double minimum, double maximum) {
+  if (std::isnan(value))
+    return value;
+  return std::clamp(value, minimum, maximum);
 }
 
 double indexed_distance_from_fleet(
@@ -321,10 +322,7 @@ ExplorationMissionPlanner::select_supported_candidate(
   std::unordered_map<int, const StellarSystem *> local_systems_index;
   const std::unordered_map<int, const StellarSystem *> *systems_index;
   if (shared) {
-    if (shared->catalog.systems_by_id.empty())
-      for (const auto &system : world.systems)
-        shared->catalog.systems_by_id.emplace(system.id, &system);
-    systems_index = &shared->catalog.systems_by_id;
+    systems_index = &shared->catalog().systems_index_for(world.systems);
   } else {
     local_systems_index.reserve(world.systems.size());
     for (const auto &system : world.systems)
@@ -365,9 +363,6 @@ ExplorationMissionPlanner::select_supported_candidate(
     const StellarSystem *system;
     int priority_band;
     double distance;
-    // Lane slot resolved once per candidate on the canonical path —
-    // lets the pop loop probe by slot instead of re-hashing the id.
-    int lane_slot;
   };
   const auto ranked_less = [](const RankedTarget &left,
                               const RankedTarget &right) {
@@ -405,25 +400,25 @@ ExplorationMissionPlanner::select_supported_candidate(
       if (profiling)
         ++prof.work_rebuilds;
       entry.entries.clear();
-      for (const auto &system : world.systems)
-        if (needs_survey_work(world.knowledge, subject, system.id))
+      for (const auto &system : world.systems) {
+        const auto level = world.knowledge.system_survey_level(
+            subject.civilization_id, system.id);
+        if (needs_survey_work_at_level(subject, level))
           entry.entries.push_back(
-              {&system,
-               survey_priority(subject.role,
-                               world.knowledge.system_survey_level(
-                                   subject.civilization_id, system.id))});
+              {&system, survey_priority(subject.role, level)});
+      }
       entry.level_revision = world.knowledge.survey_level_revision();
       entry.valid = true;
     }
     work = &entry.entries;
   } else {
-    for (const auto &system : world.systems)
-      if (needs_survey_work(world.knowledge, subject, system.id))
+    for (const auto &system : world.systems) {
+      const auto level = world.knowledge.system_survey_level(
+          subject.civilization_id, system.id);
+      if (needs_survey_work_at_level(subject, level))
         local_work.push_back(
-            {&system,
-             survey_priority(subject.role,
-                             world.knowledge.system_survey_level(
-                                 subject.civilization_id, system.id))});
+            {&system, survey_priority(subject.role, level)});
+    }
     work = &local_work;
   }
   if (profiling)
@@ -439,6 +434,50 @@ ExplorationMissionPlanner::select_supported_candidate(
   const bool prune_unreachable =
       batch != nullptr && subject.current_system_id.has_value() &&
       world.lanes.connected_component_count(prune_range) > 1;
+  // The fleet endpoints and the warp-interpolated depth are invariant
+  // across the whole work list — resolve them once instead of per
+  // candidate (indexed_distance_from_fleet otherwise pays two index
+  // lookups plus the depth arithmetic for every entry).
+  const auto *origin_system = indexed_system(
+      *systems_index,
+      subject.transit_phase == FleetTransitPhase::InterstellarWarp
+          ? subject.transit_origin_system_id
+          : subject.current_system_id);
+  const auto *waypoint_system = indexed_system(
+      *systems_index,
+      subject.transit_phase == FleetTransitPhase::InterstellarWarp
+          ? (!subject.planned_route_system_ids.empty()
+                 ? std::optional<int>(subject.planned_route_system_ids.front())
+                 : subject.destination_system_id)
+          : std::nullopt);
+  const bool flat_origin =
+      !origin_system || !origin_system->position.depth_light_years;
+  // Same expression order as interstellar_distance_from_fleet: the
+  // waypoint interpolation must stay inside the warp branch.
+  auto depth = origin_system
+                   ? origin_system->position.depth_light_years.value_or(0)
+                   : 0;
+  if (subject.transit_phase == FleetTransitPhase::InterstellarWarp &&
+      waypoint_system)
+    depth += (waypoint_system->position.depth_light_years.value_or(0) -
+              depth) *
+             clamp_preserving_nan(subject.transit_progress, 0.0, 1.0);
+  const auto distance_to = [&](const StellarSystem &target) {
+    if (flat_origin && !target.position.depth_light_years) {
+      // Same float arithmetic as fleet_transit.cpp's distance(Vec2,
+      // Vec2): float differences, float sum-of-squares, float sqrt,
+      // widened to double on return.
+      const float dx = subject.position.x - target.position.x;
+      const float dy = subject.position.y - target.position.y;
+      return static_cast<double>(std::sqrt(dx * dx + dy * dy));
+    }
+    const auto dx =
+        static_cast<double>(subject.position.x) - target.position.x;
+    const auto dy =
+        static_cast<double>(subject.position.y) - target.position.y;
+    const auto dz = depth - target.position.depth_light_years.value_or(0);
+    return std::sqrt(dx * dx + dy * dy + dz * dz);
+  };
   std::vector<RankedTarget> targets;
   targets.reserve(work->size());
   for (const auto &[system, band] : *work) {
@@ -448,10 +487,10 @@ ExplorationMissionPlanner::select_supported_candidate(
         !world.lanes.systems_connected(*subject.current_system_id,
                                        system->id, prune_range))
       continue;
-    targets.push_back({system, band,
-                       indexed_distance_from_fleet(*systems_index, subject,
-                                                   *system),
-                       batch ? world.lanes.slot_of_system(system->id) : 0});
+    // The lane slot resolves lazily at pop time — the heap only
+    // consumes a fraction of the work list, so probing here would pay
+    // the id->slot lookup for entries that are never assessed.
+    targets.push_back({system, band, distance_to(*system)});
   }
   // The (band, distance-with-NaN-last, id) order is total — heap pops yield
   // exactly the stable_sort sequence, but only the handful of entries the
@@ -478,20 +517,23 @@ ExplorationMissionPlanner::select_supported_candidate(
     if (profiling)
       ++prof.pops;
     // Verdict-only on the canonical path — the loop discards everything
-    // but is_supported. Slot probes skip the id lookups entirely; the
+    // but is_supported. The lane slot resolves here rather than at
+    // build time: only popped entries pay the id->slot lookup, and the
+    // heap touches a fraction of the work list on most selects. The
     // lane-unknown fallback keeps find_shortest_route's out_of_range
     // contract reachable for non-catalog targets.
-    const bool supported =
-        batch ? (target.lane_slot >= 0
-                     ? batch->probe_supported(subject, target.lane_slot,
-                                              fuel_policy)
-                     : batch->assess(subject, target.system->id,
-                                     mission_kind(subject.role),
-                                     fuel_policy, /*explain=*/false)
-                         .is_supported)
-              : assess_operational_reach(world, subject,
-                                         target.system->id)
-                    .is_supported;
+    const bool supported = [&] {
+      if (!batch)
+        return assess_operational_reach(world, subject, target.system->id)
+            .is_supported;
+      const int slot = world.lanes.slot_of_system(target.system->id);
+      if (slot >= 0)
+        return batch->probe_supported(subject, slot, fuel_policy);
+      return batch->assess(subject, target.system->id,
+                           mission_kind(subject.role), fuel_policy,
+                           /*explain=*/false)
+          .is_supported;
+    }();
     if (profiling)
       ++prof.assess_calls;
     if (!supported)
@@ -532,7 +574,7 @@ ExplorationMissionPlanner::select_supported_candidate(
     prof_build.emplace(prof.select_finish_ns);
   }
   SurveyOperationsBatch surveys(world.systems, world.bodies,
-                                shared ? &shared->catalog : nullptr);
+                                shared ? &shared->catalog() : nullptr);
   return build_candidate(world, subject, *chosen, batch,
                          fuel_policy, &surveys, systems_index);
 }

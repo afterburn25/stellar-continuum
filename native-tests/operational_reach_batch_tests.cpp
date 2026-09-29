@@ -49,8 +49,9 @@ int main(int argc,char **argv)try{
           "Slot probe changed return-service gating.");
     }
     // nearest_refueling_verdict must pick the identical base with an
-    // identical distance/arrival fuel — only the reason/route payload
-    // is omitted for the winner.
+    // identical distance/arrival fuel — only the reason payload is
+    // omitted; the winner's route materializes from the settled prior
+    // chain so assign_fleet_route consumes it without a cache lookup.
     const auto rich=batch.nearest_refueling(fleet,InterstellarMissionKind::ScoutReconnaissance);
     const auto lean=batch.nearest_refueling_verdict(fleet);
     check(rich.has_value()==lean.has_value(),"nearest_refueling_verdict diverged on emptiness.");
@@ -60,6 +61,8 @@ int main(int argc,char **argv)try{
           "nearest_refueling_verdict distance diverged.");
       check(lean->reach.arrival_fuel_light_years==rich->reach.arrival_fuel_light_years,
           "nearest_refueling_verdict arrival fuel diverged.");
+      check(lean->reach.route_system_ids==rich->reach.route_system_ids,
+          "nearest_refueling_verdict materialized a different winner route.");
     }
     fleet.fuel_remaining_light_years=0;
     for(int i=0;i<20;++i)check(same(assess_operational_reach(view,fleet.civilization_id,fleet,world.systems[i].id,InterstellarMissionKind::ScienceSurvey),
@@ -122,5 +125,45 @@ int main(int argc,char **argv)try{
   check(lanes.slot_of_system(999999)==-1,"slot_of_system accepted an unknown id.");
   {bool threw=false;try{lanes.route_tree_view(999999,500.0);}catch(const std::out_of_range&){threw=true;}
    check(threw,"RouteTreeView accepted an unknown origin.");}
+  // route_tree_toward contract: settled entries are bit-identical to the
+  // full build's, needed slots settle in (distance, id) order, and the
+  // accept callback's early stop leaves only a prefix resolved.
+  for(std::size_t i=0;i<world.systems.size();i+=41){
+    const int origin=world.systems[i].id;
+    const double range=300.0+static_cast<double>(i%5)*100.0;
+    const auto full=lanes.route_tree_view(origin,range);
+    std::vector<int> needed;
+    for(std::size_t j=1;j<world.systems.size();j+=23)
+      needed.push_back(lanes.slot_of_system(world.systems[j].id));
+    std::vector<double> dist;std::vector<int> prior;
+    std::vector<int> settled_order;
+    lanes.route_tree_toward(origin,range,needed,dist,prior,
+        [&](int slot){settled_order.push_back(slot);return false;});
+    check(dist.size()==slots.size()&&prior.size()==slots.size(),"route_tree_toward size mismatch.");
+    // Settlement order is ascending (distance, system id).
+    std::vector<std::pair<double,int>> full_needed;
+    for(const int slot:needed)
+      if(std::isfinite(full.distance[slot]))full_needed.emplace_back(full.distance[slot],slots[slot].id);
+    std::sort(full_needed.begin(),full_needed.end());
+    check(settled_order.size()==full_needed.size(),"route_tree_toward settled count diverged.");
+    for(std::size_t k=0;k<settled_order.size();++k){
+      const int slot=settled_order[k];
+      check(slots[slot].id==full_needed[k].second,"route_tree_toward settle order diverged from (distance,id).");
+      check(dist[slot]==full.distance[slot]&&prior[slot]==full.prior[slot],"route_tree_toward settled entry diverged from full tree.");
+    }
+    // Early accept stops at the minimum-(distance, id) approved slot.
+    if(!full_needed.empty()){
+      const auto approved=lanes.slot_of_system(full_needed[full_needed.size()/2].second);
+      int accepted=-1;std::vector<double> d2;std::vector<int> p2;
+      lanes.route_tree_toward(origin,range,needed,d2,p2,
+          [&](int slot){if(slot==approved){accepted=slot;return true;}return false;});
+      check(accepted==approved,"route_tree_toward early accept missed the approved slot.");
+    }
+  }
+  {bool threw=false;try{std::vector<double> d;std::vector<int> p;lanes.route_tree_toward(999999,500.0,{},d,p);}catch(const std::out_of_range&){threw=true;}
+   check(threw,"route_tree_toward accepted an unknown origin.");}
+  {std::vector<double> d{1.,2.};std::vector<int> p{3};
+   lanes.route_tree_toward(world.systems[0].id,0.0,{},d,p);
+   check(d.empty()&&p.empty(),"route_tree_toward kept outputs on a non-positive range.");}
   std::cout<<"operational reach batch tests passed\n";return 0;
 }catch(const std::exception &e){std::cerr<<e.what()<<'\n';return 1;}

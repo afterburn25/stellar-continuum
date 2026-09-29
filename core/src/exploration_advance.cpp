@@ -618,10 +618,14 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
   AdvanceIndex index(world.systems);
   // One planning index for the whole advance: the catalog spans are
   // immutable here and its survey-work lists revalidate through the
-  // knowledge survey-level revision when a survey completes mid-tick.
+  // knowledge survey-level revision when a survey completes mid-tick. The
+  // catalog index itself is generation-static, so it is shared campaign-
+  // wide — it still revalidates on the source spans, covering a reloaded
+  // or replaced world view.
   ExplorationPlanningSharedIndex planning_shared;
+  planning_shared.catalog_override = &campaign_catalog_;
   SurveyOperationsBatch surveys(world.systems, world.bodies,
-                                &planning_shared.catalog);
+                                planning_shared.catalog_override);
   ContactPresenceIndex presence;
   for (const auto &colony : world.colonies)
     ++presence.colonies[colony.system_id][colony.civilization_id];

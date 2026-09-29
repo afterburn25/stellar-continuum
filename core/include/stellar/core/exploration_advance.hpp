@@ -95,6 +95,9 @@ private:
               int destination_system_id, bool require_survey_work) const;
   ExplorationMissionPlanner mission_planner_;
   MissionFuelPolicy ai_fuel_policy_;
+  // Generation-static system/body catalog lookups shared across advances.
+  // Revalidates on the source spans, so a reloaded world view rebuilds it.
+  mutable SurveyCatalogIndex campaign_catalog_;
 };
 
 } // namespace stellar::core

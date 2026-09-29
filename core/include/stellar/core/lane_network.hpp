@@ -89,6 +89,28 @@ public:
   RouteTreeView route_tree_view(int origin_system_id,
                                 double maximum_leg_range_light_years);
 
+  // Caller-owned partial route tree: the same slot-indexed Dijkstra as
+  // route_tree_view, but it halts once every slot in needed_slots is
+  // settled (or the frontier exhausts). Settled distance/prior entries
+  // are bit-identical to the full build's — settlement order is a prefix
+  // of the same (distance, id) pop order — and slots never settled are
+  // exactly those the full build would leave unreachable. When
+  // accept_settled is set it runs on each needed slot in settlement
+  // order and returning true stops the build early — the accepted slot
+  // is then the minimum-(distance, id) candidate the callback approved.
+  // The result is written into caller-owned vectors and never enters the
+  // route cache, so callers that only probe a small target set skip the
+  // full-catalog build. Throws out_of_range on an unknown origin and
+  // clears the outputs for a non-positive or NaN range, matching
+  // find_shortest_route_into's ordering.
+  void route_tree_toward(int origin_system_id,
+                         double maximum_leg_range_light_years,
+                         std::span<const int> needed_slots,
+                         std::vector<double> &distance_out,
+                         std::vector<int> &prior_out,
+                         const std::function<bool(int)> &accept_settled =
+                             nullptr);
+
   // Monotonic revision of the route-tree cache — incremented whenever
   // cached trees are destroyed (capacity eviction or rebuild). Callers
   // that pin a RouteTreeView across queries must re-validate the
@@ -112,6 +134,16 @@ public:
   // paying per-pair lookups when the graph is a single component anyway.
   // Invalid ranges (non-positive or NaN) answer 0.
   std::size_t connected_component_count(
+      double maximum_leg_range_light_years);
+
+  // Slot-indexed connected-component membership at the given per-leg
+  // range — the same union-find table find_shortest_route consults to
+  // answer unreachable pairs without building a route tree. Two slots in
+  // the same component can route to each other; different components
+  // cannot. Callers probing many pairs against one origin read the span
+  // once and compare entries directly. Invalid ranges (non-positive or
+  // NaN) answer an empty span.
+  std::span<const int> route_components(
       double maximum_leg_range_light_years);
 
   // Extended routing policy for mission-aware search. `permitted_system_ids`
