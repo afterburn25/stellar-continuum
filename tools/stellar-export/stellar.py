@@ -38,9 +38,13 @@ from native_settlement_preparation_runtime import validate_native_settlement_pre
 from native_earned_settlement_runtime import validate_native_earned_settlement_export
 from native_settlement_runtime import validate_native_settlement_export
 from native_new_game_runtime import validate_native_new_game_export
+from native_restart_runtime import verify_native_restart
 from native_galaxy_runtime import validate_native_galaxy_export
 from native_ship_art_runtime import validate_native_ship_art_export
 from native_diplomacy_runtime import validate_native_diplomacy_export
+from native_quick_find_runtime import validate_native_quick_find_export
+from native_eruption_runtime import validate_native_eruption_export
+from native_developer_runtime import validate_native_developer_export
 
 ROOT = Path(__file__).resolve().parents[2]
 # cabinet.dll hosts the Windows Compression API (compressapi.h /
@@ -528,6 +532,8 @@ def export(preset_name):
                 audio_check=True, audio_settings_check=True,
                 video_settings_check=True, general_settings_check=True,
                 voice_settings_check=True, controls_settings_check=True))
+            smoke.update(verify_native_restart(output,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_travel_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json",
                 replay_check=True))
@@ -535,6 +541,12 @@ def export(preset_name):
             smoke.update(validate_native_ship_art_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_diplomacy_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_quick_find_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_eruption_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_developer_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]

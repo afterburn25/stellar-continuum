@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import tempfile
 
-from native_new_game_runtime import _bmp, _source_payload, _verify_campaign, _resolved_reported
+from native_new_game_runtime import _bmp, _source_payload, _verify_campaign, _resolved_reported, _SEED, _COUNT, _SPECIES
 
 
 def _state(stdout: str, action: str, audio_check: bool) -> dict:
@@ -31,6 +31,30 @@ def _state(stdout: str, action: str, audio_check: bool) -> dict:
         raise RuntimeError("Restart music was missing or restarted")
     if action == "cancel" and "restart_cancel=preserved_same_campaign" not in stdout:
         raise RuntimeError("Cancellation did not preserve the live campaign and camera")
+    return value
+
+
+def _fresh_state(stdout: str) -> dict:
+    matches = re.findall(r"new_game_restart=(\{[^{}]*\})", stdout)
+    if len(matches) != 1:
+        raise RuntimeError("Fresh New Game restart did not report one lifecycle outcome")
+    value = json.loads(matches[0])
+    expected = {"saved_previous": True, "restarted": True, "entry_opened": False,
+                "setup_opened": True, "species_selected": True, "size_selected": True,
+                "seed_entered": True, "create_requested": True, "activated": True,
+                "unique_slot": True}
+    details = {"system_count", "species_id", "seed", "generated_save_path",
+               "previous_save_path"}
+    if set(value) != set(expected) | details:
+        raise RuntimeError("Fresh New Game restart evidence schema changed")
+    if any(value[key] is not wanted for key, wanted in expected.items()):
+        raise RuntimeError("Fresh New Game restart skipped setup or saved into the live slot")
+    if (value["system_count"] != _COUNT or value["species_id"] != _SPECIES or
+            value["seed"] != str(int(_SEED) + 1)):
+        raise RuntimeError("Fresh New Game restart created the wrong campaign")
+    if (not isinstance(value["generated_save_path"], str) or
+            not isinstance(value["previous_save_path"], str)):
+        raise RuntimeError("Fresh New Game restart reported malformed save paths")
     return value
 
 
@@ -55,12 +79,12 @@ def verify_native_restart(folder: Path, fixture: Path, *, audio_check: bool = Tr
         anchor = work / "original.player17.json"
         anchor.write_text(json.dumps(_source_payload(fixture), ensure_ascii=False), encoding="utf-8")
 
-        def run(mode: str, name: str, save: Path, width: int, height: int):
+        def run(mode: str, name: str, save: Path, width: int, height: int, audio: bool = True):
             image = work / (name + ".bmp")
             args = [str(executable), "--asset-root", str(folder), "--save-path", str(save),
                     "--load", "--seed", "143250", "--width", str(width), "--height", str(height),
                     "--windowed", mode, str(image)]
-            if audio_check: args.append("--audio-check")
+            if audio and audio_check: args.append("--audio-check")
             process = subprocess.run(args, cwd=cwd, env=clean, capture_output=True,
                                      text=True, encoding="utf-8", errors="replace", timeout=120)
             log = folder.parent / (folder.name + "-" + name + ".log")
@@ -101,6 +125,29 @@ def verify_native_restart(folder: Path, fixture: Path, *, audio_check: bool = Tr
                 capture(reload_image, 1920, 1080)
                 _unchanged(created, json.loads(generated.read_text(encoding="utf-8")))
                 _unchanged(baseline, json.loads(anchor.read_text(encoding="utf-8")))
+
+        # Fresh-campaign variant: New Game from a live campaign driven through the
+        # automated startup entry (seed+1) — the entry evidence and unique-slot
+        # contract that --restart-smoke does not report.
+        image, stdout = run("--new-game-restart-smoke", "restart-fresh", anchor,
+                            1280, 720, audio=False)
+        results["fresh"] = _fresh_state(stdout)
+        _unchanged(baseline, json.loads(anchor.read_text(encoding="utf-8")))
+        for suffix in ("-saved", "-galaxy-types", "-galaxy-selected", "-population",
+                       "-population-dropdown", "-setup", "-loading", ""):
+            capture(image.with_stem(image.stem + suffix), 1280, 720)
+        generated = _resolved_reported(results["fresh"]["generated_save_path"], work,
+                                       "fresh restart save")
+        if generated == anchor.resolve() or not generated.is_file():
+            raise RuntimeError("Fresh New Game restart did not use an independent save slot")
+        created = json.loads(generated.read_text(encoding="utf-8"))
+        galaxy = created.get("Galaxy", {})
+        metadata = galaxy.get("GenerationMetadata") or {}
+        if (created.get("FormatVersion") != 17 or galaxy.get("Seed") != int(_SEED) + 1 or
+                metadata.get("EnteredSeed") != str(int(_SEED) + 1) or
+                metadata.get("SystemCount") != _COUNT or
+                metadata.get("PlayerSpeciesId") != _SPECIES):
+            raise RuntimeError("Fresh New Game restart save does not match its evidence")
     return {"nativeMidSessionNewGame": True, "exactPreviousCampaignPreserved": True,
-            "independentSlotAndPausedReload": True, "outcomes": results,
-            "captures": captures, "logs": logs}
+            "independentSlotAndPausedReload": True, "freshNewGameRestart": True,
+            "outcomes": results, "captures": captures, "logs": logs}

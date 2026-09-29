@@ -1,7 +1,7 @@
 import copy
 import json
 import unittest
-from native_restart_runtime import _state, _unchanged
+from native_restart_runtime import _state, _fresh_state, _unchanged
 
 class RestartEvidenceTests(unittest.TestCase):
     def text(self, action="cancel", **changes):
@@ -39,5 +39,41 @@ class RestartEvidenceTests(unittest.TestCase):
                         {**after, "Galaxy": {"Seed": 1, "Fleets": []}}):
             with self.assertRaises(RuntimeError): _unchanged(before, changed)
         self.assertEqual(before["SavedAtUtc"], "old")
+
+
+class FreshRestartEvidenceTests(unittest.TestCase):
+    def text(self, **changes):
+        value = {"saved_previous": True, "restarted": True, "entry_opened": False,
+                 "setup_opened": True, "species_selected": True, "size_selected": True,
+                 "seed_entered": True, "create_requested": True, "activated": True,
+                 "unique_slot": True, "system_count": 250,
+                 "species_id": "pelagic_high_pressure", "seed": "143251",
+                 "generated_save_path": "generated.player17.json",
+                 "previous_save_path": "original.player17.json"}
+        value.update(changes)
+        return "prefix\n new_game_restart=" + json.dumps(value) + "\n"
+
+    def test_accepts_fresh_restart_outcome(self):
+        self.assertTrue(_fresh_state(self.text())["restarted"])
+
+    def test_rejects_wrong_campaign_or_live_slot(self):
+        for changes in ({"saved_previous": False}, {"restarted": False},
+                        {"entry_opened": True}, {"setup_opened": False},
+                        {"species_selected": False}, {"size_selected": False},
+                        {"seed_entered": False}, {"create_requested": False},
+                        {"activated": False}, {"unique_slot": False},
+                        {"system_count": 500}, {"species_id": "terran_baseline"},
+                        {"seed": "143250"}, {"seed": 143251},
+                        {"generated_save_path": 1}, {"unexpected": True},
+                        {"saved_previous": 1}):
+            with self.subTest(changes=changes), self.assertRaises(RuntimeError):
+                _fresh_state(self.text(**changes))
+
+    def test_rejects_missing_or_duplicate_outcomes(self):
+        for text in ("", self.text() + self.text(),
+                     self.text().replace("new_game_restart=", "restart=")):
+            with self.subTest(text=text), self.assertRaises(RuntimeError):
+                _fresh_state(text)
+
 
 if __name__ == "__main__": unittest.main()
