@@ -263,13 +263,19 @@ input lazy probe, shared adaptive-research credit-flow index, cached
 automatic-orders body index):
 
 - `repeatFinalStatesDeterministic: true`, `continuationDeterministic:
-  true`; continuation save 145,103,156 bytes.
+  true`; continuation save 145,103,156 bytes (byte-identical size to the
+  pre-refresh run).
 - Final hash `f9c5f28cd673ddf6d213db342779cdfa1c920b2891ad910a2ddc26052e20d012`
   — differs from the header receipt because semantic changes (organic war
   settlement, belligerent contact reacquisition, research scheduling)
-  landed since `2af8d120`; this hash is the current-commit baseline.
-- **Step mean 8.93 ms** (was 65.31 ms in the header receipt — ~7.3x),
-  p95 20.04 ms, peak 56.66 ms; peak working set 2,263.0 MB.
-- Phase means: adaptive_research 2.79 (pre research-index share),
-  strategic_ai 2.27, automatic_orders 1.23, economy 0.77, exploration
-  0.59, construction 0.04, core_total 5.53.
+  landed since `2af8d120`; this hash is the current-commit baseline and
+  is **bit-identical across the entire index-sharing arc** including the
+  strategic-input and adaptive-research catalog indexes (`c8589b47`).
+- **Step mean 5.35 ms** (was 65.31 ms in the header receipt — ~12.2x),
+  p95 7.47 ms, peak 42.85 ms; working set 523.2 MB / peak 2,268.7 MB.
+- Phase means: adaptive_research 1.67, automatic_orders 1.19, economy
+  0.75, exploration 0.53, warfare 0.39, strategic_ai 0.22, combat 0.16,
+  construction 0.04, core_total 3.32.
+- Metrics unchanged in shape: 25 civilizations / 27 colonies / 150 fleets
+  / 0 wars; 4 scripted event definitions / 128 journal entries; research
+  37,570 / diplomacy 18 events.
