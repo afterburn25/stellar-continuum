@@ -66,6 +66,14 @@ class NavigationRuntimeTests(unittest.TestCase):
                         args, 0, "replay_info=" + json.dumps(info), "")
                 save = Path(args[args.index("--save-path") + 1])
                 if "--replay" in args:
+                    if "--replay-until" in args:
+                        if failure == "until diverge":
+                            return subprocess.CompletedProcess(args, 0,
+                                "replay-until: canonical state at tick 6568542 dumped to "
+                                "d.json (first leaf: World.Fleets[0].X)", "")
+                        return subprocess.CompletedProcess(args, 0,
+                            "replay-until: canonical state at tick 6568542 dumped to "
+                            "d.json (matches expected sidecar)", "")
                     if failure == "replay":
                         return subprocess.CompletedProcess(args, 0,
                             "native-map smoke ok: gpu_driver=vulkan systems=500 save=ok", "")
@@ -108,7 +116,7 @@ class NavigationRuntimeTests(unittest.TestCase):
             with mock.patch.object(runtime.subprocess, "run", side_effect=launch):
                 result = runtime.validate_native_navigation_export(
                     package, {}, replay_check=replay_check)
-            self.assertEqual(len(calls), 5 if replay_check else 2)
+            self.assertEqual(len(calls), 6 if replay_check else 2)
             self.assertEqual(len(set(result["navigationCaptures"])), 2)
             self.assertTrue(result["nativeNavigationPausedReload"])
             return result
@@ -120,6 +128,7 @@ class NavigationRuntimeTests(unittest.TestCase):
         result = self.run_replay(replay_check=True)
         self.assertTrue(result["nativeNavigationReplayVerified"])
         self.assertTrue(result["nativeNavigationReplayInfoVerified"])
+        self.assertTrue(result["nativeNavigationReplayUntilVerified"])
         self.assertEqual(result["nativeNavigationReplay"],
                          {"commands": 102, "checkpoints": 42})
 
@@ -134,6 +143,10 @@ class NavigationRuntimeTests(unittest.TestCase):
     def test_replay_check_rejects_unverified_tail(self):
         with self.assertRaisesRegex(RuntimeError, "unsound journal"):
             self.run_replay("info tail", replay_check=True)
+
+    def test_replay_check_rejects_until_divergence(self):
+        with self.assertRaisesRegex(RuntimeError, "expected sidecar"):
+            self.run_replay("until diverge", replay_check=True)
 
     def test_replay_check_requires_verified_line(self):
         with self.assertRaisesRegex(RuntimeError, "replay_verified"):

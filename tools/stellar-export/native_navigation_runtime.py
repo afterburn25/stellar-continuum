@@ -156,8 +156,27 @@ def validate_native_navigation_export(folder: Path, env: dict[str, str],
                 any(not row.get("expected_document") or not row.get("expected_verified")
                     for row in checkpoints)):
             raise RuntimeError("Native navigation replay-info found a stale expected sidecar")
+        # --replay-until dumps the canonical doc at the first checkpoint tick
+        # and leaf-diffs it against the retained expected sidecar — the
+        # bisect tool's match path must produce an identical document.
+        stop_tick = checkpoints[0].get("tick")
+        if type(stop_tick) is not int:
+            raise RuntimeError("Native navigation replay-info did not report checkpoint ticks")
+        until = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                                "--asset-root", str(folder),
+                                "--save-path", str(save), "--load",
+                                "--width", "1280", "--height", "720",
+                                "--replay", str(journal),
+                                "--replay-until", str(stop_tick)],
+                               cwd=work, env=clean_env, capture_output=True,
+                               text=True, timeout=90)
+        if until.returncode:
+            raise RuntimeError(f"Native navigation replay-until failed ({until.returncode}): {until.stderr}")
+        if "matches expected sidecar" not in until.stdout:
+            raise RuntimeError("Native navigation replay-until did not match the expected sidecar")
         return {"nativeNavigationInput": True, "nativeNavigationPausedReload": True,
                 "nativeNavigationReplayVerified": True,
                 "nativeNavigationReplay": verified,
                 "nativeNavigationReplayInfoVerified": True,
+                "nativeNavigationReplayUntilVerified": True,
                 "navigationCaptures": captures, "navigationDiagnostics": diagnostics}
