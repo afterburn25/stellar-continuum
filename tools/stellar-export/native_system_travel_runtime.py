@@ -58,7 +58,7 @@ def _normalized(payload):
 
 
 def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixture: Path,
-                                         *, voice_check=False):
+                                         *, voice_check=False, replay_check=False):
     source = _source_row(fixture)
     count = len(source.get("Galaxy", {}).get("Systems", []))
     if source.get("FormatVersion") != 17 or not count:
@@ -71,7 +71,8 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
         save = work / "local-travel.player17.json"
         save.write_text(json.dumps(source, ensure_ascii=False), encoding="utf-8")
 
-        def launch(mode, label, width=1280, height=720, check_voice=False):
+        def launch(mode, label, width=1280, height=720, check_voice=False,
+                   record=None, replay=None):
             capture = work / (label + ".bmp")
             args = [str(folder / "stellar-continuum-native.exe"), "--asset-root", str(folder),
                     "--save-path", str(save), "--load", "--width", str(width), "--height", str(height),
@@ -80,9 +81,19 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
                 # Voice smoke also proves the ordinary audio director diagnostic.
                 # Keep preparation free of either check: it establishes the route.
                 args[-2:-2] = ["--audio-check", "--voice-check"]
+            if record is not None:
+                args[-2:-2] = ["--record", str(record)]
+            if replay is not None:
+                args[-2:-2] = ["--replay", str(replay), "--replay-exit"]
             result = subprocess.run(args, cwd=work, env=clean, capture_output=True, text=True, timeout=120)
             if result.returncode != 0:
                 raise RuntimeError(f"Native local travel {label} failed ({result.returncode}): {result.stderr}")
+            if replay is not None:
+                # Replay legs replay the journal rather than running the smoke
+                # script — the banner/capture markers are not emitted.
+                if not save.is_file():
+                    raise RuntimeError("Native local travel replay did not load the isolated campaign")
+                return result.stdout, None
             if any(token not in result.stdout for token in ("gpu_driver=vulkan ", f"systems={count} ", "save=ok ")):
                 raise RuntimeError("Native local travel did not confirm its renderer, campaign and save")
             if not capture.is_file() or capture.stat().st_size < 54 or capture.read_bytes()[:2] != b"BM":
@@ -136,7 +147,12 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
         for sidecar in work.glob(save.name + ".*"):
             sidecar.unlink()
 
-        stdout, moved = launch("--system-travel-smoke", "moved", check_voice=voice_check)
+        # The journaled anchor is the rewritten fixture itself — snapshot it
+        # before the recorded leg's saves rewrite it again.
+        journal = work / "moved.replay"
+        anchor = save.read_bytes() if replay_check else None
+        stdout, moved = launch("--system-travel-smoke", "moved", check_voice=voice_check,
+                               record=journal if replay_check else None)
         moved_audio = parse_native_audio_check(stdout, fresh=False) if voice_check else None
         moved_voice = parse_native_voice_check(stdout) if voice_check else None
         state = _state(stdout)
@@ -153,6 +169,26 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
                               ("after_days", moved.get("SimulationDays"))):
             if not math.isclose(state[key], _finite(expected, key), rel_tol=1e-6, abs_tol=1e-6):
                 raise RuntimeError("Native local travel diagnostic differs from the saved canonical state")
+        travel_replay = None
+        if replay_check:
+            # Internal smoke saves journal a synthetic quicksave press, so the
+            # moving-fleet journal must replay to identical checkpoints.
+            recorded = re.search(r"(?:^|\s)replay=(\{[^{}]*\})(?:\s|$)", stdout)
+            if not recorded:
+                raise RuntimeError("Native local travel record did not report its journal")
+            recorded = json.loads(recorded.group(1))
+            save.write_bytes(anchor)
+            for sidecar in work.glob(save.name + ".*"):
+                sidecar.unlink()
+            replayed = launch("--system-travel-smoke", "replayed", replay=journal)
+            match = re.search(r"(?:^|\s)replay_verified=(\{[^{}]*\})(?:\s|$)", replayed[0])
+            if not match:
+                raise RuntimeError("Native local travel replay did not report replay_verified")
+            travel_replay = json.loads(match.group(1))
+            if (travel_replay.get("commands") != recorded.get("commands") or
+                    travel_replay.get("checkpoints") != recorded.get("checkpoints")):
+                raise RuntimeError(
+                    "Native local travel replay verified a different journal than recorded")
         reload_stdout, reloaded = launch("--system-travel-reload-smoke", "paused-reload", 1920, 1080,
                                          check_voice=voice_check)
         reload_audio = parse_native_audio_check(reload_stdout, fresh=False) if voice_check else None
@@ -169,6 +205,9 @@ def validate_native_system_travel_export(folder: Path, env: dict[str, str], fixt
     result = {"nativeSystemTravelInput": True, "nativeSystemLocalTransit": True,
             "nativeSystemTravelPausedReload": True, "systemTravelCaptures": captures,
             "systemTravelDiagnostics": diagnostics}
+    if travel_replay is not None:
+        result["nativeSystemTravelReplayVerified"] = True
+        result["systemTravelReplay"] = travel_replay
     if voice_check:
         result["nativeScientistVoice"] = True
         result["nativeScientistVoiceDiagnostics"] = {

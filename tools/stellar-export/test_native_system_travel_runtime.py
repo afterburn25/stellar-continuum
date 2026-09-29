@@ -10,7 +10,7 @@ from native_system_travel_runtime import validate_native_system_travel_export
 
 
 class NativeSystemTravelExportTests(unittest.TestCase):
-    def exercise(self, fault=None, *, voice_check=False):
+    def exercise(self, fault=None, *, voice_check=False, replay_check=False):
         source = {"FormatVersion": 17, "SavedAtUtc": "source", "SimulationDays": 0,
                   "Galaxy": {"PlayerCivilizationId": 0, "Systems": [0, 1, 2],
                              "Knowledge": [{"CivilizationId": 0, "KnownSystemIds": [0],
@@ -35,6 +35,7 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                 calls.append(args)
                 marker = ""
                 voice_marker = ""
+                journal_marker = ""
                 if "--fleet-smoke" in args:
                     self.assertNotIn("--audio-check", args)
                     self.assertNotIn("--voice-check", args)
@@ -44,12 +45,27 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                     marker = " fleet=7:2:1:0.1"
                     if fault == "preparation": fleet["TransitPhase"] = 2
                 elif "--system-travel-smoke" in args or "--system-travel-reload-smoke" in args:
-                    if voice_check:
+                    if "--record" in args or "--replay" in args:
+                        self.assertNotIn("--system-travel-reload-smoke", args)
+                    if voice_check and "--replay" not in args:
                         self.assertIn("--audio-check", args)
                         self.assertIn("--voice-check", args)
                     else:
                         self.assertNotIn("--audio-check", args)
                         self.assertNotIn("--voice-check", args)
+                    if "--record" in args:
+                        journal = Path(args[args.index("--record") + 1])
+                        journal.write_text("journal", encoding="utf-8")
+                        journal_marker = (' replay={"commands":17,"checkpoints":42,'
+                                          '"file":"moved.replay"}')
+                    if "--replay" in args:
+                        self.assertIn("--replay-exit", args)
+                        journal = Path(args[args.index("--replay") + 1])
+                        self.assertTrue(journal.is_file())
+                        if fault != "replay_missing":
+                            counts = (7, 3) if fault == "replay_counts" else (17, 42)
+                            journal_marker = (' replay_verified={"commands":%d,"checkpoints":%d}'
+                                              % counts)
                     observer=payload["Galaxy"]["Knowledge"][0]
                     self.assertEqual(observer["KnownSystemIds"], [0, 1])
                     self.assertNotIn(2, observer["KnownSystemIds"])
@@ -94,23 +110,40 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                     self.assertFalse(list(save.parent.glob(save.name + ".*")),
                                      "stale save sidecars survived the recon rewrite")
                 if fault != "capture": capture.write_bytes(b"BM"+bytes(54))
-                stdout = voice_marker + "gpu_driver=vulkan systems=3 save=ok screenshot=test.bmp"+marker
+                stdout = voice_marker + "gpu_driver=vulkan systems=3 save=ok screenshot=test.bmp"+journal_marker+marker
                 return subprocess.CompletedProcess(args, 0, stdout, "")
 
             with mock.patch("native_system_travel_runtime._source_row", return_value=copy.deepcopy(source)), \
                  mock.patch("native_system_travel_runtime.subprocess.run", side_effect=run):
-                result = validate_native_system_travel_export(package, {}, Path("source"), voice_check=voice_check)
-            self.assertEqual(len(calls), 3)
+                result = validate_native_system_travel_export(package, {}, Path("source"),
+                                                              voice_check=voice_check,
+                                                              replay_check=replay_check)
+            self.assertEqual(len(calls), 4 if replay_check else 3)
             self.assertTrue(result["nativeSystemTravelInput"])
             self.assertTrue(result["nativeSystemLocalTransit"])
             self.assertTrue(result["nativeSystemTravelPausedReload"])
+            if replay_check:
+                self.assertTrue(result["nativeSystemTravelReplayVerified"])
+                self.assertEqual(result["systemTravelReplay"],
+                                 {"commands": 17, "checkpoints": 42})
+            else:
+                self.assertNotIn("nativeSystemTravelReplayVerified", result)
             if voice_check:
                 self.assertTrue(result["nativeScientistVoice"])
                 self.assertEqual(result["nativeScientistVoiceDiagnostics"]["moved"]["voice"]["played"], 1)
             else:
                 self.assertNotIn("nativeScientistVoice", result)
+            return result
 
     def test_real_input_motion_and_full_paused_reload(self): self.exercise()
+    def test_replay_check_verifies_journaled_saves(self):
+        self.exercise(replay_check=True)
+    def test_replay_check_requires_verified_line(self):
+        with self.assertRaisesRegex(RuntimeError, "replay_verified"):
+            self.exercise("replay_missing", replay_check=True)
+    def test_replay_check_rejects_count_mismatch(self):
+        with self.assertRaisesRegex(RuntimeError, "different journal"):
+            self.exercise("replay_counts", replay_check=True)
     def test_route_must_be_in_local_departure(self):
         with self.assertRaises(RuntimeError): self.exercise("preparation")
     def test_known_arrow_navigation_is_required(self):

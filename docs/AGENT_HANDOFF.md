@@ -193,9 +193,11 @@ preserve:
   gives per-event resolution for batched dispatch (scanning `just_pressed`
   after a second same-frame press re-reports the first event's action —
   the bug that masked replayed F6 as `toggle_pause`). The packaged
-  navigation validator gates this contract: `replay_check=True` records a
-  navigation journal, restores the anchor, replays it, and requires
-  `replay_verified` counts matching the recorded journal.
+  navigation and system-travel validators gate this contract:
+  `replay_check=True` records a journal on a live leg, restores the
+  anchor, replays it, and requires `replay_verified` counts matching the
+  recorded journal — travel's moving-fleet leg also covers the
+  synthetic-press path for internal saves.
 - Draw-list test hazard: elements of `DrawList::overlay`/`world` are
   vector-backed — a held `Text*`/`UiRect*` dangles after the next
   `draw={}`/render. Copy `->at`/rects before re-rendering (the
