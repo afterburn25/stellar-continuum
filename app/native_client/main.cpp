@@ -543,7 +543,7 @@ struct Options {
   if(result.video_settings_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--video-settings-check requires an isolated new-game or reload smoke.");
   if(result.general_settings_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--general-settings-check requires an isolated new-game or reload smoke.");
   if(result.voice_settings_check&&(!result.smoke_screenshot||(!result.new_game_smoke&&!result.menu_smoke)))throw std::invalid_argument("--voice-settings-check requires an isolated new-game or reload smoke.");
-  if(result.controls_settings_check&&(!result.smoke_screenshot||!result.menu_smoke||!result.load))throw std::invalid_argument("--controls-settings-check requires an isolated --load --smoke run (the rebind mapper exists only in-campaign).");
+  if(result.controls_settings_check&&(!result.smoke_screenshot||((!result.menu_smoke||!result.load)&&!result.new_game_smoke)))throw std::invalid_argument("--controls-settings-check requires an isolated --load --smoke run (in-campaign rebind list) or --new-game-smoke (startup help card).");
   if(result.audio_settings_check&&!result.audio_check)throw std::invalid_argument("--audio-settings-check requires --audio-check and an isolated new-game or reload smoke.");
   if(result.smoke_full_exploration&&!result.developer_smoke)throw std::invalid_argument("--smoke-full-exploration requires --developer-smoke; the setup checkbox only exists in developer mode.");
   if(result.profile_frames&&!result.system_smoke&&!result.galaxy_art_smoke&&!result.campaign_profile)throw std::invalid_argument("--profile-frames requires a supported native profile smoke.");
@@ -10829,6 +10829,8 @@ int main(int argc,char **argv){
         automation.voice_settings_path=settings_path.parent_path()/"voice-settings.json";
         automation.voice_settings_screenshot=sidecar_path(*options.smoke_screenshot,L"-voice-settings");
       }
+      if(options.controls_settings_check)
+        automation.controls_settings_screenshot=sidecar_path(*options.smoke_screenshot,L"-controls-settings");
       auto result=run_native_startup_entry(window,startup_config(),&automation);
       if(result.exit_requested||!result.session)throw std::runtime_error("Automated new campaign startup did not activate a session.");
       startup_evidence=std::move(result.evidence);generated_save_path=result.session->save_path();

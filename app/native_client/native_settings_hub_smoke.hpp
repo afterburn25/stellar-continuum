@@ -406,4 +406,35 @@ void check_controls_settings(NativeSettingsHub& hub,
             << ",\"restored\":true}\n";
 }
 
+// Startup-location leg: pre-campaign the hub has no input mapper, so the
+// Controls category shows the static help card — no rebind rows, Back
+// alone. Asserts the view opens, exposes zero row hitboxes, renders, and
+// backs out to the category list.
+template <class Open, class Route, class Capture>
+void check_controls_help_card(NativeSettingsHub& hub, int width, int height,
+                              std::string_view location, Open open_controls,
+                              Route route, Capture capture) {
+  const auto require = [](bool ok,
+                          std::string_view message =
+                              "Controls help-card check failed.") {
+    if (!ok) throw std::runtime_error(std::string(message));
+  };
+  using namespace stellar::native_map;
+  open_controls();
+  require(hub.controls_view(),
+          "Controls category did not open the help-card view at startup.");
+  require(!hub.control_row_bounds(0, width, height).has_value(),
+          "The mapperless Controls view exposed a rebind row hitbox.");
+  capture();
+  const auto back = HubLayout::for_viewport(width, height).back;
+  route(InputEvent{InputEventType::LeftPressed,
+                   {back.x + back.width * .5f, back.y + back.height * .5f}});
+  route(InputEvent{InputEventType::LeftReleased,
+                   {back.x + back.width * .5f, back.y + back.height * .5f}});
+  require(!hub.controls_view() && hub.visible(),
+          "Help-card Back did not return to the settings categories.");
+  std::cout << "controls_settings_check={\"location\":\"" << location
+            << "\",\"help_card\":true}\n";
+}
+
 } // namespace stellar::native_settings

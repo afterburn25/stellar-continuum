@@ -1473,9 +1473,11 @@ canonicalizes — semantics, not bytes, are asserted). Its first live run
 caught the render loop indexing `control_row_rects` past the clipped
 page (UB when the action list overflows the view); the loop now bounds
 on the page, and `NativeSettingsHub::control_row_bounds` exposes row
-hitboxes to the harness. Pause location only — the mapper binds to the
-hub once the campaign exists, so a startup run would see the static
-help card. The same fix revealed the shipped 15-row list overflows the
+hitboxes to the harness. The pause location drives the live rebind
+list; under `--new-game-smoke` the same flag runs
+`check_controls_help_card` at startup — the mapperless Controls
+category must open the static help card (zero row hitboxes) and Back
+must return to the category list. The same fix revealed the shipped 15-row list overflows the
 ~12-row page at every viewport — the three `GALAXY_PAD` axis rows were
 permanently off-page. `controls_scroll_` (shared `VirtualizedList`)
 pages the list: wheel ticks scroll (suspended while capture is armed —

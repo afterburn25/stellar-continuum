@@ -63,6 +63,9 @@ public:
   // True while a controls row waits for a trigger — pad presses must reach
   // handle() untranslated so they can be captured as bindings.
   bool capturing()const noexcept{return capture_>=0;}
+  // True while the Controls view is up — at startup (no mapper) it is the
+  // static help card, in-campaign it is the live rebind list.
+  bool controls_view()const noexcept{return visible_&&controls_;}
   int focused()const noexcept{return focus_;}
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.

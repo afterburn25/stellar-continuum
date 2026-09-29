@@ -303,8 +303,12 @@ ctest --test-dir build-native\devin -j8 --output-on-failure
   (`pause` under `--load --smoke`, `startup` under `--new-game-smoke`).
 - Controls-settings check: `--controls-settings-check` +
   `check_controls_settings` cover the hub's in-view rebind list — the
-  last settings surface without end-to-end coverage (pause location
-  only; the input mapper is wired to the hub once the campaign exists).
+  last settings surface without end-to-end coverage. The pause location
+  drives the live list (the mapper binds to the hub once the campaign
+  exists); under `--new-game-smoke` the same flag runs
+  `check_controls_help_card`, which opens the mapperless Controls
+  category, asserts the static help card exposes zero row hitboxes,
+  renders it, and backs out to the category list.
   The check snapshots every binding in both contexts, arms capture on a
   row, verifies Escape cancels without changing bindings, installs an
   unbound probe key as the primary binding, presses a sibling's bound

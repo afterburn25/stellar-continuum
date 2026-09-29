@@ -9,6 +9,7 @@
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
 #include "native_voice_settings_smoke.hpp"
+#include "native_settings_hub_smoke.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -310,6 +311,22 @@ StartupEntryResult run_native_startup_entry(Window &window,
             workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
             config.voice_settings->render(draw,width,height);
             window.draw(draw,automation->voice_settings_screenshot);
+          });
+    }
+    if (!automation->controls_settings_screenshot.empty()) {
+      if (!config.settings_hub) throw std::runtime_error("Controls settings validation requires the settings hub.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_settings::check_controls_help_card(*config.settings_hub,
+          width,height,"startup",
+          [&]{config.settings_hub->close();
+              route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[4])});},route,
+          [&]{DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.settings_hub->render(draw,width,height);
+            window.draw(draw,automation->controls_settings_screenshot);
           });
     }
     if(config.settings_hub)config.settings_hub->close();
