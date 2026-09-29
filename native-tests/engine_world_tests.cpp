@@ -705,7 +705,8 @@ int main() {
         turret.orbital_beaming = 0.65f;
         turret.orbital_beaming_tint = 0.35f;
         turret.star_kelvin = 5800.0;
-        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f, 0.4f, 3.f, 1.f};
+        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f, 0.4f, 3.f, 1.f,
+                            0.55f};
         turret.forward_scatter = 0.4f;
         turret.forward_scatter_back = -0.35f;
         turret.forward_scatter_back_mix = 0.25f;
@@ -818,7 +819,8 @@ int main() {
               "no starKelvin does not attach a component");
         const auto *ad = world3.get<AccretionDisc>(turret_e);
         check(ad != nullptr && ad->inner == 0.3f && ad->outer == 1.f &&
-                  ad->kelvin == 12000.f && ad->beaming == -0.6f,
+                  ad->kelvin == 12000.f && ad->beaming == -0.6f &&
+                  ad->shear_rate == 0.55f,
               "spawn_scene3d accretiondisc component");
         check(world3.get<AccretionDisc>(ship_e) == nullptr,
               "no accretion key does not attach a component");
@@ -920,7 +922,7 @@ int main() {
             check(rad != nullptr && rad->inner == 0.3f &&
                       rad->kelvin == 12000.f && rad->beaming == -0.6f &&
                       rad->spiral == 0.4f && rad->spiral_arms == 3.f &&
-                      rad->spiral_turns == 1.f,
+                      rad->spiral_turns == 1.f && rad->shear_rate == 0.55f,
                   "accretiondisc codec round-trips");
             const auto *rev = restored.get<EmissionVolume>(*re_turret);
             check(rev != nullptr && rev->depth == 0.3f &&
@@ -980,6 +982,7 @@ int main() {
                   out.entities[1].accretion[4] == 0.4f &&
                   out.entities[1].accretion[5] == 3.f &&
                   out.entities[1].accretion[6] == 1.f &&
+                  out.entities[1].accretion[7] == 0.55f &&
                   out.entities[1].forward_scatter == 0.4f &&
                   out.entities[1].forward_scatter_back == -0.35f &&
                   out.entities[1].forward_scatter_back_mix == 0.25f &&

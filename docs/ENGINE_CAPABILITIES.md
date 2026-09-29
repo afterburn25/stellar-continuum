@@ -188,10 +188,14 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 - **Save/performance impact:** none persisted; one gated
   `pow`+`fract` per fragment on sheared materials only; freezes on
   pause via the shared `options.time` clock.
-- **Limitations:** the ECS `AccretionDisc` component does not expose
-  `shear_rate` — entity-document schema work if an author needs it.
-  The `options.time` 512 s wrap produces a sub-frame snap in the
-  scrolled phase (same convention as every animated term).
+- **Limitations:** the `options.time` 512 s wrap produces a sub-frame
+  snap in the scrolled phase (same convention as every animated term).
+- **Follow-up (2026-09-29):** the ECS `AccretionDisc` component and
+  the `accretion` document key expose `shear_rate` as an appended
+  eighth float ([-8,8]; 4/7/8-entry payloads all decode), so
+  document-authored discs carry Keplerian shear without hand-built
+  materials — `runtime_host` passes it through
+  `accretion_disc_material3d`'s trailing parameter.
 
 ## RenderOptions3D post-tonemap color matrix (2026-09-28)
 

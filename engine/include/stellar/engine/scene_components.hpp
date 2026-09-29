@@ -247,6 +247,10 @@ struct AccretionDisc {
   // with the uniform-disc defaults): depth [0,1], integral m-mode
   // 1..4, log-spiral winding [-4,4] trailing-positive.
   float spiral{0.f}, spiral_arms{0.f}, spiral_turns{0.f};
+  // Keplerian shear tail (appended — older 28-byte payloads decode with
+  // a rigid disc): rad/s at the inner edge [-8,8], scrolling azimuthal V
+  // by rho^(-3/2) through accretion_disc_material3d's trailing arg.
+  float shear_rate{0.f};
 };
 // Image-shaped emission volume (nebula, plasma plume, accretion glow) —
 // the component counterpart of the entity document's `volume` block.

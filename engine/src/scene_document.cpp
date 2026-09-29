@@ -500,11 +500,16 @@ std::string Scene3dDocument::to_json() const {
       item["forwardScatterHue"] = e.forward_scatter_hue;
     if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
     if (e.accretion[2] != 0.f) {
-      // Emit the spiral tail only when authored so existing documents
-      // keep their four-entry accession payload.
-      if (e.accretion[4] != 0.f || e.accretion[5] != 0.f ||
-          e.accretion[6] != 0.f)
+      // Emit the shortest payload the authored tail needs so older
+      // readers keep their four/seven-entry accession shapes.
+      if (e.accretion[7] != 0.f)
         item["accretion"] = e.accretion;
+      else if (e.accretion[4] != 0.f || e.accretion[5] != 0.f ||
+               e.accretion[6] != 0.f)
+        item["accretion"] = {e.accretion[0], e.accretion[1],
+                             e.accretion[2], e.accretion[3],
+                             e.accretion[4], e.accretion[5],
+                             e.accretion[6]};
       else
         item["accretion"] = {e.accretion[0], e.accretion[1],
                              e.accretion[2], e.accretion[3]};
@@ -810,10 +815,11 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
         return fail("starKelvin must be in [100,100000]");
       if (item.contains("accretion")) {
         const auto &ac = item.at("accretion");
-        if (!ac.is_array() || (ac.size() != 4 && ac.size() != 7))
+        if (!ac.is_array() ||
+            (ac.size() != 4 && ac.size() != 7 && ac.size() != 8))
           return fail(
               "accretion must be [inner,outer,kelvin,beaming] with an "
-              "optional [spiral,arms,turns] tail");
+              "optional [spiral,arms,turns[,shear]] tail");
         for (std::size_t i = 0; i < ac.size(); ++i)
           e.accretion[i] = ac[i].get<float>();
         if (!(e.accretion[0] > 0.f && e.accretion[1] > e.accretion[0]))
@@ -832,6 +838,8 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
                       "spiral is set");
         if (!(std::abs(e.accretion[6]) <= 4.f))
           return fail("accretion spiral turns must be in [-4,4]");
+        if (!(std::abs(e.accretion[7]) <= 8.f))
+          return fail("accretion shear must be in [-8,8]");
       }
       if (item.contains("volume")) {
         const auto &vol = item.at("volume");

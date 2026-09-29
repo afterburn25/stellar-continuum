@@ -595,6 +595,7 @@ void register_scene_components(World &world) {
         put_f32(out, m.spiral);
         put_f32(out, m.spiral_arms);
         put_f32(out, m.spiral_turns);
+        put_f32(out, m.shear_rate);
         return out;
       },
       [](const std::vector<std::uint8_t> &b) {
@@ -614,6 +615,7 @@ void register_scene_components(World &world) {
         if (b.size() - at >= 4) m.spiral = f();
         if (b.size() - at >= 4) m.spiral_arms = f();
         if (b.size() - at >= 4) m.spiral_turns = f();
+        if (b.size() - at >= 4) m.shear_rate = f();
         return m;
       });
   // f32 depth/density/seed/scatter + i32 steps + f32 flow/distort —
@@ -1066,7 +1068,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, AccretionDisc{s.accretion[0], s.accretion[1],
                                       s.accretion[2], s.accretion[3],
                                       s.accretion[4], s.accretion[5],
-                                      s.accretion[6]});
+                                      s.accretion[6], s.accretion[7]});
     // The volume's emission image is the entity texture — without one
     // the component would export a `volume` block that fails to parse.
     if (s.volume_depth > 0.f && !s.texture.empty())
@@ -1207,7 +1209,8 @@ Scene3dDocument scene3d_from_world(const World &world) {
       s.star_kelvin = sp->kelvin;
     if (const auto *ad = world.get<AccretionDisc>(entity))
       s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming,
-                     ad->spiral, ad->spiral_arms, ad->spiral_turns};
+                     ad->spiral, ad->spiral_arms, ad->spiral_turns,
+                     ad->shear_rate};
     // An orphan volume (no TextureRef) would emit a `volume` block the
     // parser rejects — skip it rather than write an unloadable document.
     if (const auto *ev = world.get<EmissionVolume>(entity);

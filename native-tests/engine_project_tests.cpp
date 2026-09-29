@@ -450,7 +450,7 @@ int main() {
     cube.orbital_beaming = 0.7f;
     cube.orbital_beaming_tint = 0.4f;
     cube.star_kelvin = 3200.0;
-    cube.accretion = {0.4f, 1.f, 9000.f, 0.8f, 0.5f, 2.f, 1.25f};
+    cube.accretion = {0.4f, 1.f, 9000.f, 0.8f, 0.5f, 2.f, 1.25f, 0.35f};
     cube.forward_scatter = 0.5f;
     cube.forward_scatter_back = -0.35f;
     cube.forward_scatter_back_mix = 0.3f;
@@ -618,6 +618,7 @@ int main() {
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
                 rc.accretion[3] == 0.8f && rc.accretion[4] == 0.5f &&
                 rc.accretion[5] == 2.f && rc.accretion[6] == 1.25f &&
+                rc.accretion[7] == 0.35f &&
                 rc.forward_scatter == 0.5f &&
                 rc.forward_scatter_back == -0.35f &&
                 rc.forward_scatter_back_mix == 0.3f &&
@@ -1007,6 +1008,14 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.6,2,1.25]}]})")
               .has_value(),
           "scene3d accretion preset rejected a legal spiral disc");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.6,2,1.25,0.4]}]})")
+              .has_value(),
+          "scene3d accretion preset rejected a legal sheared disc");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.6,2,1.25,9]}]})")
+              .has_value(),
+          "scene3d accretion shear above 8 rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"forwardScatter":1.4}]})")
               .has_value(),

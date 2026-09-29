@@ -292,9 +292,11 @@ struct Scene3dEntity {
   // an "annulus:i,o" mesh spec at matching radii. Optional tail
   // `[spiral,arms,turns]` bakes grand-design density-wave arms: spiral
   // depth [0,1], integral m-mode arms 1..4, log-spiral winding [-4,4]
-  // (trailing positive). Documents emitting only the four base entries
-  // keep the uniform disc.
-  std::array<float,7> accretion{0.f,0.f,0.f,0.f,0.f,0.f,0.f};
+  // (trailing positive). An eighth entry appends `shear` — Keplerian
+  // differential rotation, rad/s at the inner edge [-8,8] scrolling
+  // azimuthally at rho^(-3/2). Documents emitting only the four base
+  // entries keep the uniform disc; a seven-entry tail omits shear.
+  std::array<float,8> accretion{0.f,0.f,0.f,0.f,0.f,0.f,0.f,0.f};
   // Image-shaped emission volume (nebula, plasma plume): `volume` is a
   // {depth,density,seed,steps,scatter} block; depth (0,0.75] enables the
   // front-to-back march inside the closed proxy, steps bounds the
