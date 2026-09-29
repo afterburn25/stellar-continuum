@@ -1716,7 +1716,7 @@ class NativeCampaign final {
     click(find(belts_focus));capture_planet(L"-belts-cracked-close");
     const auto field_save=capture_developer_campaign_json(session_->frame().runtime(),{session_->frame().clock().simulation_days(),STELLAR_GAME_VERSION,"2050-03-21T00:00:00Z"});
     if(field_save.find("SmallBodyFields")==std::string::npos||field_save.find("CrackedWorld")==std::string::npos)throw std::runtime_error("Spawned small bodies absent from saved payload.");
-    session_->request_save();
+    request_internal_save();
     const auto save_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
     while(session_->notice().kind!=SessionNoticeKind::Saved){
       route({{InputEventType::PointerMove,{0,0}}});
@@ -4589,7 +4589,7 @@ class NativeCampaign final {
       ready.drawable_width = width;
       ready.drawable_height = height;
       (void)update(ready, width, height, 0., true);
-      session_->request_save();
+      request_internal_save();
       return;
     }
     if (fresh_progression_before_days_ != 0. || owned_fleets() != 0)
@@ -4660,7 +4660,7 @@ class NativeCampaign final {
     if (!update(ready, width, height, 0., true))
       throw std::runtime_error(
           "Fresh progression could not establish its save boundary.");
-    session_->request_save();
+    request_internal_save();
   }
   [[nodiscard]] std::string fresh_progression_smoke_status() const {
     std::ostringstream out;
@@ -5170,7 +5170,7 @@ class NativeCampaign final {
     if (!update(ready, width, height, 0., true))
       throw std::runtime_error(
           "First exploration could not establish its save boundary.");
-    session_->request_save();
+    request_internal_save();
   }
   [[nodiscard]] std::string first_exploration_smoke_status() const {
     const auto mode =
@@ -5429,7 +5429,7 @@ class NativeCampaign final {
         {"read_only", true}, {"feedback", !paused}, {"roundtrip", true}}.dump();
     InputSnapshot ready; ready.drawable_width = width; ready.drawable_height = height;
     if (!update(ready, width, height, 0., true)) throw std::runtime_error("Founded save boundary failed.");
-    session_->request_save();
+    request_internal_save();
   }
   [[nodiscard]] const std::string &settlement_completion_smoke_status() const { return settlement_completion_proof_; }
 
@@ -5578,7 +5578,7 @@ class NativeCampaign final {
     click({restored_point.x,restored_point.y});wait_art();stable();
     InputSnapshot ready;ready.drawable_width=width;ready.drawable_height=height;
     if(!update(ready,width,height,0.,true))throw std::runtime_error("Settlement review save boundary failed.");
-    session_->request_save();
+    request_internal_save();
   }
   [[nodiscard]] const std::string &settlement_preparation_smoke_status()const{return preparation_evidence_;}
 
@@ -6211,7 +6211,7 @@ class NativeCampaign final {
     if (!update(ready, width, height, 0., true))
       throw std::runtime_error(
           "First survey could not establish its save boundary.");
-    session_->request_save();
+    request_internal_save();
   }
   [[nodiscard]] std::string first_survey_smoke_status() const {
     const auto mode =
@@ -6263,17 +6263,37 @@ class NativeCampaign final {
     return out.str();
   }
 
+  // Save requests that do not flow through recorded input (smoke save
+  // boundaries, pending drains, profile saves) journal a synthetic press of
+  // the active quicksave binding so a replay dispatches the real save path
+  // and reproduces the checkpoint. Input-driven saves already journal their
+  // own command, so their request sites must not use this helper.
+  void request_internal_save() {
+    if (replay_ && replay_->recorder) {
+      const auto bindings = input_mapper_.bindings("quicksave");
+      const auto press = std::ranges::find_if(
+          bindings, [](const stellar::engine::InputBinding &binding) {
+            return binding.kind ==
+                   stellar::engine::RawInputEvent::Kind::KeyPress;
+          });
+      if (press != bindings.end())
+        replay_->recorder->record(replay_tick(), "key_press",
+                                  std::to_string(press->code));
+    }
+    session_->request_save();
+  }
+
   void request_smoke_save() {
     if (smoke_settlement_mode_) {
       session_->frame().clock().set_speed(StrategicSpeed::Paused);
       capture_settlement_smoke_state();
     }
-    session_->request_save();
+    request_internal_save();
   }
   [[nodiscard]] double campaign_profile_days()const{return session_->frame().clock().simulation_days();}
   [[nodiscard]] StrategicSpeed campaign_profile_speed()const{return session_->frame().clock().speed();}
   [[nodiscard]] SessionNoticeKind campaign_profile_notice()const{return session_->notice().kind;}
-  void campaign_profile_request_save(){session_->request_save();}
+  void campaign_profile_request_save(){request_internal_save();}
   void prepare_campaign_profile(int width,int height){
     const auto click=[&](UiRect bounds){const auto point=center(bounds);InputSnapshot input;input.drawable_width=width;input.drawable_height=height;input.pointer=point;input.events={{InputEventType::LeftPressed,point},{InputEventType::LeftReleased,point}};if(!update(input,width,height,0.,false))throw std::runtime_error("Campaign profile UI input closed the campaign.");};
     const auto layout=NativeUiLayout::for_viewport(width,height);
@@ -7367,7 +7387,7 @@ class NativeCampaign final {
       }
       if(battle_workspace_.visible()&&!menu_){
         if(event.type==InputEventType::KeyPressed&&event.key==0x4000003fu&&
-           input.focused&&input.renderable())session_->request_save();
+           input.focused&&input.renderable())request_internal_save();
         else{
           const int focus_before=battle_workspace_.focus();
           execute_battle(battle_workspace_.handle(event,width,height));
@@ -7907,7 +7927,7 @@ class NativeCampaign final {
       system_refresh_elapsed_+=elapsed;
       refresh_system(false);
       if(std::ranges::any_of(frame_result.completed_substeps,[](double step){return step>0.;}))refresh_system_travel(true);
-      if(smoke_save_pending_){smoke_save_pending_=false;session_->request_save();}
+      if(smoke_save_pending_){smoke_save_pending_=false;request_internal_save();}
     }
     supply_refresh_elapsed_+=std::max(0.,elapsed);
     roster_refresh_elapsed_+=std::max(0.,elapsed);
