@@ -98,7 +98,8 @@ small-body lighting/LOD fade, quality propagation to every view, accessibility
 gates (reduce-motion/reduce-flashing/high-contrast) on 3D scenes, and the
 DebugView3D diagnostics panel. Per-commit record and the adopted-vs-declined
 engine-API inventory live in [UI_UX_OVERHAUL_PLAN.md](UI_UX_OVERHAUL_PLAN.md);
-open renderer/core needs stay filed in
+all five renderer requests are delivered — the remaining open items are
+core-lane projections filed in
 [GAME_VISUAL_ENGINE_REQUESTS.md](GAME_VISUAL_ENGINE_REQUESTS.md). Suite: 327/327;
 live smokes green at every quality tier and both density extremes.
 
@@ -114,14 +115,23 @@ preserve:
   can starve a full-cap request (this was the `--developer-smoke` `sky=0`
   failure). `artwork_status()` reports `queue=<jobs>/<bytes>` for diagnosis.
 - The frame-level 3D render-target budget
-  (`maximum_scene3d_target_bytes`, 128 MiB) is enforced by staged emission:
-  `scene_content` renders content views first, then commits the staged
-  backdrop in 3D only when the whole frame fits; otherwise dome + nebula
-  volume re-emit through authored 2D paths (flat `Image` with
-  crop/roll/mirror/blend/tint for the dome, composite sprite for the
-  volume). At 2560×1440 a fullscreen HDR target is ~59 MiB, so the gate
-  engages there. Smoke assertions must accept the flat fallback only when
-  the budget genuinely requires it.
+  (`maximum_scene3d_target_bytes`, 128 MiB) is enforced by staged emission
+  plus `Scene3DView::render_scale` ([0.25,1]): `scene_content` renders
+  content views first, then `fit_backdrop_within_budget` shrinks the
+  staged backdrop's view targets (ceil(destination*scale) allocation,
+  linear upscale on composite) so the dome/nebula keep their
+  volumetric/warped shading down to quarter-scale; the authored 2D paths
+  run only when even .25 cannot fit. `scene()` then applies a final
+  multiplicative clamp over every view so developer panels appended after
+  the per-layer gates cannot push a frame over the cap — `prepare()`
+  throwing means a contract bug, not a load state. At 2560×1440 a
+  fullscreen HDR target is ~59 MiB, so scaling engages there. Keep the
+  game's accounting equal to the renderer's: `scene3d_view_target_bytes`
+  is the shared formula, `Window::scene3d_target_bytes` uses the live
+  device's bytes-per-pixel, and `Scene3DStatistics::renderer_active`
+  gates the bpp mirror so pre-first-3D-draw stats cannot under-count
+  (the 2560×1440 dev-smoke throw). Smoke assertions must accept the flat
+  fallback only when quarter-scale genuinely cannot fit.
 - Fixture hazards for smoke runs: stale `.bak`/`.integrity` sidecars beside
   `--save-path` make the loader silently recover the previous save — delete
   them when swapping fixtures; saves authored before `GenerationMetadata`
