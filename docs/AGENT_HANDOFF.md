@@ -142,7 +142,11 @@ preserve:
   fixture's vessels across runs; "bound no patrol_corvette art" is the tell),
   and `--system-smoke` needs a save whose player civ knows Sol (a generated
   new-game save usually won't — the smoke now fails fast with "observer does
-  not know Sol").
+  not know Sol"). For fixture-authoring smokes prefer the packaged
+  `validate_native_*_export` validators (`tools/stellar-export`) — e.g.
+  `validate_native_diplomacy_export(folder, env,
+  native-tests/fixtures/player-campaign-json.json)` authors its proposal
+  fixture in a temp dir per run rather than consuming a checked-in save.
 - `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
   verified end-to-end including the divergence negative path (section-
   localizing failure + leaf diff); the dated receipt lists every flag-legal
