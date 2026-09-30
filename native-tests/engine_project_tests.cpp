@@ -689,9 +689,9 @@ int main() {
             "unset material fields keep neutral defaults");
       const auto path = root / "editor" / "scene3d.json";
       scene.save(path);
-      const auto loaded = engine::Scene3dDocument::load(path);
-      check(loaded.has_value() && loaded->entities.size() == 2 &&
-                loaded->entities[1].mesh == "models/ship.obj",
+      const auto scene_loaded = engine::Scene3dDocument::load(path);
+      check(scene_loaded.has_value() && scene_loaded->entities.size() == 2 &&
+                scene_loaded->entities[1].mesh == "models/ship.obj",
             "scene3d save/load round-trips");
     }
     check(!engine::Scene3dDocument::from_json("{not json").has_value(),

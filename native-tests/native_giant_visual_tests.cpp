@@ -15,7 +15,7 @@ int main(int argc,char** argv)try{
   const int lod=area.width<640?256:1024;
   const auto maps=load_material(root/"assets/visual",a,lod);std::vector<MeshInstance3D> objects;append_instances(objects,a,maps,{},1,lod,0,illumination,view);
   Camera3D camera;camera.position={0,0,8};camera.projection=Projection3D::Perspective;camera.near_plane=.1f;camera.far_plane=20;
-  camera.vertical_fov_radians=2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.16/8);
+  camera.vertical_fov_radians=static_cast<float>(2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.16/8));
   draw.overlay.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects)),area});
   stellar::native_menu_style::text(draw,{area.x+3,area.y+area.height-31,area.width-6,28},caption,16,stellar::native_menu_style::ink,TextAlign::Center);
  };
