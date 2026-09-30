@@ -48,6 +48,24 @@ The adoption frontier is not authority migration — it is:
    `SimulationExecutor` cadence inside the heavy coordinator phases. This is
    scheduling, not a second authority, so the parity oracle pattern already
    established (`campaign_coordinator_parity`) carries over directly.
+   **Entry-point sketch** (scoped 2026-10-08): the 12 phase tasks run on a
+   single coordinator-owned executor with per-key tier demotion, dirty/event
+   wakeups and domains already available; per-entity cadence has two
+   structural options —
+   (a) *phase-internal cadence*: a phase keeps a per-entity next-due
+   accumulator and integrates each entity only when due, consuming the
+   accumulated span — the same coarse-integration contract as phase
+   demotion, moved inside the entity loop. No executor or ordering change;
+   divergence risk is entity-to-entity interaction between runs, so
+   adoption is per-entity-class and gated on a seeded parity oracle
+   (candidate first targets: `exploration` and `freight` entity loops —
+   distant dormant fleets are the clearest wasted work);
+   (b) *executor-level entity tasks*: register one task per entity in a
+   shared domain — uniform tier/wakeup handling but explodes task count
+   (50k-system galaxies) and replaces intra-phase ordering with domain
+   ordering, a materially larger contract change. Option (a) is the
+   right-sized first move; (b) only if cadence bookkeeping itself becomes
+   the hot path.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). Similar cheap wins may exist on the logistics
