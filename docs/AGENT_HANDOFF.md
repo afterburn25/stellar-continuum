@@ -19,7 +19,13 @@ working build. Engine `0.1.64`; game `0.1.14.2-dev`; source of truth:
 [`export/runtime-config.json`](../export/runtime-config.json). [Status update
 2026-09-30: the integration lane is now
 `engine/space-strategy-simulation-specialization` — clone/PR base — and the
-active workstream branch is `game/ui-visual-overhaul` (PR #338).]
+active workstream branch is `game/ui-visual-overhaul` (PR #338). CI status
+2026-09-30: both PR checks green at `c049755e` — `validate` (33-step
+asset/research/Godot-fixture battery) and `windows-export`
+(`windows-benchmark` export + full `windows-native-preview` build + complete
+328-test CTest; GPU-init tests skip by `SKIP_REGULAR_EXPRESSION` on the
+Vulkan-less runner — GPU coverage remains local/packaged). PR #338 open,
+mergeable, clean.]
 
 > **`work/foundation-1-30-codex-integration`** merges the
 > `engine/foundation-expansion-1-30` engine work (save history, replay,
