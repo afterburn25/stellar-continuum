@@ -94,9 +94,14 @@ std::error_code windows_error(DWORD value = GetLastError()) {
 
 // A destination another process just published or is scanning can be
 // transiently locked (antivirus, indexer); these errors usually clear quickly.
+// ERROR_UNABLE_TO_REMOVE_REPLACED is ReplaceFileW's destination-lock failure —
+// the replacement has not committed, so retrying it is safe (the
+// ERROR_UNABLE_TO_MOVE_REPLACEMENT* pair stays excluded: at that stage the
+// outcome is ambiguous and a retry could double-commit).
 bool transient_lock_error(DWORD error) {
   return error == ERROR_ACCESS_DENIED || error == ERROR_SHARING_VIOLATION ||
-         error == ERROR_LOCK_VIOLATION;
+         error == ERROR_LOCK_VIOLATION ||
+         error == ERROR_UNABLE_TO_REMOVE_REPLACED;
 }
 
 constexpr int kTransientLockAttempts = 50;
