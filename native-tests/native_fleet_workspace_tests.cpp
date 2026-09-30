@@ -166,6 +166,18 @@ int main() try {
     fleet.cargo_material_capacity = 40.;
     fleet.cargo_materials = 12.5;
     fleet.embarked_population_millions = 2.5;
+    NativeFleetMember member;
+    member.vessel_id = 10;
+    member.name = "ISS Wayfinder Prime";
+    member.design_name = "Pathfinder-class";
+    member.is_flagship = true;
+    member.has_vessel_state = true;
+    member.hull_fraction = .62f;
+    member.engine_fraction = .75f;
+    member.battles_fought = 3;
+    member.confirmed_kills = 1;
+    fleet.members = {member};
+    fleet.vessel_count = 1;
     NativeFleetWorkspace workspace{FleetWorkspacePresentation::SelectedCommands};
     workspace.set_view(std::move(view));
     DrawList draw;
@@ -175,6 +187,11 @@ int main() try {
             has_text(draw, "Cargo") && has_text(draw, "12.5 / 40.0") &&
             has_text(draw, "Embarked") && has_text(draw, "2.5M"),
         "Fleet composition rows did not surface design, condition or payload.");
+    // Member roster rides with the identity header, so it must render even
+    // on the cramped 720p card where telemetry extras clip.
+    require(has_text(draw, "Vessel") &&
+            has_text(draw, "ISS Wayfinder Prime (Flagship) · Hull 62%"),
+        "Member-vessel roster did not surface identity, flags or hull.");
   }
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},

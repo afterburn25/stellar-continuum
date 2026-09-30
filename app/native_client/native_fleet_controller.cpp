@@ -9,6 +9,7 @@
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
+#include <stellar/core/fleet_composition.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/industry_allocation.hpp>
 #include <stellar/core/ship_designs.hpp>
@@ -256,6 +257,37 @@ NativeFleetMapView NativeFleetController::build(
     if (fleet.tactical_vessel) {
       item.has_vessel_state = true;
       item.hull_integrity = fleet.tactical_vessel->hull_fraction;
+    }
+    // Member roster from the canonical composition projection — design names
+    // resolve at this presentation boundary; nothing else is recomputed.
+    const auto composition = fleet_composition(fleet);
+    item.vessel_count = composition.vessel_count;
+    for (const auto &member : composition.members) {
+      NativeFleetMember row;
+      row.vessel_id = member.vessel_id;
+      row.name = member.name;
+      if (member.design_id)
+        if (const auto *design = find_ship_design(*member.design_id))
+          row.design_name =
+              stellar::native_data::ship_design_name(locale_, *design);
+      row.is_flagship = member.is_flagship;
+      row.is_carrier = member.is_carrier;
+      row.is_interdictor = member.is_interdictor;
+      row.is_story_ship = member.is_story_ship;
+      row.hull_fraction = member.hull_fraction;
+      row.engine_fraction = member.engine_fraction;
+      row.sensor_fraction = member.sensor_fraction;
+      row.warp_drive_fraction = member.warp_drive_fraction;
+      row.reactor_fraction = member.reactor_fraction;
+      row.battles_fought = member.battles_fought;
+      row.confirmed_kills = member.confirmed_kills;
+      row.destroyed = member.destroyed;
+      row.escaped = member.escaped;
+      row.has_vessel_state = member.has_vessel_state;
+      row.embarked_population_millions = member.embarked_population_millions;
+      row.cargo_materials = member.cargo_materials;
+      row.cargo_material_capacity = member.cargo_material_capacity;
+      item.members.push_back(std::move(row));
     }
     item.owner_civilization_id = fleet.civilization_id;
     item.foreign_inspection = fleet.civilization_id != player.player_id;

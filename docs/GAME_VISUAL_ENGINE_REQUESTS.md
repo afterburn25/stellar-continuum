@@ -39,27 +39,36 @@ FALLBACK IF NOT AVAILABLE:
 
 ## Open requests
 
-### REQUEST: Per-vessel fleet composition projection
-Status:        OPEN
-Requested:    2026-09-25
-WHY NEEDED:
-  The fleet workspace and controlled-assets navigator can only describe a
-  fleet as one vessel (design name, embarked population, hull integrity).
-  Players cannot see per-ship breakdowns inside battle groups, so fleet UI
-  cannot answer "what is in this fleet" beyond the lead vessel.
-CURRENT GAME SCREEN:
-  app/native_client/native_fleet_workspace.cpp detail card;
-  app/native_client/native_controlled_assets.cpp fleet rows.
-DESIRED PUBLIC API:
-  Core projection: `FleetComposition` — a per-fleet list of member vessels
-  (design id/name, hull integrity, embarked population/cargo) exposed
-  through the existing fleet view-model, FoW/observer-sealed.
-PERFORMANCE CONSTRAINT:
-  Deterministic; save-load compatible; constant per-fleet size.
-FALLBACK IF NOT AVAILABLE:
-  Detail card keeps showing lead-vessel design + embarked totals only.
+(none — all filed requests are delivered)
 
 ## Delivered
+
+### REQUEST: Per-vessel fleet composition projection
+Status:        DELIVERED
+Requested:    2026-09-25
+Delivered:    on `game/ui-visual-overhaul` —
+`core/fleet_composition` adds `FleetComposition`/`FleetCompositionMember` —
+a read-only projection over authoritative `FleetState` that emits one
+member record per commissioned vessel in deterministic vessel-id order:
+stable tactical `vessel_id` (the same identity campaign combat bindings
+use), resolved `design_id`, `combat_profile_id`, role flags (flagship,
+carrier, interdictor, story), subsystem/hull fractions and battle record
+from the retained `MassiveVesselState` when present (`has_vessel_state`),
+plus the fleet's embarked population/cargo attributed per member.
+Observer sealing stays at the existing boundary — the controller only
+projects fleets the viewer already owns or observes, so hidden foreign
+composition cannot leak. `native_fleet_controller` maps members onto
+`NativeOwnFleet::members`/`vessel_count` with authored design names;
+`native_fleet_workspace` renders the roster as identity rows on the
+detail card (name · design · flag tags · per-member hull), and
+`native_controlled_assets` derives its fleet-row ship count from the
+projection via the localization plural convention instead of a literal.
+Tests: `fleet_composition` pins the core projection against a
+fixture-free campaign state; `native_fleet_controller` verifies
+design-name resolution, observer sealing, and that the view-model does
+not mutate authoritative state; `native_fleet_workspace` renders the
+roster row; `native_controlled_assets` covers the count text;
+`localization` audits the new keys in both shipped catalogs.
 
 ### REQUEST: Interstellar logistics route graph
 Status:        DELIVERED

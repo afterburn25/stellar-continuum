@@ -190,7 +190,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/industry_allocation.cpp core/src/strategic_intent.cpp core/src/strategic_planning.cpp core/src/strategic_input_support.cpp core/src/strategic_input_builder.cpp core/src/strategic_runtime.cpp core/src/logistics_routing.cpp core/src/logistics_views.cpp
   core/src/sovereign_currency.cpp core/src/construction_state.cpp core/src/surface_construction.cpp
   core/src/construction_projects.cpp core/src/ship_designs.cpp
-  core/src/fleet_state.cpp core/src/combat_state.cpp core/src/shipyard_state.cpp
+  core/src/fleet_state.cpp core/src/fleet_composition.cpp core/src/combat_state.cpp core/src/shipyard_state.cpp
   core/src/fleet_seeding.cpp core/src/shipbuilding.cpp core/src/fleet_transit.cpp
   core/src/lane_network.cpp core/src/fleet_reach.cpp core/src/knowledge.cpp core/src/legacy_technology.cpp core/src/fresh_campaign.cpp core/src/persistable_fresh_campaign.cpp core/src/legacy_research.cpp core/src/freight.cpp core/src/settlement_knowledge.cpp core/src/settlement_planning.cpp
   core/src/civilian_recovery.cpp core/src/colonization_runtime.cpp core/src/survey_operations.cpp core/src/exploration_planning.cpp core/src/exploration_advance.cpp
@@ -627,6 +627,9 @@ if(BUILD_TESTING)
   target_link_libraries(stellar_legacy_research_tests PRIVATE stellar_core stellar_json)
   add_test(NAME legacy_research_parity COMMAND stellar_legacy_research_tests "${CMAKE_SOURCE_DIR}/native-tests/fixtures/legacy-research.json")
   set_tests_properties(legacy_research_parity PROPERTIES TIMEOUT 60)
+  add_executable(stellar_fleet_composition_tests native-tests/fleet_composition_tests.cpp)
+  target_link_libraries(stellar_fleet_composition_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME fleet_composition COMMAND stellar_fleet_composition_tests)
   add_executable(stellar_fleet_state_tests native-tests/fleet_state_tests.cpp)
   target_link_libraries(stellar_fleet_state_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fleet_state_parity COMMAND stellar_fleet_state_tests

@@ -168,12 +168,13 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
                         46.f * scale};
   const auto detail_y = list.y + list.height + 10.f * scale;
   const auto detail_space = std::max(0.f, feedback.y - detail_y - 6.f * scale);
-  // Composition rows let the telemetry stack reach eleven lines — the
-  // taller cap only applies when the route preview keeps its ~100s
-  // reserve; compact viewports keep the legacy seven-line budget.
+  // Composition rows let the telemetry stack reach twelve lines — member
+  // roster + telemetry + payload extras — before the route preview yields;
+  // the taller cap only applies when the route preview keeps its ~100s
+  // reserve; compact viewports keep the legacy budget plus the roster row.
   const auto fleet_height = detail_space > 300.f * scale
-      ? std::min(215.f * scale, detail_space - 106.f * scale)
-      : std::min(180.f * scale, std::max(0.f,detail_space - 78.f * scale));
+      ? std::min(233.f * scale, detail_space - 106.f * scale)
+      : std::min(196.f * scale, std::max(0.f,detail_space - 78.f * scale));
   const UiRect details{inner_x, detail_y, inner_width, fleet_height};
   const UiRect route{inner_x, detail_y + fleet_height + 6.f * scale,
                      inner_width,
@@ -1057,6 +1058,37 @@ void NativeFleetWorkspace::render(
                        stat_clip);
       row_y += row_height;
     };
+    // Member-vessel roster from the canonical composition projection — the
+    // per-ship breakdown this card previously reduced to one hull scalar.
+    // Identity rows ride with the header so cramped viewports clip telemetry
+    // extras first, not the roster.
+    for (const auto &member : fleet->members) {
+      std::string line = member.name;
+      if (!member.design_name.empty() &&
+          member.design_name != fleet->design_name)
+        line += " · " + member.design_name;
+      std::string flags;
+      const auto tag = [&](bool on, std::string_view key,
+                           std::string_view fallback) {
+        if (!on) return;
+        if (!flags.empty()) flags += ", ";
+        flags += tr(key, fallback);
+      };
+      tag(member.is_flagship, "FLEET_FLAG_FLAGSHIP", "Flagship");
+      tag(member.is_carrier, "FLEET_FLAG_CARRIER", "Carrier");
+      tag(member.is_interdictor, "FLEET_FLAG_INTERDICTOR", "Interdictor");
+      tag(member.is_story_ship, "FLEET_FLAG_STORY", "Story ship");
+      if (member.destroyed)
+        tag(true, "FLEET_MEMBER_STATUS_DESTROYED", "Destroyed");
+      if (member.escaped)
+        tag(true, "FLEET_MEMBER_STATUS_ESCAPED", "Escaped");
+      if (!flags.empty()) line += " (" + flags + ")";
+      if (member.has_vessel_state)
+        line += trf("FLEET_MEMBER_HULL",
+                    {number(member.hull_fraction * 100., 0)},
+                    " · Hull {0}%");
+      stat(tr("FLEET_STAT_VESSEL", "Vessel"), line);
+    }
     // Core telemetry first; composition extras last so they are the first
     // clipped when the card is cramped.
     if (!fleet->design_name.empty())
