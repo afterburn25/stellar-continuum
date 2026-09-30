@@ -3,7 +3,7 @@ on:
   push:
     branches: ["engine/**", "cpp/**", "integration/**"]
   pull_request:
-    branches: [integration, main, "engine/stellar-engine-migration", "cpp/**"]
+    branches: [integration, main, "engine/**", "cpp/**"]
     paths:
       - "engine/**"
       - "core/**"
