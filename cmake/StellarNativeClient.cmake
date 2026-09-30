@@ -61,6 +61,8 @@ if(BUILD_TESTING)
     string(TOLOWER "${tool}" tool_lower)
     add_test(NAME "engine_shell_tool_${tool_lower}"
       COMMAND stellar-engine --tool "${tool}" --frames 20)
+    set_tests_properties("engine_shell_tool_${tool_lower}" PROPERTIES
+      SKIP_REGULAR_EXPRESSION "GPU device creation failed")
   endforeach()
 endif()
 
