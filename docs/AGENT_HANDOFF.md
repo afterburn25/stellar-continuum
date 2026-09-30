@@ -16,7 +16,10 @@ Snapshot: 2026-09-20. Repository: `afterburn25/stellar-continuum`.
 Continue from **`cpp/codex-native-architecture-integration`**, not `main` or an
 old research/editor branch. The default branch does not represent this native
 working build. Engine `0.1.64`; game `0.1.14.2-dev`; source of truth:
-[`export/runtime-config.json`](../export/runtime-config.json).
+[`export/runtime-config.json`](../export/runtime-config.json). [Status update
+2026-09-30: the integration lane is now
+`engine/space-strategy-simulation-specialization` — clone/PR base — and the
+active workstream branch is `game/ui-visual-overhaul` (PR #338).]
 
 > **`work/foundation-1-30-codex-integration`** merges the
 > `engine/foundation-expansion-1-30` engine work (save history, replay,
@@ -46,7 +49,7 @@ not require a shader SDK; regeneration requires the pinned shader toolchain.
 In an **x64 Native Tools Command Prompt for VS 2022**:
 
 ```bat
-git clone --branch cpp/codex-native-architecture-integration https://github.com/afterburn25/stellar-continuum.git
+git clone --branch engine/space-strategy-simulation-specialization https://github.com/afterburn25/stellar-continuum.git
 cd stellar-continuum
 git lfs pull
 cmake --preset windows-native-preview
