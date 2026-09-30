@@ -81,28 +81,36 @@ FALLBACK IF NOT AVAILABLE:
   Coverage section renders condition/capacity/demand scalars per system
   with the unrepresented-demand callout (shipped in 87b4a468).
 
-### REQUEST: Per-action diplomacy blocker reasons
-Status:        OPEN
-Requested:    2026-09-25
-WHY NEEDED:
-  `ObserverDiplomacyActionAvailability` reports whether an action is
-  allowed but not *which* prerequisite blocks it. The workspace surfaces
-  domain status summaries (communication/political status) as the hover
-  "why" — accurate but not precise; a player can't distinguish "no
-  transmission channel" from "proposal cooldown" without reading prose.
-CURRENT GAME SCREEN:
-  app/native_client/native_diplomacy_workspace.cpp disabled action slots
-  and negotiation terms (shipped in e015e209 / f46fd46c).
-DESIRED PUBLIC API:
-  Per-action blocker string or enum on the availability projection (e.g.
-  `blocker: none|no_channel|cooldown|war_state|...`), observer-safe,
-  localized at presentation.
-PERFORMANCE CONSTRAINT:
-  Constant-size per action; no new simulation queries at render time.
-FALLBACK IF NOT AVAILABLE:
-  Disabled slots keep surfacing the authoritative domain status summary.
-
 ## Delivered
+
+### REQUEST: Per-action diplomacy blocker reasons
+Status:        DELIVERED
+Requested:    2026-09-25
+Delivered:    on `game/ui-visual-overhaul` —
+`ObserverDiplomacyActionAvailability` now carries a constant-size
+`DiplomacyActionBlocker` per action (attempt-communication, send-proposal,
+set-access-permission, declare-war, respond, withdraw, terminate) beside
+each `can_*` flag, with the invariant `can_* == (blocker == none)`
+(`diplomacy_observer_commands.hpp`); `diplomacy_action_blocker_name()`
+gives a stable machine name for diagnostics. The enum vocabulary also
+covers the workspace's finer per-term gating (`not_hostile`,
+`agreement_active`, `access_granted`, `no_terms`) so consumers derive
+reasons from the same sealed view rather than duplicating rules.
+`NativeDiplomacyController` propagates the reasons onto
+`NativeDiplomacySelected`; `NativeDiplomacyWorkspace` resolves them at
+presentation through `DIPLOMACY_BLOCKER_*` catalog keys (en+de) for the
+three action slots and every negotiation term, falling back to the
+authoritative status summary when no blocker is reported (unidentified
+contacts keep no availability row and leak nothing new). No new
+simulation queries: blockers are computed inside the existing
+availability projection from already-sealed view fields. Tests:
+`diplomacy_observer_commands_parity` gained a fixture-free scenario
+covering every projection-assigned value plus the flag/blocker
+invariant; `native_diplomacy_controller` pins blocker values across
+channel-open, no-channel, unidentified and at-war selections;
+`native_diplomacy_workspace` asserts the localized blocker text on all
+three disabled slots and a disabled negotiation term.
+`localization` covers the new keys in both shipped catalogs.
 
 ### REQUEST: Nullable `SurfaceEffect3D::next_texture` for single-texture effects
 Status:        DELIVERED

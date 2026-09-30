@@ -128,7 +128,7 @@ private:
       stellar::native_diplomacy::DiplomacyWorkspaceAction action{
           stellar::native_diplomacy::DiplomacyWorkspaceAction::declare_war};
       bool enabled{};
-      // Authoritative status surfaced as the why when `enabled` is false.
+      // Blocker reason surfaced as the why when `enabled` is false.
       std::string tip;
     };
     std::vector<ModalTerm> terms;
@@ -156,6 +156,11 @@ private:
   [[nodiscard]] std::string
   trf(std::string_view key, std::initializer_list<std::string> args,
       std::string_view fallback) const;
+  // Localized "why" for a disabled action: the blocker reason when the
+  // projection reported one, otherwise the supplied status fallback.
+  [[nodiscard]] std::string
+  blocker_tip(stellar::core::DiplomacyActionBlocker blocker,
+              std::string fallback) const;
 
   const stellar::engine::LocalizationTable *locale_{};
   bool visible_{};

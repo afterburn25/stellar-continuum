@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/diplomacy_state.hpp>
 
 #include <cstdint>
@@ -86,6 +87,17 @@ struct NativeDiplomacySelected {
   bool can_offer_ceasefire{};
   bool can_set_access{};
   bool can_declare_war{};
+  // Per-action blocker reasons from the availability projection (plus the
+  // workspace's finer per-term gating); `none` falls back to the status
+  // summaries for contacts without an availability row.
+  stellar::core::DiplomacyActionBlocker communication_blocker{};
+  stellar::core::DiplomacyActionBlocker negotiate_blocker{};
+  stellar::core::DiplomacyActionBlocker offer_non_aggression_blocker{};
+  stellar::core::DiplomacyActionBlocker request_access_blocker{};
+  stellar::core::DiplomacyActionBlocker offer_peace_blocker{};
+  stellar::core::DiplomacyActionBlocker offer_ceasefire_blocker{};
+  stellar::core::DiplomacyActionBlocker set_access_blocker{};
+  stellar::core::DiplomacyActionBlocker declare_war_blocker{};
 };
 
 struct NativeDiplomacyView {

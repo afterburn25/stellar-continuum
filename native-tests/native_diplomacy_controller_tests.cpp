@@ -158,6 +158,18 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
           "observer history diverged");
   require(!selected.recent_events.empty(),
           "recent pair history was lost");
+  // Blocker reasons ride the same sealed projection: a disabled action now
+  // carries a machine-readable why instead of a repurposed status string.
+  using enum stellar::core::DiplomacyActionBlocker;
+  require(selected.communication_blocker == channel_open &&
+              selected.declare_war_blocker == none &&
+              selected.offer_non_aggression_blocker == none &&
+              selected.request_access_blocker == access_granted &&
+              selected.offer_peace_blocker == not_hostile &&
+              selected.offer_ceasefire_blocker == not_hostile &&
+              selected.set_access_blocker == none &&
+              selected.negotiate_blocker == none,
+          "blocker projection diverged for a channelled contact");
 
   // Selection-independent signature: rebuilding for another index keeps the
   // same revision until the world changes.
@@ -169,6 +181,12 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
               !clamped.selected.has_visible_communication &&
               clamped.selected.political_status == "No formal relationship",
           "no-channel contact selection diverged");
+  require(clamped.selected.communication_blocker == none &&
+              clamped.selected.set_access_blocker == no_channel &&
+              clamped.selected.negotiate_blocker == no_channel &&
+              clamped.selected.offer_peace_blocker == no_channel &&
+              clamped.selected.declare_war_blocker == none,
+          "blocker projection diverged for a contact without a channel");
 
   const auto unidentified =
       controller.build(frame, 7, beta.source_index).selected;
@@ -178,6 +196,12 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
               unidentified.access_summary.find("unavailable") !=
                   std::string::npos,
           "unidentified selection leaked counterpart state");
+  // No availability row exists for an unidentified contact: every blocker
+  // stays none so the workspace falls back to the identity status text.
+  require(unidentified.communication_blocker == none &&
+              unidentified.negotiate_blocker == none &&
+              unidentified.declare_war_blocker == none,
+          "unidentified contact reported blocker detail beyond the seal");
 
   // An unchanged proposal id/status does not authorize changed terms. Even a
   // sub-display-precision relationship change invalidates the displayed quote.
@@ -271,6 +295,11 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
   require(at_war.contacts.front().status == "AtWar" &&
               at_war.selected.political_status == "AtWar",
           "war declaration did not update the projected political state");
+  require(at_war.selected.declare_war_blocker == already_at_war &&
+              at_war.selected.offer_non_aggression_blocker == already_at_war &&
+              at_war.selected.offer_peace_blocker == none &&
+              at_war.selected.offer_ceasefire_blocker == none,
+          "war-state blocker projection diverged");
   require(std::ranges::any_of(at_war.history, [](const auto &event) {
             return event.kind == "War Declared";
           }),

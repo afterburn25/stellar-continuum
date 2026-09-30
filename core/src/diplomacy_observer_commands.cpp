@@ -144,6 +144,26 @@ bool any(const Range &range, Predicate predicate) {
 
 } // namespace
 
+std::string_view diplomacy_action_blocker_name(
+    DiplomacyActionBlocker blocker) noexcept {
+  switch (blocker) {
+  case DiplomacyActionBlocker::none: return "none";
+  case DiplomacyActionBlocker::channel_open: return "channel_open";
+  case DiplomacyActionBlocker::contact_lost: return "contact_lost";
+  case DiplomacyActionBlocker::no_channel: return "no_channel";
+  case DiplomacyActionBlocker::not_hostile: return "not_hostile";
+  case DiplomacyActionBlocker::already_at_war: return "already_at_war";
+  case DiplomacyActionBlocker::agreement_active: return "agreement_active";
+  case DiplomacyActionBlocker::access_granted: return "access_granted";
+  case DiplomacyActionBlocker::no_pending_proposal:
+    return "no_pending_proposal";
+  case DiplomacyActionBlocker::no_active_agreement:
+    return "no_active_agreement";
+  case DiplomacyActionBlocker::no_terms: return "no_terms";
+  }
+  return "unknown";
+}
+
 std::vector<ObserverDiplomacyActionAvailability>
 build_observer_diplomacy_action_availability(const DiplomaticStateView &view) {
   std::map<int, const DiplomaticContactView *> latest;
@@ -194,7 +214,7 @@ build_observer_diplomacy_action_availability(const DiplomaticStateView &view) {
                  (agreement.civilization_a_id == counterpart ||
                   agreement.civilization_b_id == counterpart);
         });
-    result.push_back({
+    ObserverDiplomacyActionAvailability row{
         counterpart,
         contact->awareness,
         contact->condition,
@@ -212,8 +232,35 @@ build_observer_diplomacy_action_availability(const DiplomaticStateView &view) {
         active_communication && agreements > 0,
         static_cast<int>(incoming),
         static_cast<int>(outgoing),
-        static_cast<int>(agreements),
-    });
+        static_cast<int>(agreements)};
+    const auto channel_blocker =
+        active_communication ? DiplomacyActionBlocker::none
+                             : DiplomacyActionBlocker::no_channel;
+    row.attempt_communication_blocker =
+        active_communication
+            ? DiplomacyActionBlocker::channel_open
+            : contact->condition == ContactCondition::stale_or_lost
+                  ? DiplomacyActionBlocker::contact_lost
+                  : DiplomacyActionBlocker::none;
+    row.send_proposal_blocker = channel_blocker;
+    row.set_access_permission_blocker = channel_blocker;
+    row.declare_war_blocker =
+        row.can_declare_war ? DiplomacyActionBlocker::none
+                            : DiplomacyActionBlocker::already_at_war;
+    row.respond_to_pending_proposal_blocker =
+        row.can_respond_to_pending_proposal
+            ? DiplomacyActionBlocker::none
+            : DiplomacyActionBlocker::no_pending_proposal;
+    row.withdraw_pending_proposal_blocker =
+        row.can_withdraw_pending_proposal
+            ? DiplomacyActionBlocker::none
+            : DiplomacyActionBlocker::no_pending_proposal;
+    row.terminate_active_agreement_blocker =
+        !active_communication
+            ? DiplomacyActionBlocker::no_channel
+            : agreements > 0 ? DiplomacyActionBlocker::none
+                             : DiplomacyActionBlocker::no_active_agreement;
+    result.push_back(row);
   }
   return result;
 }

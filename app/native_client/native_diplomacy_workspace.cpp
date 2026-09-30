@@ -342,6 +342,46 @@ std::string NativeDiplomacyWorkspace::trf(
   return out;
 }
 
+std::string NativeDiplomacyWorkspace::blocker_tip(
+    stellar::core::DiplomacyActionBlocker blocker,
+    std::string fallback) const {
+  using enum stellar::core::DiplomacyActionBlocker;
+  switch (blocker) {
+  case channel_open:
+    return tr("DIPLOMACY_BLOCKER_CHANNEL_OPEN",
+              "The communication channel is already open.");
+  case contact_lost:
+    return tr("DIPLOMACY_BLOCKER_CONTACT_LOST",
+              "Contact is stale or lost; restore the observation first.");
+  case no_channel:
+    return tr("DIPLOMACY_BLOCKER_NO_CHANNEL",
+              "Requires an open communication channel.");
+  case not_hostile:
+    return tr("DIPLOMACY_BLOCKER_NOT_HOSTILE",
+              "Requires hostile relations or an active war.");
+  case already_at_war:
+    return tr("DIPLOMACY_BLOCKER_ALREADY_AT_WAR",
+              "A state of war already exists.");
+  case agreement_active:
+    return tr("DIPLOMACY_BLOCKER_AGREEMENT_ACTIVE",
+              "An agreement of this kind is already in force.");
+  case access_granted:
+    return tr("DIPLOMACY_BLOCKER_ACCESS_GRANTED",
+              "Transit access is already granted.");
+  case no_pending_proposal:
+    return tr("DIPLOMACY_BLOCKER_NO_PENDING",
+              "No pending proposal to act on.");
+  case no_active_agreement:
+    return tr("DIPLOMACY_BLOCKER_NO_AGREEMENT",
+              "No active agreement to terminate.");
+  case no_terms:
+    return tr("DIPLOMACY_BLOCKER_NO_TERMS",
+              "No negotiation terms are currently available.");
+  case none: break;
+  }
+  return fallback;
+}
+
 void NativeDiplomacyWorkspace::open() noexcept {
   visible_ = true;
   focus_ = -1;
@@ -852,9 +892,9 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         modal.target_civilization_id = s.target_civilization_id;
         modal.campaign_generation = view_->campaign_generation;
         modal.diplomacy_revision = view_->diplomacy_revision;
-        // Every term stays listed — disabled rows keep the domain's
-        // authoritative status (`political`/`access`/`agreements`/
-        // `communication`) as the hover why, so a closed-off option still
+        // Every term stays listed — disabled rows surface the projection's
+        // blocker reason as the hover why (falling back to the authoritative
+        // status when no blocker was reported), so a closed-off option still
         // teaches what it needs. `!can_declare_war` is the authoritative
         // at-war projection.
         const auto add = [&](std::string name,
@@ -866,22 +906,24 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
         add(tr("DIPLOMACY_TERM_NON_AGGRESSION", "Non-aggression"),
             DiplomacyWorkspaceAction::propose_non_aggression,
             s.can_offer_non_aggression,
-            s.can_declare_war ? s.agreements_summary : s.political_status);
+            blocker_tip(s.offer_non_aggression_blocker,
+                        s.can_declare_war ? s.agreements_summary
+                                          : s.political_status));
         add(tr("DIPLOMACY_TERM_REQUEST_ACCESS", "Request transit access"),
             DiplomacyWorkspaceAction::request_access, s.can_request_access,
-            s.access_summary);
+            blocker_tip(s.request_access_blocker, s.access_summary));
         add(tr("DIPLOMACY_TERM_CEASEFIRE", "Ceasefire"),
             DiplomacyWorkspaceAction::offer_ceasefire, s.can_offer_ceasefire,
-            s.political_status);
+            blocker_tip(s.offer_ceasefire_blocker, s.political_status));
         add(tr("DIPLOMACY_TERM_PEACE", "Peace"),
             DiplomacyWorkspaceAction::offer_peace, s.can_offer_peace,
-            s.political_status);
+            blocker_tip(s.offer_peace_blocker, s.political_status));
         add(tr("DIPLOMACY_TERM_GRANT_ACCESS", "Grant transit access"),
             DiplomacyWorkspaceAction::grant_access, s.can_set_access,
-            s.communication_status);
+            blocker_tip(s.set_access_blocker, s.communication_status));
         add(tr("DIPLOMACY_TERM_DENY_ACCESS", "Deny transit access"),
             DiplomacyWorkspaceAction::deny_access, s.can_set_access,
-            s.communication_status);
+            blocker_tip(s.set_access_blocker, s.communication_status));
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
@@ -1206,11 +1248,16 @@ void NativeDiplomacyWorkspace::render(
             ? tr("DIPLOMACY_OPEN_TRANSMISSION", "Open transmission")
             : tr("DIPLOMACY_ESTABLISH_COMMUNICATION",
                  "Establish communication"),
-        transmission, sel.communication_status, false);
+        transmission,
+        blocker_tip(sel.communication_blocker, sel.communication_status),
+        false);
     draw_action(tr("DIPLOMACY_NEGOTIATE", "Negotiate"), negotiate,
-                sel.communication_status, false);
+                blocker_tip(sel.negotiate_blocker, sel.communication_status),
+                false);
     draw_action(tr("DIPLOMACY_DECLARE_WAR_ACTION", "Declare war"),
-                sel.can_declare_war, sel.political_status, true);
+                sel.can_declare_war,
+                blocker_tip(sel.declare_war_blocker, sel.political_status),
+                true);
     // The discovery hint only renders where the three action slots leave room;
     // at tight viewports the disabled buttons + tooltips carry the same why.
     const auto hint_y = layout.actions.y + 3.f * 36.f * s + 4.f * s;

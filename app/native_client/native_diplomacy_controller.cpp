@@ -671,6 +671,8 @@ struct Projection {
       if (found != availability.end()) {
         s.can_attempt_communication = found->can_attempt_communication;
         s.can_declare_war = found->can_declare_war;
+        s.communication_blocker = found->attempt_communication_blocker;
+        s.declare_war_blocker = found->declare_war_blocker;
       }
       const auto active_non_aggression = std::ranges::any_of(
           view.agreements, [&](const auto &agreement) {
@@ -692,6 +694,30 @@ struct Projection {
           channel && (political == DiplomaticPoliticalState::hostile ||
                       political == DiplomaticPoliticalState::at_war);
       s.can_set_access = channel;
+      using enum stellar::core::DiplomacyActionBlocker;
+      const auto channel_blocker = channel ? none : no_channel;
+      s.offer_non_aggression_blocker =
+          s.can_offer_non_aggression
+              ? none
+              : !channel ? no_channel
+              : political == DiplomaticPoliticalState::at_war ? already_at_war
+              : agreement_active;
+      s.request_access_blocker =
+          s.can_request_access ? none
+                               : !channel ? no_channel : access_granted;
+      s.offer_peace_blocker =
+          s.can_offer_peace ? none : !channel ? no_channel : not_hostile;
+      s.offer_ceasefire_blocker =
+          s.can_offer_ceasefire ? none : !channel ? no_channel : not_hostile;
+      s.set_access_blocker = channel_blocker;
+      s.negotiate_blocker =
+          !channel
+              ? no_channel
+              : !(s.can_offer_non_aggression || s.can_request_access ||
+                  s.can_offer_peace || s.can_offer_ceasefire ||
+                  s.can_set_access)
+                    ? no_terms
+                    : none;
     }
   }
 

@@ -134,6 +134,7 @@ void require_scrolled_draw_clipped(const DrawList &draw, UiRect region,
 } // namespace
 
 int main() try {
+  using enum stellar::core::DiplomacyActionBlocker;
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
                   std::pair{1920, 1080}, std::pair{2560, 1440},
@@ -337,6 +338,9 @@ int main() try {
   war_sel.can_offer_ceasefire = true;
   war_sel.can_offer_peace = true;
   war_sel.political_status = "At war";
+  war_sel.declare_war_blocker = already_at_war;
+  war_sel.offer_non_aggression_blocker = already_at_war;
+  war_sel.request_access_blocker = access_granted;
   NativeDiplomacyWorkspace war_workspace;
   war_workspace.open();
   war_workspace.set_view(war_view);
@@ -359,6 +363,8 @@ int main() try {
               has_text(terms_draw, "Grant transit access") &&
               has_text(terms_draw, "Deny transit access"),
           "Unavailable negotiation terms were hidden instead of disabled.");
+  require(has_text(terms_draw, "A state of war already exists."),
+          "A disabled negotiation term did not surface its blocker reason.");
   const UiRect first_term_rect{layout.modal_panel.x + 16.f * s,
                                layout.modal_panel.y + 74.f * s,
                                layout.modal_panel.width - 32.f * s,
@@ -623,6 +629,29 @@ int main() try {
           "Unavailable diplomacy actions were hidden instead of disabled.");
   require(has_text(disabled_draw, "Channel lost"),
           "A disabled diplomacy action did not explain its blocker.");
+
+  // When the projection reports a blocker reason, the hover surfaces the
+  // localized blocker instead of the status fallback.
+  dsel.communication_blocker = contact_lost;
+  dsel.negotiate_blocker = no_channel;
+  dsel.declare_war_blocker = already_at_war;
+  disabled_actions.set_view(dark);
+  const char *const slot_whys[] = {
+      "Contact is stale or lost; restore the observation first.",
+      "Requires an open communication channel.",
+      "A state of war already exists."};
+  for (int index = 0; index < 3; ++index) {
+    const UiRect why_slot{layout.actions.x + 8.f * s,
+                          layout.actions.y + 8.f * s +
+                              static_cast<float>(index) * 36.f * s,
+                          layout.actions.width - 16.f * s, 30.f * s};
+    (void)disabled_actions.handle(
+        {InputEventType::PointerMove, center(why_slot)}, 1280, 720);
+    DrawList why_draw;
+    disabled_actions.render(why_draw, 1280, 720, nullptr);
+    require(has_text(why_draw, slot_whys[index]),
+            "A disabled diplomacy action did not surface its blocker reason.");
+  }
   for (int index = 0; index < 3; ++index) {
     const UiRect slot{layout.actions.x + 8.f * s,
                       layout.actions.y + 8.f * s +
