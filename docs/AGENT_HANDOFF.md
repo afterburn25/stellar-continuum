@@ -644,6 +644,11 @@ the world AABB, raycast is O(tris) per entity with no spatial partition,
 editor has no transform gizmos — see the registry record.
 
 **Recommended next workstream: the Core-adoption architecture decision.**
+The per-framework audit applying the 2026-09-24 graduation criteria is in
+[ADR 0002](decisions/0002-engine-framework-adoption-assessment.md) — it
+recommends keeping projections-first (no framework meets criterion 1),
+with executor granularity, projection-consumer depth, and greenfield
+terraforming as the productive frontier.
 The 2026-09-24 validation receipt records 294/294 native tests green on this
 branch — the failures in the 2026-09-20 receipt were resolved through the
 integration merge. A 2026-09-23 supplement
