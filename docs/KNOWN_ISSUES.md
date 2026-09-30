@@ -249,7 +249,10 @@ all save/fixture differences harmless without inspecting their semantics.**
 - **Status:** MEASURED on `work/foundation-1-30-codex-integration` —
   certification-grade evidence for the covered workload; organic
   massive-combat engagement and heterogeneous fleet stress remain open
-  measurement limits rather than known defects.
+  measurement limits rather than known defects. Re-run on
+  `game/ui-visual-overhaul` tip `422f2519` (same scenario/seed): step
+  mean 2.59 ms, p95 3.63 ms, deterministic repeat — same conclusion,
+  recorded in the audit's combined-scenario section.
 
 ## SYNC-010 — stellar engulfment invariant fails at 1,000 systems
 
