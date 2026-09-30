@@ -471,6 +471,11 @@ int main() try {
             "Ineligible fleet exposed a tactical engagement action.");
   }
   engagement.set_view(armed);
+  (void)engagement.handle({InputEventType::PointerMove,center(layout.engage)},1280,720,markers,std::nullopt);
+  DrawList engage_tip_draw;
+  engagement.render(engage_tip_draw,1280,720,markers);
+  require(has_text(engage_tip_draw,"Order this fleet to attack the hostile forces in this system."),
+          "Engage control did not explain itself on hover.");
   engagement.set_preview(blocked, "Unknown system");
   require(engage_click() != FleetWorkspaceCommandKind::Engage,
           "Blocked travel preview accidentally started combat.");
@@ -526,6 +531,11 @@ int main() try {
     command=strategic.handle({InputEventType::LeftReleased,center(layout.military_locate)},1280,720,{},std::nullopt);
     require(command.kind==FleetWorkspaceCommandKind::Locate&&command.locate_quote==locate_quote,
             "Locate did not retain its displayed quote.");
+    (void)strategic.handle({InputEventType::PointerMove,center(layout.military_locate)},1280,720,{},std::nullopt);
+    DrawList locate_tip_draw;
+    strategic.render(locate_tip_draw,1280,720,{});
+    require(has_text(locate_tip_draw,"Center the map on this fleet."),
+            "Locate rail control did not explain itself on hover.");
     (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_hold)},1280,720,{},std::nullopt);
     (void)strategic.handle({InputEventType::PointerCancelled},1280,720,{},std::nullopt);
     command=strategic.handle({InputEventType::LeftReleased,center(layout.order_hold)},1280,720,{},std::nullopt);
@@ -563,6 +573,16 @@ int main() try {
     recovery.render(recovery_draw,1280,720,{});
     require(has_text(recovery_draw,"LOCATE")&&has_text(recovery_draw,"RETURN TO BASE"),
             "Civilian recovery did not retain both recovery controls and Locate.");
+    (void)recovery.handle({InputEventType::PointerMove,center(layout.recovery_left)},1280,720,{},std::nullopt);
+    DrawList hold_tip_draw;
+    recovery.render(hold_tip_draw,1280,720,{});
+    require(has_text(hold_tip_draw,"Pause the mission"),
+            "Recovery hold control did not explain itself on hover.");
+    (void)recovery.handle({InputEventType::PointerMove,center(layout.recovery_right)},1280,720,{},std::nullopt);
+    DrawList return_tip_draw;
+    recovery.render(return_tip_draw,1280,720,{});
+    require(has_text(return_tip_draw,"Send this fleet to an owned base"),
+            "Return-to-base control did not explain itself on hover.");
     (void)recovery.handle({InputEventType::LeftPressed,center(layout.civilian_locate)},1280,720,{},std::nullopt);
     const auto locate=recovery.handle({InputEventType::LeftReleased,center(layout.civilian_locate)},1280,720,{},std::nullopt);
     require(locate.kind==FleetWorkspaceCommandKind::Locate&&locate.locate_quote==locate_quote,

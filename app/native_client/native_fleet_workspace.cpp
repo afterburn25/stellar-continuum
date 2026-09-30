@@ -1301,6 +1301,72 @@ void NativeFleetWorkspace::render(
           width, height, layout.scale, native_ui::Tone::Military);
       break;
     }
+  // Action-rail explainers — pointer hover shares the vocabulary the focus
+  // ring announces. The order buttons already explain themselves through the
+  // tactical_help feedback strip above, so only the uncovered controls get a
+  // floating tip; they render only in legal states, so the text says what
+  // happens rather than why the control is unavailable.
+  const auto rail_tip = [&](UiRect bounds, std::string title,
+                            std::string_view body_key,
+                            std::string_view body_fallback) {
+    theme::hover_tooltip(out, bounds, pointer_, std::move(title),
+                         tr(body_key, body_fallback), width, height,
+                         layout.scale, theme::Tone::Neutral);
+  };
+  if (!preview_ && !pending_return_ && selected &&
+      selected->military_order_quote) {
+    if (selected->locate)
+      rail_tip(layout.military_locate, tr("FLEET_LOCATE", "LOCATE"),
+               "FLEET_TIP_LOCATE", "Center the map on this fleet.");
+  } else if (!preview_ && !pending_return_ && selected &&
+             selected->recovery && selected->locate) {
+    rail_tip(layout.civilian_locate, tr("FLEET_LOCATE", "LOCATE"),
+             "FLEET_TIP_LOCATE", "Center the map on this fleet.");
+  } else if (locate_on_rail) {
+    rail_tip(layout.locate, tr("FLEET_LOCATE", "LOCATE"), "FLEET_TIP_LOCATE",
+             "Center the map on this fleet.");
+  }
+  if (engage)
+    rail_tip(layout.engage, tr("FLEET_ENGAGE", "ENGAGE HOSTILES"),
+             "FLEET_TIP_ENGAGE",
+             "Order this fleet to attack the hostile forces in this system.");
+  if (preview_ && preview_->command_available)
+    rail_tip(layout.confirm, tr("FLEET_CONFIRM_TRAVEL", "CONFIRM TRAVEL"),
+             "FLEET_TIP_CONFIRM_TRAVEL",
+             "Commit this fleet to the previewed route.");
+  if (!preview_ && selected && selected->recovery) {
+    if (pending_return_) {
+      rail_tip(layout.recovery_left,
+               tr("FLEET_CONFIRM_RETURN", "CONFIRM RETURN"),
+               "FLEET_TIP_CONFIRM_RETURN",
+               "Abandon the paid mission and send this fleet to base.");
+      rail_tip(layout.recovery_right, tr("SETTINGS_CANCEL", "CANCEL"),
+               "FLEET_TIP_CANCEL_RETURN",
+               "Keep the existing mission and its progress.");
+    } else {
+      const bool hold_requested = selected->recovery->hold_requested;
+      rail_tip(layout.recovery_left,
+               tr(hold_requested ? "FLEET_RESUME" : "FLEET_HOLD",
+                  hold_requested ? "RESUME" : "HOLD"),
+               hold_requested ? "FLEET_TIP_RESUME" : "FLEET_TIP_HOLD_MISSION",
+               hold_requested
+                   ? "Resume the paused mission."
+                   : "Pause the mission — it keeps its progress.");
+      rail_tip(layout.recovery_right,
+               tr(selected->recovery->return_requested
+                      ? "FLEET_RETURN_QUEUED"
+                      : "FLEET_RETURN_BASE",
+                  selected->recovery->return_requested ? "RETURN QUEUED"
+                                                       : "RETURN TO BASE"),
+               selected->recovery->return_requested
+                   ? "FLEET_TIP_RETURN_QUEUED"
+                   : "FLEET_TIP_RETURN_BASE",
+               selected->recovery->return_requested
+                   ? "Return to base is already queued."
+                   : "Send this fleet to an owned base — the current mission "
+                     "is abandoned after confirmation.");
+    }
+  }
   if (focus_ >= 0) {
     const auto items = focusables(layout);
     if (focus_ < static_cast<int>(items.size()))
