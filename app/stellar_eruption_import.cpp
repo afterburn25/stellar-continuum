@@ -7,11 +7,11 @@
 int main(int argc,char** argv)try{
  if(argc!=3)throw std::invalid_argument("Usage: stellar_eruption_import matched-assets.json output-directory");
  using namespace stellar::native_map;using nlohmann::json;
- json manifest;std::ifstream(argv[1])>>manifest;const auto source=std::filesystem::u8path(manifest.at("sourceRoot").get<std::string>()),output=std::filesystem::u8path(argv[2]);
+ json manifest;std::ifstream(argv[1])>>manifest;const auto source=path_from_utf8(manifest.at("sourceRoot").get<std::string>()),output=path_from_utf8(argv[2]);
  int count=0;
  for(auto& item:manifest.at("files"))if(item.at("used")){
-  const auto input=decode_rgba_image(source/std::filesystem::u8path(item.at("path").get<std::string>()));
-  const auto relative=std::filesystem::u8path(item.at("runtimePath").get<std::string>());
+  const auto input=decode_rgba_image(source/path_from_utf8(item.at("path").get<std::string>()));
+  const auto relative=path_from_utf8(item.at("runtimePath").get<std::string>());
   int turns=0;if(item.at("eruptionType")=="SMALL_PROMINENCE")turns=std::array{3,3,3,1,1,1,3,1,1,1,3,3}.at(item.at("sequenceVariant").get<int>()-1);
   for(int size:{256,512,1024}){const auto image=prepare_emissive_image(*input,size,turns);const auto target=output/std::to_string(size)/relative;
    std::filesystem::create_directories(target.parent_path());encode_rgba_png(*image,target);

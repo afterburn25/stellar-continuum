@@ -38,6 +38,13 @@ struct TriangleMesh {
 inline constexpr int maximum_rgba_image_dimension=8192;
 inline constexpr std::size_t maximum_rgba_image_bytes=64u*1024u*1024u;
 inline constexpr std::size_t maximum_image_cache_entries=128;
+// UTF-8 encoded path strings (argv, JSON manifests) must construct through the
+// char8_t overload — a plain char source decodes in the native encoding.
+[[nodiscard]] inline std::filesystem::path path_from_utf8(
+    const std::string &encoded){
+  return std::filesystem::path(std::u8string(
+      reinterpret_cast<const char8_t *>(encoded.data()),encoded.size()));
+}
 // Includes the immutable CPU pixels retained by the cache and the estimated
 // RGBA texture allocation. Images also retained by callers are outside it.
 inline constexpr std::size_t maximum_image_cache_resident_bytes=192u*1024u*1024u;

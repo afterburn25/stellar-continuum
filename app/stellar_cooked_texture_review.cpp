@@ -26,8 +26,8 @@ int main(int argc,char**argv)try{
   const auto it=std::find_if(report.at("assets").begin(),report.at("assets").end(),[&](const auto&item){return item.at("format")!="bytes"&&item.at("id").template get<std::string>().find(match)!=std::string::npos;});
   if(it==report.at("assets").end())throw std::runtime_error("No QA asset matched "+name+": "+match);
   const auto id=it->at("id").get<std::string>(),source_path=it->at("source").get<std::string>();
-  unmount_asset_registry();auto source=decode_rgba_image(root/fs::u8path(source_path));
-  mount_asset_registry(package,false);auto cooked=decode_rgba_image(package/fs::u8path(id));unmount_asset_registry();
+  unmount_asset_registry();auto source=decode_rgba_image(root/path_from_utf8(source_path));
+  mount_asset_registry(package,false);auto cooked=decode_rgba_image(package/path_from_utf8(id));unmount_asset_registry();
   if(source->width()!=cooked->width()||source->height()!=cooked->height())throw std::runtime_error("Base resolution changed: "+id);
   double squares=0,max_error=0;std::uint64_t n=0;const auto&sp=source->pixels();const auto&cp=cooked->pixels();
   for(std::size_t i=0;i<sp.size();i+=4)for(int c=0;c<4;++c){const double d=c==3?double(sp[i+c])-cp[i+c]:sp[i+c]*sp[i+3]/255.-cp[i+c]*cp[i+3]/255.;squares+=d*d;max_error=std::max(max_error,std::abs(d));++n;}
