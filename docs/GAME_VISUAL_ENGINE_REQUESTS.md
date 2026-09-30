@@ -59,29 +59,38 @@ PERFORMANCE CONSTRAINT:
 FALLBACK IF NOT AVAILABLE:
   Detail card keeps showing lead-vessel design + embarked totals only.
 
-### REQUEST: Interstellar logistics route graph
-Status:        OPEN
-Requested:    2026-09-25
-WHY NEEDED:
-  `CivilizationLogisticsCoverage` reports that a corridor to an external
-  system exists, plus demand/import/gap scalars — but exposes no route
-  edges. The supply workspace can list coverage rows yet cannot draw the
-  actual interstellar links or explain corridor quality per hop.
-CURRENT GAME SCREEN:
-  app/native_client/native_logistics_workspace.cpp INTERSTELLAR COVERAGE
-  section (per-system rows without link geometry).
-DESIRED PUBLIC API:
-  Extend `CivilizationLogisticsCoverage` (or a sibling projection) with
-  sealed external `LinkRow`-style edges: endpoint systems, capacity,
-  transit days, enabled/bidirectional — mirroring the home-network
-  `HomeSystemLogisticsNetwork` link shape the workspace already renders.
-PERFORMANCE CONSTRAINT:
-  Deterministic; sealed/observer-validated like existing link rows.
-FALLBACK IF NOT AVAILABLE:
-  Coverage section renders condition/capacity/demand scalars per system
-  with the unrepresented-demand callout (shipped in 87b4a468).
-
 ## Delivered
+
+### REQUEST: Interstellar logistics route graph
+Status:        DELIVERED
+Requested:    2026-09-25
+Delivered:    on `game/ui-visual-overhaul` —
+`CivilizationLogisticsCoverage` now carries `external_links`: one
+`ExternalLogisticsLink` edge per owned external system (civilization,
+home/external system ids, capacity per day, transit days, required
+import flow, bidirectional/enabled/represented), emitted in the same
+system-id order as `external_systems` and dropped when either endpoint
+system record is absent. `civilization_logistics_coverage` takes the
+canonical `StellarSystem` span so transit days derive from authoritative
+positions at the established freight reference speed (22 ly/day, the
+same convention as fleet transit) — no UI-side route recomputation.
+`represented`/`enabled` mirror `has_represented_interstellar_freight_corridor`
+so prospective corridors stay visibly disabled rather than leaking a
+phantom route. `native_logistics` maps edges onto
+`View::external_links` with endpoint names resolved through the sealed
+system records (edges that fail identity checks are dropped); the
+supply workspace renders a new INTERSTELLAR LINKS section — route,
+status, capacity, daily demand, transit — with a localized explainer,
+cached alongside the existing node/corridor/external rows. Diagnostics
+(`campaign_diagnostics` freight-corridor-gap records) and the
+seeded-colony catalog (`coverage.externalLinks`) consume the same
+projection. Tests: `native_logistics` pins edge identity, endpoint
+name resolution, verbatim metric copying and prospective-corridor
+status against the canonical result; `native_logistics_workspace`
+renders the section and its hover explainer; `logistics_views_parity`
+is unchanged (fixture worlds carry no system records). `localization`
+covers the new keys in both shipped catalogs.
+
 
 ### REQUEST: Per-action diplomacy blocker reasons
 Status:        DELIVERED

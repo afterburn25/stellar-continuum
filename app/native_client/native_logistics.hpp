@@ -57,6 +57,24 @@ struct ExternalRow {
   [[nodiscard]] bool operator==(const ExternalRow &) const = default;
 };
 
+// One prospective interstellar corridor edge between the home system and an
+// owned external system — endpoints resolved to sealed system names.
+// `represented`/`enabled` mirror the canonical link: corridors that do not
+// exist yet stay disabled and marked unrepresented.
+struct ExternalLinkRow {
+  int system_id{};
+  std::string from;
+  std::string to;
+  std::string status;
+  double capacity_per_day{};
+  double required_per_day{};
+  double transit_days{};
+  bool enabled{};
+  bool bidirectional{true};
+  bool represented{};
+  [[nodiscard]] bool operator==(const ExternalLinkRow &) const = default;
+};
+
 // A detached, read-only presentation projection of one civilization's home
 // system plus its owned external systems. Totals are copied verbatim from
 // Core's canonical coverage result.
@@ -78,6 +96,7 @@ struct View {
   std::vector<NodeRow> nodes;
   std::vector<LinkRow> links;
   std::vector<ExternalRow> external;
+  std::vector<ExternalLinkRow> external_links;
 };
 
 [[nodiscard]] View build_home_logistics(

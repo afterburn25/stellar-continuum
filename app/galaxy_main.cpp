@@ -456,9 +456,22 @@ Json coverage_json(const CivilizationLogisticsCoverage &value) {
          {"condition", item.condition},
          {"hasRepresentedInterstellarFreightCorridor",
           item.has_represented_interstellar_freight_corridor}});
+  Json external_links = Json::array();
+  for (const auto &item : value.external_links)
+    external_links.push_back(
+        {{"civilizationId", item.civilization_id},
+         {"homeSystemId", item.home_system_id},
+         {"externalSystemId", item.external_system_id},
+         {"capacityPerDay", item.capacity_per_day},
+         {"transitDays", item.transit_days},
+         {"requiredPerDay", item.required_per_day},
+         {"bidirectional", item.bidirectional},
+         {"enabled", item.enabled},
+         {"represented", item.represented}});
   return {{"civilizationId", value.civilization_id},
           {"homeSystem", home_network_json(value.home_system)},
           {"externalSystems", external},
+          {"externalLinks", external_links},
           {"ownedSystemCount", value.owned_system_count},
           {"externalSystemCount", value.external_system_count},
           {"externalImportRequirementPerDay",
@@ -856,7 +869,7 @@ int run_galaxy_catalog(int argc, char **argv) {
         civilizations, bodies, economic_construction, {}};
     for (const auto &civilization : civilizations) {
       const auto coverage = civilization_logistics_coverage(
-          world, colonies, economies, civilization.id);
+          world, colonies, economies, systems, civilization.id);
       const auto logistics =
           economy_logistics(world, colonies, economies, civilization.id);
       logistics_preview.push_back(
