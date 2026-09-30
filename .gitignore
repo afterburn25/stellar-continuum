@@ -4,6 +4,7 @@
 .idea/
 *.tmp
 *.log
+*.obj
 bin/
 obj/
 exports/
