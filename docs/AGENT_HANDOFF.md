@@ -779,7 +779,12 @@ Settings (sliders adjust via arrows, Home/End clamp to min/max), and the
 startup workspace across Entry/ModeSelection/LoadSlots/Busy/Failure/
 Development screens with per-screen focusable collection and transition
 resets routed through `reset_pointer()`. Screen-reader/AT contracts and the
-new-game Setup sub-surface remain open.
+new-game Setup sub-surface remain open. [Status update: both have since
+shipped — the UIA bridge covers Invoke/Toggle/RangeValue/announcements
+(full fragment tree + non-Windows backends still open), and the Setup
+sub-surface gained ordered `configuration_focusables`/`galaxy_focusables`
+contracts with `focused_label`/`focused_bounds`/`seed_focused` wiring,
+pinned by `native_new_game_workspace_tests`.]
 A diagnostics-hardening lane through `34243eae` mirrors every authoritative
 validator inside `inspect_campaign_invariants`: `validate_galaxy_references`
 (settlement kind/hub/capacity/site, freight/route/order/site consistency,
