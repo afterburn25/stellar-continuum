@@ -536,6 +536,23 @@ int main() try {
     strategic.render(locate_tip_draw,1280,720,{});
     require(has_text(locate_tip_draw,"Center the map on this fleet."),
             "Locate rail control did not explain itself on hover.");
+    // German catalog at the compact viewport: the same hover path must
+    // surface the shipped strings (the shared tooltip helper wraps and
+    // clamps inside the canvas, so the longer German text still fits).
+    {
+      stellar::engine::LocalizationTable german("de","en");
+      std::string german_error;
+      require(german.load_file(std::string(STELLAR_LOCALE_DIR)+"/de.json",&german_error),
+              ("de.json rejected: "+german_error).c_str());
+      strategic.set_localization(&german);
+      const auto compact=FleetWorkspaceLayout::for_viewport(640,360);
+      (void)strategic.handle({InputEventType::PointerMove,center(compact.military_locate)},640,360,{},std::nullopt);
+      DrawList german_tip;
+      strategic.render(german_tip,640,360,{});
+      require(has_text(german_tip,"Karte auf diese Flotte zentrieren."),
+              "German locate tip missing at 640x360");
+      strategic.set_localization(nullptr);
+    }
     (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_hold)},1280,720,{},std::nullopt);
     (void)strategic.handle({InputEventType::PointerCancelled},1280,720,{},std::nullopt);
     command=strategic.handle({InputEventType::LeftReleased,center(layout.order_hold)},1280,720,{},std::nullopt);

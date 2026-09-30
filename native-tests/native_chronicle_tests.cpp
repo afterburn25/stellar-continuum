@@ -300,6 +300,33 @@ void entry_navigation() {
                    "Cycle the event-domain filter"),
           "Domain filter did not explain its cycle on hover.");
 
+  // German catalog at the compact viewport: the same hover path must
+  // surface the shipped strings (the shared tooltip helper wraps and
+  // clamps inside the canvas, so the longer German text still fits).
+  engine::LocalizationTable german("de", "en");
+  std::string german_error;
+  require(german.load_file(std::string(STELLAR_LOCALE_DIR) + "/de.json",
+                           &german_error),
+          ("de.json rejected: " + german_error).c_str());
+  view.set_localization(&german);
+  const auto hover_de = [&](float x, float y) {
+    native_map::InputEvent move;
+    move.type = native_map::InputEventType::PointerMove;
+    move.position = {x, y};
+    (void)view.handle(move, 640, 360);
+    native_map::DrawList tips;
+    view.render(tips, 640, 360);
+    return tips;
+  };
+  require(has_text(hover_de(200.f, 112.f), "auf der Karte fokussieren"),
+          "German card tip missing at 640x360");
+  require(has_text(hover_de(475.f, 127.f),
+                   "Diplomatie mit diesem Kontakt"),
+          "German DIP tip missing at 640x360");
+  require(has_text(hover_de(455.f, 89.f), "Bereichsfilter durchschalten"),
+          "German domain-filter tip missing at 640x360");
+  view.set_localization(nullptr);
+
   // The locationless card navigates nowhere.
   view.close();
   view.open(history, 1);

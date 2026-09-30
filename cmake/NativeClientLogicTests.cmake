@@ -97,6 +97,7 @@ add_executable(stellar_native_chronicle_tests
   app/native_client/native_notifications.cpp app/native_client/native_chronicle.cpp)
 target_include_directories(stellar_native_chronicle_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_chronicle_tests PRIVATE stellar_core)
+target_compile_definitions(stellar_native_chronicle_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
 add_test(NAME native_chronicle COMMAND stellar_native_chronicle_tests)
 if(MSVC)
   target_compile_options(stellar_native_notification_tests PRIVATE /W4 /WX)
@@ -193,6 +194,7 @@ add_executable(stellar_native_fleet_workspace_tests
   app/native_client/native_overview.cpp app/native_client/native_ship_art_assets.cpp)
 target_include_directories(stellar_native_fleet_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_core stellar_native_image)
+target_compile_definitions(stellar_native_fleet_workspace_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
 add_test(NAME native_fleet_workspace COMMAND stellar_native_fleet_workspace_tests)
 add_executable(stellar_native_fleet_presentation_tests
   native-tests/native_fleet_presentation_tests.cpp app/native_client/native_fleet_presentation.cpp)
