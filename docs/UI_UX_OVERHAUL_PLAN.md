@@ -180,7 +180,7 @@ breaks navigation/AT flow, or presents wrong state)
 
 ### MEDIUM
 
-1. Tooltip coverage is uneven — PARTIALLY DONE. Disabled action buttons now
+1. ~~Tooltip coverage is uneven~~ — DONE. Disabled action buttons now
    explain themselves at the point of interaction: `theme::hover_tooltip`
    renders the authoritative blocker (shipyard `batch_blocker`/
    `cancellation_blocker`, construction `start`/`queue` messages, planetary
@@ -234,7 +234,7 @@ breaks navigation/AT flow, or presents wrong state)
    shared `empty_state` helper or a matched secondary line (shipyard,
    construction and missions already guided). Remaining bare states are
    developer-only surfaces where a next action does not apply.
-4. Typography hierarchy varies per workspace — PARTIALLY DONE. New
+4. ~~Typography hierarchy varies per workspace~~ — DONE. New
    `theme::type` ramp (title/body/small = 24/15/12, compact_body/
    compact_small = 14/11) is the single vocabulary; construction, colony,
    diplomacy (26→24) and economy (23→24) migrated to the canonical triple,
