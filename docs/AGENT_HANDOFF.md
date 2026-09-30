@@ -226,16 +226,18 @@ preserve:
   `--new-game-restart-smoke`; `--smoke-full-exploration` requires
   developer mode.
 - Authoritative `stellar.py export windows-native-preview` verified
-  end-to-end at `79ed3047`
-  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-79ed3047-20260930T035259600367Z`):
-  fresh configure+build, 328/328 CTest (one transient
-  `engine_windows_maintenance` file-lock flake passed on the automatic
-  `--rerun-failed` retry), every `tools/stellar-export/test_*.py` module,
-  dependency audit, packaging, restricted-PATH relocated smoke, the full
-  validator battery, ZIP + SHA-256
-  `e35af2ccba25a8ee89766f4271f0818fe3f65beebee5b4c656c61ca1612a28cb`.
+  end-to-end at `217918b7`
+  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-217918b7-20260930T053810915133Z`):
+  fresh configure+build, 328/328 CTest on the first pass (the
+  `atomic_file_write` `ERROR_UNABLE_TO_REMOVE_REPLACED` retry removed
+  the transient destination-lock flake class), every
+  `tools/stellar-export/test_*.py` module, dependency audit, packaging,
+  restricted-PATH relocated smoke, the full validator battery, ZIP +
+  SHA-256
+  `e8ad75b9598864d90775c67c5bf93cddb563f1bcb40c74aaa21a67e8c581f06f`.
   Validation JSON: 106 top-level booleans, only `graphicalParity` false
-  (intentional). Prior authoritative export at `412e683d`
+  (intentional). Prior authoritative exports at `79ed3047`
+  (SHA `e35af2cc…`) and `412e683d`
   (`StellarContinuum-0.1.14.2-dev-windows-native-preview-412e683d-20260929T233838555462Z`):
   fresh configure+build, 327/327 CTest, every
   `tools/stellar-export/test_*.py` module (native_build now globs them —
