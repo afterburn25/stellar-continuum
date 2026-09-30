@@ -11,7 +11,9 @@
 #include <cmath>
 #include <cstdio>
 #include <limits>
+#include <span>
 #include <utility>
+#include <vector>
 
 namespace stellar::native_chronicle {
 namespace {
@@ -57,6 +59,24 @@ std::string resolve(const stellar::engine::LocalizationTable *locale,
   if (locale && locale->contains(key))
     return std::string(locale->translate(key));
   return std::string(fallback);
+}
+
+std::string formatted(const stellar::engine::LocalizationTable *locale,
+                      std::string_view key,
+                      std::initializer_list<std::string> args,
+                      std::string_view fallback) {
+  if (locale && locale->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
 }
 
 std::string entry_label(const std::string &category,
@@ -1185,7 +1205,80 @@ void NativeChronicleView::render(DrawList &out, int width, int height) const {
                  entry.summary, message_color,
                  std::max(11, static_cast<int>(std::lround(13.f * s))),
                  card.message_bounds.width, layout.list_viewport);
+    // Card affordances explain what activation does — cards navigate to the
+    // event's system, DIP opens the contact, chips toggle the tag filter.
+    if (card.navigable && card.bounds.contains(pointer_) &&
+        entry.system_id != 0)
+      stellar::native_ui::hover_tooltip(
+          out, card.bounds, pointer_,
+          entry_label(entry.category, locale_) + "  " + entry.date,
+          resolve(locale_, "CHRONICLE_TIP_NAVIGATE",
+                  "Focus this event's system on the map."),
+          width, height, s, stellar::native_ui::Tone::Neutral);
+    if (card.contact_button &&
+        card.contact_button->contains(pointer_))
+      stellar::native_ui::hover_tooltip(
+          out, *card.contact_button, pointer_,
+          resolve(locale_, "CHRONICLE_CONTACT", "DIP"),
+          resolve(locale_, "CHRONICLE_TIP_CONTACT",
+                  "Open diplomacy with this contact."),
+          width, height, s, stellar::native_ui::Tone::Neutral);
+    for (const auto &chip : card.tag_chips)
+      if (chip.bounds.contains(pointer_)) {
+        const bool focused = chip.tag == tag_filter_;
+        stellar::native_ui::hover_tooltip(
+            out, chip.bounds, pointer_,
+            resolve(locale_, "CHRONICLE_TAG", "Tag") + " " + chip.tag,
+            focused
+                ? resolve(locale_, "CHRONICLE_TIP_TAG_CLEAR",
+                          "Clear this tag filter.")
+                : formatted(locale_, "CHRONICLE_TIP_TAG_FILTER",
+                            {chip.tag},
+                            "Filter the feed to events tagged {0}."),
+            width, height, s, stellar::native_ui::Tone::Neutral);
+      }
   }
+  // Filter-row and paging explainers — the same labels the focus ring
+  // announces, with the behavior each control cycles through.
+  const auto tip = [&](UiRect bounds, std::string title,
+                       std::string_view body_key,
+                       std::string_view body_fallback) {
+    stellar::native_ui::hover_tooltip(
+        out, bounds, pointer_, std::move(title),
+        resolve(locale_, body_key, body_fallback), width, height, s,
+        stellar::native_ui::Tone::Neutral);
+  };
+  tip(layout.domain_button,
+      resolve(locale_, "CHRONICLE_DOMAIN_FILTER", "Domain filter"),
+      "CHRONICLE_TIP_DOMAIN",
+      "Cycle the event-domain filter — all domains or one category.");
+  tip(layout.significance_button,
+      resolve(locale_, "CHRONICLE_SIGNIFICANCE_FILTER", "Significance filter"),
+      "CHRONICLE_TIP_SIGNIFICANCE",
+      "Cycle the minimum significance — routine entries drop out at higher "
+      "floors.");
+  tip(layout.actor_button,
+      resolve(locale_, "CHRONICLE_ACTOR_FILTER", "Actor filter"),
+      "CHRONICLE_TIP_ACTOR",
+      "Cycle the actor scope — every recorded event or only your "
+      "civilization's.");
+  tip(layout.time_button,
+      resolve(locale_, "CHRONICLE_TIME_FILTER", "Time filter"),
+      "CHRONICLE_TIP_TIME",
+      "Cycle the time window — all history, the last 30 days, or the last "
+      "year.");
+  if (layout.focus_button)
+    tip(*layout.focus_button,
+        resolve(locale_, "CHRONICLE_CLEAR_TAG", "Clear tag focus"),
+        "CHRONICLE_TIP_TAG_CLEAR", "Clear this tag filter.");
+  if (layout.page_older_button)
+    tip(*layout.page_older_button,
+        resolve(locale_, "CHRONICLE_PAGE_OLDER", "Older page"),
+        "CHRONICLE_TIP_PAGE_OLDER", "Show the previous page of older events.");
+  if (layout.page_newer_button)
+    tip(*layout.page_newer_button,
+        resolve(locale_, "CHRONICLE_PAGE_NEWER", "Newer page"),
+        "CHRONICLE_TIP_PAGE_NEWER", "Show the next page of newer events.");
   stellar::native_ui::scrollbar(
       out,
       {layout.list_viewport.x + layout.list_viewport.width - 3.f * s,
