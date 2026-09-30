@@ -103,9 +103,19 @@ small-body lighting/LOD fade, quality propagation to every view, accessibility
 gates (reduce-motion/reduce-flashing/high-contrast) on 3D scenes, and the
 DebugView3D diagnostics panel. Per-commit record and the adopted-vs-declined
 engine-API inventory live in [UI_UX_OVERHAUL_PLAN.md](UI_UX_OVERHAUL_PLAN.md);
-all five renderer requests are delivered — the remaining open items are
-core-lane projections filed in
-[GAME_VISUAL_ENGINE_REQUESTS.md](GAME_VISUAL_ENGINE_REQUESTS.md). Suite: 327/327;
+all five renderer requests are delivered, and the three core-lane
+projection requests filed in
+[GAME_VISUAL_ENGINE_REQUESTS.md](GAME_VISUAL_ENGINE_REQUESTS.md) are now
+delivered too — per-action diplomacy blocker reasons
+(`DiplomacyActionBlocker` on `ObserverDiplomacyActionAvailability`, sealed
+through `NativeDiplomacySelected` to localized disabled-slot/term hovers),
+the interstellar logistics route graph
+(`CivilizationLogisticsCoverage::external_links` — sealed corridor edges
+rendered as the supply workspace's INTERSTELLAR LINKS section and
+serialized as `coverage.externalLinks`), and per-vessel fleet composition
+(`core/fleet_composition` — `FleetCompositionMember` roster sealed onto
+`NativeOwnFleet::members`, rendered as identity rows on the detail card
+and consumed by the controlled-assets ship count). Suite: 328/328;
 live smokes green at every quality tier and both density extremes.
 
 Hardening contracts added late in the workstream that future changes must
