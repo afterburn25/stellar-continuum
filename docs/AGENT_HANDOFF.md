@@ -215,6 +215,24 @@ preserve:
   positional/modifier arguments. `--audio-check` is illegal under
   `--new-game-restart-smoke`; `--smoke-full-exploration` requires
   developer mode.
+- Authoritative `stellar.py export windows-native-preview` verified
+  end-to-end at `412e683d`
+  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-412e683d-20260929T233838555462Z`):
+  fresh configure+build, 327/327 CTest, every
+  `tools/stellar-export/test_*.py` module (native_build now globs them —
+  the hardcoded list had orphaned 21 modules incl. the wired validators'
+  parser suites; `test_galaxy_asset_import` self-skips when
+  `assets/source/` provenance is absent), dependency audit, packaging
+  (5943 manifest files incl. `assets/visual/moons/**`, `Data/locale/`,
+  `Documentation/ReleaseNotes.md`), restricted-PATH relocated smoke, the
+  full validator battery, ZIP + SHA-256
+  `9557278177bd75edb5167eb9032bd5597360b3a046d64eeaa3596a50929f103a`.
+  Validation JSON: 106 booleans, only `graphicalParity` false
+  (intentional). native_build now retries failed CTest cases once via
+  `--rerun-failed` — `player_campaign_save` once flaked on a transient OS
+  file lock and passed immediately on retry; persistent defects still
+  fail the second pass. Separate clean-machine/VM certification remains
+  required; restricted-PATH is not that.
 - Draw-list test hazard: elements of `DrawList::overlay`/`world` are
   vector-backed — a held `Text*`/`UiRect*` dangles after the next
   `draw={}`/render. Copy `->at`/rects before re-rendering (the
