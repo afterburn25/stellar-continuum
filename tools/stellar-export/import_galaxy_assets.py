@@ -3,7 +3,6 @@ Source files are unchanged. Runtime previews contain complete artwork, never a c
 """
 from pathlib import Path
 import argparse, hashlib, json, re, unicodedata, math
-from PIL import Image
 MORPHOLOGIES = ('spiral','barred_spiral','elliptical','lenticular','irregular','ring')
 STATES = ('starburst','active','mature','aging','quiescent')
 def identify(name):
@@ -20,6 +19,9 @@ def identify(name):
     return morphology,state,variant
 
 def import_assets(source,root):
+    # Pillow is only needed for the actual image bake; identify() and the
+    # manifest tests must import this module on hosts without PIL.
+    from PIL import Image
     records=[]; seen=set()
     edits_path=root/'export/galaxy-asset-edits.json'
     edits=json.loads(edits_path.read_text(encoding='utf8'))['edits'] if edits_path.exists() else {}
