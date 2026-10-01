@@ -1,6 +1,8 @@
 #include <stellar/engine/memory_tracker.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/world.hpp>
+#include <stellar/engine/history.hpp>
 
 #include <atomic>
 #include <iostream>
@@ -130,6 +132,40 @@ int main() {
         check(json.find("\"gpu.textures\"") != std::string::npos,
               "memory JSON export contains subsystems");
         check(!tracker.overlay_lines().empty(), "memory overlay lines produced");
+    }
+
+    // World occupancy census — container capacities, observational only.
+    {
+        World world;
+        const auto empty_bytes = world.estimated_memory_bytes();
+        const auto a = world.create();
+        world.add<int>(a, 7);
+        const auto grown_bytes = world.estimated_memory_bytes();
+        check(grown_bytes > empty_bytes,
+              "world census grows with entities and components");
+        for (int i = 0; i < 64; ++i) {
+            const auto e = world.create();
+            world.add<int>(e, i);
+        }
+        check(world.estimated_memory_bytes() > grown_bytes,
+              "world census tracks container growth");
+        check(MemoryTracker::instance().snapshot().subsystems.size() >= 3,
+              "subsystems persist across census calls");
+    }
+
+    // EventHistory occupancy census — payloads, not just the event count.
+    {
+        EventHistory history;
+        const auto empty = history.estimated_memory_bytes();
+        check(empty == 0, "empty history reports no footprint");
+        HistoryEvent event;
+        event.category = "colony.founded";
+        event.summary = "a longer-than-sso summary payload string";
+        event.actors = {1, 2, 3};
+        event.tags = {"alpha", "beta"};
+        history.record(std::move(event));
+        check(history.estimated_memory_bytes() > sizeof(HistoryEvent),
+              "history census counts payload storage");
     }
 
     if (failures != 0) {

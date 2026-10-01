@@ -21,6 +21,9 @@ public:
     return {};
   }
   std::size_t loaded_count()const noexcept{std::size_t n=0;for(const auto& p:images_)n+=bool(p);return n;}
+  // Releases completed preparation tickets even while no small body is being
+  // drawn; an uncollected ticket would hold its queue reservation.
+  void poll(){for(auto& ticket:pending_)if(ticket&&ticket->ready()){const auto index=static_cast<std::size_t>(&ticket-pending_.data());images_[index]=ticket->take();ticket.reset();}}
 private:
   std::filesystem::path root_;
   std::shared_ptr<stellar::native_map::ImagePreparationQueue> queue_;

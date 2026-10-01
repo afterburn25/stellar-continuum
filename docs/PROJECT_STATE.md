@@ -5,7 +5,7 @@
 | Project | Stellar Continuum |
 | Engine | Custom Stellar Engine |
 | Language | C++23 engine and game |
-| Branch | `cpp/codex-native-architecture-integration` |
+| Branch | `engine/space-strategy-simulation-specialization` (workstream: `game/ui-visual-overhaul`, PR #338) |
 | Game / engine version | `0.1.14.2-dev` / `0.1.64` from `export/runtime-config.json` |
 | Platform | Windows x64, MSVC 2022, SDL3/Vulkan native presentation |
 | Milestone | Native playable development integration with celestial content, cooking and Windows maintenance; validation/release reliability remains open |

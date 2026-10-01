@@ -1,6 +1,8 @@
 #include "native_shipyard_workspace.hpp"
 #include "native_ui_layout.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <algorithm>
 #include <iostream>
 #include <ranges>
@@ -293,8 +295,89 @@ void stale_cancellation_quote_clears_when_its_revision_changes() {
 
 } // namespace
 
+void compact_designs_scroll_reaches_last_card() {
+  // At minimum resolution the designs viewport is a fraction of a card tall;
+  // every card must still be scroll-reachable — a content-height formula that
+  // double-counts the current offset strands the tail rows.
+  NativeShipyardWorkspace workspace;
+  workspace.open();
+  auto many = view();
+  many.available_designs.clear();
+  for (int i = 0; i < 9; ++i)
+    many.available_designs.push_back(design("design-" + std::to_string(i)));
+  workspace.set_view(many);
+  const auto layout = ShipyardWorkspaceLayout::for_viewport(640, 360);
+  REQUIRE(layout.designs.height < 260.f * layout.scale);
+  const auto wheel_at = center(layout.designs);
+  for (int n = 0; n < 100 && !workspace.design_bounds("design-8", 640, 360); ++n)
+    (void)workspace.handle({InputEventType::Wheel, wheel_at, {}, -1.f}, 640, 360);
+  REQUIRE(workspace.design_bounds("design-8", 640, 360).has_value());
+  // Same contract at the reference size.
+  workspace.open();
+  workspace.set_view(many);
+  const auto wide = ShipyardWorkspaceLayout::for_viewport(1920, 1080);
+  for (int n = 0; n < 100 && !workspace.design_bounds("design-8", 1920, 1080); ++n)
+    (void)workspace.handle({InputEventType::Wheel, center(wide.designs), {}, -1.f}, 1920, 1080);
+  REQUIRE(workspace.design_bounds("design-8", 1920, 1080).has_value());
+}
+
+void localized_shipyard_messages() {
+  // Core shipbuilding outcomes/blockers are stable English literals; the
+  // workspace recomposes known skeletons through the bound locale table and
+  // passes unrecognized text through unchanged.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string loc_error;
+  REQUIRE(german.load_json(
+      R"({"locale":"de","strings":{
+        "SHIPYARD_DENY_QUEUE_FULL":"Die Werftwarteschlange ist voll (maximal 8 ausstehende Schiffe).",
+        "SHIPYARD_DESIGN_REQUIRES":"{0} erfordert {1}.",
+        "SHIPYARD_MSG_STARTED":"Schiffbau gestartet: {0}. Autorisiert für {1}.",
+        "SHIPYARD_UNAVAILABLE":"Bau nicht verfügbar."
+      }})",
+      &loc_error));
+  NativeShipyardWorkspace workspace;
+  workspace.set_localization(&german);
+  workspace.open();
+  auto locked = view();
+  locked.available_designs.front().can_start = false;
+  locked.available_designs.front().start_blocker =
+      "The shipyard queue is full (8 pending vessels maximum).";
+  workspace.set_view(locked);
+  const auto card = workspace.design_bounds("scout", 1280, 720);
+  REQUIRE(card.has_value());
+  (void)workspace.handle({InputEventType::LeftPressed, center(*card)},
+                         1280, 720);
+  const auto has = [](const DrawList &draw, std::string_view needle) {
+    return std::ranges::any_of(draw.overlay, [&](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value.contains(needle);
+    });
+  };
+  DrawList readiness;
+  workspace.render(readiness, 1280, 720);
+  REQUIRE(has(readiness, "Werftwarteschlange ist voll"));
+  workspace.set_notice(
+      "Ship construction started: Pathfinder Scout. Authorized for $300M SOL.",
+      true);
+  DrawList notice;
+  workspace.render(notice, 1280, 720);
+  REQUIRE(has(notice, "Schiffbau gestartet: Pathfinder Scout"));
+  workspace.set_notice("Prospector Colonizer requires Orbital Shipyard.",
+                       false);
+  DrawList requires_tip;
+  workspace.render(requires_tip, 1280, 720);
+  REQUIRE(has(requires_tip, "Prospector Colonizer erfordert Orbital "
+                            "Shipyard."));
+  workspace.set_notice("Unmapped core telemetry text.", false);
+  DrawList passthrough;
+  workspace.render(passthrough, 1280, 720);
+  REQUIRE(has(passthrough, "Unmapped core telemetry text."));
+}
+
 int run_tests() {
   layout_is_contained_and_action_stays_visible();
+  localized_shipyard_messages();
+  compact_designs_scroll_reaches_last_card();
   start_and_cancel_use_real_mouse_hit_bounds();
   campaign_replacement_discards_old_order_context();
   empty_and_locked_states_render_without_invented_items();
@@ -314,11 +397,52 @@ int run_tests() {
   REQUIRE(batch.handle({InputEventType::LeftPressed,center(layout.action)},1920,1080).kind==ShipyardWorkspaceCommandKind::None);
   DrawList blocked;batch.render(blocked,1920,1080);
   REQUIRE(std::ranges::any_of(blocked.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value.contains("Not enough reserved population.");}));
+  // The readiness line embeds the blocker inside a multi-line string; an
+  // exact-match Text proves the hover tooltip rendered the reason alone.
+  (void)batch.handle({InputEventType::PointerMove,{4.f,4.f}},1920,1080);
+  DrawList unhovered;batch.render(unhovered,1920,1080);
+  REQUIRE(std::ranges::none_of(unhovered.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value=="Not enough reserved population.";}));
+  (void)batch.handle({InputEventType::PointerMove,center(layout.action)},1920,1080);
+  DrawList tip;batch.render(tip,1920,1080);
+  REQUIRE(std::ranges::any_of(tip.overlay,[](const auto& item){const auto* label=std::get_if<Text>(&item);return label&&label->value=="Not enough reserved population.";}));
   (void)batch.handle({InputEventType::LeftPressed,center(layout.search)},1920,1080);REQUIRE(batch.wants_text_input());
   InputEvent typing{InputEventType::TextEntered};typing.text="nonexistent";(void)batch.handle(typing,1920,1080);
   REQUIRE(!batch.design_bounds("scout",1920,1080));
   (void)batch.handle({InputEventType::LeftPressed,center(layout.sort)},1920,1080);REQUIRE(batch.popover_open());
   (void)batch.handle({InputEventType::EscapePressed},1920,1080);REQUIRE(batch.visible()&&!batch.popover_open());
+  {
+    // Keyboard focus: (y,x)-ordered ring over the whole dashboard.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kHome=0x4000004au,kEnd=0x4000004du,kDigit5='5';
+    const int width=1920,height=1080;
+    NativeShipyardWorkspace w;w.open();w.set_view(view());
+    const auto key=[&](std::uint32_t k,bool shift=false){InputEvent e{InputEventType::KeyPressed};e.key=k;e.shift=shift;return w.handle(e,width,height);};
+    REQUIRE(w.focus()<0);
+    const auto ring_layout=ShipyardWorkspaceLayout::for_viewport(width,height);
+    REQUIRE(w.focused_label(ring_layout).empty());
+    REQUIRE(key(kTab).captured&&w.focus()==0);
+    REQUIRE(w.focused_label(ring_layout)=="Close shipyard");
+    REQUIRE(key(kTab).captured&&w.focus()==1);
+    REQUIRE(w.focused_label(ring_layout)=="All ships");
+    REQUIRE(key(kTab,true).captured&&w.focus()==0);
+    REQUIRE(key(kEnd).captured&&w.focus()>1);
+    REQUIRE(!w.focused_label(ring_layout).empty());
+    REQUIRE(key(kHome).captured&&w.focus()==0);
+    (void)key(kTab);(void)key(kTab);REQUIRE(w.focus()==2);
+    REQUIRE(w.focused_label(ring_layout)=="Search ships");
+    REQUIRE(key(kReturn).captured&&w.wants_text_input()&&w.focus()==2);
+    InputEvent edit{InputEventType::TextEntered};edit.text="zz";(void)w.handle(edit,width,height);
+    REQUIRE(!w.design_bounds("scout",width,height));
+    (void)key(kDigit5);REQUIRE(w.wants_text_input()&&w.focus()==2);
+    (void)key(kTab);REQUIRE(!w.wants_text_input()&&w.focus()==3);
+    REQUIRE(!key(kDigit5).captured);
+    (void)key(kEnd);const int at=w.focus();const auto started=key(kReturn);
+    REQUIRE(started.kind==ShipyardWorkspaceCommandKind::Start&&w.focus()==at&&w.visible());
+    (void)key(kHome);REQUIRE(key(kReturn).captured&&!w.visible());
+    w.open();w.set_view(view());
+    (void)key(kTab);
+    (void)w.handle({InputEventType::LeftPressed,center(ShipyardWorkspaceLayout::for_viewport(width,height).designs)},width,height);
+    REQUIRE(w.focus()<0);
+  }
   return 0;
 }
 

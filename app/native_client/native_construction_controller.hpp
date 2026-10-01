@@ -9,6 +9,8 @@
 #include <thread>
 #include <vector>
 
+namespace stellar::engine { class LocalizationTable; }
+
 namespace stellar::native_construction {
 struct NativeConstructionAction {
   bool enabled{};
@@ -49,8 +51,10 @@ public:
   [[nodiscard]] NativeConstructionCommandOutcome start(stellar::core::CampaignFrame &, std::uint64_t generation, std::uint64_t revision, std::string_view project_id);
   [[nodiscard]] NativeConstructionCommandOutcome queue(stellar::core::CampaignFrame &, std::uint64_t generation, std::uint64_t revision, std::string_view project_id);
   [[nodiscard]] NativeConstructionCommandOutcome cancel(stellar::core::CampaignFrame &, std::uint64_t generation, std::uint64_t revision, std::string_view project_id);
+  void set_localization(const stellar::engine::LocalizationTable *table) noexcept { locale_ = table; }
 private:
   void require_owner() const;
+  const stellar::engine::LocalizationTable *locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::uint64_t revision_{};

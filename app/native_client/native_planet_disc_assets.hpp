@@ -39,6 +39,9 @@ public:
   [[nodiscard]] std::uint64_t source_decode_count()const noexcept;
   [[nodiscard]] std::uint64_t generated_disc_count()const noexcept;
   [[nodiscard]] std::size_t pending_count()const noexcept;
+  // Releases completed preparation tickets even while no planet disc is being
+  // drawn; an uncollected ticket would hold its queue reservation.
+  void poll();
 private:
   struct Storage;
   std::unique_ptr<Storage> storage_;

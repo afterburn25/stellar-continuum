@@ -1,5 +1,8 @@
 #include <stellar/core/logistics.hpp>
 
+#include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/interstellar_distance.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <stdexcept>
@@ -8,6 +11,9 @@
 namespace stellar::core {
 namespace {
 constexpr double minimum_population_scale = .001;
+// Freight corridors run at the reference strategic speed (ly/day) established
+// in fleet_transit.cpp — freight traffic is bulk shipping, not warship sorties.
+constexpr double interstellar_freight_light_years_per_day = 22.0;
 
 SupplyCondition classify(double coverage) {
     return coverage < .70 ? SupplyCondition::Critical : coverage < .95 ? SupplyCondition::Strained : SupplyCondition::Healthy;
@@ -116,7 +122,8 @@ HomeSystemLogisticsNetwork home_system_logistics(EconomyWorldView world, std::sp
 }
 
 CivilizationLogisticsCoverage civilization_logistics_coverage(EconomyWorldView world, std::span<const Colony> colonies,
-    std::span<const CivilizationEconomy> economies, int civilization_id) {
+    std::span<const CivilizationEconomy> economies, std::span<const StellarSystem> system_records,
+    int civilization_id) {
     const auto& civ = civilization(world.civilizations, civilization_id);
     const auto snapshot = economy_logistics(world, colonies, economies, civilization_id);
     std::unordered_map<int, ColonyLogisticsSnapshot> by_colony;
@@ -137,6 +144,24 @@ CivilizationLogisticsCoverage civilization_logistics_coverage(EconomyWorldView w
         }
         external.local_surplus_per_day = std::max(0.0, external.local_support_capacity_per_day - external.support_demand_per_day);
         result.external_import_requirement_per_day += external.import_requirement_per_day; result.external_local_surplus_per_day += external.local_surplus_per_day; result.external_systems.push_back(external);
+    }
+    const auto home_record = std::ranges::find(system_records, civ.home_system_id, &StellarSystem::id);
+    if (home_record != system_records.end()) {
+        for (const auto& external : result.external_systems) {
+            const auto endpoint = std::ranges::find(system_records, external.system_id, &StellarSystem::id);
+            if (endpoint == system_records.end()) continue;
+            ExternalLogisticsLink link;
+            link.civilization_id = civilization_id;
+            link.home_system_id = civ.home_system_id;
+            link.external_system_id = external.system_id;
+            link.capacity_per_day = snapshot.cargo_handling_capacity_per_day;
+            link.transit_days = distance_light_years(home_record->position, endpoint->position) /
+                interstellar_freight_light_years_per_day;
+            link.required_per_day = external.import_requirement_per_day;
+            link.represented = external.has_represented_interstellar_freight_corridor;
+            link.enabled = link.represented;
+            result.external_links.push_back(link);
+        }
     }
     result.owned_system_count = 1 + static_cast<int>(result.external_systems.size()); result.external_system_count = static_cast<int>(result.external_systems.size());
     result.unrepresented_interstellar_support_per_day = result.external_import_requirement_per_day;

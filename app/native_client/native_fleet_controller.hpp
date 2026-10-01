@@ -5,12 +5,15 @@
 #include <stellar/core/own_combat_fleet_status.hpp>
 
 #include <cstdint>
+#include <initializer_list>
 #include <optional>
 #include <span>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_fleet {
 
@@ -85,6 +88,22 @@ struct NativeScienceSurveyStatus {
   bool operator==(const NativeScienceSurveyStatus &) const = default;
 };
 
+// One member vessel of an inspectable fleet — sealed copy of the canonical
+// FleetCompositionMember with presentation-resolved design/flag labels.
+struct NativeFleetMember {
+  std::int64_t vessel_id{};
+  std::string name;
+  std::string design_name;
+  bool is_flagship{}, is_carrier{}, is_interdictor{}, is_story_ship{};
+  float hull_fraction{1.f}, engine_fraction{1.f}, sensor_fraction{1.f},
+      warp_drive_fraction{1.f}, reactor_fraction{1.f};
+  int battles_fought{}, confirmed_kills{};
+  bool destroyed{}, escaped{}, has_vessel_state{};
+  double embarked_population_millions{};
+  double cargo_materials{}, cargo_material_capacity{};
+  [[nodiscard]] bool operator==(const NativeFleetMember &) const = default;
+};
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -109,6 +128,18 @@ struct NativeOwnFleet {
   std::optional<NativeScoutReconnaissanceStatus> reconnaissance;
   std::optional<NativeScienceSurveyStatus> science_survey;
   std::string recovery_message;
+  // Composition the detail block surfaces — resolved design name, live
+  // payload, and the vessel's structural condition after combat.
+  std::string design_name;
+  double cargo_materials{},cargo_material_capacity{};
+  double embarked_population_millions{};
+  bool has_vessel_state{};
+  float hull_integrity{1.f};
+  // Sealed member-vessel roster — the canonical fleet_composition projection
+  // with design names resolved at presentation. Empty only when the fleet
+  // record itself is out of scope for the observer.
+  std::vector<NativeFleetMember> members;
+  int vessel_count{};
   bool foreign_inspection{};
   int owner_civilization_id{};
   std::string owner_name;
@@ -191,11 +222,21 @@ public:
   [[nodiscard]] NativeFleetLocateOutcome locate_selected(
       stellar::core::CampaignFrame &, const NativeFleetLocateQuote &);
   [[nodiscard]] std::optional<int> selection() const;
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
 private:
   void require_owner() const;
   void bind_generation(std::uint64_t campaign_generation);
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  [[nodiscard]] std::string trf(std::string_view key,
+                                std::initializer_list<std::string> args,
+                                std::string_view fallback) const;
 
+  const stellar::engine::LocalizationTable *locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::optional<int> selected_fleet_id_;

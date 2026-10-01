@@ -28,6 +28,22 @@ void geometry_and_physics(){
   require(hit&&std::abs(*hit-.495)<1e-12,"Fast segment tunnelled through sphere");
   require(!segment_sphere({2,0,-100},{2,0,100},{0,0,0},1),"Sphere false positive");
   require(segment_sphere({0,0,0},{0,0,0},{0,0,0},1)==0.,"Initial overlap lost");
+  // Segment vs AABB: entry fraction, slab miss on each axis, parallel
+  // inside/outside, initial overlap, and a tall-thin box that a bounding
+  // sphere would admit but the box rejects.
+  const auto box_hit=segment_aabb({0,0,-10},{0,0,10},{-1,-1,-1},{1,1,1});
+  require(box_hit&&std::abs(*box_hit-.45)<1e-12,"AABB entry fraction wrong");
+  require(!segment_aabb({2,0,-10},{2,0,10},{-1,-1,-1},{1,1,1}),
+          "AABB x-miss false positive");
+  require(!segment_aabb({0,5,-10},{0,5,10},{-1,-1,-1},{1,1,1}),
+          "AABB parallel-outside false positive");
+  require(segment_aabb({0,0,0},{0,0,10},{-1,-1,-1},{1,1,1})==0.,
+          "AABB initial overlap lost");
+  require(segment_aabb({0,9.9,0},{0,-9.9,0},{-.5,-10,-.5},{.5,10,.5})
+              .has_value(),
+          "thin AABB missed a segment through it");
+  require(!segment_aabb({.9,0,0},{.9,10,0},{-.5,-10,-.5},{.5,10,.5}),
+          "thin AABB accepted a segment beside it");
   const auto terrain=heightfield_mesh(32,16,[](float x,float y){return x*.25f+y*.5f;});
   const auto& a=terrain->vertices()[0];require(std::abs(a.normal.z-.8728716f)<1e-5f,"Heightfield normals incorrect");
   const auto collision=segment_triangle({0,0,10},{0,0,-10},{-1,-1,0},{1,-1,0},{0,1,0});

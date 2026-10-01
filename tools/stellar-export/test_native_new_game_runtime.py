@@ -7,7 +7,9 @@ import tempfile
 import unittest
 from unittest import mock
 
-from native_new_game_runtime import _video_diagnostic, validate_native_new_game_export
+from native_new_game_runtime import (_controls_diagnostic, _general_diagnostic,
+                                     _video_diagnostic, _voice_settings_diagnostic,
+                                     validate_native_new_game_export)
 
 
 def fixture(path):
@@ -44,7 +46,7 @@ class VideoDiagnosticTests(unittest.TestCase):
     location = "startup"
 
     def stdout(self, **overrides):
-        report = {"location": self.location, "opened": True, "four_rows": True,
+        report = {"location": self.location, "opened": True, "choice_rows": True,
                   "previewed": True, "normal_capture": True, "confirm_capture": True,
                   "escape_reverted": True, "kept": True, "restored": True}
         report.update(overrides)
@@ -74,7 +76,7 @@ class VideoDiagnosticTests(unittest.TestCase):
 
     def test_duplicate_video_key_is_rejected(self):
         duplicate = ('video_settings_check={"location":"startup","opened":true,'
-                     '"opened":true,"four_rows":true,"previewed":true,'
+                     '"opened":true,"choice_rows":true,"previewed":true,'
                      '"normal_capture":true,"confirm_capture":true,'
                      '"escape_reverted":true,"kept":true,"restored":true}')
         with self.assertRaises(RuntimeError):
@@ -83,6 +85,139 @@ class VideoDiagnosticTests(unittest.TestCase):
     def test_wrong_video_location_is_rejected(self):
         with self.assertRaises(RuntimeError):
             _video_diagnostic(self.stdout(location="pause"), self.location)
+
+
+class GeneralDiagnosticTests(unittest.TestCase):
+    location = "pause"
+
+    def stdout(self, **overrides):
+        report = {"location": self.location, "opened": True, "capture": True,
+                  "text_scale": True, "cancel_restored": True, "saved": True,
+                  "restored": True}
+        report.update(overrides)
+        return "general_settings_check=" + json.dumps(report, separators=(",", ":"))
+
+    def test_valid_general_diagnostic(self):
+        self.assertEqual(_general_diagnostic(self.stdout(), self.location)["location"],
+                         self.location)
+
+    def test_missing_general_diagnostic_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic("gpu_driver=vulkan", self.location)
+
+    def test_missing_general_field_is_rejected(self):
+        report = json.loads(self.stdout().removeprefix("general_settings_check="))
+        del report["text_scale"]
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic("general_settings_check=" + json.dumps(report), self.location)
+
+    def test_false_general_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(self.stdout(restored=False), self.location)
+
+    def test_integer_general_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(self.stdout(text_scale=1), self.location)
+
+    def test_duplicate_general_key_is_rejected(self):
+        duplicate = ('general_settings_check={"location":"pause","opened":true,'
+                     '"opened":true,"capture":true,"text_scale":true,'
+                     '"cancel_restored":true,"saved":true,"restored":true}')
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(duplicate, self.location)
+
+    def test_wrong_general_location_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _general_diagnostic(self.stdout(location="startup"), self.location)
+
+
+class VoiceSettingsDiagnosticTests(unittest.TestCase):
+    location = "startup"
+
+    def stdout(self, **overrides):
+        report = {"location": self.location, "opened": True, "previewed": True,
+                  "replay": True, "stop": True, "defaults": True,
+                  "cancel_restored": True, "saved": True, "restored": True}
+        report.update(overrides)
+        return "voice_settings_check=" + json.dumps(report, separators=(",", ":"))
+
+    def test_valid_voice_settings_diagnostic(self):
+        self.assertEqual(
+            _voice_settings_diagnostic(self.stdout(), self.location)["location"],
+            self.location)
+
+    def test_missing_voice_settings_diagnostic_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _voice_settings_diagnostic("gpu_driver=vulkan", self.location)
+
+    def test_missing_voice_settings_field_is_rejected(self):
+        report = json.loads(self.stdout().removeprefix("voice_settings_check="))
+        del report["previewed"]
+        with self.assertRaises(RuntimeError):
+            _voice_settings_diagnostic(
+                "voice_settings_check=" + json.dumps(report), self.location)
+
+    def test_false_voice_settings_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _voice_settings_diagnostic(self.stdout(restored=False), self.location)
+
+    def test_wrong_voice_settings_location_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _voice_settings_diagnostic(self.stdout(location="pause"), self.location)
+
+
+class ControlsDiagnosticTests(unittest.TestCase):
+    def pause_stdout(self, **overrides):
+        report = {"location": "pause", "opened": True, "capture_cancel": True,
+                  "rebound": True, "restored": True, "scrolled": False,
+                  "axis_captured": False, "pinned": False, "noticed": False,
+                  "triggers": False, "stole": False, "file_preexisted": False}
+        report.update(overrides)
+        return "controls_settings_check=" + json.dumps(report, separators=(",", ":"))
+
+    def test_valid_controls_pause_diagnostic(self):
+        self.assertEqual(
+            _controls_diagnostic(self.pause_stdout(), "pause")["location"], "pause")
+
+    def test_conditional_flags_may_be_false(self):
+        # At tall viewports the row list fits without scrolling — the scroll/
+        # axis/pin/steal evidence stays false while the core proof holds.
+        report = _controls_diagnostic(self.pause_stdout(scrolled=False), "pause")
+        self.assertTrue(report["rebound"])
+
+    def test_valid_controls_startup_help_card(self):
+        report = 'controls_settings_check={"location":"startup","help_card":true}'
+        self.assertTrue(_controls_diagnostic(report, "startup")["help_card"])
+
+    def test_startup_schema_rejects_pause_fields(self):
+        report = ('controls_settings_check={"location":"startup","help_card":true,'
+                  '"opened":true}')
+        with self.assertRaises(RuntimeError):
+            _controls_diagnostic(report, "startup")
+
+    def test_pause_schema_rejects_help_card(self):
+        report = 'controls_settings_check={"location":"pause","help_card":true}'
+        with self.assertRaises(RuntimeError):
+            _controls_diagnostic(report, "pause")
+
+    def test_missing_controls_diagnostic_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _controls_diagnostic("gpu_driver=vulkan", "pause")
+
+    def test_missing_controls_field_is_rejected(self):
+        report = json.loads(self.pause_stdout().removeprefix("controls_settings_check="))
+        del report["stole"]
+        with self.assertRaises(RuntimeError):
+            _controls_diagnostic(
+                "controls_settings_check=" + json.dumps(report), "pause")
+
+    def test_false_controls_required_flag_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _controls_diagnostic(self.pause_stdout(rebound=False), "pause")
+
+    def test_integer_controls_conditional_is_rejected(self):
+        with self.assertRaises(RuntimeError):
+            _controls_diagnostic(self.pause_stdout(scrolled=1), "pause")
 
 
 class NativeNewGameRuntimeTests(unittest.TestCase):

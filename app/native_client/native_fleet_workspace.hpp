@@ -6,6 +6,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -19,6 +20,11 @@ namespace stellar::native_fleet_ui {
 struct FleetScreenMarker {
   int fleet_id{};
   stellar::native_map::Point position{};
+  // Screen-space hull bearing (degrees, 0 = +x) and observed motion for the
+  // Scene3D ship glyph. Derived from the fleet's published destination;
+  // idle fleets keep a neutral -90-degree (up) heading.
+  float heading_degrees{-90.f};
+  bool in_transit{};
 };
 
 enum class FleetWorkspacePresentation { Outliner, SelectedCommands };
@@ -90,6 +96,10 @@ public:
     locale_ = table;
   }
   void set_view(stellar::native_fleet::NativeFleetMapView view);
+  void
+  set_scene3d_quality(stellar::native_map::RenderQuality3D value) noexcept {
+    scene3d_quality_ = value;
+  }
   void discard_campaign();
   void set_preview(stellar::native_fleet::NativeFleetRoutePreview preview,
                    std::string target_display_name);
@@ -131,8 +141,40 @@ public:
   [[nodiscard]] const std::optional<stellar::native_fleet::NativeFleetRoutePreview> &
   preview() const noexcept;
   [[nodiscard]] std::optional<int> selected_fleet_id() const noexcept;
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  void reset_focus() noexcept { focus_ = -1; }
+  // Localized label of the ringed control — the announcement surface for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(const FleetWorkspaceLayout &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const FleetWorkspaceLayout &) const;
 
 private:
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+    // Set when `bounds` was clipped to the outliner list viewport: the
+    // row's translated, unclipped rect so keyboard focus can snap the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
+  };
+  // Outliner display order: fleets grouped by status (in combat → in
+  // transit → on mission → stationed), urgent first, projection order kept
+  // inside a group. Header rows carry a localized "NAME · count" caption and
+  // appear only when at least two status groups are non-empty.
+  struct FleetListRow {
+    std::size_t fleet_index{};   // into view_->own_fleets (header: unused)
+    bool header{};
+    std::string caption;
+    float top{};                 // un-scrolled offset inside the list
+    float height{};              // row pitch / header pitch
+  };
+  [[nodiscard]] std::vector<FleetListRow>
+  fleet_rows(const FleetWorkspaceLayout &) const;
+  [[nodiscard]] float
+  fleet_content_height(const FleetWorkspaceLayout &) const;
+  [[nodiscard]] std::vector<FocusRect>
+  focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;
   enum class PressTarget { None, Hold, Defend, Retreat, Locate };
   [[nodiscard]] const stellar::native_fleet::NativeOwnFleet *
@@ -156,12 +198,17 @@ private:
   std::string return_warning_;
   bool notice_accepted_{};
   stellar::native_map::Point pointer_{};
-  float list_scroll_{};
+  // Render-time geometry sync keeps the scrollbar thumb honest — mutable so
+  // the const render path can re-clamp without lying about state changes.
+  mutable stellar::engine::ScrollView list_scroll_{};
   PressTarget pressed_action_{PressTarget::None};
   stellar::native_map::UiRect pressed_bounds_{};
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;
   std::optional<stellar::native_fleet::NativeFleetLocateQuote> pressed_locate_quote_;
   mutable int last_ship_art_rows_{};
+  stellar::native_map::RenderQuality3D scene3d_quality_{
+      stellar::native_map::RenderQuality3D::High};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_fleet_ui

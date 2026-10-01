@@ -4,6 +4,7 @@
 #include <cmath>
 #include <iostream>
 #include <ranges>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -192,6 +193,51 @@ int main() {
         REQUIRE(candidate->clip && inside(inspector_1080, *candidate->clip));
         if (candidate->clip->width < inspector_1080.width)
           REQUIRE(candidate->clip->y + candidate->clip->height <= footer_1080 - 8.f);
+      }
+
+    // Minimum-height panels collapse the name banner so the scrollable fact
+    // list keeps a usable viewport instead of clipping to zero height.
+    const UiRect inspector_tiny{60.f, 128.f, 220.f, 167.f};
+    constexpr float footer_tiny = 232.f;
+    BodyInspectionPanel tiny;
+    tiny.set_text_measurer(measured);
+    tiny.set_inspection(inspection(5, "Erebus"));
+    DrawList tiny_draw;
+    tiny.render(tiny_draw, inspector_tiny, footer_tiny);
+    REQUIRE(contains(tiny_draw, "SYSTEM INSPECTOR") &&
+            contains(tiny_draw, "SURVEY COMPLETE"));
+    REQUIRE(!contains(tiny_draw, "Erebus"));
+    REQUIRE(tiny.scroll_offset() == 0.f);
+    std::set<std::string> reachable;
+    for (const auto &item : tiny_draw.overlay)
+      if (const auto *candidate = std::get_if<Text>(&item); candidate)
+        reachable.insert(candidate->value);
+    float last_scroll = -1.f;
+    for (int step = 0; step < 256 && tiny.scroll_offset() != last_scroll; ++step) {
+      last_scroll = tiny.scroll_offset();
+      tiny.scroll(-0.5f, inspector_tiny, footer_tiny);
+      DrawList frame;
+      tiny.render(frame, inspector_tiny, footer_tiny);
+      for (const auto &item : frame.overlay)
+        if (const auto *candidate = std::get_if<Text>(&item); candidate)
+          reachable.insert(candidate->value);
+    }
+    for (const char *required :
+         {"Physical", "6,371 km", "9.81 m/s²", "Environment",
+          "Oxygen / nitrogen", "Satellites & signals", "Known moons"})
+      if (reachable.count(required) != 1) {
+        std::cerr << "unreachable: " << required << " scroll=" << tiny.scroll_offset()
+                  << " reachable:";
+        for (const auto &entry : reachable) std::cerr << " [" << entry << "]";
+        std::cerr << '\n';
+        REQUIRE(false);
+      }
+    REQUIRE(tiny.scroll_offset() > 0.f);
+    for (const auto &item : tiny_draw.overlay)
+      if (const auto *candidate = std::get_if<Text>(&item); candidate) {
+        REQUIRE(candidate->clip && inside(inspector_tiny, *candidate->clip));
+        if (candidate->clip->width < inspector_tiny.width)
+          REQUIRE(candidate->clip->y + candidate->clip->height <= footer_tiny - 8.f);
       }
 
     panel.clear();

@@ -5,8 +5,10 @@
 #include "native_dropdown.hpp"
 #include <filesystem>
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <initializer_list>
 #include <optional>
@@ -52,6 +54,24 @@ public:
   [[nodiscard]] bool popover_open()const{return dropdown_.visible();}
   void bind_preferences(std::filesystem::path);
   [[nodiscard]] bool wants_text_input()const{return visible_&&search_focused_;}
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string
+  focused_label(const ShipyardWorkspaceLayout &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const ShipyardWorkspaceLayout &) const;
+  // UIA control kind of the ringed control — Edit on the search field,
+  // Custom elsewhere.
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(const ShipyardWorkspaceLayout &) const;
+  // Current text of the ringed Edit — null when focus is elsewhere.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(const ShipyardWorkspaceLayout &) const;
+  // Applies a platform value SetValue to the ringed Edit — false when the
+  // focus sits on a non-edit control.
+  bool set_focused_text(std::string text, const ShipyardWorkspaceLayout &);
   void close() noexcept;
   [[nodiscard]] bool visible() const noexcept;
   [[nodiscard]] bool confirmation_open() const noexcept {
@@ -91,6 +111,20 @@ private:
   [[nodiscard]] const stellar::native_shipyard::NativeShipyardOrder *
   selected_order() const noexcept;
   void reconcile_selection();
+  // Keyboard-focus contract: (y,x)-ordered controls across the whole
+  // dashboard; activation replays the authoritative click dispatch.
+  struct FocusItem {
+    stellar::native_map::UiRect rect;
+    std::uint64_t target;
+    std::string label;
+    // Set when `rect` was clipped to a scroll viewport: the control's
+    // translated, unclipped bounds plus which lane scrolls it —
+    // 1 design cards, 2 build orders — so keyboard focus snaps the list.
+    std::optional<stellar::native_map::UiRect> unclipped;
+    int scroll_lane{0};
+  };
+  [[nodiscard]] std::vector<FocusItem> focusables(
+      const ShipyardWorkspaceLayout &) const;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
   [[nodiscard]] std::string
@@ -106,16 +140,16 @@ private:
   std::optional<std::string> cancel_confirmation_id_;
   std::string notice_;
   bool notice_accepted_{};
-  float design_scroll_{};
-  float order_scroll_{};
+  mutable stellar::engine::ScrollView design_scroll_{};
+  mutable stellar::engine::ScrollView order_scroll_{};
   mutable int last_ship_art_rows_{};
   std::filesystem::path preferences_path_;
   std::vector<std::string> favorites_;
   std::string search_;
   int category_{},sort_{},filter_{},quantity_{1};
   bool search_focused_{};
-  float detail_scroll_{};
-  mutable float detail_limit_{};
+  int focus_{-1};
+  mutable stellar::engine::ScrollView detail_scroll_{};
   stellar::native_ui::Dropdown dropdown_;
   TextMeasurer measure_;
 };

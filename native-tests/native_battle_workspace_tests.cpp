@@ -1,5 +1,7 @@
 #include "native_battle_workspace.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -796,6 +798,221 @@ void fit_keeps_formations_clear_of_controls() {
   }
 }
 
+void keyboard_focus() {
+  constexpr std::uint32_t kTab = 9u;
+  constexpr std::uint32_t kReturn = 13u;
+  constexpr std::uint32_t kHome = 0x4000004au;
+  constexpr int width = 1280, height = 720;
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, width, height);
+  const auto key = [&](std::uint32_t k, bool shift = false) {
+    InputEvent e{InputEventType::KeyPressed};
+    e.key = k;
+    e.shift = shift;
+    return workspace.handle(e, width, height);
+  };
+  require(workspace.focus() < 0, "Battle focus should start unset.");
+  const auto ring_layout = BattleWorkspaceLayout::for_viewport(width, height);
+  require(workspace.focused_label(ring_layout).empty(),
+          "Unfocused battle workspace reported a label.");
+  // Top row: play, speed, fit, menu; then the two-column order grid.
+  require(key(kTab).captured && workspace.focus() == 0,
+          "Tab did not land on the play control.");
+  require(workspace.focused_label(ring_layout) == "Pause",
+          "Focused play control label mismatch.");
+  auto command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::TogglePause &&
+              workspace.focus() == 0,
+          "Play activation did not toggle pause.");
+  (void)key(kTab);
+  command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::CycleSpeed &&
+              workspace.focus() == 1,
+          "Speed activation did not cycle speed.");
+  (void)key(kTab);
+  (void)key(kTab);
+  command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::Menu,
+          "Menu activation did not issue the menu command.");
+  require(workspace.visible(), "Menu command closed the battle surface.");
+  // Order buttons activate through the same press dispatch.
+  const int hold = 4; // first order-grid entry
+  (void)key(kHome);
+  for (int i = 0; i < hold; ++i)
+    (void)key(kTab);
+  require(workspace.focus() == hold,
+          "Hold order is not the first order-grid focusable.");
+  require(workspace.focused_label(ring_layout) == "Hold",
+          "Focused order button label mismatch.");
+  command = key(kReturn);
+  require(command.captured && command.kind == BattleWorkspaceCommandKind::None,
+          "Order issued without a selection.");
+  // Select an owned formation, then keyboard-activate Hold.
+  const auto own = workspace.project({-60.f, 0.f}, width, height);
+  (void)workspace.handle(press(InputEventType::LeftPressed, own), width,
+                       height);
+  (void)workspace.handle(press(InputEventType::LeftReleased, own), width,
+                         height);
+  require(workspace.selection().contains(11), "selection failed");
+  require(workspace.focus() < 0,
+          "Pointer selection did not clear keyboard focus.");
+  for (int i = 0; i <= hold; ++i)
+    (void)key(kTab);
+  require(workspace.focus() == hold,
+          "Refocus did not reach the Hold order.");
+  command = key(kReturn);
+  require(command.kind == BattleWorkspaceCommandKind::IssueOrder &&
+              command.orders.size() == 1 &&
+              command.orders.front().formation_id == 11 &&
+              command.orders.front().type == MassiveCombatOrderType::Hold,
+          "Keyboard activation did not issue the Hold order.");
+  require(workspace.focus() == hold,
+          "Order activation lost keyboard focus.");
+  // Pointer cancellation clears focus.
+  (void)workspace.handle(press(InputEventType::PointerCancelled, {}), width,
+                         height);
+  require(workspace.focus() < 0,
+          "Pointer cancellation did not clear keyboard focus.");
+}
+
+void order_button_tips() {
+  constexpr int width = 1280, height = 720;
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, width, height);
+  const auto layout = BattleWorkspaceLayout::for_viewport(width, height);
+  InputEvent hover{};
+  hover.type = InputEventType::PointerMove;
+  hover.position = center(layout.order_buttons[0]);
+  (void)workspace.handle(hover, width, height);
+  DrawList draw;
+  workspace.render(draw, width, height);
+  require(std::ranges::any_of(draw.overlay, [](const auto &item) {
+            const auto *label = std::get_if<Text>(&item);
+            return label &&
+                   label->value == "Hold position and fight from the current post.";
+          }),
+          "Hovered Hold button emitted no order explanation.");
+  hover.position = {8.f, 8.f};
+  (void)workspace.handle(hover, width, height);
+  DrawList clear;
+  workspace.render(clear, width, height);
+  require(!std::ranges::any_of(clear.overlay, [](const auto &item) {
+            const auto *label = std::get_if<Text>(&item);
+            return label &&
+                   label->value == "Hold position and fight from the current post.";
+          }),
+          "Order explanation persisted after the pointer left the grid.");
+}
+
+void localized_battle_messages() {
+  // Combat feed/status prose is authored as stable English skeletons in
+  // core; the workspace recomposes known skeletons through the bound table
+  // and passes unrecognized text through unchanged.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string loc_error;
+  require(german.load_json(R"({"locale":"de","strings":{
+      "BATTLE_EVENT_DAMAGE":"{0} hat {1} Flächenschaden erlitten und {2} Schiffe verloren.",
+      "BATTLE_EVENT_ORDER_CHANGED":"{0}: {1}.",
+      "BATTLE_EVENT_WARP_BLOCKED":"Warp blockiert.",
+      "BATTLE_ACK_ORDER":"{0} bestätigt: {1}.",
+      "BATTLE_DENY_HOSTILE":"Kein aktives feindliches Ziel.",
+      "BATTLE_ORDER_HOLD":"halten"
+    }})",
+                            &loc_error),
+          loc_error);
+  const int width = 1280, height = 720;
+  auto snap = snapshot();
+  snap.events.clear();
+  const auto add = [&](std::string message) {
+    snap.events.push_back(
+        {.sequence = static_cast<std::int64_t>(snap.events.size() + 1),
+         .tick = 400,
+         .type = MassiveCombatEventType::Damage,
+         .actor_civilization_id = 1,
+         .actor_formation_id = 11,
+         .target_formation_id = 77,
+         .magnitude = 0,
+         .position = MassivePoint{},
+         .message = std::move(message),
+         .details_known = true});
+  };
+  add("Vanguard Fleet sustained 3 aggregate damage and lost 2 ships.");
+  add("Vanguard Fleet: Hold.");
+  add("Warp completion blocked by a hostile interdiction field.");
+  add("Unmapped core telemetry text.");
+  NativeBattleWorkspace workspace;
+  workspace.set_localization(&german);
+  workspace.open(snap, 1, width, height);
+  DrawList feed;
+  workspace.render(feed, width, height);
+  const auto has = [&](const auto &draw, std::string_view needle) {
+    return std::ranges::any_of(draw.overlay, [&](const auto &item) {
+      const auto *label = std::get_if<Text>(&item);
+      return label && label->value == needle;
+    });
+  };
+  require(has(feed, "Vanguard Fleet hat 3 Flächenschaden erlitten und 2 "
+                    "Schiffe verloren."),
+          "damage skeleton did not localize");
+  require(has(feed, "Vanguard Fleet: halten."),
+          "order-changed skeleton did not localize");
+  require(has(feed, "Warp blockiert."),
+          "warp-blocked skeleton did not localize");
+  require(has(feed, "Unmapped core telemetry text."),
+          "unmapped event text did not pass through");
+  workspace.set_status("Vanguard Fleet acknowledged Hold.");
+  DrawList ack;
+  workspace.render(ack, width, height);
+  require(has(ack, "Vanguard Fleet bestätigt: halten."),
+          "acknowledged status did not localize");
+  workspace.set_status(
+      "The requested target is not an active hostile formation.", true);
+  DrawList deny;
+  workspace.render(deny, width, height);
+  require(has(deny, "Kein aktives feindliches Ziel."),
+          "denial status did not localize");
+  // Without a table every skeleton stays the authored English literal.
+  NativeBattleWorkspace plain;
+  plain.open(snapshot(), 1, width, height);
+  plain.set_status("Vanguard Fleet acknowledged Hold.");
+  DrawList english;
+  plain.render(english, width, height);
+  require(has(english, "Vanguard Fleet acknowledged Hold."),
+          "no-table status did not stay English");
+}
+
+void wrapped_order_labels_stay_inside_buttons() {
+  // Localized order labels that exceed the button width word-wrap; the
+  // wrapped block must be vertically centered so its second line stays
+  // inside the button clip (the rasterizer clamps fonts at 8px, so
+  // shrinking cannot rescue two-word labels).
+  NativeBattleWorkspace workspace;
+  workspace.open(snapshot(), 1, 640, 360);
+  // Deterministic two-line wrapped extent, as the platform measurer reports.
+  workspace.set_text_measurer([](const Text &probe) {
+    return probe.wrap_width > 0.f ? TextExtent{90, 20} : TextExtent{90, 10};
+  });
+  DrawList draw;
+  workspace.render(draw, 640, 360);
+  const auto layout = BattleWorkspaceLayout::for_viewport(640, 360);
+  const auto &focus_rect = layout.order_buttons[3];
+  const auto label = std::ranges::find_if(
+      draw.overlay, [](const auto &item) {
+        const auto *text = std::get_if<Text>(&item);
+        return text && text->value == "Focus fire";
+      });
+  require(label != draw.overlay.end(), "order label was not emitted");
+  const auto &text = std::get<Text>(*label);
+  require(text.clip && text.clip->x == focus_rect.x &&
+              text.clip->y == focus_rect.y &&
+              text.clip->width == focus_rect.width &&
+              text.clip->height == focus_rect.height,
+          "order label lost its button clip");
+  require(text.at.y >= focus_rect.y &&
+              text.at.y + 20.f <= focus_rect.y + focus_rect.height,
+          "wrapped order label is not centered inside the button");
+}
+
 } // namespace
 
 int main() {
@@ -805,6 +1022,7 @@ int main() {
     selection_rules();
     gesture_ownership();
     order_commands();
+    keyboard_focus();
     speed_and_chrome();
     ship_art_hit_targets();
     camera_roundtrip_and_resize();
@@ -814,6 +1032,9 @@ int main() {
     targeted_chrome_gesture_does_not_order();
     spatial_orders_preserve_depth();
     fit_keeps_formations_clear_of_controls();
+    order_button_tips();
+    localized_battle_messages();
+    wrapped_order_labels_stay_inside_buttons();
   } catch (const std::exception &error) {
     std::cerr << "native battle workspace tests failed: " << error.what()
               << '\n';

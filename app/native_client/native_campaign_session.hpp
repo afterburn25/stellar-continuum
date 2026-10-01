@@ -15,6 +15,7 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
@@ -36,6 +37,11 @@ struct SessionNotice {
   SessionNoticeKind kind{};
   std::string message;
   double progress{};
+  // Localization key for fixed notices — the client translates
+  // `message` through it at display time when the active locale covers
+  // the key. Empty for dynamic messages (failure details, load-pipeline
+  // statuses), which always render their literal text.
+  std::string message_key;
 };
 
 // Only this transition's own capture/write may unlock setup; older writes cannot.
@@ -148,10 +154,11 @@ private:
       std::uint64_t revision, std::uint64_t cache_generation);
   void begin_load();
   void publish_save_result(const stellar::core::PlayerCampaignSaveResult &,
-                           std::string success_message);
+                           std::string success_message,
+                           std::string_view success_key = {});
   void publish_background_save_result(
       const stellar::core::PlayerCampaignSaveResult &);
-  void publish_failure(std::string message);
+  void publish_failure(std::string message, std::string_view key = {});
   void require_owner() const;
   [[nodiscard]] bool drain_live_save();
   std::unique_ptr<Live> live_;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <optional>
@@ -80,6 +81,10 @@ struct SceneEntity {
   // so children can also drift relative to their parent. Cycles and
   // missing parents are ignored (child keeps its last world position).
   std::string parent;
+  // Id of a document `animations` clip driving this entity's channels each
+  // sim step — keyframed patrols, door slides, opacity pulses. A track
+  // owns its channel while the clip plays.
+  std::string anim;
 };
 
 // Grid terrain layer: a tileset image sliced into tile_w/tile_h cells
@@ -97,6 +102,26 @@ struct SceneTilemap {
   bool collide{false};
   // One tileset cell index per grid cell, row-major; <0 = empty.
   std::vector<int> cells;
+  // Optional map name ("ground", "decor") — attaches EntityName to the
+  // spawned carrier so games can resolve layers with tilemap_index()
+  // instead of tracking document-order indices.
+  std::string name;
+};
+
+// Named scalar-track animation shared by entities — keyframed motion,
+// sizing, opacity and tint authored once and referenced by `anim` on any
+// number of entities. Track keys use the same (time,value) list shape as
+// emitter curves; `events` are (time,name) markers the host forwards to
+// the game as the playhead crosses them.
+struct SceneAnimationDef {
+  std::string id;
+  std::string loop{"loop"}; // "once" | "loop" | "pingpong"
+  // channel -> (time,value) keys. Channels: x y w h vx vy opacity
+  // rotation spin tintR tintG tintB — each owned by the track while the
+  // entity plays the clip (a track sets the field every sim step).
+  std::vector<std::pair<std::string, std::vector<std::pair<float, float>>>>
+      tracks;
+  std::vector<std::pair<float, std::string>> events;
 };
 
 // Declarative particle emitter definition — registers into the runtime's
@@ -145,6 +170,174 @@ struct Scene3dEntity {
   std::string data;
   // Name of another 3D entity to follow at its authored offset.
   std::string parent;
+  // Named emitter from the document's `emitters` table, attached on
+  // spawn — particles anchor to the entity's projected screen position.
+  std::string vfx;
+  // Metallic-workflow material. All members are optional — a document that
+  // leaves them at defaults renders exactly the legacy diffuse path.
+  float metallic{0.f}, roughness{0.55f};
+  // Packed metallic/roughness map (glTF convention: G = roughness scale,
+  // B = metallic), content-relative.
+  std::string metallic_roughness;
+  // Emissive radiance map (colony lights, engine glow), content-relative.
+  std::string emissive;
+  // 0 disables emission; scales emissive map × emissive tint.
+  float emissive_strength{0.f};
+  float emissive_r{1.f}, emissive_g{1.f}, emissive_b{1.f};
+  // 0 = emit everywhere; 1 = emit only across the terminator (night side).
+  float night_emissive{0.f};
+  // Equirect radiance map feeding diffuse irradiance + specular
+  // environment response for this material, content-relative.
+  std::string environment;
+  float environment_strength{0.f}; // 0 disables IBL
+  // Alpha cutout: fragments below this discard (lattices, decals).
+  float alpha_cutout{0.f};
+  // Surface texture repeat, per axis; (1,1) disables tiling.
+  float uv_tile_x{1.f}, uv_tile_y{1.f};
+  // Single-scatter limb atmosphere: tinted rim weighted to the day side.
+  // strength 0 leaves the body's authored art untouched.
+  float atmo_strength{0.f}, atmo_power{3.f}, atmo_night{0.05f};
+  float atmo_r{0.45f}, atmo_g{0.62f}, atmo_b{1.f};
+  // Terminator-transmitted rim tint — the limb blends toward this color
+  // at the day/night boundary (sunset reddening). strength 0 keeps the
+  // authored tint everywhere.
+  float atmo_sunset_strength{0.f};
+  float atmo_sunset_r{0.85f}, atmo_sunset_g{0.35f}, atmo_sunset_b{0.12f};
+  // Distance culling: hidden once the camera is farther than this many
+  // world units from the bounding-sphere surface. 0 = always visible.
+  float visible_range{0.f};
+  // Screen-door fade-out width ahead of the range cull, as a fraction of
+  // `range` [0,0.5] — the object dithers out instead of popping. The
+  // authored disappearance distance is unchanged.
+  float visible_fade{0.15f};
+  // Shadow casting opt-out (document key `castsShadow`, default true):
+  // false keeps an opaque mesh out of the directional and spot depth
+  // passes — backdrop shells and markers stay lit-only.
+  bool casts_shadow{true};
+  // Shadow receiving opt-out (document key `receivesShadow`, default
+  // true): false keeps depth-map terms lit on this mesh — self-lit
+  // markers and backdrops ignore umbrae. Analytic blockers still apply.
+  bool receives_shadow{true};
+  // Opaque surface response — content-relative maps; any subset binds.
+  // The cloud map's alpha self-shadows the surface (cloud_opacity) and
+  // its RGB can composite as a visible deck (cloud_albedo), drifted by
+  // cloud_offset. Packed properties are roughness / liquid / ice /
+  // height; height also drives relief parallax.
+  std::string normal_map, properties_map, cloud_map;
+  float normal_strength{0.35f}, relief{0.f}, cloud_opacity{0.f};
+  float cloud_albedo{0.f}, cloud_offset_x{0.f}, cloud_offset_y{0.f};
+  // Cloud-deck altitude in object units [0,.1]: raises the cloud layer
+  // for view parallax and displaced/self shadowing; 0 keeps the deck
+  // texture-space.
+  float cloud_height{0.f};
+  // Wrap-diffuse terminator softening [0,1]; 0 keeps Lambert shading.
+  float terminator_wrap{0.f};
+  // Linear limb darkening [0,1] for self-luminous discs (stars, hot
+  // bodies); 0 keeps a uniform disc.
+  float limb_darkening{0.f};
+  // Quadratic limb-darkening coefficient [0,1] — steepens the edge
+  // falloff (two-term transit-photometry law); 0 keeps linear.
+  float limb_darkening_q{0.f};
+  // Three-term limb-darkening coefficient [0,1] — the Sing nonlinear
+  // law's mid-curve (1−μ^{3/2}) term; reaches further into mid-disc
+  // than the quadratic edge term. 0 keeps the two-term profile.
+  float limb_darkening_mid{0.f};
+  // Gas-giant differential rotation: latitude-weighted longitude shear
+  // of every surface map sample, UV units [-0.5,0.5]; 0 = rectilinear.
+  float band_shear{0.f};
+  // Zonal-wind harmonic strength [0,1]: mixes a third spatial cosine into
+  // `band_shear`'s profile for alternating mid-latitude jets.
+  float band_waves{0.f};
+  // Zonal drift rate in UV longitude per second [-0.25,0.25] — scrolls
+  // the deck slowly for super-rotating giants. 0 keeps the static warp.
+  float band_drift{0.f};
+  // Warp-evolution phase rate in rad/s [-8,8] — propagating mid-latitude
+  // wave at half the shear amplitude; 0 freezes the warp, no effect
+  // without bandShear.
+  float band_turbulence{0.f};
+  // Latitude-differential drift fraction [-8,8] — equatorial belts
+  // super-rotate by diff·cos²(latitude) over the authored bandDrift
+  // rate; 0 scrolls all latitudes uniformly. No effect without
+  // bandDrift.
+  float band_diff{0.f};
+  // First-order orbital beaming for material orbiting local +Y (accretion
+  // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
+  float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — the bright
+  // lane blueshifts, the dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
+  // Henyey–Greenstein scattering phase: positive brightens the backlit
+  // sheet (dusty rings), negative boosts opposition (icy regolith).
+  // [-1,1]; 0 disables.
+  float forward_scatter{0.f};
+  // Optional second HG lobe: asymmetry [-1,1] blended in by
+  // `forward_scatter_back_mix` [0,1] — pairs the narrow forward spike
+  // with a broad weak back lobe like real dust sheets; mix 0 keeps
+  // the single-lobe phase.
+  float forward_scatter_back{0.f};
+  float forward_scatter_back_mix{0.f};
+  // Rayleigh-style wavelength weight for the phase lobes [0,1] —
+  // blue-tilts the scattered light (icy dust reads blue instead of
+  // achromatic white); 0 keeps achromatic scatter.
+  float forward_scatter_hue{0.f};
+  // Spectral-class star photosphere preset (K): derives blackbody tint,
+  // emissive response, and a temperature-graded limb coefficient.
+  // [100,100000]; 0 leaves the material untouched. Overrides `tint`
+  // and `limbDarken` — author explicit fields instead for custom discs.
+  double star_kelvin{0.0};
+  // Accretion-disc preset: `accretion:[inner,outer,kelvin,beaming]`
+  // builds the Shakura–Sunyaev radial blackbody texture plus orbital
+  // beaming via accretion_disc_material3d. The `inner`/`outer` values
+  // describe the annulus mesh the material is authored for; pair with
+  // an "annulus:i,o" mesh spec at matching radii. Optional tail
+  // `[spiral,arms,turns]` bakes grand-design density-wave arms: spiral
+  // depth [0,1], integral m-mode arms 1..4, log-spiral winding [-4,4]
+  // (trailing positive). An eighth entry appends `shear` — Keplerian
+  // differential rotation, rad/s at the inner edge [-8,8] scrolling
+  // azimuthally at rho^(-3/2). Documents emitting only the four base
+  // entries keep the uniform disc; a seven-entry tail omits shear.
+  std::array<float,8> accretion{0.f,0.f,0.f,0.f,0.f,0.f,0.f,0.f};
+  // Image-shaped emission volume (nebula, plasma plume): `volume` is a
+  // {depth,density,seed,steps,scatter} block; depth (0,0.75] enables the
+  // front-to-back march inside the closed proxy, steps bounds the
+  // integration budget [8,64], scatter [0,1] is the directional
+  // star-lit limb term. The entity's own texture supplies the emission
+  // image, and the material renders transparent automatically.
+  float volume_depth{0.f}, volume_density{5.f}, volume_seed{0.f};
+  int volume_steps{32};
+  float volume_scatter{0.f};
+  // Filament shape controls: `flow` is a bounded phase offset that
+  // re-poses the warp field (variety between otherwise identical
+  // nebulae), `distort` [0,.1] is the secondary warp amplitude.
+  float volume_flow{0.f}, volume_distort{0.f};
+  // Optional second emission image: `image2` names another texture and
+  // `blend` [0,1] mixes it against the entity texture (0 = the entity
+  // texture alone). A missing/unloadable image2 leaves the primary.
+  float volume_blend{0.f};
+  std::string volume_image2;
+  // Optional occlusion sphere: opaque radius in object units centred on
+  // the entity origin — a corona stops shining through its star.
+  // [0,1e4]; 0 disables.
+  float volume_occlude{0.f};
+  // Phase drift rate for the filament warp — the volume re-poses slowly
+  // over scene time instead of freezing. [-64,64]; 0 keeps it static.
+  float volume_flow_rate{0.f};
+  // Screen-space mesh LOD chain: spec strings resolved like `mesh`,
+  // coarsest-first. lod_meshes[i] draws once the projected bounding
+  // diameter drops below lod_pixels/2^i pixels (at most 8 levels).
+  std::vector<std::string> lod_meshes;
+  float lod_pixels{32.f};
+  // Screen-door transition width above each LOD threshold, as a
+  // fraction of that threshold [0,0.5]; 0 keeps the hard switch.
+  float lod_fade{.15f};
+  // Named group proxy: when the merged bounding sphere of a group's
+  // contributing members projects below lod_proxy_pixels, the whole
+  // group collapses into one view-aligned lod_proxy draw (a mesh spec
+  // like `card:8,8`) carrying the representative member's material —
+  // a fleet/cluster impostor for extreme zoom-out. Empty group disables.
+  std::string lod_group;
+  std::string lod_proxy;
+  float lod_proxy_pixels{16.f};
 };
 
 // An extra directional light — the material pipeline evaluates at most
@@ -153,6 +346,32 @@ struct Scene3dLight {
   float dir_x{0.f}, dir_y{0.f}, dir_z{1.f};
   float r{1.f}, g{1.f}, b{1.f};
   float intensity{0.5f};
+};
+
+// A world-space point light — station floods, engine glow, muzzle light.
+// The material pipeline evaluates at most four per scene; range 0 keeps
+// pure inverse-square falloff instead of a hard window.
+struct Scene3dPointLight {
+  float x{}, y{}, z{};
+  float r{1.f}, g{1.f}, b{1.f};
+  float intensity{1.f};
+  float range{0.f};
+  // Optional spot cone — direction defaults to zero (omni); cosines
+  // give the full-intensity inner cone and zero-intensity outer edge.
+  float spot_x{}, spot_y{}, spot_z{};
+  float spot_inner{1.f};
+  float spot_outer{1.f};
+  // Shadowed spot cone: renders casters from the light's position into
+  // its quadrant of the shared depth atlas. Requires spotDir.
+  bool cast_shadow{false};
+  // [0,1] umbra darkness when castShadow is set (1 = full cut).
+  float shadow_strength{1.f};
+  // [0,8] PCF penumbra multiplier on the tier radius when castShadow
+  // is set (1 = tier default).
+  float shadow_softness{1.f};
+  // [0,8] receiver-side lift along the shading normal in map texels,
+  // scaled by the fragment's light distance (PointLight3D::shadow_normal_offset).
+  float shadow_normal_offset{0.f};
 };
 
 // A 3D scene: camera, key light, and mesh entities — the 3D counterpart of
@@ -172,6 +391,53 @@ struct Scene3dDocument {
   float light_intensity{1.0f};
   // Up to two additional world-space directional lights (fill/rim).
   std::vector<Scene3dLight> lights;
+  // World-space point lights; at most four reach the fragment pipeline.
+  std::vector<Scene3dPointLight> point_lights;
+  // Scene-level equirect environment probe (content-relative path):
+  // fills the IBL slot for entities that set environmentStrength but
+  // author no environment map of their own.
+  std::string environment;
+  // Captured environment probe: when probe_capture is set the renderer
+  // bakes six face views at probe_anchor once and binds the resampled
+  // equirect as the scene environment slot — opt-in materials reflect
+  // the local scene instead of only an authored map. Static bake: the
+  // probe holds the layout the first frame sees.
+  bool probe_capture{false};
+  float probe_x{0.f}, probe_y{0.f}, probe_z{0.f};
+  int probe_resolution{128}; // [16,512] px per face
+  // Post-processing applied to the 3D view's HDR resolve. Exposure is a
+  // linear pre-tonemap multiplier (1 = neutral), bloom is an additive mip
+  // halo above its luminance threshold, contrast pivots about 0.18.
+  float exposure{1.f};
+  float bloom{0.f}, bloom_threshold{1.f};
+  // vignette is a post-tonemap corner darkening (0 = off, 1 = full).
+  float contrast{1.f}, saturation{1.f}, sharpen{0.f}, vignette{0.f};
+  // Quality tier for expensive per-view effects: low|medium|high|ultra.
+  std::string quality{"high"};
+  // Diagnostic shading override for the 3D view:
+  // lit|unlit|albedo|normals|roughness|metallic|emissive|lighting.
+  std::string debug_view{"lit"};
+  // Key-light directional shadow map: an ortho coverage volume centred
+  // shadow_distance units along camera forward. shadow_extent<=0 disables;
+  // resolution 0 picks the quality-tier default (1024/2048/4096).
+  // shadow_cascades adds wider ortho tiers (world half-extents — finite,
+  // strictly increasing, each exceeding shadow_extent, at most four) so
+  // coverage survives extreme zoom-out: orbit-scale, then system-scale
+  // and beyond. Legacy cascade/cascade2 scalar keys still parse.
+  float shadow_extent{0.f}, shadow_distance{64.f}, shadow_depth{256.f};
+  float shadow_strength{1.f}, shadow_bias{0.0005f};
+  std::uint32_t shadow_resolution{0};
+  std::vector<float> shadow_cascades;
+  // [0,8] PCF penumbra multiplier on the tier radius (1 = default).
+  float shadow_softness{1.f};
+  // [0,8] receiver-side normal offset in map texels: receivers lift
+  // along their shading normal before depth projection so slope-scaled
+  // acne clears without raising the constant bias. 0 disables.
+  float shadow_normal_offset{0.f};
+  // When true the authored extents are multipliers of the camera's
+  // visible half-height at the box centre (ShadowMap3D::camera_fit),
+  // not absolute world units.
+  bool shadow_fit{false};
   // Background clear color.
   std::uint8_t bg_r{8}, bg_g{16}, bg_b{26};
   // Downward (-Y) acceleration in units/s²; 0 disables gravity.
@@ -218,6 +484,10 @@ struct SceneDocument {
   // load — entity `vfx` fields reference these by id (game-registered
   // definitions via host.vfx().define() still work).
   std::vector<SceneEmitterDef> emitters;
+  // Keyframed entity animations resolved by `anim` fields on load —
+  // the host builds one shared Timeline per def and steps a playhead
+  // per referencing entity.
+  std::vector<SceneAnimationDef> animations;
 
   static constexpr std::string_view filename{"scene.json"};
 

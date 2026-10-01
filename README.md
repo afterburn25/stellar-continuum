@@ -2,8 +2,9 @@
 
 Stellar Continuum is a space civilization strategy game built with **custom
 Stellar Engine**, **C++ engine code** and **C++ game code** (C++23).
-The current native development branch is `cpp/codex-native-architecture-integration`.
-Godot/C# is the deprecated predecessor, not the current runtime.
+The engine lane is `engine/space-strategy-simulation-specialization`;
+feature work lands through `game/**` pull requests. Godot/C# is the
+deprecated predecessor, not the current runtime.
 
 **Start with [the agent handoff](docs/AGENT_HANDOFF.md).** This is an unfinished
 Windows x64 development build. See [current build/test results](docs/validation/2026-09-20-development-sync.md)

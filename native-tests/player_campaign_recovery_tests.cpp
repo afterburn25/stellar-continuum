@@ -198,6 +198,13 @@ void success_case(const Json &fixture, std::string_view name, Setup setup,
   // The frozen evidence predates native migrations: the stellar activity clock
   // initializes at the saved epoch, absent appearances are derived, and the
   // canonical Sol roster is appended. Verify each, then compare the rest.
+  if (!expected_state.contains("EventHistory")) {
+    // The persistent chronicle tail was added after these saves: restore +
+    // recapture already proves it round-trips, so drop it before comparing.
+    require(actual_state.contains("EventHistory"),
+            std::string(name) + ": missing persistent chronicle tail");
+    actual_state.erase("EventHistory");
+  }
   auto &actual_galaxy = actual_state["Galaxy"];
   auto &expected_galaxy = expected_state["Galaxy"];
   if (!expected_galaxy.contains("StellarActivityDay")) {

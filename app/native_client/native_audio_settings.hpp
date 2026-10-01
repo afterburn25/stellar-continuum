@@ -1,6 +1,7 @@
 #pragma once
 #include "native_menu_hover.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
@@ -47,6 +48,23 @@ class NativeAudioSettings final {
   void set_localization(const stellar::engine::LocalizationTable* table){locale_=table;}
   void open();
   [[nodiscard]] bool visible() const;
+  [[nodiscard]] int focused() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
+  // Normalized range of the ringed slider — null for non-slider controls.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementRange>
+  focused_range() const;
+  // Semantic role of the ringed control for platform control typing.
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control() const;
+  // Checked state of the focused CheckBox — drives the UIA toggle pattern.
+  [[nodiscard]] std::optional<bool> focused_toggle() const;
+  // Applies a platform range SetValue to the ringed slider — false when the
+  // focus sits on a non-slider control.
+  bool set_focused_range(double value);
   // While visible this consumes every event, including events outside the panel.
   [[nodiscard]] bool handle(const stellar::native_map::InputEvent&, int width, int height);
   void render(stellar::native_map::DrawList&, int width, int height) const;
@@ -65,6 +83,7 @@ class NativeAudioSettings final {
   void save();
   void set_from_track(Dragged, stellar::native_map::Point,
                       const AudioSettingsLayout&);
+  void activate_at(const AudioSettingsLayout&, stellar::native_map::Point);
   [[nodiscard]] std::string tr(std::string_view key, std::string_view fallback) const;
 
   std::thread::id owner_{std::this_thread::get_id()};
@@ -82,6 +101,7 @@ class NativeAudioSettings final {
   int viewport_width_{};
   int viewport_height_{};
   bool save_diagnostic_emitted_{};
+  int focus_{-1};
   const stellar::engine::LocalizationTable* locale_{};
 };
 

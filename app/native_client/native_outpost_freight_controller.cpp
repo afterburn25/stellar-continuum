@@ -1,6 +1,8 @@
 #include "native_outpost_freight_controller.hpp"
+#include "native_route_messages.hpp"
 
 #include <stellar/core/colony_operations.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -148,10 +150,18 @@ bool valid_operations(const ResourceOutpostOperationsSnapshot &operations) {
          operations.remaining_deposit_materials >= 0.0;
 }
 
-NativeOutpostFreightOutcome stale() {
-  return {false, "The freight dispatch changed; review it again."};
-}
 } // namespace
+
+std::string NativeOutpostFreightController::tr(
+    std::string_view key, std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+NativeOutpostFreightOutcome NativeOutpostFreightController::stale() const {
+  return {false, tr("FREIGHT_MSG_STALE", "The freight dispatch changed; review it again.")};
+}
 
 void NativeOutpostFreightController::require_owner() const {
   if (std::this_thread::get_id() != owner_)
@@ -192,7 +202,7 @@ NativeOutpostFreightController::preview(CampaignFrame &frame,
     if (view.campaign_generation != generation ||
         view.player_civilization_id != current.player_id ||
         !view.resource_outpost) {
-      result.message = "That resource outpost view is stale.";
+      result.message = tr("FREIGHT_MSG_VIEW_STALE", "That resource outpost view is stale.");
       return result;
     }
     const auto *outpost =
@@ -209,12 +219,12 @@ NativeOutpostFreightController::preview(CampaignFrame &frame,
         !current.world.knowledge.is_system_fully_surveyed(current.player_id,
                                                           view.system_id)) {
       result.message =
-          "That fully surveyed owned resource outpost is unavailable.";
+          tr("FREIGHT_MSG_OUTPOST_UNAVAILABLE", "That fully surveyed owned resource outpost is unavailable.");
       return result;
     }
     if (std::ranges::count(current.world.economies, current.player_id,
                            &CivilizationEconomy::civilization_id) != 1) {
-      result.message = "The player economy is unavailable or ambiguous.";
+      result.message = tr("FREIGHT_MSG_ECONOMY", "The player economy is unavailable or ambiguous.");
       return result;
     }
 
@@ -227,7 +237,7 @@ NativeOutpostFreightController::preview(CampaignFrame &frame,
       return result;
     }
     if (!valid_operations(operations)) {
-      result.message = "The resource outpost has invalid operating values.";
+      result.message = tr("FREIGHT_MSG_INVALID_OPS", "The resource outpost has invalid operating values.");
       return result;
     }
     result.outpost_name = outpost->name;
@@ -262,7 +272,7 @@ NativeOutpostFreightController::preview(CampaignFrame &frame,
     });
     if (candidates.empty()) {
       result.message =
-          "No idle owned bulk freighter is available at a developed colony.";
+          tr("FREIGHT_MSG_NO_FREIGHTER", "No idle owned bulk freighter is available at a developed colony.");
       return result;
     }
 
@@ -284,7 +294,7 @@ NativeOutpostFreightController::preview(CampaignFrame &frame,
         if (!after) {
           if (result.message.empty())
             result.message =
-                "Freight preflight did not preserve the selected fleet.";
+                tr("FREIGHT_MSG_PREFLIGHT", "Freight preflight did not preserve the selected fleet.");
           continue;
         }
         fleet = candidate.fleet;
@@ -335,13 +345,13 @@ NativeOutpostFreightController::issue(CampaignFrame &frame,
   auto held = std::move(*quote_);
   quote_.reset();
   if (frame.clock().speed() != StrategicSpeed::Paused)
-    return {false, "Pause the campaign before dispatching freight."};
+    return {false, tr("FREIGHT_MSG_PAUSED", "Pause the campaign before dispatching freight.")};
 
   std::optional<Context> current_holder;
   try {
     current_holder.emplace(context(frame));
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
   auto &current = *current_holder;
   const auto &q = held.preview;
@@ -383,7 +393,7 @@ NativeOutpostFreightController::issue(CampaignFrame &frame,
     operations = resource_outpost_snapshot(current.world.bodies,
                                            current.world.economies, *outpost);
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
   if (!valid_operations(operations) ||
       operations.stored_materials != held.decision.stored_materials ||
@@ -399,21 +409,25 @@ NativeOutpostFreightController::issue(CampaignFrame &frame,
     preflight = current.runtime.core().issue_freight_collection_order(
         &copied, current.player_id, q.fleet_id, q.colony_id);
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
   const auto *after =
       unique_by(copied.campaign().fleets, q.fleet_id, &FleetState::id);
   if (!preflight.accepted || !after ||
       !same_decision_fleet(*after, held.decision.fleet_after_preflight))
     return {false,
-            preflight.message.empty() ? stale().message : preflight.message};
+            preflight.message.empty()
+                ? stale().message
+                : native_route::localized_message(locale_,
+                                                  preflight.message)};
 
   try {
     const auto result = current.runtime.core().issue_freight_collection_order(
         &current.simulation, current.player_id, q.fleet_id, q.colony_id);
-    return {result.accepted, result.message};
+    return {result.accepted,
+            native_route::localized_message(locale_, result.message)};
   } catch (const std::exception &error) {
-    return {false, error.what()};
+    return {false, native_route::localized_message(locale_, error.what())};
   }
 }
 

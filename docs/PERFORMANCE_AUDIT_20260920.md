@@ -174,3 +174,14 @@ harness), colony counts stay at founding levels (no organic colonization
 events), and the injected fleets are uniform patrol-corvette squadrons,
 not heterogeneous late-game compositions. Combat mass is exercised by the
 per-tick combat scan, not by resolved engagements.
+
+Re-measured 2026-09-30 on `game/ui-visual-overhaul` tip `422f2519`
+(identical scenario and seed): step mean 2.59 ms, p95 3.63 ms,
+peak 32.37 ms (a single `strategic_ai`/`core_total` outlier spike —
+phase maxes 17.7/24.3 ms; the foundation-branch run's 8.85 ms peak had
+no comparable spike, so treat it as a transient, not a regression
+trend); eight 66.7 MB autosaves mean 1,744 ms, p95/peak 2,006 ms;
+`repeatFinalStatesDeterministic` true; 185 adaptive research events,
+24,000 industry allocations, zero combat events — the engagement-coverage
+limit above stands. Conclusion unchanged: the combined tick stays under
+a 16.6 ms frame budget at this scale.

@@ -1,4 +1,5 @@
 #include "native_body_inspection.hpp"
+#include "native_data_names.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -149,6 +150,29 @@ std::string confirmed_inclination(double value,
 }
 } // namespace
 
+std::string world_class_name(stellar::core::PlanetaryWorldClass value,
+                             const stellar::engine::LocalizationTable *locale) {
+  switch (value) {
+  case stellar::core::PlanetaryWorldClass::Barren: return translate(locale,"BODY_CLASS_BARREN","Barren");
+  case stellar::core::PlanetaryWorldClass::Continental: return translate(locale,"BODY_CLASS_CONTINENTAL","Continental");
+  case stellar::core::PlanetaryWorldClass::Ocean: return translate(locale,"BODY_CLASS_OCEAN","Ocean");
+  case stellar::core::PlanetaryWorldClass::HighPressureOcean: return translate(locale,"BODY_CLASS_HIGH_PRESSURE_OCEAN","High-pressure ocean");
+  case stellar::core::PlanetaryWorldClass::Desert: return translate(locale,"BODY_CLASS_DESERT","Desert");
+  case stellar::core::PlanetaryWorldClass::Arid: return translate(locale,"BODY_CLASS_ARID","Arid");
+  case stellar::core::PlanetaryWorldClass::Frozen: return translate(locale,"BODY_CLASS_FROZEN","Frozen");
+  case stellar::core::PlanetaryWorldClass::Greenhouse: return translate(locale,"BODY_CLASS_GREENHOUSE","Greenhouse");
+  case stellar::core::PlanetaryWorldClass::Molten: return translate(locale,"BODY_CLASS_MOLTEN","Molten");
+  case stellar::core::PlanetaryWorldClass::Hydrocarbon: return translate(locale,"BODY_CLASS_HYDROCARBON","Hydrocarbon");
+  case stellar::core::PlanetaryWorldClass::Ammonia: return translate(locale,"BODY_CLASS_AMMONIA","Ammonia");
+  case stellar::core::PlanetaryWorldClass::Reducing: return translate(locale,"BODY_CLASS_REDUCING","Reducing atmosphere");
+  case stellar::core::PlanetaryWorldClass::Exotic: return translate(locale,"BODY_CLASS_EXOTIC","Exotic");
+  case stellar::core::PlanetaryWorldClass::GasGiant: return translate(locale,"BODY_CLASS_GAS_GIANT","Gas giant");
+  case stellar::core::PlanetaryWorldClass::IceGiant: return translate(locale,"BODY_CLASS_ICE_GIANT","Ice giant");
+  case stellar::core::PlanetaryWorldClass::Cracked: return translate(locale,"BODY_CLASS_CRACKED","Cracked world");
+  }
+  return translate(locale,"BODY_UNCONFIRMED","Unconfirmed");
+}
+
 std::optional<BodyInspection>
 build_body_inspection(const native_system::NativeSystemSnapshot &snapshot,
                       const int body_id,
@@ -166,7 +190,7 @@ build_body_inspection(const native_system::NativeSystemSnapshot &snapshot,
                          found->details.has_value();
   const auto hidden = [locale] { return translate(locale,"BODY_UNCONFIRMED","Unconfirmed"); };
   BodySection physical{translate(locale,"BODY_SECTION_PHYSICAL","Physical"), {{translate(locale,"BODY_FACT_TYPE","Type"), physical_kind(found->kind,locale)},
-      {translate(locale,"BODY_FACT_CLASS","World class"), confirmed&&found->appearance&&!found->appearance->source_asset_id.starts_with("sol:")?stellar::core::planet_appearance_display_name(*found->appearance):confirmed && found->world_class ? std::string(stellar::core::planetary_world_class_name(*found->world_class)) : hidden()},
+      {translate(locale,"BODY_FACT_CLASS","World class"), confirmed&&found->appearance&&!found->appearance->source_asset_id.starts_with("sol:")?stellar::native_data::planet_appearance_name(locale,*found->appearance):confirmed && found->world_class ? world_class_name(*found->world_class,locale) : hidden()},
       {translate(locale,"BODY_FACT_RADIUS","Radius"), confirmed ? confirmed_radius(found->radius_earth,locale) : hidden()},
       {translate(locale,"BODY_FACT_MASS","Mass"), confirmed ? confirmed_mass(found->details->mass_earth,locale) : hidden()},
       {translate(locale,"BODY_FACT_GRAVITY","Gravity"), confirmed ? confirmed_gravity(found->details->gravity_g,locale) : hidden()},

@@ -87,13 +87,22 @@ target_link_libraries(stellar_native_notification_tests PRIVATE stellar_engine)
 add_test(NAME native_notifications COMMAND stellar_native_notification_tests)
 add_executable(stellar_native_notification_events_tests
   native-tests/native_notification_events_tests.cpp
-  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp)
+  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
+  app/native_client/native_chronicle.cpp)
 target_include_directories(stellar_native_notification_events_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_notification_events_tests PRIVATE stellar_core stellar_native_campaign_feedback)
 add_test(NAME native_notification_events COMMAND stellar_native_notification_events_tests)
+add_executable(stellar_native_chronicle_tests
+  native-tests/native_chronicle_tests.cpp
+  app/native_client/native_notifications.cpp app/native_client/native_chronicle.cpp)
+target_include_directories(stellar_native_chronicle_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_chronicle_tests PRIVATE stellar_core)
+target_compile_definitions(stellar_native_chronicle_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
+add_test(NAME native_chronicle COMMAND stellar_native_chronicle_tests)
 if(MSVC)
   target_compile_options(stellar_native_notification_tests PRIVATE /W4 /WX)
   target_compile_options(stellar_native_notification_events_tests PRIVATE /W4 /WX)
+  target_compile_options(stellar_native_chronicle_tests PRIVATE /W4 /WX)
 endif()
 add_executable(stellar_native_system_travel_tests
   native-tests/native_system_travel_tests.cpp
@@ -185,6 +194,7 @@ add_executable(stellar_native_fleet_workspace_tests
   app/native_client/native_overview.cpp app/native_client/native_ship_art_assets.cpp)
 target_include_directories(stellar_native_fleet_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_core stellar_native_image)
+target_compile_definitions(stellar_native_fleet_workspace_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
 add_test(NAME native_fleet_workspace COMMAND stellar_native_fleet_workspace_tests)
 add_executable(stellar_native_fleet_presentation_tests
   native-tests/native_fleet_presentation_tests.cpp app/native_client/native_fleet_presentation.cpp)
@@ -263,6 +273,16 @@ if(MSVC)
   target_compile_options(stellar_native_diplomacy_workspace_tests PRIVATE /WX)
 endif()
 
+add_executable(stellar_native_quick_find_tests
+  native-tests/native_quick_find_tests.cpp
+  app/native_client/native_quick_find.cpp)
+target_include_directories(stellar_native_quick_find_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_quick_find_tests PRIVATE stellar_core)
+add_test(NAME native_quick_find COMMAND stellar_native_quick_find_tests)
+if(MSVC)
+  target_compile_options(stellar_native_quick_find_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_native_fresh_progression_tests
   native-tests/native_fresh_progression_tests.cpp
   app/native_client/native_research_controller.cpp
@@ -313,6 +333,7 @@ endif()
 
 add_executable(stellar_native_colony_workspace_tests
   native-tests/native_colony_workspace_tests.cpp
+  app/native_client/native_body_inspection.cpp
   app/native_client/native_colony_workspace.cpp)
 target_include_directories(stellar_native_colony_workspace_tests PRIVATE
   app/native_client
@@ -656,7 +677,9 @@ if(MSVC)
 endif()
 add_test(NAME native_colony_roster COMMAND stellar_native_colony_roster_tests)
 
-add_executable(stellar_native_planetary_screen_tests native-tests/native_planetary_screen_tests.cpp)
+add_executable(stellar_native_planetary_screen_tests
+  native-tests/native_planetary_screen_tests.cpp
+  app/native_client/native_body_inspection.cpp)
 target_include_directories(stellar_native_planetary_screen_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_planetary_screen_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_planetary_screen COMMAND stellar_native_planetary_screen_tests "${CMAKE_SOURCE_DIR}/assets/visual/sol")

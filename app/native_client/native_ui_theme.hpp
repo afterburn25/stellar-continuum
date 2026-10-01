@@ -1,23 +1,35 @@
 #pragma once
 
+#include "native_ui_layout.hpp"
+
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/accessibility.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <functional>
 #include <optional>
 #include <string>
 #include <utility>
+#include <variant>
 
 namespace stellar::native_ui {
 
+using native_map::Circle;
 using native_map::Color;
 using native_map::DrawList;
 using native_map::FilledRectangle;
+using native_map::Image;
 using native_map::FontFace;
 using native_map::Line;
 using native_map::Point;
+using native_map::Scene3DView;
 using native_map::StrokedRectangle;
 using native_map::Text;
 using native_map::TextAlign;
+using native_map::TriangleMesh;
 using native_map::UiRect;
 
 namespace color {
@@ -45,6 +57,125 @@ inline constexpr Color construction{241, 151, 91, 255};
 inline constexpr Color diplomacy{95, 210, 192, 255};
 inline constexpr Color military{255, 119, 110, 255};
 inline constexpr Color shadow{0, 4, 9, 168};
+}
+
+// Canonical type ramp in unscaled pixels: one vocabulary for workspace
+// chrome so the heading/body/small hierarchy reads identically on every
+// surface. Dense tabular surfaces (fleet/battle/inspection) use the compact
+// body/small rungs instead of inventing their own. Every rung multiplies the
+// accessibility text scale like the shared NativeUiLayout font metrics, so
+// workspace text enlarges without growing chrome geometry.
+namespace type {
+// Bespoke chrome sizes outside the ramp route through this so they carry
+// viewport fit and the accessibility text scale exactly once.
+[[nodiscard]] inline int scaled(float base_pixels, float scale) noexcept {
+  return static_cast<int>(
+      std::lround(base_pixels * scale * native_map::NativeUiLayout::text_scale()));
+}
+[[nodiscard]] inline int title(float scale) noexcept {
+  return scaled(24.f, scale);
+}
+[[nodiscard]] inline int body(float scale) noexcept {
+  return scaled(15.f, scale);
+}
+[[nodiscard]] inline int small(float scale) noexcept {
+  return scaled(12.f, scale);
+}
+[[nodiscard]] inline int compact_body(float scale) noexcept {
+  return scaled(14.f, scale);
+}
+[[nodiscard]] inline int compact_small(float scale) noexcept {
+  return scaled(11.f, scale);
+}
+} // namespace type
+
+// Global high-contrast pass over a finished DrawList: snaps low-luminance
+// text to the primary ink so every surface gains readability without
+// per-screen palette plumbing. Colored accents above the threshold keep
+// their semantic hue; dim labels/disabled text become legible. Rendered
+// 3D scenes get the same treatment through the post-tonemap contrast and
+// unsharp terms on their render options, so planets, ships and nebula
+// volumes sharpen together with the surrounding chrome.
+inline void apply_high_contrast(DrawList &draw) {
+  const auto boost = [](Color &c) {
+    const float luminance = .299f * c.r + .587f * c.g + .114f * c.b;
+    if (luminance < 160.f) c = color::text_primary;
+  };
+  const auto punch = [](Scene3DView &view) {
+    view.options.contrast = std::max(view.options.contrast, 1.35f);
+    view.options.sharpen = std::max(view.options.sharpen, .3f);
+  };
+  for (auto &text : draw.text) boost(text.color);
+  for (auto &command : draw.overlay) {
+    if (auto *text = std::get_if<Text>(&command)) boost(text->color);
+    if (auto *view = std::get_if<Scene3DView>(&command)) punch(*view);
+  }
+  for (auto &command : draw.world) {
+    if (auto *text = std::get_if<Text>(&command)) boost(text->color);
+    if (auto *view = std::get_if<Scene3DView>(&command)) punch(*view);
+  }
+}
+
+// Every color-bearing field a draw-command variant can hold. Shared by the
+// world and overlay variants; Scene3DView carries no CPU color to rewrite.
+template <typename Command, typename Fn>
+inline void for_each_command_color(Command &command, const Fn &fn) {
+  std::visit([&](auto &value) {
+    if constexpr (requires { value.color; }) fn(value.color);
+    else if constexpr (requires { value.tint; }) fn(value.tint);
+  }, command);
+}
+
+// Global color-blind pass over a finished DrawList: Machado et al. (2009)
+// severity-1 simulation matrices measure the contrast the deficiency loses,
+// then the standard error redistribution pushes it into the channels the
+// mode still perceives (blue + luminance) — semantic accent hues stay
+// distinguishable instead of merely being simulated away. Covers every
+// CPU-side surface (text, primitives, image tints, mesh tints) and every
+// GPU-rendered 3D view: Scene3DView options carry the same composed map as
+// RenderOptions3D::color_matrix, applied post-tonemap in display space.
+inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
+  if (mode == engine::ColorBlindMode::None) return;
+  const float *m;
+  switch (mode) {
+  case engine::ColorBlindMode::Protanopia: {
+    static constexpr float matrix[]{.152286f,1.052583f,-.204868f,.114503f,.786281f,.099216f,-.003882f,-.048116f,1.051998f};
+    m=matrix;break; }
+  case engine::ColorBlindMode::Deuteranopia: {
+    static constexpr float matrix[]{.367322f,.860646f,-.227968f,.280085f,.672501f,.047413f,-.011820f,.042940f,.968881f};
+    m=matrix;break; }
+  default: {
+    static constexpr float matrix[]{1.255528f,-.076749f,-.178779f,-.078411f,.930809f,.147602f,.004733f,.691367f,.303900f};
+    m=matrix;break; }
+  }
+  const auto daltonize = [&](Color &c) {
+    const float r=static_cast<float>(c.r),g=static_cast<float>(c.g),b=static_cast<float>(c.b);
+    const float eg=g-(m[3]*r+m[4]*g+m[5]*b),eb=b-(m[6]*r+m[7]*g+m[8]*b);
+    const auto channel=[](float v){return static_cast<std::uint8_t>(std::clamp(std::lround(v),0l,255l));};
+    c.r=channel(r+.7f*eg+.7f*eb);c.g=channel(g+eg+.7f*eb);c.b=channel(b+.7f*eg+eb);
+  };
+  for (auto &line : draw.lines) daltonize(line.color);
+  for (auto &circle : draw.circles) daltonize(circle.color);
+  for (auto &text : draw.text) daltonize(text.color);
+  for (auto &command : draw.overlay) for_each_command_color(command,daltonize);
+  for (auto &command : draw.world) for_each_command_color(command,daltonize);
+  // The CPU daltonizer is linear in float space, so the 3D remap composes
+  // the identical map: e_g = g − sim.row1·c, e_b = b − sim.row2·c, then
+  // c' = c + {.7,.7}·e_g + {.7,.7,1}·e_b per channel. Column-major for
+  // RenderOptions3D::color_matrix.
+  const float er[3]{-m[3],1.f-m[4],-m[5]},eb[3]{-m[6],-m[7],1.f-m[8]};
+  std::array<float,9> remap{};
+  for (int col = 0; col < 3; ++col) {
+    remap[col*3+0] = (col==0?1.f:0.f) + .7f*er[col] + .7f*eb[col];
+    remap[col*3+1] = (col==1?1.f:0.f) +      er[col] + .7f*eb[col];
+    remap[col*3+2] = (col==2?1.f:0.f) + .7f*er[col] +      eb[col];
+  }
+  for (auto &command : draw.overlay)
+    if (auto *view = std::get_if<Scene3DView>(&command))
+      view->options.color_matrix = remap;
+  for (auto &command : draw.world)
+    if (auto *view = std::get_if<Scene3DView>(&command))
+      view->options.color_matrix = remap;
 }
 
 enum class Tone { Neutral, Selected, Success, Caution, Danger, Science, Economy, Construction, Diplomacy, Military, Unknown };
@@ -92,16 +223,33 @@ inline void panel(DrawList &out, UiRect bounds, Tone tone = Tone::Neutral,
   fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
 }
 
+// Rectangle intersection shared by the clipped helpers below.
+[[nodiscard]] inline std::optional<UiRect> clipped(UiRect a, UiRect b) {
+  const float x = std::max(a.x, b.x), y = std::max(a.y, b.y);
+  const float r = std::min(a.x + a.width, b.x + b.width),
+              bottom = std::min(a.y + a.height, b.y + b.height);
+  if (r <= x || bottom <= y) return std::nullopt;
+  return UiRect{x, y, r - x, bottom - y};
+}
+
 inline void section_header(DrawList &out, UiRect bounds, std::string title,
                            int pixels, Tone tone = Tone::Neutral,
-                           std::string value = {}) {
+                           std::string value = {},
+                           std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible) return;
   text(out, {bounds.x, bounds.y}, std::move(title), accent(tone), pixels,
-       bounds.width, TextAlign::Left, FontFace::Heading);
+       bounds.width, TextAlign::Left, FontFace::Heading, visible);
   if (!value.empty())
-    text(out, {bounds.x, bounds.y}, std::move(value), color::text_secondary,
-         pixels, bounds.width, TextAlign::Right);
-  fill(out, {bounds.x, bounds.y + static_cast<float>(pixels) + 5.f,
-             bounds.width, 1.f}, color::keyline);
+    text(out, {bounds.x + bounds.width, bounds.y}, std::move(value),
+         color::text_secondary, pixels, bounds.width, TextAlign::Right,
+         FontFace::Interface, visible);
+  if (const auto rule = clipped(
+          {bounds.x, bounds.y + static_cast<float>(pixels) + 5.f, bounds.width,
+           1.f},
+          *visible))
+    fill(out, *rule, color::keyline);
 }
 
 inline void button(DrawList &out, UiRect bounds, std::string caption,
@@ -115,9 +263,12 @@ inline void button(DrawList &out, UiRect bounds, std::string caption,
                                                     : color::keyline_strong)
                               : color::keyline);
   if (active) fill(out, {bounds.x, bounds.y, 3.f, bounds.height}, accent(tone));
-  text(out, {bounds.x, bounds.y + (bounds.height - pixels) * .5f - 1.f},
+  // Center anchors on at.x — the caption centers on the button's midpoint and
+  // clips to the button if it overflows.
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
        std::move(caption), enabled ? color::text_primary : color::disabled,
-       pixels, bounds.width, TextAlign::Center, FontFace::Heading, bounds);
+       pixels, 0.f, TextAlign::Center, FontFace::Heading, bounds);
 }
 
 inline void progress(DrawList &out, UiRect bounds, double ratio,
@@ -126,6 +277,102 @@ inline void progress(DrawList &out, UiRect bounds, double ratio,
   const auto width = bounds.width * static_cast<float>(std::clamp(ratio, 0., 1.));
   if (width > 0.f) fill(out, {bounds.x, bounds.y, width, bounds.height}, accent(tone));
   stroke(out, bounds, color::keyline);
+}
+
+// One keyboard/pad focus indicator — replaces the per-workspace hardcoded
+// {160,210,255,255} stroked rects so the ring is identical on every surface.
+inline void focus_ring(DrawList &out, UiRect bounds) {
+  stroke(out, bounds, color::focus);
+}
+
+// Scannable statistic: muted micro-label over a larger tone-colored value.
+// The primary Phase-3 hierarchy element for headline numbers.
+inline void metric_tile(DrawList &out, UiRect bounds, std::string label,
+                        std::string value, int label_pixels, int value_pixels,
+                        Tone tone = Tone::Neutral, bool filled = true,
+                        std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible) return;
+  if (filled) {
+    fill(out, *visible, color::surface_secondary);
+    // The keyline only draws when the tile is fully inside its scroll region —
+    // a clipped stroke reads as a stray edge at the viewport boundary.
+    if (!clip || (visible->x == bounds.x && visible->y == bounds.y &&
+                  visible->width == bounds.width &&
+                  visible->height == bounds.height))
+      stroke(out, bounds, color::keyline);
+  }
+  const float pad = std::max(4.f, bounds.width * .06f);
+  text(out, {bounds.x + pad, bounds.y + 5.f}, std::move(label),
+       color::text_muted, label_pixels, bounds.width - 2.f * pad,
+       TextAlign::Left, FontFace::Heading, visible);
+  text(out, {bounds.x + pad, bounds.y + bounds.height * .5f - 1.f},
+       std::move(value),
+       tone == Tone::Neutral ? color::text_primary : accent(tone),
+       value_pixels, bounds.width - 2.f * pad, TextAlign::Left,
+       FontFace::Heading, visible);
+}
+
+// Compact status pill: tone-colored keyline + centered caps label.
+inline void badge(DrawList &out, UiRect bounds, std::string label, int pixels,
+                  Tone tone = Tone::Neutral) {
+  fill(out, bounds, color::surface_secondary);
+  stroke(out, bounds, accent(tone));
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(label), accent(tone), pixels, 0.f, TextAlign::Center,
+       FontFace::Heading, bounds);
+}
+
+// Label left / value right row — the standard fact line.
+inline void key_value(DrawList &out, UiRect bounds, std::string label,
+                      std::string value, int pixels,
+                      Tone tone = Tone::Neutral,
+                      std::optional<UiRect> clip = std::nullopt) {
+  const auto visible =
+      clip ? clipped(bounds, *clip) : std::optional<UiRect>{bounds};
+  if (!visible || visible->width <= 0.f || visible->height <= 0.f) return;
+  text(out, {bounds.x, bounds.y}, std::move(label), color::text_secondary,
+       pixels, bounds.width * .48f, TextAlign::Left, FontFace::Interface,
+       visible);
+  text(out, {bounds.x + bounds.width, bounds.y}, std::move(value),
+       tone == Tone::Neutral ? color::text_primary : accent(tone), pixels,
+       bounds.width * .52f, TextAlign::Right, FontFace::Interface, visible);
+}
+
+// Empty/error surface: centered muted message with an optional accent hint
+// line underneath for the player's next action.
+inline void empty_state(DrawList &out, UiRect bounds, std::string title,
+                        std::string hint, int pixels) {
+  text(out, {bounds.x + bounds.width * .5f, bounds.y + bounds.height * .38f},
+       std::move(title), color::text_secondary, pixels, bounds.width - 16.f,
+       TextAlign::Center, FontFace::Heading, bounds);
+  if (!hint.empty())
+    text(out, {bounds.x + bounds.width * .5f, bounds.y + bounds.height * .38f +
+                                               pixels * 1.6f},
+         std::move(hint), color::text_muted, std::max(9, pixels - 3),
+         bounds.width - 16.f, TextAlign::Center, FontFace::Interface, bounds);
+}
+
+// Single tab inside a strip — caller owns the strip frame; active tabs get a
+// tone underbar and primary text, inactive tabs stay muted.
+inline void tab(DrawList &out, UiRect bounds, std::string caption,
+                Point pointer, int pixels, bool active,
+                bool enabled = true) {
+  const bool hovered = enabled && bounds.contains(pointer);
+  if (active || hovered)
+    fill(out, bounds, active ? color::surface_raised : color::surface_hover);
+  if (active)
+    fill(out, {bounds.x, bounds.y + bounds.height - 2.f, bounds.width, 2.f},
+         color::selected);
+  text(out, {bounds.x + bounds.width * .5f,
+             bounds.y + (bounds.height - pixels) * .5f - 1.f},
+       std::move(caption),
+       !enabled ? color::disabled
+                : active ? color::text_primary
+                         : hovered ? color::text_primary : color::text_secondary,
+       pixels, bounds.width, TextAlign::Center, FontFace::Heading, bounds);
 }
 
 inline void tooltip(DrawList &out, Point anchor, std::string title,
@@ -146,6 +393,60 @@ inline void tooltip(DrawList &out, Point anchor, std::string title,
   text(out, {x + 12.f * scale, y + 31.f * scale}, std::move(body),
        color::text_secondary, static_cast<int>(12.f * scale),
        width - 24.f * scale);
+}
+
+// Compact single-line hint for icon rails and tight controls: auto-sizes to
+// the measured text when a measurer is supplied, else estimates by pixel
+// width. Clamped inside the viewport like `tooltip`.
+inline void hint(DrawList &out, Point anchor, std::string caption,
+                 int viewport_width, int viewport_height, int pixels,
+                 float scale = 1.f,
+                 const std::function<native_map::TextExtent(const Text &)>
+                     &measure = {}) {
+  const Text probe{{}, caption, color::text_primary, pixels};
+  const auto extent = measure ? measure(probe)
+                              : native_map::TextExtent{
+                                    static_cast<int>(caption.size() * pixels *
+                                                     .55f),
+                                    pixels + 4};
+  const float width =
+      static_cast<float>(extent.width) + 14.f * scale,
+      height = static_cast<float>(extent.height) + 10.f * scale;
+  const float x = std::clamp(
+      anchor.x, 8.f,
+      std::max(8.f, static_cast<float>(viewport_width) - width - 8.f));
+  const float y = std::clamp(
+      anchor.y, 8.f,
+      std::max(8.f, static_cast<float>(viewport_height) - height - 8.f));
+  const UiRect bounds{x, y, std::max(1.f, width), std::max(1.f, height)};
+  fill(out, bounds, color::surface_opaque);
+  stroke(out, bounds, color::keyline_strong);
+  text(out, {x + 7.f * scale, y + 5.f * scale}, std::move(caption),
+       color::text_primary, pixels, width - 14.f * scale, TextAlign::Left,
+       FontFace::Interface, bounds);
+}
+
+// The shared "why is this unavailable" pattern: renders `tooltip` beside the
+// pointer only while `bounds` is hovered and `body` carries a reason.
+inline void hover_tooltip(DrawList &out, UiRect bounds, Point pointer,
+                          std::string title, std::string body,
+                          int viewport_width, int viewport_height,
+                          float scale = 1.f, Tone tone = Tone::Caution) {
+  if (body.empty() || !bounds.contains(pointer)) return;
+  tooltip(out, {pointer.x + 14.f * scale, pointer.y + 20.f * scale},
+          std::move(title), std::move(body), viewport_width, viewport_height,
+          scale, tone);
+}
+
+// Shared scrollbar: faint rail + selected-tone thumb inside `rail`. Draws
+// nothing while the content fits the viewport — one treatment everywhere.
+inline void scrollbar(DrawList &out, UiRect rail,
+                      const engine::ScrollView &scroll, float min_thumb_px) {
+  const auto thumb = scroll.thumb(rail.height, min_thumb_px);
+  if (thumb.size <= 0.f) return;
+  fill(out, rail, {color::keyline.r, color::keyline.g, color::keyline.b, 90});
+  fill(out, {rail.x, rail.y + thumb.offset, rail.width, thumb.size},
+       color::selected);
 }
 
 }

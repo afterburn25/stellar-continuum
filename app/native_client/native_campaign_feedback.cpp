@@ -1,5 +1,7 @@
 #include "native_campaign_feedback.hpp"
 
+#include <stellar/engine/localization.hpp>
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -77,6 +79,20 @@ void collect_step(CampaignFeedbackSummary& summary,
   return "Update available";
 }
 
+[[nodiscard]] const char* notice_key(FeedbackKind kind) noexcept {
+  switch (kind) {
+  case FeedbackKind::ResearchReport: return "FEEDBACK_RESEARCH";
+  case FeedbackKind::ConstructionComplete: return "FEEDBACK_CONSTRUCTION";
+  case FeedbackKind::ShipComplete: return "FEEDBACK_SHIP";
+  case FeedbackKind::SurveyComplete: return "FEEDBACK_SURVEY";
+  case FeedbackKind::ContactDetected: return "FEEDBACK_CONTACT";
+  case FeedbackKind::ColonyFounded: return "FEEDBACK_COLONY";
+  case FeedbackKind::CombatAlert: return "FEEDBACK_COMBAT";
+  case FeedbackKind::Count: break;
+  }
+  return "FEEDBACK_UPDATE";
+}
+
 [[nodiscard]] float scale_for(int width, int height) noexcept {
   const auto safe_width = static_cast<float>(std::max(1, width));
   const auto safe_height = static_cast<float>(std::max(1, height));
@@ -107,6 +123,13 @@ CampaignFeedbackSummary collect_campaign_feedback(
          event.type == CombatEventType::FleetRetreatInitiated))
       saturating_add(summary.counts[index(FeedbackKind::CombatAlert)], 1);
   return summary;
+}
+
+std::string NativeCampaignFeedback::tr(std::string_view key,
+                                       std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
 }
 
 void NativeCampaignFeedback::require_owner() const {
@@ -199,7 +222,7 @@ void NativeCampaignFeedback::render(DrawList& draw, int width, int height) const
     const auto alpha = static_cast<std::uint8_t>(std::lround(235.f * fade));
     draw.overlay.emplace_back(FilledRectangle{panel, {panel_fill.r, panel_fill.g, panel_fill.b, alpha}});
     draw.overlay.emplace_back(StrokedRectangle{panel, {panel_stroke.r, panel_stroke.g, panel_stroke.b, alpha}});
-    std::string value = notice_label(notice.kind);
+    std::string value = tr(notice_key(notice.kind), notice_label(notice.kind));
     if (notice.count > 1) value += " x" + std::to_string(notice.count);
     const UiRect text_bounds{panel.x + 12.f * scale, panel.y + 14.f * scale,
                              std::max(1.f, panel.width - 24.f * scale), panel.height - 8.f * scale};

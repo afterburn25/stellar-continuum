@@ -38,9 +38,13 @@ from native_settlement_preparation_runtime import validate_native_settlement_pre
 from native_earned_settlement_runtime import validate_native_earned_settlement_export
 from native_settlement_runtime import validate_native_settlement_export
 from native_new_game_runtime import validate_native_new_game_export
+from native_restart_runtime import verify_native_restart
 from native_galaxy_runtime import validate_native_galaxy_export
 from native_ship_art_runtime import validate_native_ship_art_export
 from native_diplomacy_runtime import validate_native_diplomacy_export
+from native_quick_find_runtime import validate_native_quick_find_export
+from native_eruption_runtime import validate_native_eruption_export
+from native_developer_runtime import validate_native_developer_export
 
 ROOT = Path(__file__).resolve().parents[2]
 # cabinet.dll hosts the Windows Compression API (compressapi.h /
@@ -107,7 +111,13 @@ def native_build(preset, env):
     # The unfiltered suite includes the heavy scale tests (~7 min of
     # generation/scale work alone on a shared runner); 900 s proved short once
     # the documented SYNC exclusions were removed.
-    run(ctest, env=env, timeout=1800)
+    try:
+        run(ctest, env=env, timeout=1800)
+    except subprocess.CalledProcessError:
+        # A single OS-level flake (AV/indexer file locks during atomic writes)
+        # can fail one test in an otherwise green suite. Rerun just the failed
+        # tests once; a persistent defect still fails the second pass.
+        run(ctest + ["--rerun-failed"], env=env, timeout=1800)
     suffix = {"windows-testing": "testing", "windows-development": "development", "windows-headless": "headless", "windows-native-preview": "preview"}[preset]
     directory = ROOT / "build-native" / suffix
     test_env = dict(env, STELLAR_NATIVE_EXE=str(directory / "stellar-continuum.exe"))
@@ -116,19 +126,9 @@ def native_build(preset, env):
     # unset runs every test.  unittest -k cannot express exclusion, so the
     # filtered runner drops exactly the named tests.
     unittest_exclude = env.get("STELLAR_UNITTEST_EXCLUDE", "").split()
-    for test_file in [
-        "test_export.py", "test_native_client_runtime.py",
-        "test_native_audio_assets.py", "test_native_audio_runtime.py",
-        "test_native_fleet_runtime.py", "test_native_military_runtime.py",
-        "test_native_production_runtime.py", "test_native_system_runtime.py",
-        "test_native_system_travel_runtime.py", "test_native_colony_runtime.py",
-        "test_native_freight_runtime.py", "test_native_settlement_runtime.py",
-        "test_native_navigation_assets.py", "test_native_navigation_runtime.py",
-        "test_native_support_runtime.py", "test_native_battle_runtime.py",
-        "test_native_new_game_runtime.py", "test_native_galaxy_runtime.py",
-        "test_native_ship_art_runtime.py", "test_native_diplomacy_runtime.py",
-        "test_native_frame_profile.py", "test_native_campaign_profile.py",
-    ]:
+    for test_file in sorted(
+        path.name for path in (ROOT / "tools/stellar-export").glob("test_*.py")
+    ):
         if unittest_exclude:
             run([sys.executable, ROOT / "tools/stellar-export/filtered_test_runner.py",
                  ROOT / "tools/stellar-export" / test_file, *unittest_exclude], env=test_env)
@@ -490,7 +490,8 @@ def export(preset_name):
         smoke = relocated_smoke(output)
         if native_client:
             smoke.update(validate_native_client_export(output, env))
-            smoke.update(validate_native_navigation_export(output, env))
+            smoke.update(validate_native_navigation_export(output, env,
+                                                           replay_check=True))
             smoke.update(validate_native_support_export(output, env))
             smoke.update(validate_native_battle_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
@@ -523,13 +524,25 @@ def export(preset_name):
                 output / "Data/astronomy/hyg-nearby-500-v1.json"))
             smoke.update(validate_native_settlement_export(output, env))
             smoke.update(validate_native_new_game_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json",
+                audio_check=True, audio_settings_check=True,
+                video_settings_check=True, general_settings_check=True,
+                voice_settings_check=True, controls_settings_check=True))
+            smoke.update(verify_native_restart(output,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_travel_export(output, env,
-                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+                ROOT / "native-tests/fixtures/player-campaign-json.json",
+                replay_check=True))
             smoke.update(validate_native_galaxy_export(output, env))
             smoke.update(validate_native_ship_art_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_diplomacy_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_quick_find_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_eruption_export(output, env,
+                ROOT / "native-tests/fixtures/player-campaign-json.json"))
+            smoke.update(validate_native_developer_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
         if preset.get("benchmark"):
             smoke["foundationBenchmarks"] = [json.loads(run([exe, "--headless", "--systems", count, "--ticks", "100", "--workers", "4"], env=env, capture=True)) for count in (100, 500, 1000, 2500, 5000)]

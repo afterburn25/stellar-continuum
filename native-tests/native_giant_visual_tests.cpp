@@ -15,7 +15,7 @@ int main(int argc,char** argv)try{
   const int lod=area.width<640?256:1024;
   const auto maps=load_material(root/"assets/visual",a,lod);std::vector<MeshInstance3D> objects;append_instances(objects,a,maps,{},1,lod,0,illumination,view);
   Camera3D camera;camera.position={0,0,8};camera.projection=Projection3D::Perspective;camera.near_plane=.1f;camera.far_plane=20;
-  camera.vertical_fov_radians=2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.16/8);
+  camera.vertical_fov_radians=static_cast<float>(2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.16/8));
   draw.overlay.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects)),area});
   stellar::native_menu_style::text(draw,{area.x+3,area.y+area.height-31,area.width-6,28},caption,16,stellar::native_menu_style::ink,TextAlign::Center);
  };
@@ -70,6 +70,8 @@ int main(int argc,char** argv)try{
  auto panel_draw=render();window.draw(panel_draw,folder/"giant-test-panel.png");
  const auto press=[&](std::string_view label){auto draw=render();for(const auto& cmd:draw.overlay)if(const auto* t=std::get_if<Text>(&cmd);t&&t->value==label&&t->clip){Point p{t->clip->x+t->clip->width/2,t->clip->y+t->clip->height/2};panel.handle({InputEventType::LeftPressed,p},1280,720,frame);panel.handle({InputEventType::LeftReleased,p},1280,720,frame);return;}throw std::runtime_error("Missing panel control "+std::string(label));};
  for(auto action:{"ICE GIANTS","NEXT SUBCLASS","NEXT PLANET IMAGE","NEXT RING IMAGE","TILT +15°","CAMERA LEFT","CAMERA HIGHER","STAR DIRECTION +45°","STAR SPECTRUM","MOVE FARTHER","RING SHADOW: ON","PLANET SHADOW: ON"})press(action);
+ {const auto draw=render();const auto* view=[&]{for(const auto& c:draw.overlay)if(const auto* v=std::get_if<Scene3DView>(&c))return v;return static_cast<const Scene3DView*>(nullptr);}();
+  check(view&&view->options.time>0,"Preview ignored the shader clock; band drift renders frozen");}
  window.draw(render(),folder/"giant-test-panel-adjusted.png");
  const auto& live=frame.runtime().world().campaign();const auto lab=build_developer_giant_test(live);const auto& planet=lab.body;
  check(live.systems.size()==250,"QA changed generated system count");
@@ -77,6 +79,29 @@ int main(int argc,char** argv)try{
  const auto saved=capture_developer_campaign_json(frame.runtime(),{0,"giant-test","2050-03-21T00:00:00Z"});
  auto restored=restore_developer_campaign_json(load_adaptive_research_strategic_runtime(root/"data/research/v1"),saved);
  check(build_developer_giant_test(restored.galaxy()).body.appearance==planet.appearance,"Full campaign round-trip changed QA appearance");
+ // Keyboard ring: the twenty buttons walk in (y,x) order and Return/Space
+ // replay the same dispatch a pointer press+release takes; the toggle
+ // buttons classify CheckBox; Escape releases the ring before closing.
+ {
+  const auto key=[&](std::uint32_t code,bool shift=false){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=code;ev.shift=shift;return panel.handle(ev,1280,720,frame);};
+  check(panel.focus()<0,"Giant panel opened with stale focus.");
+  check(key(9)&&panel.focus()>=0,"Tab did not enter the giant panel ring.");
+  check(panel.focused_label(1280,720)=="GAS GIANTS","First giant-panel target is not GAS GIANTS.");
+  check(panel.focused_bounds(1280,720).has_value(),"Focused giant control lacks bounds.");
+  int guard=0;
+  while(panel.focused_label(1280,720).find("RING SHADOW")!=0&&guard++<32)check(key(9),"Giant panel navigation leaked.");
+  check(panel.focused_control(1280,720)==stellar::engine::AnnouncementControl::CheckBox,"Ring-shadow toggle was not classified as a CheckBox.");
+  check(key(13),"Giant panel activation leaked.");
+  while(panel.focused_label(1280,720)!="CLOSE"&&guard++<64)check(key(9),"Giant panel navigation to CLOSE leaked.");
+  check(key(13)&&!panel.visible(),"Keyboard CLOSE did not close the giant panel.");
+  panel.open(frame);
+  check(key(9)&&panel.focus()>=0,"Tab did not re-enter the giant panel ring.");
+  InputEvent tap{};tap.type=InputEventType::LeftPressed;tap.position={8,8};
+  check(panel.handle(tap,1280,720,frame)&&panel.focus()<0,"Pointer press did not clear the giant panel ring.");
+  check(key(9),"Giant panel Tab leaked.");
+  check(panel.handle({InputEventType::EscapePressed},1280,720,frame)&&panel.focus()<0&&panel.visible(),"Escape closed the panel instead of releasing its ring.");
+  check(panel.handle({InputEventType::EscapePressed},1280,720,frame)&&!panel.visible(),"Second Escape did not close the giant panel.");
+ }
  // Synthetic ring extraction catches background leakage, missing gaps and aliasing.
  constexpr int n=512;std::vector<std::uint8_t> pixels(n*n*4,0);for(int y=0;y<n;++y)for(int x=0;x<n;++x){double r=std::hypot((x-256)/210.,(y-256)/130.);auto i=(y*n+x)*4;pixels[i+3]=255;if(r>.58&&r<1&&(r<.76||r>.82)){pixels[i]=190;pixels[i+1]=160;pixels[i+2]=120;}}
  auto ring=prepare_ring_material(*RgbaImage::create(n,n,std::move(pixels)));check(ring.usable&&ring.material->height()==2048&&ring.gap_fraction>.015,"Elliptical ring extraction lost its transparent radial gap");

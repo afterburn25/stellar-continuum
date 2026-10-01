@@ -76,7 +76,12 @@ public:
   void set_stellar_art(StellarArtProvider value){stellar_art_=std::move(value);}
   void set_stellar_activity(StellarActivityProvider value){stellar_activity_=std::move(value);}
   void set_planet_materials(stellar::native_planets::MaterialProvider value){planet_materials_=std::move(value);}
+  void set_scene3d_quality(stellar::native_map::RenderQuality3D value)noexcept{scene3d_quality_=value;}
+  // Optional world-fixed radiance map for the planet scene's IBL slot —
+  // the phenomena pipeline feeds its composited local nebula field here.
+  void set_scene_environment(std::shared_ptr<const stellar::native_map::RgbaImage> value){scene_environment_=std::move(value);}
   void set_small_body_images(SmallBodyImageProvider value){small_bodies_.set_images(std::move(value));}
+  void set_small_body_scene3d_quality(stellar::native_map::RenderQuality3D quality)noexcept{small_bodies_.set_scene3d_quality(quality);}
   void set_simulation_days(double days);
   [[nodiscard]] std::optional<int> tracked_body_id()const noexcept{return tracked_body_id_;}
   void set_motion_running(bool running)noexcept{motion_running_=running;}
@@ -107,6 +112,19 @@ public:
   [[nodiscard]] bool visible()const noexcept{return snapshot_.has_value();}
   [[nodiscard]] std::optional<int> system_id()const noexcept;
   [[nodiscard]] std::optional<int> selected_body_id()const noexcept{return selected_body_id_;}
+  [[nodiscard]] bool small_body_keyboard_focus()const noexcept{return small_body_ring_>=0;}
+  // Keyboard ring index over the small-body controls (-1 when unfocused).
+  [[nodiscard]] int focused()const noexcept{return small_body_ring_;}
+  // Localized label of the ringed small-body control for
+  // screen-reader/live-region consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width,int height)const;
+  // Client-pixel rect of the ringed small-body control — null when nothing
+  // is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width,int height)const;
+  // True when the small-body inspector overlay is open and owns the point —
+  // the panel draws over HUD chrome, so it claims hits first.
+  [[nodiscard]] bool small_body_panel_owns(stellar::native_map::Point point,int width,int height)const;
   [[nodiscard]] std::optional<stellar::core::SmallBodyInstance> focused_small_body()const{
     if(!snapshot_||!small_body_focus_||snapshot_->small_body_fields.empty())return std::nullopt;
     const auto& f=snapshot_->small_body_fields[small_body_field_%snapshot_->small_body_fields.size()];
@@ -142,6 +160,10 @@ private:
   void sync_body_inspection();
   std::optional<SystemWorkspaceCommand> handle_small_bodies(const stellar::native_map::InputEvent&,int,int);
   void render_small_body_panel(stellar::native_map::DrawList&,int,int);
+  // Ordered (y,x) focus ring for the small-body chrome; each entry carries
+  // the localized label it renders so announcements match the screen.
+  [[nodiscard]] std::vector<std::pair<stellar::native_map::UiRect,std::string>>
+      small_body_ring_targets(int width,int height)const;
   [[nodiscard]] const stellar::native_system::NativeSystemBody *selected_body()const noexcept;
   [[nodiscard]] const stellar::native_system_travel::NativeLocalFleetMarker *selected_fleet()const noexcept;
   [[nodiscard]] std::vector<int> fleet_hits(stellar::native_map::Point)const;
@@ -161,6 +183,7 @@ private:
   bool small_body_panel_{},small_body_debug_{},small_body_focus_{};
   std::size_t small_body_field_{};
   std::uint32_t small_body_index_{};
+  int small_body_ring_{-1};
   std::optional<stellar::native_system::NativeSystemSnapshot> snapshot_;
   std::optional<stellar::native_system::SystemSpatialSnapshot> spatial_;
   std::optional<stellar::native_system::SystemSpatialViewport> viewport_;
@@ -184,6 +207,8 @@ private:
   std::shared_ptr<const stellar::native_map::RgbaImage> shipyard_image_;
   bool dragging_{},pending_initial_travel_fit_{};
   bool artwork_ready_{true};
+  stellar::native_map::RenderQuality3D scene3d_quality_{stellar::native_map::RenderQuality3D::High};
+  std::shared_ptr<const stellar::native_map::RgbaImage> scene_environment_;
   int width_{},height_{};
 };
 } // namespace stellar::native_system_ui

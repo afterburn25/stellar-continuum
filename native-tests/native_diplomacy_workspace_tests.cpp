@@ -1,8 +1,10 @@
 #include "native_diplomacy_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <iostream>
 #include <stdexcept>
 #include <string_view>
@@ -122,7 +124,9 @@ void require_scrolled_draw_clipped(const DrawList &draw, UiRect region,
   view.proposals.push_back({11, "INCOMING", "Agreement", "Non Aggression",
                             "Join a pact of non-aggression.", true, true,
                             false});
-  view.agreements.push_back({5, "Access", "ACTIVE", "2050-06-01", ""});
+  view.agreements.push_back({5, "Access", "ACTIVE",
+                             stellar::core::DiplomaticAgreementStatus::active,
+                             "2050-06-01", ""});
   view.history.push_back({9, "2050-03-01", "Contact Established",
                           "A channel opened with Nova Concord."});
   return view;
@@ -130,6 +134,7 @@ void require_scrolled_draw_clipped(const DrawList &draw, UiRect region,
 } // namespace
 
 int main() try {
+  using enum stellar::core::DiplomacyActionBlocker;
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
                   std::pair{1920, 1080}, std::pair{2560, 1440},
@@ -147,6 +152,16 @@ int main() try {
                 contained(layout.surface, layout.feedback) &&
                 contained(viewport, layout.modal_panel),
             "Diplomacy workspace escaped its viewport.");
+    // The three action slots stay pinned inside the meter panel at every
+    // resolution; the meter viewport sits above them and scrolls instead.
+    require(contained(layout.meter_panel, layout.actions) &&
+                contained(layout.meter_panel, layout.meters),
+            "Meter panel children escaped at this viewport.");
+    require(layout.actions.height >= 3.f * 36.f * layout.scale,
+            "Action column clipped its three pinned buttons.");
+    require(layout.meters.y + layout.meters.height <=
+                layout.actions.y + .01f,
+            "Meter viewport overlaps the pinned action strip.");
     if(height>=720)
       require(layout.surface.x >=
                   navigation.inspect.x + navigation.inspect.width,
@@ -312,6 +327,55 @@ int main() try {
   require(stale_confirm.kind != DiplomacyWorkspaceCommandKind::Action,
           "A dismissed stale modal still issued an action.");
 
+  // The negotiation modal lists every term; unavailable terms render disabled
+  // with the domain's authoritative status as the hover why, and clicking one
+  // is a captured no-op.
+  auto war_view = sample_view();
+  auto &war_sel = war_view.selected;
+  war_sel.can_declare_war = false; // at war
+  war_sel.can_offer_non_aggression = false;
+  war_sel.can_request_access = false;
+  war_sel.can_offer_ceasefire = true;
+  war_sel.can_offer_peace = true;
+  war_sel.political_status = "At war";
+  war_sel.declare_war_blocker = already_at_war;
+  war_sel.offer_non_aggression_blocker = already_at_war;
+  war_sel.request_access_blocker = access_granted;
+  NativeDiplomacyWorkspace war_workspace;
+  war_workspace.open();
+  war_workspace.set_view(war_view);
+  (void)war_workspace.handle(
+      {InputEventType::LeftPressed, center(negotiate)}, 1280, 720);
+  require(war_workspace.modal_open(),
+          "At-war negotiation modal did not open.");
+  (void)war_workspace.handle({InputEventType::PointerMove,
+                              center({layout.modal_panel.x + 16.f * s,
+                                      layout.modal_panel.y + 74.f * s,
+                                      layout.modal_panel.width - 32.f * s,
+                                      36.f * s})},
+                             1280, 720);
+  DrawList terms_draw;
+  war_workspace.render(terms_draw, 1280, 720, nullptr);
+  require(has_text(terms_draw, "Non-aggression") &&
+              has_text(terms_draw, "Request transit access") &&
+              has_text(terms_draw, "Ceasefire") &&
+              has_text(terms_draw, "Peace") &&
+              has_text(terms_draw, "Grant transit access") &&
+              has_text(terms_draw, "Deny transit access"),
+          "Unavailable negotiation terms were hidden instead of disabled.");
+  require(has_text(terms_draw, "A state of war already exists."),
+          "A disabled negotiation term did not surface its blocker reason.");
+  const UiRect first_term_rect{layout.modal_panel.x + 16.f * s,
+                               layout.modal_panel.y + 74.f * s,
+                               layout.modal_panel.width - 32.f * s,
+                               36.f * s};
+  const auto disabled_term = war_workspace.handle(
+      {InputEventType::LeftPressed, center(first_term_rect)}, 1280, 720);
+  require(disabled_term.captured &&
+              disabled_term.kind == DiplomacyWorkspaceCommandKind::None &&
+              war_workspace.modal_open(),
+          "A disabled negotiation term dispatched a transition.");
+
   // Contact rows and proposal buttons cannot be activated through a clipped
   // edge after scrolling.
   auto crowded = sample_view();
@@ -385,6 +449,10 @@ int main() try {
       layout.tabs.height};
   (void)intelligence.handle({InputEventType::LeftPressed, center(intelligence_tab)},
                             1280, 720);
+  // The detail viewport is shorter than the intelligence content at 720p;
+  // scroll down enough to bring the unresolved card into view.
+  (void)intelligence.handle(
+      {InputEventType::Wheel, center(layout.detail_rows), {}, -2.f}, 1280, 720);
   DrawList intelligence_draw;
   intelligence.render(intelligence_draw, 1280, 720, nullptr);
   require_scrolled_draw_clipped(intelligence_draw, layout.detail_rows,
@@ -424,6 +492,193 @@ int main() try {
       640, 360);
   require(hidden_focus.kind != DiplomacyWorkspaceCommandKind::FocusSystem,
           "A clipped intelligence control accepted an off-region click.");
+
+  // Keyboard-focus contract: Tab/arrows ring every actionable rect in (y,x)
+  // order, Home/End jump to the ends, Return/Space replay the click dispatch
+  // at the focused rect, and the modal narrows the ring to its own controls.
+  {
+    NativeDiplomacyWorkspace keys;
+    keys.open();
+    keys.set_view(sample_view());
+    const auto key = [&](std::uint32_t code, bool shift = false) {
+      InputEvent event{};
+      event.type = InputEventType::KeyPressed;
+      event.key = code;
+      event.shift = shift;
+      return keys.handle(event, 1280, 720);
+    };
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kDown = 0x40000051u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    constexpr std::uint32_t kF5 = 0x4000003fu;
+    const auto focused_rect = [&] {
+      DrawList ring_draw;
+      keys.render(ring_draw, 1280, 720, nullptr);
+      const auto *ring =
+          std::get_if<StrokedRectangle>(&ring_draw.overlay.back());
+      require(ring && ring->color.r == stellar::native_ui::color::focus.r &&
+                  ring->color.g == stellar::native_ui::color::focus.g,
+              "Focused diplomacy control rendered no accent ring.");
+      return ring->bounds;
+    };
+    require(keys.focus() < 0, "Diplomacy focus ring present before any key.");
+    require(key(kTab).captured && keys.focus() == 0 &&
+                overlaps(focused_rect(), layout.close),
+            "First Tab did not ring the close control.");
+    require(key(kTab, true).captured && keys.focus() > 0,
+            "Shift+Tab did not wrap to the last control.");
+    const int last = keys.focus();
+    require(key(kHome).captured && keys.focus() == 0 &&
+                key(kEnd).captured && keys.focus() == last,
+            "Home/End did not jump between the ring ends.");
+    require(key(kDown).captured && keys.focus() == 0,
+            "Down did not wrap from the last control to the first.");
+    require(!key(kF5).captured, "An unrelated key was captured.");
+
+    // The ring carries announcement labels for screen-reader consumers.
+    require(keys.focused_label(1280, 720) == "RETURN",
+            "Focused close control announced the wrong label.");
+    require(key(kEnd).captured &&
+                !keys.focused_label(1280, 720).empty(),
+            "Last ring control announced an empty label.");
+    (void)key(kHome);
+
+    // Activate the negotiate action: walk the ring until it lands on the
+    // negotiate button, then Return replays the click dispatch.
+    const UiRect negotiate_rect{layout.actions.x + 8.f * s,
+                                layout.actions.y + 8.f * s + 36.f * s,
+                                layout.actions.width - 16.f * s, 30.f * s};
+    bool found = false;
+    for (int step = 0; step < 60 && !found; ++step) {
+      if (overlaps(focused_rect(), negotiate_rect)) found = true;
+      else (void)key(kDown);
+    }
+    require(found, "Ring never reached the negotiate action.");
+    auto command = key(kReturn);
+    require(command.captured && keys.modal_open() && keys.focus() < 0,
+            "Return on the negotiate action did not open the term modal.");
+    // The modal narrows the ring to its terms plus cancel.
+    require(key(kTab).captured && keys.focus() == 0,
+            "Modal ring did not restart on the first term.");
+    command = key(kReturn); // first term reaches the confirmation modal
+    require(command.captured && keys.modal_open(),
+            "Term activation did not reach the confirmation modal.");
+    require(key(kTab).captured && keys.focus() == 0,
+            "Confirmation modal ring did not restart.");
+    command = key(kReturn); // confirm button
+    require(command.kind == DiplomacyWorkspaceCommandKind::Action &&
+                command.action ==
+                    DiplomacyWorkspaceAction::propose_non_aggression &&
+                command.target_civilization_id == 7 &&
+                command.campaign_generation == 4 &&
+                command.diplomacy_revision == 3 && command.captured,
+            "Keyboard-confirmed negotiation did not emit the action.");
+
+    // A contact row selects by keyboard through the same dispatch.
+    const UiRect second_contact{layout.contact_rows.x + 4.f * s,
+                                layout.contact_rows.y + 4.f * s + 62.f * s,
+                                layout.contact_rows.width - 8.f * s,
+                                58.f * s};
+    (void)key(kHome);
+    found = false;
+    for (int step = 0; step < 60 && !found; ++step) {
+      if (overlaps(focused_rect(), second_contact)) found = true;
+      else (void)key(kDown);
+    }
+    require(found, "Ring never reached a contact row.");
+    command = key(kSpace);
+    require(command.kind == DiplomacyWorkspaceCommandKind::SelectContact &&
+                command.contact_index == 1 && command.captured,
+            "Space on a contact row did not select it.");
+
+    // A pointer press hands ownership back to the pointer.
+    require(keys.handle({InputEventType::LeftPressed, center(layout.surface)},
+                        1280, 720)
+                    .captured &&
+                keys.focus() < 0,
+            "Pointer press did not clear the diplomacy ring.");
+  }
+
+  // A contact with no legal actions still shows all three action slots as
+  // disabled; hover surfaces the authoritative status as the why, and clicks
+  // are captured without dispatching.
+  auto dark = sample_view();
+  auto &dsel = dark.selected;
+  dsel.has_visible_communication = false;
+  dsel.can_attempt_communication = false;
+  dsel.can_offer_non_aggression = false;
+  dsel.can_request_access = false;
+  dsel.can_offer_peace = false;
+  dsel.can_offer_ceasefire = false;
+  dsel.can_set_access = false;
+  dsel.can_declare_war = false;
+  dsel.communication_status = "Channel lost";
+  dsel.political_status = "At war";
+  NativeDiplomacyWorkspace disabled_actions;
+  disabled_actions.open();
+  disabled_actions.set_view(dark);
+  (void)disabled_actions.handle({InputEventType::PointerMove,
+                                 {negotiate.x + negotiate.width * .5f,
+                                  negotiate.y + negotiate.height * .5f}},
+                                1280, 720);
+  DrawList disabled_draw;
+  disabled_actions.render(disabled_draw, 1280, 720, nullptr);
+  require(has_text(disabled_draw, "Establish communication") &&
+              has_text(disabled_draw, "Negotiate") &&
+              has_text(disabled_draw, "Declare war"),
+          "Unavailable diplomacy actions were hidden instead of disabled.");
+  require(has_text(disabled_draw, "Channel lost"),
+          "A disabled diplomacy action did not explain its blocker.");
+
+  // When the projection reports a blocker reason, the hover surfaces the
+  // localized blocker instead of the status fallback.
+  dsel.communication_blocker = contact_lost;
+  dsel.negotiate_blocker = no_channel;
+  dsel.declare_war_blocker = already_at_war;
+  disabled_actions.set_view(dark);
+  const char *const slot_whys[] = {
+      "Contact is stale or lost; restore the observation first.",
+      "Requires an open communication channel.",
+      "A state of war already exists."};
+  for (int index = 0; index < 3; ++index) {
+    const UiRect why_slot{layout.actions.x + 8.f * s,
+                          layout.actions.y + 8.f * s +
+                              static_cast<float>(index) * 36.f * s,
+                          layout.actions.width - 16.f * s, 30.f * s};
+    (void)disabled_actions.handle(
+        {InputEventType::PointerMove, center(why_slot)}, 1280, 720);
+    DrawList why_draw;
+    disabled_actions.render(why_draw, 1280, 720, nullptr);
+    require(has_text(why_draw, slot_whys[index]),
+            "A disabled diplomacy action did not surface its blocker reason.");
+  }
+  for (int index = 0; index < 3; ++index) {
+    const UiRect slot{layout.actions.x + 8.f * s,
+                      layout.actions.y + 8.f * s +
+                          static_cast<float>(index) * 36.f * s,
+                      layout.actions.width - 16.f * s, 30.f * s};
+    const auto hit = disabled_actions.handle(
+        {InputEventType::LeftPressed, center(slot)}, 1280, 720);
+    require(hit.captured &&
+                hit.kind == DiplomacyWorkspaceCommandKind::None &&
+                !disabled_actions.modal_open(),
+            "A disabled diplomacy action dispatched a command.");
+  }
+
+  // Hovering a relationship meter explains what it measures.
+  NativeDiplomacyWorkspace meters;
+  meters.open();
+  meters.set_view(dark);
+  (void)meters.handle({InputEventType::PointerMove,
+                       {layout.meters.x + 4.f * s,
+                        layout.meters.y + 4.f * s}},
+                      1280, 720);
+  DrawList meters_draw;
+  meters.render(meters_draw, 1280, 720, nullptr);
+  require(has_text(meters_draw, "TRUST") &&
+              has_text(meters_draw,
+                       "How reliably this contact honors its agreements."),
+          "A relationship meter did not explain itself on hover.");
 
   // The close control emits Close.
   const auto closed = workspace.handle(

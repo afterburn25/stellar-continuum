@@ -1,8 +1,10 @@
 #include <stellar/engine/asset_registry.hpp>
 #include "native_phenomena.hpp"
+#include "native_data_names.hpp"
 #include "native_menu_style.hpp"
 #include <stellar/core/stellar_population_profiles.hpp>
 #include <stellar/engine/foundation.hpp>
+#include <stellar/engine/surface_attachment.hpp>
 #include <cmath>
 #include <iomanip>
 #include <sstream>
@@ -11,6 +13,10 @@ using namespace stellar::core;
 using namespace stellar::engine;
 namespace {
 constexpr int local_width=1536,local_height=864;
+// Square canvas for the emission-volume path: the shader's proxy box maps
+// the texture over a 1x1 local square, so a square source shows the same
+// undistorted crop windows at any window aspect.
+constexpr int volume_canvas=1536;
 constexpr std::size_t art_budget=96u*1024u*1024u;
 std::uint8_t byte(double v){return static_cast<std::uint8_t>(std::clamp(std::lround(v),0l,255l));}
 double fade(std::chrono::steady_clock::time_point start){return std::clamp(std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()/.65,0.,1.);}
@@ -24,23 +30,23 @@ std::array<double,4> sample(const RgbaImage& image,double u,double v){
   for(int j=0;j<2;++j)for(int i=0;i<2;++i){const auto at=(static_cast<std::size_t>(std::min(y+j,image.height()-1))*image.width()+std::min(x+i,image.width()-1))*4;const double weight=(i?fx:1-fx)*(j?fy:1-fy),a=image.pixels()[at+3]/255.;alpha+=a*weight;for(int k=0;k<3;++k)color[k]+=image.pixels()[at+k]*a*weight;}
   if(alpha>0)for(int k=0;k<3;++k)color[k]/=alpha;color[3]=alpha;return color;
 }
-std::shared_ptr<const RgbaImage> composite_local(const SystemPhenomenonContext& c,const std::vector<LocalLayer>& layers){
-  std::vector<std::uint8_t> pixels(local_width*local_height*4u);
+std::shared_ptr<const RgbaImage> composite_local(const SystemPhenomenonContext& c,const std::vector<LocalLayer>& layers,int width=local_width,int height=local_height){
+  std::vector<std::uint8_t> pixels(static_cast<std::size_t>(width)*static_cast<std::size_t>(height)*4u);
   double total=0;for(const auto& layer:layers)if(!layer.asset.obscuring)total+=.65*std::sqrt(layer.overlap.intensity*layer.region.opacity);
   const double normalization=total>0?std::min(1.,.28/total):0;
   struct Crop{Point center;double sx,sy,cs,sn,weight,mirror;bool dark;};std::vector<Crop> crops;
   for(const auto& layer:layers){const auto mapping=phenomenon_art_mapping(layer.region,layer.asset);const auto uv=mapping.uv(c.world_x,c.world_y);DeterministicRandom rng(c.local_seed^layer.region.shape.seed);
     const double crop=.30+.04*rng.unit_double();
-    crops.push_back({uv,crop,crop*local_height/local_width*layer.asset.aspect_ratio,std::cos(layer.region.shape.rotation),std::sin(layer.region.shape.rotation),layer.asset.obscuring?4*layer.overlap.density*layer.region.opacity:.65*std::sqrt(layer.overlap.intensity*layer.region.opacity)*normalization,layer.region.mirrored?-1.:1.,layer.asset.obscuring});
+    crops.push_back({uv,crop,crop*height/width*layer.asset.aspect_ratio,std::cos(layer.region.shape.rotation),std::sin(layer.region.shape.rotation),layer.asset.obscuring?4*layer.overlap.density*layer.region.opacity:.65*std::sqrt(layer.overlap.intensity*layer.region.opacity)*normalization,layer.region.mirrored?-1.:1.,layer.asset.obscuring});
   }
-  for(int y=0;y<local_height;++y)for(int x=0;x<local_width;++x){double alpha=0;std::array<double,3> rgb{};
-    for(std::size_t i=0;i<layers.size();++i){const auto& crop=crops[i];const double dx=(x/static_cast<double>(local_width)-.5)*crop.sx,dy=(y/static_cast<double>(local_height)-.5)*crop.sy;
+  for(int y=0;y<height;++y)for(int x=0;x<width;++x){double alpha=0;std::array<double,3> rgb{};
+    for(std::size_t i=0;i<layers.size();++i){const auto& crop=crops[i];const double dx=(x/static_cast<double>(width)-.5)*crop.sx,dy=(y/static_cast<double>(height)-.5)*crop.sy;
       const auto color=sample(*layers[i].texture,crop.center.x+crop.mirror*(crop.cs*dx+crop.sn*dy),crop.center.y-crop.sn*dx+crop.cs*dy);
       const auto a=crop.dark?1-std::exp(-color[3]*crop.weight):color[3]*crop.weight;for(int k=0;k<3;++k)rgb[k]=rgb[k]*(1-a)+color[k]*a;alpha=alpha+(1-alpha)*a;
     }
-    const auto at=(static_cast<std::size_t>(y)*local_width+x)*4;if(alpha>0)for(int k=0;k<3;++k)pixels[at+k]=byte(rgb[k]/alpha);pixels[at+3]=byte(std::min(.985,alpha)*255);
+    const auto at=(static_cast<std::size_t>(y)*width+x)*4;if(alpha>0)for(int k=0;k<3;++k)pixels[at+k]=byte(rgb[k]/alpha);pixels[at+3]=byte(std::min(.985,alpha)*255);
   }
-  return RgbaImage::create(local_width,local_height,std::move(pixels));
+  return RgbaImage::create(width,height,std::move(pixels));
 }
 }
 DecalMapping phenomenon_art_mapping(const GalaxyPhenomenon& r,const PhenomenonVisualAsset& a){
@@ -73,13 +79,14 @@ std::shared_ptr<const RgbaImage> make_local_environment(const GalaxyPhenomena& f
   return composite_local(c,layers);
 }
 void NativePhenomena::use_assets(std::filesystem::path root){asset_root_=std::filesystem::absolute(std::move(root));for(const auto& a:phenomenon_art_catalog())if(!stellar::engine::resource_exists(asset_root_/a.path))throw std::runtime_error("Missing phenomenon artwork: "+a.filename);stellar::engine::log("phenomenon-art",phenomenon_art_inventory());}
-std::size_t NativePhenomena::cache_bytes()const{std::size_t total=(atlas_?atlas_->byte_size():0)+(local_?local_->byte_size():0);for(const auto& [key,entry]:art_)if(entry.image)total+=entry.image->byte_size();return total;}
-void NativePhenomena::bind(const GalaxyPhenomena* f){atlas_job_.reset();local_job_.reset();atlas_.reset();local_.reset();art_.clear();contexts_.clear();field_=f?std::optional{*f}:std::nullopt;local_system_=-1;ready_=!f||f->regions.empty();previous_system_=false;transition_=std::chrono::steady_clock::now();index_.clear();if(f){for(std::size_t i=0;i<f->regions.size();++i){const auto& s=f->regions[i].shape;const auto b=std::max(s.extent_x,s.extent_y)*1.04;index_.insert(i,{s.x-b,s.y-b,s.x+b,s.y+b});}stellar::engine::log("phenomenon-art",phenomenon_art_usage(*f));}}
+std::size_t NativePhenomena::cache_bytes()const{std::size_t total=(atlas_?atlas_->byte_size():0)+(local_?local_->byte_size():0)+(local_volume_?local_volume_->byte_size():0);for(const auto& [key,entry]:art_)if(entry.image)total+=entry.image->byte_size();return total;}
+void NativePhenomena::bind(const GalaxyPhenomena* f){atlas_job_.reset();local_job_.reset();local_volume_job_.reset();atlas_.reset();local_.reset();local_volume_.reset();local_volume_scene_.reset();local_volume_source_=nullptr;art_.clear();contexts_.clear();field_=f?std::optional{*f}:std::nullopt;local_system_=-1;ready_=!f||f->regions.empty();previous_system_=false;transition_=std::chrono::steady_clock::now();index_.clear();if(f){for(std::size_t i=0;i<f->regions.size();++i){const auto& s=f->regions[i].shape;const auto b=std::max(s.extent_x,s.extent_y)*1.04;index_.insert(i,{s.x-b,s.y-b,s.x+b,s.y+b});}stellar::engine::log("phenomenon-art",phenomenon_art_usage(*f));}}
 const SystemPhenomenonContext& NativePhenomena::context(int id,double x,double y){auto found=contexts_.find(id);if(found==contexts_.end())found=contexts_.emplace(id,phenomenon_context(field(),x,y,id)).first;return found->second;}
 void NativePhenomena::poll(){
   for(auto& [key,entry]:art_)if(entry.job&&entry.job->ready()){entry.image=entry.job->take();entry.job.reset();}
   if(atlas_job_&&atlas_job_->ready()){atlas_=atlas_job_->take();atlas_job_.reset();}
   if(local_job_&&local_job_->ready()){local_=local_job_->take();local_job_.reset();transition_=std::chrono::steady_clock::now();}
+  if(local_volume_job_&&local_volume_job_->ready()){local_volume_=local_volume_job_->take();local_volume_job_.reset();}
 }
 void NativePhenomena::collect_art(){
   ++frame_;poll();
@@ -104,11 +111,24 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
   const auto [tile,columns,rows]=phenomenon_atlas_layout(field_->regions.size());(void)rows;
   const UiRect screen{0,0,static_cast<float>(w),static_cast<float>(h)};const double transition=.35+.65*fade(transition_);
   std::vector<TriangleMesh> batches;DrawList diagnostics;int full_detail_used=0;
+  // Surveyed regions carry a name so the cloud reads as charted geography
+  // rather than ambient art; drawn after the decal batches so labels sit
+  // above the clouds they name, and only once the region is large enough on
+  // screen for the text to be legible.
+  std::vector<Text> surveyed_labels;
   const auto corner=camera.unproject({0,0},w,h),end=camera.unproject({static_cast<float>(w),static_cast<float>(h)},w,h);
   for(const auto i:index_.query({corner.x,corner.y,end.x,end.y})){const auto& r=field_->regions[i];const auto& a=phenomenon_art(*field_,r);const auto mapping=phenomenon_art_mapping(r,a);const auto p=camera.project({r.shape.x,r.shape.y},w,h);const float extent=static_cast<float>(std::max(r.shape.extent_x,r.shape.extent_y)*1.04*camera.pixels_per_world);
     if(p.x+extent<0||p.y+extent<0||p.x-extent>w||p.y-extent>h||extent<.35f)continue;
     const UiRect dest{p.x-extent,p.y-extent,extent*2,extent*2};const bool known=surveyed.contains(r.id);
     const double far_opacity=extent<60?.85:1.;const double strength=std::min(.68,r.opacity*(.6+r.intensity)*visual_multiplier(options))*far_opacity*transition;
+    if(known&&extent>=90.f&&extent<=520.f){
+      const auto& d=phenomenon_definition(r.type);
+      surveyed_labels.emplace_back(Text{{p.x,p.y+extent*.42f},
+          r.designation.empty()?stellar::native_data::phenomenon_name(locale_,d):r.designation+" · "+stellar::native_data::phenomenon_name(locale_,d),
+          {152,230,247,static_cast<std::uint8_t>(std::min(255.,150.+strength*180.))},
+          static_cast<int>(std::clamp(extent*.075f,10.f,14.f)),extent*2.f,screen,
+          TextAlign::Center,FontFace::Heading});
+    }
     if(options.heatmap&&atlas_){const UiRect source{static_cast<float>(i%columns*tile),static_cast<float>(i/columns*tile),static_cast<float>(tile),static_cast<float>(tile)};out.world.emplace_back(Image{atlas_,dest,source,{255,255,255,200},screen});}
     else{
       int lod=decal_lod_width(mapping.half_width*2*camera.pixels_per_world,options.density);if(lod==2944&&full_detail_used++>=3)lod=768;
@@ -120,36 +140,82 @@ void NativePhenomena::append_map(DrawList& out,const Camera& camera,int w,int h,
       if(batches.empty()||!append_decal_batch(batches.back(),std::move(mesh)))batches.push_back(std::move(mesh));
     }
     if(options.bounds){const Color line{90,220,255,130};diagnostics.world.emplace_back(Line{{dest.x,dest.y},{dest.x+dest.width,dest.y},line});diagnostics.world.emplace_back(Line{{dest.x+dest.width,dest.y},{dest.x+dest.width,dest.y+dest.height},line});diagnostics.world.emplace_back(Line{{dest.x+dest.width,dest.y+dest.height},{dest.x,dest.y+dest.height},line});diagnostics.world.emplace_back(Line{{dest.x,dest.y+dest.height},{dest.x,dest.y},line});}
-    if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?phenomenon_definition(r.type).name:tr(locale_,"PHENOMENA_UNKNOWN_SHORT","Uncharted cloud"))+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
+    if(options.labels||options.region_bias||options.membership||options.filenames)diagnostics.world.emplace_back(Text{p,r.designation+" "+((known||options.labels)?stellar::native_data::phenomenon_name(locale_,phenomenon_definition(r.type)):tr(locale_,"PHENOMENA_UNKNOWN_SHORT","Uncharted cloud"))+(options.filenames?" | "+a.filename:"")+(options.region_bias?" | "+std::string(stellar_region_name(r.affinity)):"")+(options.membership?" | systems "+std::to_string(r.systems_contained.size()):""),{152,230,247,255},12,420,screen});
   }
   for(auto& mesh:batches)out.world.emplace_back(std::move(mesh));
+  for(auto& label:surveyed_labels)out.world.emplace_back(std::move(label));
   for(auto& command:diagnostics.world)out.world.emplace_back(std::move(command));
 }
-void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w,int h,double zoom,const VisualOptions& options,bool combat){
+void NativePhenomena::append_system(DrawList& out,int id,double x,double y,int w,int h,double zoom,const VisualOptions& options,bool combat,bool volumetric){
   collect_art();if(!field_){ready_=true;return;}const auto& c=context(id,x,y);DeterministicRandom starfield(static_cast<std::uint64_t>(id)^0x53595354454dULL);
   if(options.background_stars)for(int i=0;i<220;++i){const Point at{static_cast<float>(starfield.unit_double()*w),static_cast<float>(starfield.unit_double()*h)};out.world.emplace_back(Circle{at,static_cast<float>(.35+starfield.unit_double()*.5),{160,186,211,static_cast<std::uint8_t>(50+starfield.unit_double()*85)}});}
-  if(id!=local_system_){local_job_.reset();local_.reset();local_system_=id;transition_=std::chrono::steady_clock::now();}if(!previous_system_){previous_system_=true;transition_=std::chrono::steady_clock::now();}
+  if(id!=local_system_){local_job_.reset();local_volume_job_.reset();local_.reset();local_volume_.reset();local_volume_scene_.reset();local_volume_source_=nullptr;local_system_=id;transition_=std::chrono::steady_clock::now();}if(!previous_system_){previous_system_=true;transition_=std::chrono::steady_clock::now();}
   // A clear local sky must not keep loading/fading a previous system's cloud,
   // or reserve work for a fully invisible layer. Map phenomena remain intact.
-  if(!options.local_nebula||options.local_opacity<=0){local_job_.reset();local_.reset();ready_=true;return;}
+  if(!options.local_nebula||options.local_opacity<=0){local_job_.reset();local_volume_job_.reset();local_.reset();local_volume_.reset();local_volume_scene_.reset();local_volume_source_=nullptr;ready_=true;return;}
   const auto overlaps=local_art_overlaps(*field_,c);if(overlaps.empty()){ready_=true;return;}
   if(local_job_&&local_job_->ready()){local_=local_job_->take();local_job_.reset();transition_=std::chrono::steady_clock::now();}
-  if(!local_&&!local_job_){std::vector<LocalLayer> layers;for(const auto& o:overlaps){const auto& r=region(*field_,o.id);const auto& a=phenomenon_art(*field_,r);if(auto image=request_art(a,2944))layers.push_back({r,o,a,image});}
+  if(local_volume_job_&&local_volume_job_->ready()){local_volume_=local_volume_job_->take();local_volume_job_.reset();}
+  const auto gather_layers=[&]{std::vector<LocalLayer> layers;for(const auto& o:overlaps){const auto& r=region(*field_,o.id);const auto& a=phenomenon_art(*field_,r);if(auto image=request_art(a,2944))layers.push_back({r,o,a,image});}return layers;};
+  if(!local_&&!local_job_){auto layers=gather_layers();
     if(layers.size()==overlaps.size()){if(queue_)local_job_=queue_->submit(local_width*local_height*4u,[c,layers]{return composite_local(c,layers);});else local_=composite_local(c,layers);}
   }
-  ready_=local_!=nullptr&&fade(transition_)>=1.;if(!local_)return;
+  // The volume canvas is only prepared when the layer can actually render as
+  // a volume; a mid-session density bump submits it lazily on the next frame.
+  if(volumetric&&options.density>0&&!local_volume_&&!local_volume_job_){auto layers=gather_layers();
+    if(layers.size()==overlaps.size()){if(queue_)local_volume_job_=queue_->submit(static_cast<std::size_t>(volume_canvas)*volume_canvas*4u,[c,layers]{return composite_local(c,layers,volume_canvas,volume_canvas);});else local_volume_=composite_local(c,layers,volume_canvas,volume_canvas);}
+  }
+  ready_=local_!=nullptr&&fade(transition_)>=1.&&(!volumetric||options.density<=0||local_volume_!=nullptr);if(!local_)return;
   const auto opacity=byte(255*std::clamp(options.local_opacity,0.,1.)*local_visual_multiplier(options,zoom,combat)*fade(transition_));const UiRect screen{0,0,static_cast<float>(w),static_cast<float>(h)};
-  // Aspect-preserving viewport crop, independent of system camera zoom.
-  const float aspect=w/static_cast<float>(h);UiRect source{0,0,static_cast<float>(local_->width()),static_cast<float>(local_->height())};
-  if(source.width/source.height>aspect){const auto width=source.height*aspect;source.x=(source.width-width)*.5f;source.width=width;}else{const auto height=source.width/aspect;source.y=(source.height-height)*.5f;source.height=height;}
-  out.world.emplace_back(Image{local_,screen,source,{255,255,255,opacity},screen});
+  if(volumetric&&options.density>0&&local_volume_){
+    // The same authored composite, but integrated as an image-shaped
+    // emission volume instead of a flat card: filaments gain real depth,
+    // a slow authored churn and star-facing single scatter. The proxy box
+    // spans x[-.5,.5] y[-.22,.78] z[-depth,depth] in local units, so the
+    // y offset recentres the image band on the view centre.
+    if(!local_volume_scene_||local_volume_source_!=local_volume_.get()||local_volume_w_!=w||local_volume_h_!=h||local_volume_opacity_!=opacity){
+      const float scale=static_cast<float>(std::max(w,h));
+      DeterministicRandom nebula(static_cast<std::uint64_t>(c.local_seed)^0x4e4542554c41ULL);
+      MeshInstance3D instance;
+      instance.mesh=stellar::native_map::surface_emission_volume(.6f);
+      instance.position={0,-.28f*scale,-4000.f};
+      instance.scale=scale;
+      auto& material=instance.material;
+      material.texture=local_volume_;
+      material.transparent=true;
+      material.linear_light=true;
+      material.tint={255,255,255,opacity};
+      auto& volume=material.surface_effect.emplace();
+      volume.volume_depth=.6f;
+      volume.volume_density=4.f;
+      volume.volume_seed=static_cast<float>(nebula.unit_double()*4096.);
+      volume.flow_phase=static_cast<float>(nebula.unit_double()*6.2831853);
+      volume.flow_rate=.015f;
+      volume.volume_scatter=.5f;
+      Camera3D camera;camera.projection=Projection3D::Orthographic;camera.position={0,0,50000};camera.orthographic_height=static_cast<float>(h);camera.near_plane=.1f;camera.far_plane=120000;
+      // Camera-space +Z keys the scatter lobe toward the viewer, where the
+      // system's own star sits relative to the backdrop.
+      local_volume_scene_=Scene3D::create(camera,{std::move(instance)},{0,0,1});
+      local_volume_source_=local_volume_.get();local_volume_w_=w;local_volume_h_=h;local_volume_opacity_=opacity;
+    }
+    Scene3DView view{local_volume_scene_,screen};
+    view.options.quality=scene3d_quality_;
+    view.options.time=static_cast<float>(visual_seconds_);
+    view.options.bloom_strength=.3f;view.options.bloom_threshold=.9f;
+    out.world.emplace_back(std::move(view));
+  }else{
+    // Aspect-preserving viewport crop, independent of system camera zoom.
+    const float aspect=w/static_cast<float>(h);UiRect source{0,0,static_cast<float>(local_->width()),static_cast<float>(local_->height())};
+    if(source.width/source.height>aspect){const auto width=source.height*aspect;source.x=(source.width-width)*.5f;source.width=width;}else{const auto height=source.width/aspect;source.y=(source.height-height)*.5f;source.height=height;}
+    out.world.emplace_back(Image{local_,screen,source,{255,255,255,opacity},screen});
+  }
 }
 void NativePhenomena::inspect(DrawList& out,const Camera& camera,Point pointer,int w,int h,const std::set<std::uint32_t>& surveyed,bool developer,bool pinned)const{
   if(!field_||pointer.x<60||pointer.y<110||pointer.x>w-330||pointer.y>h-105)return;
   const auto p=camera.unproject(pointer,w,h);const auto c=phenomenon_context(field(),p.x,p.y);if(!c.dominant)return;
   const auto& r=region(*field_,*c.dominant);const bool known=developer||surveyed.contains(r.id);const auto& d=phenomenon_definition(r.type);
-  std::ostringstream text;text<<(known?r.designation+" · "+d.name:tr(locale_,"PHENOMENA_UNKNOWN","Uncharted interstellar cloud"))<<'\n';
-  if(known){text<<d.description<<'\n'<<tr(locale_,"PHENOMENA_SENSOR","Sensor range")<<' '<<std::fixed<<std::setprecision(0)<<c.effects.sensor*100<<"% · "<<tr(locale_,"PHENOMENA_SURVEY","Survey effort")<<' '<<std::setprecision(2)<<c.effects.scanning<<"x\n";
+  std::ostringstream text;text<<(known?r.designation+" · "+stellar::native_data::phenomenon_name(locale_,d):tr(locale_,"PHENOMENA_UNKNOWN","Uncharted interstellar cloud"))<<'\n';
+  if(known){text<<stellar::native_data::phenomenon_description(locale_,d)<<'\n'<<tr(locale_,"PHENOMENA_SENSOR","Sensor range")<<' '<<std::fixed<<std::setprecision(0)<<c.effects.sensor*100<<"% · "<<tr(locale_,"PHENOMENA_SURVEY","Survey effort")<<' '<<std::setprecision(2)<<c.effects.scanning<<"x\n";
     text<<tr(locale_,"PHENOMENA_RADIATION","Radiation potential")<<' '<<std::setprecision(2)<<c.effects.hazard<<" · "<<r.systems_contained.size()<<' '<<tr(locale_,"PHENOMENA_INTERSECTING","intersecting systems");
     if(developer)text<<"\nID "<<r.id<<" · "<<c.overlaps.size()<<" overlaps · edge "<<c.overlaps.front().edge_distance<<" ly\nDensity "<<c.overlaps.front().density<<" · shape seed "<<r.shape.seed;
   }else text<<tr(locale_,"PHENOMENA_HINT","Survey a system inside this cloud to identify its environment.");

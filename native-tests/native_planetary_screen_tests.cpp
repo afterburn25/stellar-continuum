@@ -71,7 +71,7 @@ int main(int argc,char** argv)try{
     const auto count=calls;v.planet.details.reset();screen.set_view(v);
     check(calls==count&&screen.globe().regions().empty()&&material()!=maps[*planet_surface_asset_index("earth",0)],"Hidden world retained authored details");
     v.planet.details.emplace();v.planet.sol_texture_key="earth";v.planet.details->pressure_kpa=101;v.population_millions=1;v.infrastructure=1;screen.set_view(v);
-    DrawList earth;screen.render(earth,v,1920,1080);bool found=false;for(const auto& item:earth.overlay)if(const auto* s=std::get_if<Scene3DView>(&item);s&&s->scene){found=true;check(s->scene->instances().size()==2&&s->scene->instances()[0].material.texture==maps[0],"Earth must retain its colour and night layers without added clouds");}check(found,"Earth scene absent");
+    DrawList earth;screen.render(earth,v,1920,1080);bool found=false;for(const auto& item:earth.overlay)if(const auto* s=std::get_if<Scene3DView>(&item);s&&s->scene){found=true;const auto& surface=s->scene->instances()[0].material;check(s->scene->instances().size()==1&&surface.texture==maps[0]&&surface.pbr&&surface.pbr->emissive==maps[*planet_surface_asset_index("earth",1)],"Earth must retain its colour and night layers without added clouds");}check(found,"Earth scene absent");
     check(!planet_surface_asset_index("../jupiter",0)&&!planet_surface_asset_index("mars",1)&&!planet_surface_asset_index("mars",-1),"Map resolver accepted an unsupported path/layer");
   }
   for(const auto [w,h]:std::array<std::pair<int,int>,5>{{{1280,720},{1920,1080},{2560,1440},{3440,1440},{3840,2160}}}){
@@ -122,6 +122,153 @@ int main(int argc,char** argv)try{
     check(screen.selected_slot()==-1&&!screen.modal(),"Changing planet retained previous selection or quote");
     check(screen.handle({InputEventType::LeftReleased,slot},w,h).action==PlanetaryAction::None,"Changing planet left stale hit targets");
   }
+  {
+    // Minimum-drawable compact mode: at 640x360 the fixed column stacks
+    // shrink (s < .8) rather than collapse — the details/slots list keeps a
+    // usable scroll viewport, no right-column block overlaps another, and the
+    // slot rows still emit clipped text the pointer can reach.
+    const int w=640,h=360;const auto l=PlanetaryLayout::make(w,h);
+    for(const auto& r:{l.left,l.right,l.slots,l.details,l.tabs,l.command,l.queue,l.modal,l.confirm,l.cancel})
+      check(r.width>0&&r.height>0&&r.x>=0&&r.y>=0&&r.x+r.width<=w&&r.y+r.height<=h,"Compact planetary panel out of bounds");
+    check(l.details.height>40,"Compact details column has no scroll viewport");
+    check(l.tabs.y+l.tabs.height<=l.details.y&&l.details.y+l.details.height<=l.command.y&&l.command.y+l.command.height<=l.queue.y,"Compact right column overlaps itself");
+    check(l.vitals.y+l.vitals.height<=l.alerts.y,"Compact vitals strip overlaps the alerts block");
+    check(l.save.width>=60.f&&l.save.x+l.save.width<=l.screen.x+l.screen.width+0.5f,
+          "Compact save control lost its readable width or left the screen");
+    const auto in=[](const UiRect& r){return Point{r.x+r.width*.5f,r.y+r.height*.5f};};
+    check(l.modal.contains(in(l.confirm))&&l.modal.contains(in(l.cancel)),"Compact modal lost its review buttons");
+    NativePlanetaryScreen screen;NativeColonyView view;
+    view.body_id=3;view.planet.details.emplace();view.solid_surface=true;
+    view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
+    view.surface_hub_level=2;view.body_display_name="Earth";
+    screen.set_view(view);DrawList draw;screen.render(draw,view,w,h);
+    const int tab_rows=l.tabs.height>36*l.s?2:1,tab_cols=4/tab_rows;
+    const float tab_h=(l.tabs.height-(tab_rows-1)*4*l.s)/tab_rows,tab_w=l.tabs.width/tab_cols;
+    const Point slots_tab{l.tabs.x+(1%tab_cols)*tab_w+tab_w*.5f,l.tabs.y+(1/tab_cols)*(tab_h+4*l.s)+tab_h*.5f};
+    (void)screen.handle({InputEventType::LeftPressed,slots_tab},w,h);
+    (void)screen.handle({InputEventType::LeftReleased,slots_tab},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool slot_listed=false,layer_short=false,layer_long=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){
+      if(t->value=="Available slot")slot_listed=true;
+      if(t->value=="○  Resources"||t->value=="○  Military")layer_short=true;
+      if(t->value.find("· unavailable")!=std::string::npos)layer_long=true;
+    }
+    check(slot_listed,"Compact layout hides the available building slot");
+    check(layer_short&&!layer_long,
+          "Compact layer rows keep the overflowing qualifier instead of the short label");
+  }
+  {
+    // Keyboard-focus contract: the ring walks the render-registered hit
+    // registry in (y,x) order, Escape releases it before Back, pointer
+    // presses reset it, Return/Space replays the same dispatch a matched
+    // press+release takes, and the confirmation modal narrows the ring to
+    // its own controls.
+    NativePlanetaryScreen screen;NativeColonyView view;
+    view.body_id=3;view.planet.details.emplace();view.solid_surface=true;
+    view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
+    view.surface_hub_level=2;view.body_display_name="Earth";
+    screen.set_view(view);
+    const int w=1920,h=1080;
+    DrawList draw;screen.render(draw,view,w,h);
+    const auto key=[&](std::uint32_t k,bool shift=false){
+      InputEvent e{};e.type=InputEventType::KeyPressed;e.key=k;e.shift=shift;
+      return screen.handle(e,w,h);};
+    constexpr std::uint32_t kTab=9u,kReturn=13u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const auto escape=[&]{return screen.handle({InputEventType::EscapePressed},w,h);};
+    check(screen.focus()<0,"Planet ring present before any key");
+    check(screen.focused_label().empty()&&!screen.focused_bounds().has_value(),
+          "Unfocused planet returned a label or bounds");
+    check(key(kTab).action==PlanetaryAction::None&&screen.focus()==0,
+          "Tab did not arm the planet ring");
+    check(!screen.focused_label().empty()&&screen.focused_bounds().has_value(),
+          "Focused planet control has no label or bounds");
+    check(screen.focused_control()==stellar::engine::AnnouncementControl::Button,
+          "Planet control did not classify as a button");
+    check(key(kEnd).action==PlanetaryAction::None&&screen.focus()>0,
+          "End did not reach the planet ring tail");
+    check(key(kHome).action==PlanetaryAction::None&&screen.focus()==0,
+          "Home did not return to the planet ring head");
+    check(escape().action==PlanetaryAction::None&&screen.focus()<0,
+          "Escape did not release the planet ring");
+    check(escape().action==PlanetaryAction::Back,
+          "Escape after release did not emit Back");
+    // Keyboard activation replays the pointer dispatch: walk the ring to
+    // the Save button and confirm it emits Save, not a tab/selection side
+    // effect.
+    (void)key(kTab);bool found_save=false;
+    for(int i=0;i<200&&screen.focus()>=0;++i){
+      if(screen.focused_label()=="Save"){found_save=true;break;}
+      (void)key(kTab);
+    }
+    check(found_save,"Save control missing from the planet ring");
+    check(key(kReturn).action==PlanetaryAction::Save,
+          "Return did not replay the Save dispatch");
+    // A pointer press clears the ring; the modal narrows it to Cancel and
+    // Confirm only.
+    (void)screen.handle({InputEventType::LeftPressed,{10,10}},w,h);
+    check(screen.focus()<0,"Pointer press kept the planet ring");
+    NativeSurfacePlacementQuote quote;quote.accepted=true;
+    quote.building_name="Science lab";quote.message="Authorize construction";
+    screen.set_confirmation(quote);draw={};screen.render(draw,view,w,h);
+    (void)key(kTab);check(screen.focused_label()=="Cancel",
+                          "Modal ring did not start at Cancel");
+    (void)key(kEnd);check(screen.focused_label()=="Confirm",
+                          "Modal ring tail is not Confirm");
+    check(key(kReturn).action==PlanetaryAction::Confirm,
+          "Return did not replay the Confirm dispatch");
+    screen.complete("Done");
+  }
+  {
+    // A deficit colony exposes the vitals strip plus issue chips that carry
+    // the real gap; activating a chip routes into the economy tab.
+    NativePlanetaryScreen screen;NativeColonyView view;
+    view.body_id=3;view.planet.details.emplace();view.solid_surface=true;
+    view.campaign_generation=1;view.colony_id=7;view.building_capacity=32;
+    view.surface_hub_level=2;view.body_display_name="Earth";
+    view.population_millions=9500;view.stability=.62;view.power_supply=10;
+    view.power_demand=40;view.food_reserve_days=5;view.employment_rate=.77;
+    view.workforce_demand_millions=120;view.workforce_available_millions=100;
+    screen.set_view(view);
+    const int w=1600,h=900;
+    DrawList draw;screen.render(draw,view,w,h);
+    const Text* chip=nullptr;bool vitals=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){
+      if(t->value=="POWER -30")chip=t;
+      vitals|=t->value=="POPULATION";
+    }
+    check(vitals,"Owned colony omitted the vitals strip");
+    check(chip,"Deficit colony did not expose a POWER issue chip");
+    (void)screen.handle({InputEventType::LeftPressed,chip->at},w,h);
+    (void)screen.handle({InputEventType::LeftReleased,chip->at},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool economy=false;
+    for(const auto& item:draw.overlay)
+      if(const auto* t=std::get_if<Text>(&item);t&&t->value=="PRODUCTION & REQUIREMENTS")economy=true;
+    check(economy,"Issue chip did not activate the economy tab");
+    // With an unpowered structure present the chip routes straight to it and
+    // hover lists the affected facilities.
+    NativeSurfaceSite dark;dark.name="Ore Refinery";dark.slot_index=4;
+    dark.complete=true;dark.enabled=true;dark.staffed=true;dark.condition=1.;
+    dark.efficiency=1.;
+    view.construction_sites={dark};screen.set_view(view);
+    draw={};screen.render(draw,view,w,h);
+    chip=nullptr;for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value=="POWER -30")chip=t;
+    check(chip,"POWER chip disappeared once a structure was attached");
+    const Point chip_at=chip->at;
+    (void)screen.handle({InputEventType::PointerMove,chip_at},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool detail=false,heading=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){detail|=t->value=="Ore Refinery";heading|=t->value=="Affected structures";}
+    check(detail&&heading,"Chip hover did not list the affected structure");
+    (void)screen.handle({InputEventType::LeftPressed,chip_at},w,h);
+    (void)screen.handle({InputEventType::LeftReleased,chip_at},w,h);
+    draw={};screen.render(draw,view,w,h);
+    bool manage=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item);t&&t->value=="Disable building")manage=true;
+    check(manage,"Issue chip did not select the affected structure");
+  }
   for (const auto [w,h] : std::array<std::pair<int,int>,2>{{{1280,720},{1920,1080}}}) {
     NativePlanetaryScreen developer; NativeColonyView v;
     v.campaign_generation=10;v.body_id=3;v.developer_inspection=true;v.foreign_settlement=true;
@@ -145,6 +292,23 @@ int main(int argc,char** argv)try{
     v.observer_only=true;v.foreign_settlement=false;v.colony_id=0;v.body_id=9;developer.set_view(v);draw={};developer.render(draw,v,w,h);
     bool empty=false;for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item))empty|=t->value.find("Population 0")!=std::string::npos;
     check(empty,"Developer unsettled world does not state that it has zero colony population");
+  }
+  {
+    // A disabled command-center button surfaces the authoritative lock reason
+    // as a hover tooltip at the point of interaction.
+    NativePlanetaryScreen screen;NativeColonyView v;
+    v.campaign_generation=12;v.body_id=5;v.body_display_name="Held World";
+    v.planet.visual_class=stellar::native_system::NativeSystemBodyVisualClass::rocky;
+    v.planet.details.emplace();
+    v.hub_upgrade_available=false;v.can_afford_hub_upgrade=false;
+    v.hub_upgrade_lock_reason="Requires planetary shield coverage.";
+    screen.set_view(v);
+    const int w=1280,h=720;const auto l=PlanetaryLayout::make(w,h);
+    (void)screen.handle({InputEventType::PointerMove,{l.command.x+10,l.command.y+10}},w,h);
+    DrawList draw;screen.render(draw,v,w,h);
+    bool reason=false,title=false;
+    for(const auto& item:draw.overlay)if(const auto* t=std::get_if<Text>(&item)){reason|=t->value=="Requires planetary shield coverage.";title|=t->value=="Command Center unavailable";}
+    check(reason&&title,"Disabled command center did not explain the blocker on hover");
   }
   NativePlanetaryScreen observer;NativeColonyView secret;secret.campaign_generation=9;secret.body_id=8;secret.observer_only=true;secret.body_display_name="Unknown";observer.set_view(secret);DrawList hidden;observer.render(hidden,secret,1920,1080);
   check(observer.globe().regions().empty(),"Unsurveyed planet leaked regions");

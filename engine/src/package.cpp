@@ -355,4 +355,71 @@ std::size_t scan_packages(PackageRegistry &registry,
   return added;
 }
 
+namespace {
+std::filesystem::path save_manifest_path(const std::filesystem::path &save_path) {
+  return save_path.parent_path() /
+         (save_path.filename().string() + ".packages.json");
+}
+} // namespace
+
+void write_save_package_manifest(const std::filesystem::path &save_path,
+                                 const PackageLoadPlan &plan) {
+  nlohmann::json packages = nlohmann::json::array();
+  for (const auto &m : plan.order)
+    packages.push_back({{"id", m.id}, {"version", m.version.to_string()}});
+  const nlohmann::json doc{{"schemaVersion", 1}, {"packages", packages}};
+  std::ofstream out(save_manifest_path(save_path));
+  if (out)
+    out << doc.dump(2);
+}
+
+SavePackageReport
+verify_save_package_manifest(const std::filesystem::path &save_path,
+                             const PackageLoadPlan &plan) {
+  SavePackageReport report;
+  std::ifstream in(save_manifest_path(save_path), std::ios::binary);
+  if (!in)
+    return report;
+  nlohmann::json doc;
+  try {
+    doc = nlohmann::json::parse(in);
+  } catch (...) {
+    return report;
+  }
+  const auto it_packages = doc.find("packages");
+  if (!doc.is_object() || it_packages == doc.end() ||
+      !it_packages->is_array())
+    return report;
+  report.manifest_present = true;
+  std::unordered_map<std::string, std::string> recorded;
+  for (const auto &p : *it_packages) {
+    if (!p.is_object())
+      continue;
+    const std::string id = p.value("id", "");
+    if (id.empty())
+      continue;
+    recorded[id] = p.value("version", "");
+  }
+  std::unordered_set<std::string> current_ids;
+  for (const auto &m : plan.order) {
+    current_ids.insert(m.id);
+    const auto it = recorded.find(m.id);
+    if (it == recorded.end()) {
+      report.extra_packages.push_back(m.id);
+      continue;
+    }
+    const std::string current = m.version.to_string();
+    if (it->second != current)
+      report.version_mismatches.push_back(m.id + ": recorded " + it->second +
+                                          " != current " + current);
+  }
+  for (const auto &[id, version] : recorded)
+    if (!current_ids.contains(id))
+      report.missing_packages.push_back(id);
+  std::sort(report.missing_packages.begin(), report.missing_packages.end());
+  std::sort(report.extra_packages.begin(), report.extra_packages.end());
+  std::sort(report.version_mismatches.begin(), report.version_mismatches.end());
+  return report;
+}
+
 } // namespace stellar::engine

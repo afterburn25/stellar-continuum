@@ -85,9 +85,32 @@ int main(int argc,char** argv)try{
  sky.options.category=BackgroundCategory::Dense;sky.options.dark_test=false;window.draw(draw(),output/"clear.png");const double clear=brightness(*decode_rgba_image(output/"clear.png"));
  sky.options.dark_test=true;window.draw(draw(),output/"dark.png");check(brightness(*decode_rgba_image(output/"dark.png"))<clear*.08,"Dark cloud failed to attenuate stars");sky.options.dark_test=false;
  auto scene=draw();scene.world.emplace_back(Circle{{640,360},40,{240,140,80,255}});scene.overlay.emplace_back(FilledRectangle{{0,0,140,80},{20,220,100,255}});window.draw(scene,output/"layer-order.png");const auto image=decode_rgba_image(output/"layer-order.png");check(image->pixels()[(360*1280+640)*4]>200&&image->pixels()[(40*1280+50)*4+1]>200,"Objects or UI were obscured by sky");
- const auto identity=sky.catalog.profile(id);for(int q=0;q<4;++q)for(int d=0;d<3;++d){window.draw(draw(q,d),output/("quality-"+std::to_string(q)+"-density-"+std::to_string(d)+".png"));check(sky.catalog.profile(id)==identity,"Graphics preference changed generated identity");check(sky.cache_bytes()<=64u*1024*1024,"Unbounded sky cache");}
+ const auto identity=sky.catalog.profile(id);for(int q=0;q<4;++q)for(int d=0;d<3;++d){const auto frame=draw(q,d);check(std::get<Scene3DView>(frame.world.front()).options.quality==static_cast<RenderQuality3D>(q),"Sky dome view did not propagate the quality tier");window.draw(frame,output/("quality-"+std::to_string(q)+"-density-"+std::to_string(d)+".png"));check(sky.catalog.profile(id)==identity,"Graphics preference changed generated identity");check(sky.cache_bytes()<=64u*1024*1024,"Unbounded sky cache");}
  sky.options.blend_test=true;sky.options.blend_scale=2;check(sky.resolved(id).blend_asset_id.empty(),"QA blend reintroduced a rejected bright secondary");window.draw(draw(),output/"blend-test.png");sky.options.blend_test=false;
+ // The render-target budget gate drops the dome to its authored 2D path when
+ // a frame cannot fit another fullscreen view: the image keeps the authored
+ // tint and covers the viewport, only the dome warp and aniso are lost.
+ {DrawList flat;sky.append(flat,id,1280,720,2,1,0.f,false);
+  check(!flat.world.empty()&&std::holds_alternative<Image>(flat.world.front()),"Budget fallback kept the dome as a 3D view");
+  const auto& plate=std::get<Image>(flat.world.front());
+  check(plate.resource&&plate.destination.width>=1280&&plate.destination.height>=720&&plate.tint.a==255,"Flat sky fallback lost its artwork or coverage");}
  NativeBackgroundDebug panel;panel.toggle(sky);panel.data(sky,id);scene=draw();panel.render(scene,1280,720,sky);window.draw(scene,output/"debug-panel.png");
+ // Keyboard ring: the eight option/navigation buttons walk in (y,x) order
+ // and Return/Space replay the same dispatch a pointer press takes.
+ {
+  const auto press=[&](std::uint32_t key){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;return panel.handle(ev,1280,720,sky);};
+  check(panel.focus()<0,"Background debug opened with stale focus.");
+  check(press(9)&&panel.focus()==0,"Tab did not enter the background debug ring.");
+  check(!panel.focused_label(1280,720,sky).empty()&&panel.focused_bounds(1280,720).has_value(),"Focused background control lacks label or bounds.");
+  check(panel.focused_control(1280,720)==stellar::engine::AnnouncementControl::Button,"Background button misclassified.");
+  const bool nebula_before=sky.options.nebula;
+  check(press(13),"Background debug activation leaked.");
+  check(sky.options.nebula!=nebula_before,"Keyboard activation did not toggle the nebula layer.");
+  sky.options.nebula=nebula_before;
+  check(press(9)&&panel.focus()>=0,"Background ring did not stay live after activation.");
+  check(panel.handle({InputEventType::EscapePressed},1280,720,sky)&&panel.focus()<0&&panel.visible(),"Escape closed the background panel instead of releasing its ring.");
+  check(panel.handle({InputEventType::EscapePressed},1280,720,sky)&&!panel.visible(),"Second Escape did not close the background panel.");
+ }
  // Exercise the actual generated gas/dust contexts through the same native
  // environment assembly used in System View, not only a synthetic overlay.
  sky.options={};double deepest=0;for(const auto& s:world.systems){const double depth=sky.catalog.profile(s.id).environment.dark_optical_depth;if(depth>deepest){deepest=depth;id=s.id;}}
@@ -98,7 +121,14 @@ int main(int argc,char** argv)try{
  stellar::native_phenomena::VisualOptions visual;visual.background_stars=false;
  const auto& star=*std::ranges::find(world.systems,id,&StellarSystem::id);
  for(int n=0;n<3000;++n){scene=draw();nebula.append_system(scene,id,star.position.x,star.position.y,1280,720,1,visual);if(nebula.ready())break;std::this_thread::sleep_for(std::chrono::milliseconds(1));}
- check(nebula.ready()&&scene.world.size()>1&&std::holds_alternative<Scene3DView>(scene.world.front())&&std::holds_alternative<Image>(scene.world.back()),"Real nebula failed to load above the celestial dome");
+ check(nebula.ready()&&scene.world.size()>1&&std::holds_alternative<Scene3DView>(scene.world.front())&&std::holds_alternative<Scene3DView>(scene.world.back()),"Real nebula failed to load above the celestial dome");
+ {const auto& cloud=std::get<Scene3DView>(scene.world.back());check(cloud.scene->instances().size()==1,"Nebula volume scene must carry exactly one proxy");
+  const auto& material=cloud.scene->instances().front().material;
+  check(material.surface_effect&&material.surface_effect->volume_depth>0&&material.surface_effect->volume_scatter>0&&material.surface_effect->flow_rate>0&&material.transparent&&material.texture&&material.tint.a>0,"Local nebula did not emit an authored emission volume");}
+ // Budget-gated flat path: the same cloud emitted as a 2D sprite when the
+ // frame's 3D render-target budget cannot fit another fullscreen view.
+ {DrawList flat;nebula.append_system(flat,id,star.position.x,star.position.y,1280,720,1,visual,false,false);
+  check(!flat.world.empty()&&std::holds_alternative<Image>(flat.world.back()),"Budget fallback kept the raymarched volume view");}
  scene.world.emplace_back(Circle{{640,360},35,{240,140,80,255}});window.draw(scene,output/"generated-dark-nebula.png");const auto dark_scene=decode_rgba_image(output/"generated-dark-nebula.png");check(dark_scene->pixels()[(360*1280+640)*4]>200,"Real cloud obscured a later system object");
  // Put the canonical preset at a known generated cloud location. Its clear
  // local policy must skip both absorption and imagery in System and battle,

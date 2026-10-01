@@ -158,6 +158,39 @@ void disabled_and_failure_paths(const fs::path& root) {
   wait_until_ready(missing);
   require(missing.stats().failed && missing.failure_message().find((root / "missing").string()) != std::string::npos,
           "missing asset failure did not preserve the requested asset root");
+  for (int index = 0; index < 10; ++index) missing.service();
+  require(missing.stats().failed && missing.stats().device_recoveries == 0,
+          "a permanent decode failure armed device recovery");
+}
+
+void device_fault_recovery(const fs::path& root) {
+  NativeAudioDirector director(root);
+  wait_until_ready(director);
+  director.menu_ready();
+  director.service();
+  require(director.stats().music_start_count == 1, "recovery fixture did not start music");
+  director.force_device_fault_for_test();
+  require(director.stats().failed && !director.stats().enabled && !director.stats().music_started,
+          "injected device fault did not disable audio");
+  director.service();
+  require(director.stats().failed && director.stats().device_recoveries == 0,
+          "device recovery ran inside its cooldown window");
+  const auto deadline = std::chrono::steady_clock::now() + 12s;
+  while (director.stats().failed && std::chrono::steady_clock::now() < deadline) {
+    director.service();
+    std::this_thread::sleep_for(50ms);
+  }
+  require(!director.stats().failed && director.stats().enabled && director.stats().device_recoveries == 1,
+          "device fault was not recovered by the bounded retry");
+  const auto music_deadline = std::chrono::steady_clock::now() + 5s;
+  while (!director.stats().music_started && std::chrono::steady_clock::now() < music_deadline) {
+    director.service();
+    std::this_thread::sleep_for(20ms);
+  }
+  require(director.stats().music_started && director.stats().music_start_count == 2,
+          "music did not resume after device recovery");
+  director.confirm();
+  require(director.stats().confirm_count == 1, "effects did not resume after device recovery");
 }
 
 void stop_before_decode_completion(const fs::path& root) {
@@ -214,6 +247,7 @@ int main(int argc, char** argv) try {
   voice_queue_and_stop(root);
   missing_voice_preserves_required_audio(root);
   disabled_and_failure_paths(root);
+  device_fault_recovery(root);
   stop_before_decode_completion(root);
   invalid_gain_is_rejected(root);
   owner_guard(root);

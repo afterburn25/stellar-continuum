@@ -119,4 +119,6 @@ std::shared_ptr<const RgbaImage> NativePlanetDiscAssets::request_image(const Sys
 void NativePlanetDiscAssets::discard_campaign()noexcept{storage_->clear_pending();storage_->cache.clear();storage_->bytes=0;storage_->generation.reset();}
 std::size_t NativePlanetDiscAssets::cache_entries()const noexcept{return storage_->cache.size();}std::size_t NativePlanetDiscAssets::cache_bytes()const noexcept{return storage_->bytes;}std::uint64_t NativePlanetDiscAssets::source_decode_count()const noexcept{return storage_->decodes;}std::uint64_t NativePlanetDiscAssets::generated_disc_count()const noexcept{return storage_->generated;}
 std::size_t NativePlanetDiscAssets::pending_count()const noexcept{return storage_->pending.size();}
+
+void NativePlanetDiscAssets::poll(){storage_->require_owner();storage_->collect_ready();}
 } // namespace stellar::native_system_ui

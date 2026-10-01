@@ -1,8 +1,11 @@
 #include "native_system_workspace.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <algorithm>
+#include <cstdint>
 #include <iomanip>
 #include <sstream>
+#include <vector>
 
 namespace stellar::native_system_ui {
 using namespace stellar::native_map;
@@ -16,20 +19,56 @@ struct Layout {
 };
 Layout layout_for(int w,int h){
   const auto field=SystemWorkspaceLayout::for_viewport(w,h).world_field;
-  const float s=NativeUiLayout::for_viewport(w,h).scale;
-  Layout l;l.scale=s;l.launcher={field.x+12*s,field.y+field.height-35*s,180*s,29*s};
+  const auto ui=NativeUiLayout::for_viewport(w,h);
+  const float s=ui.scale;
+  Layout l;l.launcher={field.x+12*s,field.y+field.height-35*s,180*s,29*s};
   l.motion={field.x+field.width-168*s,field.y+field.height-69*s,156*s,29*s};
-  l.panel={field.x+12*s,field.y+8*s,std::min(450*s,field.width-24*s),446*s};
-  const auto p=l.panel;l.close={p.x+p.width-65*s,p.y+9*s,55*s,25*s};
-  const float half=(p.width-30*s)*.5f;
-  l.previous={p.x+10*s,p.y+48*s,half,27*s};l.next={p.x+20*s+half,p.y+48*s,half,27*s};
-  const float third=(p.width-40*s)/3;
-  l.body={p.x+10*s,p.y+286*s,third,28*s};l.large={p.x+20*s+third,p.y+286*s,third,28*s};l.focus={p.x+30*s+third*2,p.y+286*s,third,28*s};
-  l.debug={p.x+10*s,p.y+323*s,p.width-20*s,27*s};
-  for(int i=0;i<4;++i)l.spawn[i]={p.x+(10+(i%2)*(half/s+10))*s,p.y+(362+(i/2)*33)*s,half,27*s};
+  UiRect panel{field.x+12*s,field.y+8*s,std::min(450*s,field.width-24*s),446*s};
+  // Compact fields: the inspector is a screen overlay, not a field inset.
+  // When the designed panel would slide off the drawable (or shrink to an
+  // unusably narrow strip where other HUD surfaces swallow its input),
+  // anchor it below the navigation bar on the chart column and compress its
+  // internal scale so every control stays inside the drawable.
+  float ps=s;
+  if(panel.y+panel.height>h-4.f*s||panel.width<280.f*s){
+    const float top=ui.navigation_bar.y+ui.navigation_bar.height+2.f*s;
+    const float bottom=h-4.f*s;
+    ps=std::clamp(std::min(bottom-top,446.f*s)/446.f,.45f,s);
+    panel={0,top,450.f*ps,446.f*ps};
+    panel.x=std::clamp(field.x+12*s,4.f*s,std::max(4.f*s,std::min(field.x+field.width+4.f*s,w-4.f*s)-panel.width));
+  }
+  l.scale=ps;l.panel=panel;
+  const auto p=l.panel;l.close={p.x+p.width-65*ps,p.y+9*ps,55*ps,25*ps};
+  const float half=(p.width-30*ps)*.5f;
+  l.previous={p.x+10*ps,p.y+48*ps,half,27*ps};l.next={p.x+20*ps+half,p.y+48*ps,half,27*ps};
+  const float third=(p.width-40*ps)/3;
+  l.body={p.x+10*ps,p.y+286*ps,third,28*ps};l.large={p.x+20*ps+third,p.y+286*ps,third,28*ps};l.focus={p.x+30*ps+third*2,p.y+286*ps,third,28*ps};
+  l.debug={p.x+10*ps,p.y+323*ps,p.width-20*ps,27*ps};
+  for(int i=0;i<4;++i)l.spawn[i]={p.x+(10+(i%2)*(half/ps+10))*ps,p.y+(362+(i/2)*33)*ps,half,27*ps};
   return l;
 }
 std::string number(double n,int precision=2){std::ostringstream s;s<<std::fixed<<std::setprecision(precision)<<n;return s.str();}
+std::string resolve(const stellar::engine::LocalizationTable* locale,std::string_view key,std::string_view fallback){
+  if(locale&&locale->contains(key))return std::string(locale->translate(key));
+  return std::string(fallback);}
+std::string field_type_display(SmallBodyFieldType type,const stellar::engine::LocalizationTable* locale){
+  constexpr std::array keys{"SMALLBODY_TYPE_ROCKY","SMALLBODY_TYPE_METALLIC","SMALLBODY_TYPE_CARBONACEOUS","SMALLBODY_TYPE_MIXED","SMALLBODY_TYPE_ICE","SMALLBODY_TYPE_DEBRIS_DISK","SMALLBODY_TYPE_SHATTERED","SMALLBODY_TYPE_CRACKED","SMALLBODY_TYPE_PLANETARY_HALO"};
+  const auto i=static_cast<std::size_t>(type);
+  return resolve(locale,i<keys.size()?keys[i]:"SMALLBODY_TYPE_ROCKY",small_body_field_name(type));}
+std::string material_display(SmallBodyMaterial material,const stellar::engine::LocalizationTable* locale){
+  constexpr std::array keys{"SMALLBODY_MAT_ROCK","SMALLBODY_MAT_METAL","SMALLBODY_MAT_CARBON","SMALLBODY_MAT_WATER_ICE","SMALLBODY_MAT_METHANE_ICE","SMALLBODY_MAT_AMMONIA_ICE","SMALLBODY_MAT_ROCK_ICE","SMALLBODY_MAT_VOLATILES"};
+  const auto i=static_cast<std::size_t>(material);
+  return resolve(locale,i<keys.size()?keys[i]:"SMALLBODY_MAT_ROCK",small_body_material_name(material));}
+std::string resource_display(SmallBodyResource resource,const stellar::engine::LocalizationTable* locale){
+  constexpr std::array keys{"SMALLBODY_RES_MINERALS","SMALLBODY_RES_METALS","SMALLBODY_RES_ORGANICS","SMALLBODY_RES_WATER","SMALLBODY_RES_HYDROGEN","SMALLBODY_RES_DEUTERIUM","SMALLBODY_RES_VOLATILES","SMALLBODY_RES_SALVAGE","SMALLBODY_RES_EXOTICS"};
+  const auto i=static_cast<std::size_t>(resource);
+  return resolve(locale,i<keys.size()?keys[i]:"SMALLBODY_RES_MINERALS",small_body_resource_name(resource));}
+std::string size_display(const SmallBodyInstance& body,const stellar::engine::LocalizationTable* locale){
+  const auto radius=small_body_display_radius(body);
+  if(radius>=36.f)return resolve(locale,"SMALLBODY_SIZE_HUGE","Huge");
+  if(radius>=13.f)return resolve(locale,"SMALLBODY_SIZE_LARGE","Large");
+  if(radius>=4.f)return resolve(locale,"SMALLBODY_SIZE_MEDIUM","Medium");
+  return resolve(locale,"SMALLBODY_SIZE_SMALL","Small");}
 void label(DrawList& out,UiRect r,std::string value,Color c={207,224,238,255},int size=13){out.overlay.emplace_back(Text{{r.x+8,r.y+5},std::move(value),c,size,r.width-16,r});}
 void button(DrawList& out,UiRect r,std::string value){out.overlay.emplace_back(FilledRectangle{r,{13,35,51,252}});out.overlay.emplace_back(StrokedRectangle{r,{65,130,157,255}});label(out,r,std::move(value));}
 }
@@ -43,15 +82,70 @@ void NativeSystemWorkspace::focus_small_body(int width,int height){tracked_body_
   small_body_focus_=true;
   dragging_=false;pending_initial_travel_fit_=false;small_body_panel_=false;
 }
-std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies(const InputEvent& e,int width,int height){
-  if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return std::nullopt;
-  const auto l=layout_for(width,height);const SystemWorkspaceCommand handled{SystemWorkspaceCommandKind::none,true};
-  if(l.motion.contains(e.position)){
-    dragging_=false;
-    if(e.type==InputEventType::LeftPressed)return SystemWorkspaceCommand{SystemWorkspaceCommandKind::toggle_motion,true};
-    return handled;
+std::vector<std::pair<UiRect,std::string>>
+NativeSystemWorkspace::small_body_ring_targets(int width,int height)const{
+  const auto l=layout_for(width,height);
+  const auto fields=snapshot_?snapshot_->small_body_fields.size():0;
+  std::vector<std::pair<UiRect,std::string>> t;
+  t.emplace_back(l.launcher,trf("SMALLBODY_LAUNCHER",{std::to_string(fields)},"BELTS & DEBRIS  {0}"));
+  t.emplace_back(l.motion,motion_running_?tr("SMALLBODY_MOTION_ON","Motion ON / Pause"):tr("SMALLBODY_MOTION_OFF","Paused / Resume"));
+  if(small_body_panel_){
+    t.emplace_back(l.close,tr("SMALLBODY_CLOSE","Close"));
+    if(fields){
+      t.emplace_back(l.previous,tr("SMALLBODY_PREV","Previous field"));
+      t.emplace_back(l.next,tr("SMALLBODY_NEXT","Next field"));
+      t.emplace_back(l.body,tr("SMALLBODY_NEXT_BODY","Next body"));
+      t.emplace_back(l.large,tr("SMALLBODY_NEXT_LARGE","Next large"));
+      t.emplace_back(l.focus,tr("SMALLBODY_FOCUS","Focus body"));
+    }
+    if(snapshot_&&snapshot_->developer){
+      t.emplace_back(l.debug,small_body_debug_?tr("SMALLBODY_DEBUG_HIDE","Hide orbital bands / density debug"):tr("SMALLBODY_DEBUG_SHOW","Show orbital bands / density debug"));
+      constexpr std::array spawn_keys{"SMALLBODY_SPAWN_BELT","SMALLBODY_SPAWN_ICE","SMALLBODY_SPAWN_DISK","SMALLBODY_SPAWN_CRACKED"};
+      const std::array<std::string,4> spawn_names{tr(spawn_keys[0],"+ Asteroid belt"),tr(spawn_keys[1],"+ Ice belt"),tr(spawn_keys[2],"+ Debris disk"),tr(spawn_keys[3],"+ Cracked debris")};
+      for(std::size_t i=0;i<4;++i)t.emplace_back(l.spawn[i],spawn_names[i]);
+    }
   }
-  if(e.type==InputEventType::LeftPressed&&l.launcher.contains(e.position)){small_body_panel_=!small_body_panel_;dragging_=false;return handled;}
+  std::sort(t.begin(),t.end(),[](const auto&a,const auto&b){return a.first.y!=b.first.y?a.first.y<b.first.y:a.first.x<b.first.x;});
+  return t;
+}
+std::string NativeSystemWorkspace::focused_label(int width,int height)const{
+  if(small_body_ring_<0||!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return{};
+  const auto ring=small_body_ring_targets(width,height);
+  if(small_body_ring_>=static_cast<int>(ring.size()))return{};
+  return ring[static_cast<std::size_t>(small_body_ring_)].second;
+}
+std::optional<UiRect> NativeSystemWorkspace::focused_bounds(int width,int height)const{
+  if(small_body_ring_<0||!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return std::nullopt;
+  const auto ring=small_body_ring_targets(width,height);
+  if(small_body_ring_>=static_cast<int>(ring.size()))return std::nullopt;
+  return ring[static_cast<std::size_t>(small_body_ring_)].first;
+}
+bool NativeSystemWorkspace::small_body_panel_owns(Point point,int width,int height)const{
+  return small_body_panel_&&snapshot_&&layout_for(width,height).panel.contains(point);
+}
+std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies(const InputEvent& e,int width,int height){
+  if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed){small_body_ring_=-1;return std::nullopt;}
+  const auto l=layout_for(width,height);const SystemWorkspaceCommand handled{SystemWorkspaceCommandKind::none,true};
+  if(e.type==InputEventType::LeftPressed||e.type==InputEventType::PointerCancelled)small_body_ring_=-1;
+  if(e.type==InputEventType::KeyPressed&&e.key){
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+    const auto targets=small_body_ring_targets(width,height);
+    const int count=static_cast<int>(targets.size());
+    const bool backward=e.key==kLeft||e.key==kUp||(e.key==kTab&&e.shift);
+    if(e.key==kTab||e.key==kRight||e.key==kDown||backward){small_body_ring_=small_body_ring_<0?0:(backward?small_body_ring_+count-1:small_body_ring_+1)%count;return handled;}
+    if(e.key==kHome||e.key==kEnd){small_body_ring_=e.key==kHome?0:count-1;return handled;}
+    if((e.key==kReturn||e.key==kSpace)&&small_body_ring_>=0&&small_body_ring_<count){
+      const auto r=targets[small_body_ring_].first;const int keep=small_body_ring_;
+      InputEvent press{InputEventType::LeftPressed,{r.x+r.width*.5f,r.y+r.height*.5f}};
+      const auto command=handle_small_bodies(press,width,height);
+      small_body_ring_=keep;
+      return command?*command:handled;
+    }
+    return std::nullopt;
+  }
+  // When the inspector is open its overlay draws over the launcher and
+  // motion controls (compact layouts can cover them entirely), so the panel
+  // claims hits first.
   if(small_body_panel_){
     if(e.type==InputEventType::EscapePressed){small_body_panel_=false;return handled;}
     if(l.panel.contains(e.position)){
@@ -78,6 +172,12 @@ std::optional<SystemWorkspaceCommand> NativeSystemWorkspace::handle_small_bodies
       }return handled;
     }
   }
+  if(l.motion.contains(e.position)){
+    dragging_=false;
+    if(e.type==InputEventType::LeftPressed)return SystemWorkspaceCommand{SystemWorkspaceCommandKind::toggle_motion,true};
+    return handled;
+  }
+  if(e.type==InputEventType::LeftPressed&&l.launcher.contains(e.position)){small_body_panel_=!small_body_panel_;dragging_=false;return handled;}
   if(e.type==InputEventType::LeftPressed&&SystemWorkspaceLayout::for_viewport(width,height).world_field.contains(e.position)&&spatial_&&viewport_&&!viewport_->hit_body(*spatial_,e.position.x,e.position.y)&&fleet_hits(e.position).empty()){
     if(const auto hit=small_bodies_.hit(e.position)){const auto it=std::ranges::find(snapshot_->small_body_fields,hit->field_id,&SmallBodyField::id);if(it!=snapshot_->small_body_fields.end()){small_body_field_=static_cast<std::size_t>(it-snapshot_->small_body_fields.begin());small_body_index_=hit->body_index;small_body_panel_=true;dragging_=false;return handled;}}
   }return std::nullopt;
@@ -86,7 +186,12 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
   if(!snapshot_||snapshot_->survey_level!=SystemSurveyLevel::fully_surveyed)return;
   const auto l=layout_for(width,height);button(out,l.launcher,trf("SMALLBODY_LAUNCHER",{std::to_string(snapshot_->small_body_fields.size())},"BELTS & DEBRIS  {0}"));
   button(out,l.motion,motion_running_?tr("SMALLBODY_MOTION_ON","Motion ON / Pause"):tr("SMALLBODY_MOTION_OFF","Paused / Resume"));
-  if(!small_body_panel_)return;
+  const auto ring=[&]{
+    if(small_body_ring_<0)return;
+    const auto t=small_body_ring_targets(width,height);
+    if(small_body_ring_<static_cast<int>(t.size()))stellar::native_ui::focus_ring(out,t[static_cast<std::size_t>(small_body_ring_)].first);
+  };
+  if(!small_body_panel_){ring();return;}
   out.overlay.emplace_back(FilledRectangle{l.panel,{5,17,28,252}});out.overlay.emplace_back(StrokedRectangle{l.panel,{77,151,178,255}});
   label(out,{l.panel.x,l.panel.y+6*l.scale,l.panel.width-76*l.scale,32*l.scale},tr("SMALLBODY_TITLE","SMALL-BODY SURVEY"),{164,221,237,255},15);
   button(out,l.close,tr("SMALLBODY_CLOSE","Close"));button(out,l.previous,tr("SMALLBODY_PREV","Previous field"));button(out,l.next,tr("SMALLBODY_NEXT","Next field"));
@@ -96,11 +201,11 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
   else {
     small_body_field_%=snapshot_->small_body_fields.size();const auto& f=snapshot_->small_body_fields[small_body_field_];small_body_index_%=f.visible_count;
     const auto body=small_body_instance(f,small_body_index_);
-    row(trf("SMALLBODY_FIELD",{std::string(small_body_field_name(f.type)),std::to_string(f.id)},"{0}  #{1}"));
+    row(trf("SMALLBODY_FIELD",{field_type_display(f.type,locale_),std::to_string(f.id)},"{0}  #{1}"));
     row(trf(f.planet_centered?"SMALLBODY_RANGE_PARENT":"SMALLBODY_RANGE_STAR",{number(f.inner_radius_au,f.planet_centered?5:2),number(f.outer_radius_au,f.planet_centered?5:2)},f.planet_centered?"{0} - {1} AU from parent":"{0} - {1} AU from star"));
-    row(trf("SMALLBODY_BODY",{std::to_string(body.id),std::string(small_body_size_name(body)),std::string(small_body_material_name(body.material))},"Body {0} / {1} / {2}"));
+    row(trf("SMALLBODY_BODY",{std::to_string(body.id),size_display(body,locale_),material_display(body.material,locale_)},"Body {0} / {1} / {2}"));
     const auto resources=small_body_resources(f,body.id);std::string r;
-    for(std::size_t i=0;i<resources.size();++i)if(resources[i]>0){if(!r.empty())r+="  ";r+=std::string(small_body_resource_name(static_cast<SmallBodyResource>(i)))+" "+number(resources[i],0);}
+    for(std::size_t i=0;i<resources.size();++i)if(resources[i]>0){if(!r.empty())r+="  ";r+=resource_display(static_cast<SmallBodyResource>(i),locale_)+" "+number(resources[i],0);}
     row(r);
     const auto position=stellar::engine::analytic_orbit_position(body.orbit,snapshot_->simulation_days-f.epoch_days);
     const auto environment=small_body_environment(f,position,snapshot_->simulation_days);
@@ -120,5 +225,6 @@ void NativeSystemWorkspace::render_small_body_panel(DrawList& out,int width,int 
     for(std::size_t i=0;i<4;++i)button(out,l.spawn[i],spawn_names[i]);
     const auto& cfg=small_body_configuration();label(out,{l.panel.x,l.panel.y+429*l.scale,l.panel.width,17*l.scale},trf("SMALLBODY_CFG",{number(cfg.orbit_exponent),number(cfg.planet_scale),std::to_string(small_bodies_.statistics().batches)},"Orbit exponent {0} / planet x{1} / draws {2}"),{137,176,195,255},11);
   }
+  ring();
 }
 }

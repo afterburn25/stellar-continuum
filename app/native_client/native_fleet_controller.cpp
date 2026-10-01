@@ -1,12 +1,18 @@
 #include "native_fleet_controller.hpp"
+#include "native_data_names.hpp"
+#include "native_military_messages.hpp"
+#include "native_route_messages.hpp"
 #include <stellar/core/campaign_observation.hpp>
+#include <stellar/engine/localization.hpp>
 #include <unordered_set>
 
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
+#include <stellar/core/fleet_composition.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/industry_allocation.hpp>
+#include <stellar/core/ship_designs.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -160,6 +166,30 @@ void NativeFleetController::require_owner() const {
         "Native fleet control must run on the simulation owner thread.");
 }
 
+std::string NativeFleetController::tr(std::string_view key,
+                                      std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
+std::string NativeFleetController::trf(
+    std::string_view key, std::initializer_list<std::string> args,
+    std::string_view fallback) const {
+  if (locale_ && locale_->contains(key)) {
+    const std::vector<std::string> values(args.begin(), args.end());
+    return locale_->format(key, std::span<const std::string>(values));
+  }
+  std::string out{fallback};
+  std::size_t index = 0;
+  for (const auto &arg : args) {
+    const std::string marker = "{" + std::to_string(index++) + "}";
+    if (const auto at = out.find(marker); at != std::string::npos)
+      out.replace(at, marker.size(), arg);
+  }
+  return out;
+}
+
 void NativeFleetController::bind_generation(
     const std::uint64_t campaign_generation) {
   if (generation_ && campaign_generation < *generation_)
@@ -217,11 +247,53 @@ NativeFleetMapView NativeFleetController::build(
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
       item.combat_status = status->second;
+    if (fleet.design_id)
+      if (const auto *design = find_ship_design(*fleet.design_id))
+        item.design_name =
+            stellar::native_data::ship_design_name(locale_, *design);
+    item.cargo_materials = fleet.cargo_materials;
+    item.cargo_material_capacity = fleet.cargo_material_capacity;
+    item.embarked_population_millions = fleet.embarked_population_millions;
+    if (fleet.tactical_vessel) {
+      item.has_vessel_state = true;
+      item.hull_integrity = fleet.tactical_vessel->hull_fraction;
+    }
+    // Member roster from the canonical composition projection — design names
+    // resolve at this presentation boundary; nothing else is recomputed.
+    const auto composition = fleet_composition(fleet);
+    item.vessel_count = composition.vessel_count;
+    for (const auto &member : composition.members) {
+      NativeFleetMember row;
+      row.vessel_id = member.vessel_id;
+      row.name = member.name;
+      if (member.design_id)
+        if (const auto *design = find_ship_design(*member.design_id))
+          row.design_name =
+              stellar::native_data::ship_design_name(locale_, *design);
+      row.is_flagship = member.is_flagship;
+      row.is_carrier = member.is_carrier;
+      row.is_interdictor = member.is_interdictor;
+      row.is_story_ship = member.is_story_ship;
+      row.hull_fraction = member.hull_fraction;
+      row.engine_fraction = member.engine_fraction;
+      row.sensor_fraction = member.sensor_fraction;
+      row.warp_drive_fraction = member.warp_drive_fraction;
+      row.reactor_fraction = member.reactor_fraction;
+      row.battles_fought = member.battles_fought;
+      row.confirmed_kills = member.confirmed_kills;
+      row.destroyed = member.destroyed;
+      row.escaped = member.escaped;
+      row.has_vessel_state = member.has_vessel_state;
+      row.embarked_population_millions = member.embarked_population_millions;
+      row.cargo_materials = member.cargo_materials;
+      row.cargo_material_capacity = member.cargo_material_capacity;
+      item.members.push_back(std::move(row));
+    }
     item.owner_civilization_id = fleet.civilization_id;
     item.foreign_inspection = fleet.civilization_id != player.player_id;
     const auto owner = std::ranges::find(player.world.civilizations, fleet.civilization_id, &Civilization::id);
     if (owner != player.world.civilizations.end()) item.owner_name = owner->name;
-    if (item.foreign_inspection) item.recovery_message = "Developer inspection · " + item.owner_name + " · Live fleet statistics";
+    if (item.foreign_inspection) item.recovery_message = trf("FLEET_MSG_DEV_INSPECTION", {item.owner_name}, "Developer inspection · {0} · Live fleet statistics");
     item.reconnaissance = scout_reconnaissance(player, fleet);
     item.science_survey = science_survey(player, fleet);
     result.own_fleets.push_back(std::move(item));
@@ -256,13 +328,14 @@ NativeFleetMapView NativeFleetController::build(
       const auto *live = find_owned(player, selected->id);
       selected->recovery = recovery_quote(*live, campaign_generation, player.player_id);
       if (live->return_to_base_failure_reason)
-        selected->recovery_message = *live->return_to_base_failure_reason;
+        selected->recovery_message = native_route::localized_message(
+            locale_, *live->return_to_base_failure_reason);
       else if (live->return_to_base_requested)
-        selected->recovery_message = "Return to base queued. Routing uses actual fuel at the next system.";
+        selected->recovery_message = tr("FLEET_MSG_RETURN_QUEUED", "Return to base queued. Routing uses actual fuel at the next system.");
       else
         // Route planning belongs to the explicit order, not a 10 Hz outliner
         // refresh. Core reports reachability and paid-work confirmation there.
-        selected->recovery_message = "Return to the nearest reachable owned refuelling settlement. Paid colony work requires confirmation.";
+        selected->recovery_message = tr("FLEET_MSG_RETURN_GUIDANCE", "Return to the nearest reachable owned refuelling settlement. Paid colony work requires confirmation.");
     }
     if (selected != result.own_fleets.end()) {
       const auto status = status_by_id.find(selected->id);
@@ -293,14 +366,14 @@ NativeFleetSelectionOutcome NativeFleetController::select(
     const int fleet_id) {
   require_owner();
   if (!generation_ || *generation_ != campaign_generation)
-    return {false, "The campaign changed; refresh fleets before selecting."};
+    return {false, tr("FLEET_MSG_CAMPAIGN_SELECT", "The campaign changed; refresh fleets before selecting.")};
   auto player = context(frame);
   const auto *fleet = find_inspectable(player, fleet_id);
   if (!fleet)
-    return {false, "That owned fleet is no longer available."};
+    return {false, tr("FLEET_MSG_FLEET_GONE", "That owned fleet is no longer available.")};
   selected_fleet_id_ = fleet->id;
   military_order_quote_.reset();
-  return {true, fleet->name + " selected."};
+  return {true, trf("FLEET_MSG_SELECTED", {fleet->name}, "{0} selected.")};
 }
 
 NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
@@ -308,7 +381,7 @@ NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
     const std::span<const int> hit_fleet_ids) {
   require_owner();
   if (!generation_ || *generation_ != campaign_generation)
-    return {false, "The campaign changed; refresh fleets before selecting."};
+    return {false, tr("FLEET_MSG_CAMPAIGN_SELECT", "The campaign changed; refresh fleets before selecting.")};
   auto player = context(frame);
   std::vector<int> owned_hits;
   owned_hits.reserve(hit_fleet_ids.size());
@@ -318,7 +391,7 @@ NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
   owned_hits.erase(std::unique(owned_hits.begin(), owned_hits.end()),
                    owned_hits.end());
   if (owned_hits.empty())
-    return {false, "No owned fleet is available at that position."};
+    return {false, tr("FLEET_MSG_NO_FLEET_POSITION", "No owned fleet is available at that position.")};
 
   auto current = selected_fleet_id_
                      ? std::ranges::find(owned_hits, *selected_fleet_id_)
@@ -329,7 +402,7 @@ NativeFleetSelectionOutcome NativeFleetController::select_next_hit(
   const auto *fleet = find_inspectable(player, *next);
   selected_fleet_id_ = *next;
   military_order_quote_.reset();
-  return {true, fleet->name + " selected."};
+  return {true, trf("FLEET_MSG_SELECTED", {fleet->name}, "{0} selected.")};
 }
 
 void NativeFleetController::clear_selection() {
@@ -346,18 +419,18 @@ NativeFleetRoutePreview NativeFleetController::preview_selected_route(
   result.campaign_generation = campaign_generation;
   result.target_system_id = target_system_id;
   if (!generation_ || *generation_ != campaign_generation) {
-    result.message = "The campaign changed; refresh fleets before previewing a route.";
+    result.message = tr("FLEET_MSG_CAMPAIGN_PREVIEW", "The campaign changed; refresh fleets before previewing a route.");
     return result;
   }
   auto player = context(frame);
   if (!selected_fleet_id_) {
-    result.message = "Select an owned fleet before previewing a route.";
+    result.message = tr("FLEET_MSG_SELECT_FIRST", "Select an owned fleet before previewing a route.");
     return result;
   }
   auto *fleet = find_owned(player, *selected_fleet_id_);
   if (!fleet) {
     selected_fleet_id_.reset();
-    result.message = "The selected owned fleet is no longer available.";
+    result.message = tr("FLEET_MSG_SELECTED_GONE", "The selected owned fleet is no longer available.");
     return result;
   }
   result.fleet_id = fleet->id;
@@ -378,7 +451,7 @@ NativeFleetRoutePreview NativeFleetController::preview_selected_route(
   }
   result.route_supported = reach.is_supported;
   result.route_authoritative = reach.is_authoritative;
-  result.message = reach.reason;
+  result.message = native_route::localized_message(locale_, reach.reason);
   result.route_distance_light_years = reach.route_distance_light_years;
   if (reach.route_system_ids) result.route_system_ids = *reach.route_system_ids;
   if (!reach.is_supported) return result;
@@ -393,18 +466,18 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_route(
     CampaignFrame &frame, const NativeFleetRoutePreview &preview) {
   require_owner();
   if (!generation_ || *generation_ != preview.campaign_generation)
-    return {false, "The campaign changed; refresh fleets before issuing an order.", 0};
+    return {false, tr("FLEET_MSG_CAMPAIGN_ORDER", "The campaign changed; refresh fleets before issuing an order."), 0};
   auto player = context(frame);
   if (!selected_fleet_id_ || *selected_fleet_id_ != preview.fleet_id)
-    return {false, "Fleet selection changed; preview the route again.", 0};
+    return {false, tr("FLEET_MSG_SELECTION_PREVIEW", "Fleet selection changed; preview the route again."), 0};
   auto *fleet = find_owned(player, preview.fleet_id);
   if (!fleet)
-    return {false, "That owned fleet is no longer available.", 0};
+    return {false, tr("FLEET_MSG_FLEET_GONE", "That owned fleet is no longer available."), 0};
   if (fleet->mission_order_revision != preview.expected_mission_order_revision)
-    return {false, "Fleet orders changed; preview the route again.",
+    return {false, tr("FLEET_MSG_ORDERS_PREVIEW", "Fleet orders changed; preview the route again."),
             fleet->mission_order_revision};
   if (!preview.command_available || !preview.route_supported)
-    return {false, preview.message.empty() ? "That route is unavailable."
+    return {false, preview.message.empty() ? tr("FLEET_MSG_ROUTE_UNAVAILABLE", "That route is unavailable.")
                                            : preview.message,
             fleet->mission_order_revision};
 
@@ -439,11 +512,11 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_route(
     accepted = order.accepted;
     message = std::move(order.message);
   } else {
-    return {false, "Travel orders are unavailable for this vessel.",
+    return {false, tr("FLEET_MSG_VESSEL_NO_TRAVEL", "Travel orders are unavailable for this vessel."),
             fleet->mission_order_revision};
   }
   const auto current = find_owned(player, preview.fleet_id);
-  return {accepted, std::move(message),
+  return {accepted, native_route::localized_message(locale_, message),
           current ? current->mission_order_revision
                   : preview.expected_mission_order_revision};
 }
@@ -458,15 +531,15 @@ NativeFleetOrderOutcome NativeFleetController::issue_civilian_recovery(
     NativeCivilianRecoveryAction action, bool confirm_abandon) {
   require_owner();
   if (!generation_ || *generation_ != quote.campaign_generation)
-    return {false, "The campaign changed; review this recovery order again."};
+    return {false, tr("FLEET_MSG_CAMPAIGN_RECOVERY", "The campaign changed; review this recovery order again.")};
   auto player = context(frame);
   if (player.player_id != quote.observer_id || selected_fleet_id_ != quote.fleet_id)
-    return {false, "Fleet selection changed; review this recovery order again."};
+    return {false, tr("FLEET_MSG_SELECTION_RECOVERY", "Fleet selection changed; review this recovery order again.")};
   auto *fleet = find_owned(player, quote.fleet_id);
   if (!fleet || !is_civilian_role(fleet->role))
-    return {false, "Select an active owned civilian mission ship."};
+    return {false, tr("FLEET_MSG_SELECT_CIVILIAN", "Select an active owned civilian mission ship.")};
   if (recovery_quote(*fleet, *generation_, player.player_id) != quote)
-    return {false, "The mission changed; pause and review the recovery order again.",
+    return {false, tr("FLEET_MSG_MISSION_CHANGED", "The mission changed; pause and review the recovery order again."),
             fleet->mission_order_revision};
   const auto id = fleet->id;
   bool accepted{}, confirmation{};
@@ -484,10 +557,10 @@ NativeFleetOrderOutcome NativeFleetController::issue_civilian_recovery(
         : player.runtime.core().issue_civilian_resume_order(&player.simulation, player.player_id, id);
     accepted = outcome.accepted;
     message = outcome.message;
-  } else return {false, "Unknown civilian recovery action."};
+  } else return {false, tr("FLEET_MSG_UNKNOWN_RECOVERY", "Unknown civilian recovery action.")};
   const auto *current = find_owned(player, id);
-  return {accepted, std::move(message), current ? current->mission_order_revision : 0,
-          confirmation};
+  return {accepted, native_route::localized_message(locale_, message),
+          current ? current->mission_order_revision : 0, confirmation};
 }
 
 NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
@@ -496,35 +569,36 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
   require_owner();
   if (type != MilitaryOrderType::Hold && type != MilitaryOrderType::Defend &&
       type != MilitaryOrderType::Retreat)
-    return {false, "Unknown military order."};
+    return {false, tr("FLEET_MSG_UNKNOWN_MILITARY", "Unknown military order.")};
   if (!generation_ || *generation_ != quote.campaign_generation ||
       !military_order_quote_ || *military_order_quote_ != quote ||
       selected_fleet_id_ != quote.fleet_id)
-    return {false, "The military order changed; refresh fleet details first."};
+    return {false, tr("FLEET_MSG_MILITARY_CHANGED", "The military order changed; refresh fleet details first.")};
   auto player = context(frame);
   if (player.player_id != quote.observer_id ||
       (player.world.active_combat_encounter && !player.world.active_combat_encounter->reconciled))
-    return {false, "Strategic military orders are unavailable during tactical combat."};
+    return {false, tr("FLEET_MSG_TACTICAL_BLOCKED", "Strategic military orders are unavailable during tactical combat.")};
   auto *fleet = find_owned(player, quote.fleet_id);
   if (!fleet)
-    return {false, "Select an active owned armed military fleet."};
+    return {false, tr("FLEET_MSG_SELECT_ARMED", "Select an active owned armed military fleet.")};
   auto statuses = player.runtime.core().get_own_combat_fleet_status(
       &player.simulation, player.player_id);
   const auto status = std::ranges::find(statuses.fleets, fleet->id,
                                         &OwnCombatFleetStatus::fleet_id);
   if (status == statuses.fleets.end() || !status->is_armed)
-    return {false, "Select an active owned armed military fleet.", fleet->mission_order_revision};
+    return {false, tr("FLEET_MSG_SELECT_ARMED", "Select an active owned armed military fleet."), fleet->mission_order_revision};
   auto current = military_quote(*fleet, *status, *generation_, player.player_id,
                                 tactical_for(player.world, fleet->id));
   current.token = quote.token;
   if (current != quote)
-    return {false, "Fleet orders changed; refresh fleet details first.", fleet->mission_order_revision};
+    return {false, tr("FLEET_MSG_ORDERS_DETAILS", "Fleet orders changed; refresh fleet details first."), fleet->mission_order_revision};
   const auto outcome = player.runtime.core().issue_military_order(
       &player.simulation, player.player_id, fleet->id,
       MilitaryOrder{type, {}, type == MilitaryOrderType::Defend ? fleet->current_system_id : std::nullopt});
   military_order_quote_.reset();
   const auto *after = find_owned(player, quote.fleet_id);
-  return {outcome.accepted, outcome.message,
+  return {outcome.accepted,
+          native_military::localized_message(locale_, outcome.message),
           after ? after->mission_order_revision : quote.mission_order_revision};
 }
 
@@ -533,14 +607,14 @@ NativeFleetLocateOutcome NativeFleetController::locate_selected(
   require_owner();
   if (!generation_ || *generation_ != quote.campaign_generation ||
       selected_fleet_id_ != quote.fleet_id)
-    return {false, "The fleet selection changed; refresh fleet details first."};
+    return {false, tr("FLEET_MSG_SELECTION_DETAILS", "The fleet selection changed; refresh fleet details first.")};
   auto player = context(frame);
   if (player.player_id != quote.observer_id)
-    return {false, "The fleet observer changed; refresh fleet details first."};
+    return {false, tr("FLEET_MSG_OBSERVER_DETAILS", "The fleet observer changed; refresh fleet details first.")};
   const auto *fleet = find_inspectable(player, quote.fleet_id);
   if (!fleet || fleet->mission_order_revision != quote.mission_order_revision)
-    return {false, "That owned fleet is no longer at its displayed position."};
-  return {true, fleet->name + " located.", fleet->id, fleet->current_system_id,
+    return {false, tr("FLEET_MSG_FLEET_MOVED", "That owned fleet is no longer at its displayed position.")};
+  return {true, trf("FLEET_MSG_LOCATED", {fleet->name}, "{0} located."), fleet->id, fleet->current_system_id,
           fleet->position};
 }
 

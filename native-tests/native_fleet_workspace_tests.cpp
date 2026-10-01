@@ -1,5 +1,8 @@
 #include "native_fleet_workspace.hpp"
 
+#include <stellar/engine/native_scene3d.hpp>
+
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -131,6 +134,65 @@ int main() try {
     require(confirm.kind==FleetWorkspaceCommandKind::Confirm,
         "Selected fleet command card lost canonical travel confirmation.");
   }
+  {
+    NativeFleetWorkspace ships{FleetWorkspacePresentation::SelectedCommands};
+    ships.set_view(player_view(true));
+    DrawList draw;
+    const std::array markers{FleetScreenMarker{10,{600,380},35.f,true},
+                             FleetScreenMarker{12,{700,420}}};
+    ships.render(draw,1280,720,markers);
+    require(draw.circles.size()==markers.size()*2,
+        "Scene3D fleet glyphs displaced the faction marker circles.");
+    const auto scene=std::ranges::find_if(draw.world,[](const auto &command){
+        return std::holds_alternative<Scene3DView>(command);});
+    require(scene!=draw.world.end(),
+        "Fleet markers emitted no Scene3D ship layer.");
+    const auto &instances=std::get<Scene3DView>(*scene).scene->instances();
+    require(instances.size()==4,
+        "Transit and idle fleet glyphs did not emit the expected hull and flame instances.");
+    require(std::ranges::count_if(instances,[](const auto &instance){
+        return instance.material.pbr&&instance.material.pbr->metallic>0.f;})==2,
+        "Fleet ship hulls lost their lit PBR materials.");
+    require(std::ranges::count_if(instances,[](const auto &instance){
+        return instance.material.pbr&&instance.material.pbr->emissive;})==1,
+        "Engine emission did not stay exclusive to the transiting fleet.");
+  }
+  {
+    auto view = player_view(true);
+    auto& fleet = view.own_fleets.front();
+    fleet.design_name = "Pathfinder-class";
+    fleet.has_vessel_state = true;
+    fleet.hull_integrity = .62f;
+    fleet.cargo_material_capacity = 40.;
+    fleet.cargo_materials = 12.5;
+    fleet.embarked_population_millions = 2.5;
+    NativeFleetMember member;
+    member.vessel_id = 10;
+    member.name = "ISS Wayfinder Prime";
+    member.design_name = "Pathfinder-class";
+    member.is_flagship = true;
+    member.has_vessel_state = true;
+    member.hull_fraction = .62f;
+    member.engine_fraction = .75f;
+    member.battles_fought = 3;
+    member.confirmed_kills = 1;
+    fleet.members = {member};
+    fleet.vessel_count = 1;
+    NativeFleetWorkspace workspace{FleetWorkspacePresentation::SelectedCommands};
+    workspace.set_view(std::move(view));
+    DrawList draw;
+    workspace.render(draw, 1280, 720, {});
+    require(has_text(draw, "Design") && has_text(draw, "Pathfinder-class") &&
+            has_text(draw, "Condition") && has_text(draw, "62%") &&
+            has_text(draw, "Cargo") && has_text(draw, "12.5 / 40.0") &&
+            has_text(draw, "Embarked") && has_text(draw, "2.5M"),
+        "Fleet composition rows did not surface design, condition or payload.");
+    // Member roster rides with the identity header, so it must render even
+    // on the cramped 720p card where telemetry extras clip.
+    require(has_text(draw, "Vessel") &&
+            has_text(draw, "ISS Wayfinder Prime (Flagship) · Hull 62%"),
+        "Member-vessel roster did not surface identity, flags or hull.");
+  }
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
                   std::pair{1920, 1080}, std::pair{2560, 1440},
@@ -169,6 +231,56 @@ int main() try {
   require(has_text(empty_draw, "No active player fleets") &&
               empty_draw.circles.empty(),
           "Fresh prewarp fleet state invented a vessel or hid its empty state.");
+
+  {
+    // Status grouping: a fleet in transit lands in the urgent group ahead of
+    // stationed fleets, headers render, and row dispatch still resolves the
+    // correct authoritative fleet beneath each header.
+    NativeFleetWorkspace grouped;
+    auto grouped_view = player_view();
+    grouped_view.own_fleets.back().destination_system_id = 77;
+    grouped.set_view(std::move(grouped_view));
+    constexpr int gw = 1920, gh = 1080;
+    DrawList grouped_draw;
+    grouped.render(grouped_draw, gw, gh, {});
+    require(has_text(grouped_draw, "IN TRANSIT  ·  1") &&
+                has_text(grouped_draw, "STATIONED  ·  1"),
+            "Grouped outliner omitted the status group headers.");
+    const auto gl = FleetWorkspaceLayout::for_viewport(gw, gh);
+    const float gs = gl.scale;
+    // The IN TRANSIT group comes first: header (24) then the colony row (45).
+    const UiRect transit_row{gl.list.x, gl.list.y + 24.f * gs, gl.list.width,
+                             41.f * gs};
+    const auto pick = grouped.handle(
+        {InputEventType::LeftPressed, center(transit_row)}, gw, gh, {},
+        std::nullopt);
+    require(pick.kind == FleetWorkspaceCommandKind::Select &&
+                pick.fleet_id == 12,
+            "Grouped outliner dispatched the wrong fleet row.");
+    // The stationed scout sits below the second header — beyond the list
+    // viewport. Keyboard focus snaps it into view, then the same projected
+    // row must dispatch the scout.
+    InputEvent end{InputEventType::KeyPressed};
+    end.key = 0x4000004du;
+    require(grouped.handle(end, gw, gh, {}, std::nullopt).captured,
+            "End key was not captured by the grouped outliner.");
+    const auto focused = grouped.focused_bounds(gl);
+    require(focused && gl.list.contains(center(*focused)),
+            "End did not snap the scrolled scout row into the outliner.");
+    const auto snapped = grouped.handle(
+        {InputEventType::LeftPressed, center(*focused)}, gw, gh, {},
+        std::nullopt);
+    require(snapped.kind == FleetWorkspaceCommandKind::Select &&
+                snapped.fleet_id == 10,
+            "Scrolled grouped row dispatched the wrong fleet.");
+    // A single-group list renders no headers — unchanged flat geometry.
+    NativeFleetWorkspace flat;
+    flat.set_view(player_view());
+    DrawList flat_draw;
+    flat.render(flat_draw, gw, gh, {});
+    require(!has_text(flat_draw, "STATIONED  ·"),
+            "Single-group outliner rendered a noise header.");
+  }
 
   NativeFleetWorkspace workspace;
   workspace.set_view(player_view());
@@ -212,9 +324,12 @@ int main() try {
   DrawList blocked_draw;
   workspace.render(blocked_draw, 1280, 720, markers);
   require(has_text(blocked_draw, "ISS Wayfinder") &&
-              has_text(blocked_draw, "Strength 7.2") &&
-              has_text(blocked_draw, "Fuel 18.75 / 40.00 ly") &&
-              has_text(blocked_draw, "Range 24.00 ly") &&
+              has_text(blocked_draw, "Strength") &&
+              has_text(blocked_draw, "7.2") &&
+              has_text(blocked_draw, "Fuel") &&
+              has_text(blocked_draw, "18.75 / 40.00 ly") &&
+              has_text(blocked_draw, "Range") &&
+              has_text(blocked_draw, "24.00 ly") &&
               has_text(blocked_draw, "Destination Unknown system") &&
               has_text(blocked_draw, "Insufficient operational range") &&
               !has_text(blocked_draw, "CONFIRM TRAVEL") &&
@@ -356,6 +471,11 @@ int main() try {
             "Ineligible fleet exposed a tactical engagement action.");
   }
   engagement.set_view(armed);
+  (void)engagement.handle({InputEventType::PointerMove,center(layout.engage)},1280,720,markers,std::nullopt);
+  DrawList engage_tip_draw;
+  engagement.render(engage_tip_draw,1280,720,markers);
+  require(has_text(engage_tip_draw,"Order this fleet to attack the hostile forces in this system."),
+          "Engage control did not explain itself on hover.");
   engagement.set_preview(blocked, "Unknown system");
   require(engage_click() != FleetWorkspaceCommandKind::Engage,
           "Blocked travel preview accidentally started combat.");
@@ -383,7 +503,7 @@ int main() try {
     strategic.render(tactical_draw,1280,720,{});
     require(has_text(tactical_draw,"HOLD")&&has_text(tactical_draw,"DEFEND")&&
                 has_text(tactical_draw,"RETREAT")&&has_text(tactical_draw,"LOCATE")&&
-                has_text(tactical_draw,"Order Hold"),
+                has_text(tactical_draw,"Order")&&has_text(tactical_draw,"Hold"),
             "Eligible armed fleet did not show strategic choices and Locate.");
     strategic.set_notice("Persistent command result.",true);
     (void)strategic.handle({InputEventType::PointerMove,center(layout.order_hold)},1280,720,{},std::nullopt);
@@ -411,6 +531,28 @@ int main() try {
     command=strategic.handle({InputEventType::LeftReleased,center(layout.military_locate)},1280,720,{},std::nullopt);
     require(command.kind==FleetWorkspaceCommandKind::Locate&&command.locate_quote==locate_quote,
             "Locate did not retain its displayed quote.");
+    (void)strategic.handle({InputEventType::PointerMove,center(layout.military_locate)},1280,720,{},std::nullopt);
+    DrawList locate_tip_draw;
+    strategic.render(locate_tip_draw,1280,720,{});
+    require(has_text(locate_tip_draw,"Center the map on this fleet."),
+            "Locate rail control did not explain itself on hover.");
+    // German catalog at the compact viewport: the same hover path must
+    // surface the shipped strings (the shared tooltip helper wraps and
+    // clamps inside the canvas, so the longer German text still fits).
+    {
+      stellar::engine::LocalizationTable german("de","en");
+      std::string german_error;
+      require(german.load_file(std::string(STELLAR_LOCALE_DIR)+"/de.json",&german_error),
+              ("de.json rejected: "+german_error).c_str());
+      strategic.set_localization(&german);
+      const auto compact=FleetWorkspaceLayout::for_viewport(640,360);
+      (void)strategic.handle({InputEventType::PointerMove,center(compact.military_locate)},640,360,{},std::nullopt);
+      DrawList german_tip;
+      strategic.render(german_tip,640,360,{});
+      require(has_text(german_tip,"Karte auf diese Flotte zentrieren."),
+              "German locate tip missing at 640x360");
+      strategic.set_localization(nullptr);
+    }
     (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_hold)},1280,720,{},std::nullopt);
     (void)strategic.handle({InputEventType::PointerCancelled},1280,720,{},std::nullopt);
     command=strategic.handle({InputEventType::LeftReleased,center(layout.order_hold)},1280,720,{},std::nullopt);
@@ -448,6 +590,16 @@ int main() try {
     recovery.render(recovery_draw,1280,720,{});
     require(has_text(recovery_draw,"LOCATE")&&has_text(recovery_draw,"RETURN TO BASE"),
             "Civilian recovery did not retain both recovery controls and Locate.");
+    (void)recovery.handle({InputEventType::PointerMove,center(layout.recovery_left)},1280,720,{},std::nullopt);
+    DrawList hold_tip_draw;
+    recovery.render(hold_tip_draw,1280,720,{});
+    require(has_text(hold_tip_draw,"Pause the mission"),
+            "Recovery hold control did not explain itself on hover.");
+    (void)recovery.handle({InputEventType::PointerMove,center(layout.recovery_right)},1280,720,{},std::nullopt);
+    DrawList return_tip_draw;
+    recovery.render(return_tip_draw,1280,720,{});
+    require(has_text(return_tip_draw,"Send this fleet to an owned base"),
+            "Return-to-base control did not explain itself on hover.");
     (void)recovery.handle({InputEventType::LeftPressed,center(layout.civilian_locate)},1280,720,{},std::nullopt);
     const auto locate=recovery.handle({InputEventType::LeftReleased,center(layout.civilian_locate)},1280,720,{},std::nullopt);
     require(locate.kind==FleetWorkspaceCommandKind::Locate&&locate.locate_quote==locate_quote,
@@ -509,6 +661,104 @@ int main() try {
               !has_text(replacement_draw, "Old campaign order accepted") &&
               !has_text(replacement_draw, "Alpha Centauri"),
           "Fleet preview, notice, or selection survived campaign replacement.");
+
+  {
+    // Keyboard focus traversal: rows then release-gated orders and Locate.
+    constexpr std::uint32_t kTab = 9u;
+    constexpr std::uint32_t kReturn = 13u;
+    constexpr std::uint32_t kEnd = 0x4000004du;
+    constexpr std::uint32_t kDigit5 = '5';
+    const int width = 1280, height = 720;
+    const auto key = [&](NativeFleetWorkspace &w, std::uint32_t k,
+                         bool shift = false) {
+      InputEvent e{InputEventType::KeyPressed};
+      e.key = k;
+      e.shift = shift;
+      return w.handle(e, width, height, {}, std::nullopt);
+    };
+    NativeFleetWorkspace outliner;
+    outliner.set_view(player_view(true));
+    require(outliner.focus() < 0, "Fleet focus should start unset.");
+    require(key(outliner, kTab).captured && outliner.focus() == 0,
+            "Tab did not land on the first fleet row.");
+    require(outliner.focused_label(outliner.layout(width, height)) ==
+                "ISS Wayfinder Long Range Expeditionary Vessel",
+            "Focused row label mismatch.");
+    require(key(outliner, kTab).captured && outliner.focus() == 1,
+            "Tab did not advance to the second fleet row.");
+    require(key(outliner, kTab, true).captured && outliner.focus() == 0,
+            "Shift+Tab did not retreat focus.");
+    require(key(outliner, kEnd).captured && outliner.focus() == 1,
+            "End did not reach the last focusable row.");
+    // Boundary wrap-out releases the ring so the dispatcher can hand the
+    // same key to the next map focus group (HUD chrome, assets navigator).
+    require(!key(outliner, kTab).captured && outliner.focus() < 0,
+            "Tab past the tail did not release the ring.");
+    require(key(outliner, kTab, true).captured && outliner.focus() == 1,
+            "Shift+Tab did not re-enter at the tail.");
+    require(key(outliner, kTab, true).captured && outliner.focus() == 0,
+            "Shift+Tab did not walk to the head.");
+    require(!key(outliner, kTab, true).captured && outliner.focus() < 0,
+            "Shift+Tab at the head did not release the ring.");
+    require(key(outliner, kTab).captured && outliner.focus() == 0,
+            "Tab did not re-enter at the head.");
+    require(key(outliner, kEnd).captured && outliner.focus() == 1,
+            "End did not return to the last focusable row.");
+    auto command = key(outliner, kReturn);
+    require(command.kind == FleetWorkspaceCommandKind::Select &&
+                command.fleet_id == 12,
+            "Row activation did not select its fleet.");
+    require(outliner.focus() == 1, "Row activation lost keyboard focus.");
+    require(!key(outliner, kDigit5).captured,
+            "Unhandled key was captured by the focus handler.");
+    (void)outliner.handle(
+        {InputEventType::LeftPressed, center(outliner.layout(width, height).panel)},
+        width, height, {}, std::nullopt);
+    require(outliner.focus() < 0,
+            "Pointer press did not clear keyboard focus.");
+  }
+  {
+    // Release-gated strategic orders fire through the press+release pair.
+    constexpr std::uint32_t kTab = 9u;
+    constexpr std::uint32_t kReturn = 13u;
+    constexpr std::uint32_t kEnd = 0x4000004du;
+    NativeFleetWorkspace strategic;
+    auto tactical = player_view(true);
+    auto &fleet = tactical.own_fleets.front();
+    fleet.military_order_quote = NativeMilitaryOrderQuote{
+        .campaign_generation = 4, .token = 9, .observer_id = 0, .fleet_id = 10,
+        .mission_order_revision = fleet.mission_order_revision,
+        .role = stellar::core::FleetRole::Military, .current_system_id = 0,
+        .armed = true, .combat_effective = true};
+    fleet.locate = NativeFleetLocateQuote{
+        .campaign_generation = 4, .observer_id = 0, .fleet_id = 10,
+        .mission_order_revision = fleet.mission_order_revision};
+    const auto order_quote = *fleet.military_order_quote;
+    const auto locate_quote = *fleet.locate;
+    strategic.set_view(tactical);
+    const auto key = [&](std::uint32_t k) {
+      InputEvent e{InputEventType::KeyPressed};
+      e.key = k;
+      return strategic.handle(e, 1280, 720, {}, std::nullopt);
+    };
+    (void)key(kTab);
+    (void)key(kTab);
+    (void)key(kTab);
+    require(strategic.focus() == 2,
+            "Order buttons did not follow the fleet rows in the ring.");
+    auto command = key(kReturn);
+    require(command.kind == FleetWorkspaceCommandKind::MilitaryOrder &&
+                command.military_order == stellar::core::MilitaryOrderType::Hold &&
+                command.military_order_quote == order_quote,
+            "Keyboard activation did not fire the release-gated Hold order.");
+    require(strategic.focus() == 2,
+            "Order activation lost keyboard focus.");
+    require(key(kEnd).captured, "End did not reach the Locate control.");
+    command = key(kReturn);
+    require(command.kind == FleetWorkspaceCommandKind::Locate &&
+                command.locate_quote == locate_quote,
+            "Keyboard activation did not fire release-gated Locate.");
+  }
 
   std::cout << "Native owned-fleet outliner, map hit, route preview, confirmation, "
                "empty-state and secrecy tests passed\n";

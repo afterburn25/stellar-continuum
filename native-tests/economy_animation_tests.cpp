@@ -121,6 +121,39 @@ int main() {
   check(std::abs(wrap_time(6.0f, 4.0f, LoopMode::PingPong) - 2.0f) < 1e-5,
         "pingpong mirror");
 
+  // --- AnimationPlayer lifecycle ---
+  AnimationPlayer clip;
+  check(clip.advance(1.0f).values.empty(),
+        "timeline-less player steps empty");
+  clip.play(&timeline, LoopMode::Once);
+  check(clip.playing() && !clip.finished(), "play starts");
+  auto step = clip.advance(1.2f);
+  check(step.events.size() == 1 && step.events[0].name == "beat",
+        "player emits crossed event");
+  check(std::abs(step.values.at("pulse") - 0.3f) < 1e-5,
+        "player evaluates track at wrapped time");
+  clip.set_speed(2.0f);
+  step = clip.advance(0.4f); // playhead 2.0 — no event
+  check(step.events.empty(), "no event before crest");
+  step = clip.advance(1.0f); // playhead 4.0 — crest at 3.0 crossed, clamps
+  check(step.events.size() == 1 && step.events[0].name == "crest",
+        "speed-scaled advance crosses crest");
+  check(clip.finished() && std::abs(clip.time() - 4.0f) < 1e-5,
+        "once-mode clamps at duration");
+  clip.set_paused(true);
+  check(clip.advance(1.0f).values.empty(), "paused steps empty");
+  clip.set_paused(false);
+  clip.play(&timeline, LoopMode::Loop);
+  step = clip.advance(5.0f); // wraps once: crest(3) + beat(1, next cycle)
+  check(step.events.size() == 2, "player wrap emits both cycle events");
+  check(std::abs(clip.time() - 5.0f) < 1e-5,
+        "loop keeps unwrapped playhead");
+  clip.seek(2.5f);
+  check(std::abs(clip.time() - 2.5f) < 1e-5, "seek restores playhead");
+  clip.stop();
+  check(clip.timeline() == nullptr && clip.time() == 0.f,
+        "stop detaches and resets");
+
   // --- Accessibility ---
   AccessibilitySettings settings;
   settings.ui_scale = 5.0f;     // out of range
@@ -136,6 +169,92 @@ int main() {
         "settings round-trip with enum parsing");
   check(AccessibilitySettings::from_json("not json").ui_scale == 1.0f,
         "malformed settings fall back to defaults");
+
+  // --- Accessibility announcer ---
+  AccessibilityAnnouncer announcer{3};
+  check(announcer.empty() && !announcer.take().has_value(),
+        "announcer starts drained");
+  announcer.announce("first");
+  announcer.announce("first");
+  check(announcer.size() == 1, "consecutive duplicates collapse");
+  announcer.announce("second");
+  announcer.announce("");
+  check(announcer.size() == 2, "empty text dropped");
+  check(announcer.latest()->text == "second", "latest tracks newest");
+  announcer.announce("third");
+  announcer.announce("fourth");  // capacity 3 -> oldest polite evicted
+  check(announcer.size() == 3 && announcer.take()->text == "second",
+        "capacity evicts oldest polite first");
+  announcer.announce("alert", AnnouncementPriority::Assertive);
+  check(announcer.size() == 1 && announcer.latest()->text == "alert",
+        "assertive preempts queued polite");
+  const auto seq_a = announcer.latest()->sequence;
+  announcer.announce("next", AnnouncementPriority::Assertive);
+  check(announcer.size() == 2 && announcer.latest()->sequence > seq_a,
+        "assertive does not preempt assertive; sequence increments");
+  check(announcer.take()->text == "alert" && announcer.take()->text == "next" &&
+            !announcer.take().has_value(),
+        "take drains in publish order");
+  announcer.announce("arrived");
+  announcer.announce_focus("focused control",
+                           stellar::engine::AnnouncementBounds{4.f, 8.f, 16.f,
+                                                               24.f},
+                           std::nullopt,
+                           stellar::engine::AnnouncementControl::Button);
+  const auto status_item = announcer.take();
+  const auto focus_item = announcer.take();
+  check(status_item && status_item->kind == AnnouncementKind::Status &&
+            focus_item && focus_item->kind == AnnouncementKind::Focus,
+        "announcement kind did not distinguish focus from status");
+  check(focus_item->bounds && focus_item->bounds->x == 4.f &&
+            focus_item->bounds->width == 16.f && !status_item->bounds,
+        "focus announcement did not retain its control bounds");
+  check(focus_item->control == stellar::engine::AnnouncementControl::Button &&
+            status_item->control ==
+                stellar::engine::AnnouncementControl::Custom,
+        "focus announcement did not retain its control kind");
+  check(!announcer.take().has_value(), "announcer did not drain fully");
+
+  // Same-focus state changes must re-announce: identical labels with
+  // different checked/range/value state are not duplicates.
+  announcer.announce_focus("mute", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::CheckBox,
+                           false);
+  announcer.announce_focus("mute", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::CheckBox,
+                           false);
+  check(announcer.size() == 1, "identical checked state deduped");
+  announcer.announce_focus("mute", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::CheckBox,
+                           true);
+  check(announcer.size() == 2, "checked change did not re-announce");
+  announcer.clear();
+  announcer.announce_focus("volume", std::nullopt,
+                           stellar::engine::AnnouncementRange{0.f, 1.f, 0.5f},
+                           stellar::engine::AnnouncementControl::Slider);
+  announcer.announce_focus("volume", std::nullopt,
+                           stellar::engine::AnnouncementRange{0.f, 1.f, 0.75f},
+                           stellar::engine::AnnouncementControl::Slider);
+  check(announcer.size() == 2, "range change did not re-announce");
+  announcer.clear();
+  announcer.announce_focus("search", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Edit,
+                           std::nullopt,
+                           stellar::engine::AnnouncementValue{"alp"});
+  announcer.announce_focus("search", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Edit,
+                           std::nullopt,
+                           stellar::engine::AnnouncementValue{"alph"});
+  check(announcer.size() == 2, "edit-value change did not re-announce");
+  announcer.clear();
+  announcer.announce_focus("planets", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Group,
+                           std::nullopt, std::nullopt, true);
+  announcer.announce_focus("planets", std::nullopt, std::nullopt,
+                           stellar::engine::AnnouncementControl::Group,
+                           std::nullopt, std::nullopt, false);
+  check(announcer.size() == 2, "expanded change did not re-announce");
+  announcer.clear();
 
   if (failures == 0)
     std::cout << "Economy, replay, animation and accessibility tests passed\n";

@@ -88,6 +88,23 @@ public:
     static bool intersects(const PhysicsBody& a, const PhysicsBody& b) noexcept;
     static bool point_inside(const PhysicsBody& body, float x, float y) noexcept;
 
+    // Persistence: bodies, id counter, broadphase cell size and the live
+    // trigger-overlap set round-trip so a restored world continues without
+    // re-firing ENTER events for pairs that were already overlapping. The
+    // broadphase grid itself is derived state and rebuilds on restore.
+    struct State {
+        std::uint32_t version{1};
+        float broadphase_cell_size{256.0f};
+        PhysicsBodyId next_id{1};
+        std::vector<PhysicsBody> bodies;                       // sorted by id
+        std::vector<std::pair<PhysicsBodyId, PhysicsBodyId>> overlapping;
+    };
+    [[nodiscard]] State capture_state() const;
+    // Replaces all bodies and overlap state. Throws invalid_argument on
+    // duplicate ids, overlapping pairs that reference missing bodies, or a
+    // non-finite/non-positive cell size.
+    void restore_state(const State& state);
+
 private:
     struct BodyPairHash {
         std::size_t operator()(const std::pair<PhysicsBodyId, PhysicsBodyId>& p) const noexcept {

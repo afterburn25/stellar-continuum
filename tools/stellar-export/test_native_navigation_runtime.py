@@ -39,7 +39,7 @@ class NavigationProofTests(unittest.TestCase):
 
 
 class NavigationRuntimeTests(unittest.TestCase):
-    def run_replay(self, failure=None):
+    def run_replay(self, failure=None, replay_check=False):
         with tempfile.TemporaryDirectory() as temporary:
             package = Path(temporary) / "package"
             package.mkdir()
@@ -49,11 +49,50 @@ class NavigationRuntimeTests(unittest.TestCase):
                 calls.append(args)
                 self.assertTrue(Path(args[0]).is_absolute())
                 self.assertNotEqual(Path(kwargs["cwd"]), package)
-                loading = "--load" in args
+                if "--replay-info" in args:
+                    info = {"commands": 102, "commands_ordered": True,
+                            "checkpoints_ordered": True, "pointer_out_of_bounds": 0,
+                            "unverified_tail_commands": 0,
+                            "checkpoints": [{"tick": 6568542, "sections": 42,
+                                             "expected_document": True,
+                                             "expected_verified": True}]}
+                    if failure == "info missing":
+                        return subprocess.CompletedProcess(args, 0, "ok", "")
+                    if failure == "info stale":
+                        info["checkpoints"][0]["expected_verified"] = False
+                    if failure == "info tail":
+                        info["unverified_tail_commands"] = 2
+                    return subprocess.CompletedProcess(
+                        args, 0, "replay_info=" + json.dumps(info), "")
                 save = Path(args[args.index("--save-path") + 1])
+                if "--replay" in args:
+                    if "--replay-until" in args:
+                        if failure == "until diverge":
+                            return subprocess.CompletedProcess(args, 0,
+                                "replay-until: canonical state at tick 6568542 dumped to "
+                                "d.json (first leaf: World.Fleets[0].X)", "")
+                        return subprocess.CompletedProcess(args, 0,
+                            "replay-until: canonical state at tick 6568542 dumped to "
+                            "d.json (matches expected sidecar)", "")
+                    if failure == "replay":
+                        return subprocess.CompletedProcess(args, 0,
+                            "native-map smoke ok: gpu_driver=vulkan systems=500 save=ok", "")
+                    if failure == "replay counts":
+                        return subprocess.CompletedProcess(args, 0,
+                            'replay_verified={"commands":2,"checkpoints":7}', "")
+                    return subprocess.CompletedProcess(args, 0,
+                        'replay_verified={"commands":102,"checkpoints":42}', "")
                 capture = Path(args[args.index("--navigation-smoke") + 1])
                 width = int(args[args.index("--width") + 1])
                 height = int(args[args.index("--height") + 1])
+                if "--record" in args:
+                    journal = Path(args[args.index("--record") + 1])
+                    journal.write_text("journal", encoding="utf-8")
+                    return subprocess.CompletedProcess(args, 0,
+                        'native-map smoke ok: gpu_driver=vulkan systems=500 save=ok navigation='
+                        + json.dumps(PROOF)
+                        + '\nreplay={"commands":102,"checkpoints":42,"file":"j"}', "")
+                loading = "--load" in args
                 if loading:
                     self.assertTrue(save.is_file())
                 payload = {"FormatVersion": 17, "SavedAtUtc": "reload" if loading else "fresh",
@@ -75,13 +114,47 @@ class NavigationRuntimeTests(unittest.TestCase):
                     "native-map smoke ok: gpu_driver=vulkan systems=500 save=ok navigation=" + json.dumps(PROOF), "")
 
             with mock.patch.object(runtime.subprocess, "run", side_effect=launch):
-                result = runtime.validate_native_navigation_export(package, {})
-            self.assertEqual(len(calls), 2)
+                result = runtime.validate_native_navigation_export(
+                    package, {}, replay_check=replay_check)
+            self.assertEqual(len(calls), 6 if replay_check else 2)
             self.assertEqual(len(set(result["navigationCaptures"])), 2)
             self.assertTrue(result["nativeNavigationPausedReload"])
+            return result
 
     def test_relocated_two_resolution_reload(self):
         self.run_replay()
+
+    def test_replay_check_records_and_verifies_journal(self):
+        result = self.run_replay(replay_check=True)
+        self.assertTrue(result["nativeNavigationReplayVerified"])
+        self.assertTrue(result["nativeNavigationReplayInfoVerified"])
+        self.assertTrue(result["nativeNavigationReplayUntilVerified"])
+        self.assertEqual(result["nativeNavigationReplay"],
+                         {"commands": 102, "checkpoints": 42})
+
+    def test_replay_check_requires_inventory(self):
+        with self.assertRaisesRegex(RuntimeError, "inventory"):
+            self.run_replay("info missing", replay_check=True)
+
+    def test_replay_check_rejects_stale_sidecar(self):
+        with self.assertRaisesRegex(RuntimeError, "stale expected sidecar"):
+            self.run_replay("info stale", replay_check=True)
+
+    def test_replay_check_rejects_unverified_tail(self):
+        with self.assertRaisesRegex(RuntimeError, "unsound journal"):
+            self.run_replay("info tail", replay_check=True)
+
+    def test_replay_check_rejects_until_divergence(self):
+        with self.assertRaisesRegex(RuntimeError, "expected sidecar"):
+            self.run_replay("until diverge", replay_check=True)
+
+    def test_replay_check_requires_verified_line(self):
+        with self.assertRaisesRegex(RuntimeError, "replay_verified"):
+            self.run_replay("replay", replay_check=True)
+
+    def test_replay_check_rejects_count_mismatch(self):
+        with self.assertRaisesRegex(RuntimeError, "different journal"):
+            self.run_replay("replay counts", replay_check=True)
 
     def test_reload_requires_own_correct_capture(self):
         for failure in ("missing capture", "size"):

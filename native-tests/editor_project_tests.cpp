@@ -40,9 +40,20 @@ int main() {
     project.edits[77].name = "Kepler-\xc3\xa9toile"; // UTF-8: "Kepler-étoile"
     project.edits[300].note = "note only";
     project.edits[301].bookmarked = true;
+    project.edits[302].anomaly = true; // trait override: YES
+    project.edits[303].rare_resource = false; // trait override: NO
+    project.edits[303].pre_warp_civilization = true;
+    project.edits[303].position_x = -42.5; // map position override
+    project.edits[303].position_y = 7.25;
     project.edits[400]; // Fully empty row must not serialize.
     project.body_edits[3].name = "Earth";
     project.body_edits[3].bookmarked = true;
+    project.body_edits[3].radius_earth = 1.25; // numeric override
+    project.body_edits[3].orbit_au = 1.524; // stellar orbit override
+    project.body_edits[3].mass_earth = 0.83; // mass override
+    project.body_edits[3].eccentricity = 0.21; // orbit eccentricity override
+    project.body_edits[3].inclination_degrees = 97.5; // orbit inclination override
+    project.body_edits[3].satellite_orbit_km = 384400.0; // moon orbit override
     project.body_edits[9].note = "moon survey";
     project.name = "Survey Run \"Kestrel\"";
     const auto text = serialize_project(project);
@@ -51,7 +62,7 @@ int main() {
     require(restored.seed == project.seed, "seed did not round-trip");
     require(restored.system_count == project.system_count,
             "system count did not round-trip");
-    require(restored.edits.size() == 4, "empty edit rows must be omitted");
+    require(restored.edits.size() == 6, "empty edit rows must be omitted");
     require(restored.edits.at(12).name == project.edits.at(12).name,
             "display name did not round-trip");
     require(restored.edits.at(12).note == project.edits.at(12).note,
@@ -60,12 +71,98 @@ int main() {
     require(restored.edits.at(77).name == project.edits.at(77).name,
             "unicode name did not round-trip");
     require(!restored.edits.contains(400), "empty edit row serialized");
+    require(restored.edits.at(302).anomaly && *restored.edits.at(302).anomaly,
+            "anomaly override did not round-trip");
+    require(restored.edits.at(303).rare_resource &&
+                !*restored.edits.at(303).rare_resource,
+            "explicit-false rare-resource override did not round-trip");
+    require(restored.edits.at(303).pre_warp_civilization &&
+                *restored.edits.at(303).pre_warp_civilization,
+            "pre-warp override did not round-trip");
+    require(!restored.edits.at(12).anomaly &&
+                !restored.edits.at(12).rare_resource &&
+                !restored.edits.at(12).pre_warp_civilization,
+            "unset trait overrides must stay unset (AUTO follows generated)");
+    require(restored.edits.at(303).position_x &&
+                *restored.edits.at(303).position_x == -42.5 &&
+            restored.edits.at(303).position_y &&
+                *restored.edits.at(303).position_y == 7.25,
+            "position overrides did not round-trip");
+    require(!restored.edits.at(12).position_x &&
+                !restored.edits.at(12).position_y,
+            "unset position overrides must stay unset (AUTO follows generated)");
     require(restored.body_edits.size() == 2, "body edits did not round-trip");
     require(restored.body_edits.at(3).name == "Earth" &&
                 restored.body_edits.at(3).bookmarked,
             "body name/bookmark did not round-trip");
     require(restored.body_edits.at(9).note == "moon survey",
             "body note did not round-trip");
+    require(restored.body_edits.at(3).radius_earth &&
+                *restored.body_edits.at(3).radius_earth == 1.25,
+            "radius override did not round-trip");
+    require(!restored.body_edits.at(9).radius_earth,
+            "unset radius override must stay unset (AUTO follows generated)");
+    require(restored.body_edits.at(3).orbit_au &&
+                *restored.body_edits.at(3).orbit_au == 1.524,
+            "orbit override did not round-trip");
+    require(!restored.body_edits.at(9).orbit_au,
+            "unset orbit override must stay unset (AUTO follows generated)");
+    require(restored.body_edits.at(3).mass_earth &&
+                *restored.body_edits.at(3).mass_earth == 0.83,
+            "mass override did not round-trip");
+    require(!restored.body_edits.at(9).mass_earth,
+            "unset mass override must stay unset (AUTO follows generated)");
+    require(restored.body_edits.at(3).eccentricity &&
+                *restored.body_edits.at(3).eccentricity == 0.21,
+            "eccentricity override did not round-trip");
+    require(!restored.body_edits.at(9).eccentricity,
+            "unset eccentricity override must stay unset (AUTO follows generated)");
+
+    // Eccentricity is the one override where zero is meaningful (circular)
+    // and AnalyticOrbit rejects >= 0.95 — the codec enforces the same range.
+    {
+      const auto circular = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"eccentricity":0.0}]})");
+      require(circular.body_edits.at(3).eccentricity &&
+                  *circular.body_edits.at(3).eccentricity == 0.0,
+              "zero eccentricity must round-trip as a real override");
+      const auto hyperbolic = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"eccentricity":1.2}]})");
+      require(!hyperbolic.body_edits.contains(3),
+              "out-of-range eccentricity must not serialize an override");
+    }
+    require(restored.body_edits.at(3).inclination_degrees &&
+                *restored.body_edits.at(3).inclination_degrees == 97.5,
+            "inclination override did not round-trip");
+    require(!restored.body_edits.at(9).inclination_degrees,
+            "unset inclination override must stay unset (AUTO follows generated)");
+
+    // Inclination is bounded to the generated 0-180 degree domain.
+    {
+      const auto retrograde = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"inclinationDeg":140.0}]})");
+      require(retrograde.body_edits.at(3).inclination_degrees &&
+                  *retrograde.body_edits.at(3).inclination_degrees == 140.0,
+              "retrograde inclination must round-trip as a real override");
+      const auto out_of_domain = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"inclinationDeg":190.0}]})");
+      require(!out_of_domain.body_edits.contains(3),
+              "out-of-domain inclination must not serialize an override");
+    }
+    require(restored.body_edits.at(3).satellite_orbit_km &&
+                *restored.body_edits.at(3).satellite_orbit_km == 384400.0,
+            "satellite orbit override did not round-trip");
+    require(!restored.body_edits.at(9).satellite_orbit_km,
+            "unset satellite orbit override must stay unset (AUTO follows generated)");
+
+    // Satellite orbit radius is a positive distance — non-positive input
+    // must not deserialize an override.
+    {
+      const auto nonpositive = parse_project(
+          R"({"schemaVersion":1,"seed":5,"systems":250,"edits":[],"bodyEdits":[{"id":3,"name":"","note":"","bookmarked":false,"satelliteOrbitKm":0.0}]})");
+      require(!nonpositive.body_edits.contains(3),
+              "non-positive satellite orbit must not serialize an override");
+    }
 
     // Documents without the additive bodyEdits array still parse.
     const auto legacy = parse_project(

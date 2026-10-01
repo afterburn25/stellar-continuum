@@ -9,7 +9,8 @@
 namespace stellar::native_fleet_ui {
 
 std::string observer_safe_fleet_message(
-    std::string_view message, std::span<const ObservedSystemName> systems) {
+    std::string_view message, std::span<const ObservedSystemName> systems,
+    const stellar::engine::LocalizationTable *locale) {
   std::map<std::string, bool> unique_names;
   for (const auto &system : systems)
     if (!system.name.empty()) unique_names[system.name] |= system.known;
@@ -50,7 +51,11 @@ std::string observer_safe_fleet_message(
           return left_boundary && right_boundary;
         });
     if (matched != names.end()) {
-      result += matched->known ? matched->name : "Unknown system";
+      result += matched->known
+                    ? matched->name
+                    : (locale && locale->contains("SYSTEM_NAME_UNKNOWN")
+                           ? locale->translate("SYSTEM_NAME_UNKNOWN")
+                           : "Unknown system");
       index += matched->name.size();
     } else {
       result.push_back(message[index]);

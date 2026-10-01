@@ -1,5 +1,7 @@
 #include "native_research_controller.hpp"
+#include "native_research_messages.hpp"
 #include "native_research_presentation.hpp"
+#include "native_currency_format.hpp"
 
 #include <stellar/core/adaptive_research_funding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
@@ -155,7 +157,7 @@ struct PlayerContext {
     const stellar::engine::LocalizationTable *locale) {
   if (value > 0. && currency.format(value) == currency.format(0.))
     return trf_at(locale, "RESEARCH_PER_DAY", {positive_amount(currency, value, locale)}, "{0}/day");
-  return currency.format_rate(-value);
+  return stellar::native_currency_format::format_rate_localized(locale, currency, -value);
 }
 
 [[nodiscard]] std::string funding_signature(
@@ -223,7 +225,8 @@ struct PlayerContext {
               tr_at(locale,"RESEARCH_ERR_HYPOTHESIS","This hypothesis must be resolved before the program can resume.")};
     if (!project->current_blockers.empty())
       return {NativeResearchIntent::Resume, false,
-              project->current_blockers.front().message};
+              native_research::localized_message(
+                  locale, project->current_blockers.front().message)};
     if (!player.economy)
       return {NativeResearchIntent::Resume, false,
               tr_at(locale,"RESEARCH_ERR_NO_ECONOMY","The player has no economy available to fund research.")};
@@ -236,7 +239,9 @@ struct PlayerContext {
       node.state >= ResearchMaturity::mature)
     return {};
   if (!node.blockers.empty())
-    return {NativeResearchIntent::Start, false, node.blockers.front().message};
+    return {NativeResearchIntent::Start, false,
+            native_research::localized_message(locale,
+                                               node.blockers.front().message)};
   const auto &capacity = view.directed_program_capacity;
   if (!capacity.lab_capacity_only && capacity.maximum_directed_programs &&
       capacity.active_program_count >= *capacity.maximum_directed_programs)
@@ -338,7 +343,8 @@ NativeResearchWindow NativeResearchController::build(
         .cost = cost,
     };
     for (const auto &blocker : project ? project->current_blockers : node.blockers)
-      projected.blockers.push_back(blocker.message);
+      projected.blockers.push_back(
+          native_research::localized_message(locale_, blocker.message));
     for (const auto &capability_id : node.known_capabilities) {
       const auto *definition = player.authority.catalog().find_capability(capability_id);
       projected.known_capabilities.push_back(
@@ -478,7 +484,9 @@ NativeResearchCommandOutcome NativeResearchController::execute(
     default:break;
   }
   if(planning){const auto edited=player.campaign.edit_plan(player.world.player_civilization_id,*planning,node_id);
-    return {edited.accepted,edited.message,player.state.revision()};}
+    return {edited.accepted,
+            native_research::localized_message(locale_, edited.message),
+            player.state.revision()};}
   const auto view = player.authority.kernel().build_view(player.state, target);
   const auto visible = std::ranges::find(view.visible_nodes, node_id,
                                          &AdaptiveResearchNodeView::node_id);
@@ -514,7 +522,9 @@ NativeResearchCommandOutcome NativeResearchController::execute(
   } else {
     return {false, tr_at(locale_,"RESEARCH_ERR_NO_COMMAND","No research command was selected."), player.state.revision()};
   }
-  return {command.accepted, command.message, player.state.revision()};
+  return {command.accepted,
+          native_research::localized_message(locale_, command.message),
+          player.state.revision()};
 }
 
 void NativeResearchController::select(std::optional<std::string> node_id) {

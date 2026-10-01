@@ -215,7 +215,12 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
                                  ? "Recovered campaign from an older autosave"
                                  : "Recovered campaign from backup")
                           : "Loaded campaign",
-                      1.};
+                      1.,
+                      recovered ? (loaded.origin ==
+                                           PlayerCampaignLoadOrigin::History
+                                       ? "SESSION_NOTICE_RECOVERED_HISTORY"
+                                       : "SESSION_NOTICE_RECOVERED_BACKUP")
+                                : "SESSION_NOTICE_LOADED"};
   return session;
 }
 
@@ -283,12 +288,14 @@ bool NativeCampaignSession::request_new_campaign() {
   require_owner();
   if (new_campaign_pending()) return false;
   if (pending_load_ || exit_requested_ || exit_ready_ || !manual_capture_ready_) {
-    publish_failure("New Game is unavailable until the current campaign operation finishes");
+    publish_failure("New Game is unavailable until the current campaign operation finishes",
+                    "SESSION_NOTICE_NEW_GAME_UNAVAILABLE");
     return false;
   }
   save_requested_ = false;
   new_campaign_transition_ = NewCampaignTransition::Waiting;
-  notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.};
+  notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.,
+             "SESSION_NOTICE_SAVING_NEW_GAME"};
   return true;
 }
 void NativeCampaignSession::cancel_new_campaign() {
@@ -297,7 +304,8 @@ void NativeCampaignSession::cancel_new_campaign() {
     return;
   // A writer in flight may finish, but cannot authorize any later request.
   new_campaign_transition_ = NewCampaignTransition::Inactive;
-  notice_ = {SessionNoticeKind::None, "Current campaign retained", 0.};
+  notice_ = {SessionNoticeKind::None, "Current campaign retained", 0.,
+             "SESSION_NOTICE_CAMPAIGN_RETAINED"};
 }
 
 PlayerCampaignRuntimeFactory NativeCampaignSession::runtime_factory() const {
@@ -307,9 +315,11 @@ PlayerCampaignRuntimeFactory NativeCampaignSession::runtime_factory() const {
 }
 
 void NativeCampaignSession::publish_save_result(
-    const PlayerCampaignSaveResult &result, std::string success_message) {
+    const PlayerCampaignSaveResult &result, std::string success_message,
+    std::string_view success_key) {
   if (result.succeeded) {
-    notice_ = {SessionNoticeKind::Saved, std::move(success_message), 1.};
+    notice_ = {SessionNoticeKind::Saved, std::move(success_message), 1.,
+               std::string(success_key)};
   } else {
     publish_failure("Save failed: " +
                     (result.error_message.empty() ? result.error_type
@@ -317,10 +327,12 @@ void NativeCampaignSession::publish_save_result(
   }
 }
 
-void NativeCampaignSession::publish_failure(std::string message) {
+void NativeCampaignSession::publish_failure(std::string message,
+                                            std::string_view key) {
   if (new_campaign_pending()) new_campaign_transition_ = NewCampaignTransition::Failed;
   std::cerr << "Stellar Continuum native session: " << message << '\n';
-  notice_ = {SessionNoticeKind::Failure, std::move(message), 0.};
+  notice_ = {SessionNoticeKind::Failure, std::move(message), 0.,
+             std::string(key)};
 }
 
 void NativeCampaignSession::publish_background_save_result(
@@ -334,7 +346,10 @@ void NativeCampaignSession::publish_background_save_result(
     save_requested_ = false;
     exit_requested_ = false;
   }
-  publish_save_result(result, manual ? "Saved campaign" : "Autosaved campaign");
+  publish_save_result(result,
+                      manual ? "Saved campaign" : "Autosaved campaign",
+                      manual ? "SESSION_NOTICE_SAVED"
+                             : "SESSION_NOTICE_AUTOSAVED");
 }
 
 bool NativeCampaignSession::drain_live_save() {
@@ -345,7 +360,7 @@ bool NativeCampaignSession::drain_live_save() {
     manual_save_pending_ = false;
   }
   if (completed && !completed->succeeded) {
-    publish_save_result(*completed, "Saved campaign");
+    publish_save_result(*completed, "Saved campaign", "SESSION_NOTICE_SAVED");
     return false;
   }
   return true;
@@ -371,7 +386,8 @@ CampaignFrameResult NativeCampaignSession::advance(
             live_->frame, result, game_version_, saved_at_utc)) {
       publish_background_save_result(*completed);
     } else if (live_->saves.pending() && !pending_load_) {
-      notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
+      notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.,
+                 "SESSION_NOTICE_SAVING"};
     }
   } catch (const std::exception &error) {
     publish_failure(std::string("Autosave failed: ") + error.what());
@@ -383,11 +399,13 @@ void NativeCampaignSession::request_save() {
   require_owner();
   if (new_campaign_pending()) return;
   if (pending_load_) {
-    publish_failure("Wait for the current load before saving");
+    publish_failure("Wait for the current load before saving",
+                    "SESSION_NOTICE_WAIT_LOAD_SAVE");
     return;
   }
   save_requested_ = true;
-  notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
+  notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.,
+             "SESSION_NOTICE_SAVING"};
 }
 
 void NativeCampaignSession::set_save_capture_observer(
@@ -427,7 +445,8 @@ void NativeCampaignSession::request_load() {
   require_owner();
   if (new_campaign_pending()) return;
   if (pending_load_) {
-    publish_failure("A campaign load is already in progress");
+    publish_failure("A campaign load is already in progress",
+                    "SESSION_NOTICE_LOAD_IN_PROGRESS");
     return;
   }
   try {
@@ -437,7 +456,8 @@ void NativeCampaignSession::request_load() {
     save_requested_ = false;
     exit_requested_ = false;
     manual_capture_ready_ = false;
-    notice_ = {SessionNoticeKind::Loading, "Loading campaign", 0.};
+    notice_ = {SessionNoticeKind::Loading, "Loading campaign", 0.,
+               "SESSION_NOTICE_LOADING"};
     begin_load();
   } catch (const std::exception &error) {
     publish_failure(std::string("Load failed: ") + error.what());
@@ -448,12 +468,14 @@ void NativeCampaignSession::request_exit() {
   require_owner();
   cancel_new_campaign();
   if (pending_load_) {
-    publish_failure("Wait for the current load before exiting");
+    publish_failure("Wait for the current load before exiting",
+                    "SESSION_NOTICE_WAIT_LOAD_EXIT");
     return;
   }
   exit_requested_ = true;
   save_requested_ = false;
-  notice_ = {SessionNoticeKind::Saving, "Saving before exit", 0.};
+  notice_ = {SessionNoticeKind::Saving, "Saving before exit", 0.,
+             "SESSION_NOTICE_SAVING_EXIT"};
 }
 
 std::unique_ptr<NativeCampaignSession::Live> NativeCampaignSession::activate(
@@ -507,7 +529,12 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
                               ? "Recovered campaign from an older autosave"
                               : "Recovered campaign from backup")
                        : "Loaded campaign",
-                   1.};
+                   1.,
+                   recovered ? (loaded.origin ==
+                                        PlayerCampaignLoadOrigin::History
+                                    ? "SESSION_NOTICE_RECOVERED_HISTORY"
+                                    : "SESSION_NOTICE_RECOVERED_BACKUP")
+                             : "SESSION_NOTICE_LOADED"};
         replaced = true;
       } catch (...) {
         publish_failure("Load failed: " +
@@ -538,11 +565,12 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
           live_->frame.clock().simulation_days(), game_version_, saved_at_utc};
       const auto failed = live_->saves.begin_manual(live_->frame.runtime(), options);
       if (failed) {
-        publish_save_result(*failed, "Saved campaign");
+        publish_save_result(*failed, "Saved campaign", "SESSION_NOTICE_SAVED");
       } else {
         manual_save_pending_ = true;
         new_campaign_transition_ = NewCampaignTransition::Saving;
-        notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.};
+        notice_ = {SessionNoticeKind::Saving, "Saving this campaign before New Game", 0.,
+                   "SESSION_NOTICE_SAVING_NEW_GAME"};
       }
     } catch (const std::exception &error) {
       publish_failure(std::string("Save before New Game failed: ") + error.what());
@@ -559,7 +587,8 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
     save_requested_ = false;
     exit_requested_ = false;
     if (!manual_capture_ready_) {
-      publish_failure("Save is unavailable until a campaign frame completes");
+      publish_failure("Save is unavailable until a campaign frame completes",
+                      "SESSION_NOTICE_SAVE_UNAVAILABLE");
       return replaced;
     }
     try {
@@ -570,15 +599,18 @@ bool NativeCampaignSession::service(const std::string &saved_at_utc,
           live_->frame.clock().simulation_days(), game_version_, saved_at_utc};
       if (exiting) {
         const auto result = live_->saves.save_manual(live_->frame.runtime(), options);
-        publish_save_result(result, "Saved campaign; exiting");
+        publish_save_result(result, "Saved campaign; exiting",
+                            "SESSION_NOTICE_SAVED_EXITING");
         exit_ready_ = result.succeeded;
       } else {
         const auto failed = live_->saves.begin_manual(live_->frame.runtime(), options);
         if (failed) {
-          publish_save_result(*failed, "Saved campaign");
+          publish_save_result(*failed, "Saved campaign",
+                              "SESSION_NOTICE_SAVED");
         } else {
           manual_save_pending_ = true;
-          notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.};
+          notice_ = {SessionNoticeKind::Saving, "Saving campaign", 0.,
+                     "SESSION_NOTICE_SAVING"};
         }
       }
     } catch (const std::exception &error) {

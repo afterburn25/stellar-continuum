@@ -1,5 +1,6 @@
 #include "native_small_body_renderer.hpp"
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/stellar_object.hpp>
 #include <stellar/engine/native_triangle_mesh.hpp>
 #include <stellar/engine/texture_decal.hpp>
 #include <iostream>
@@ -50,9 +51,28 @@ int main(){try{
   for(const auto& v:solid.mesh->vertices()){min_z=std::min(min_z,v.position.z);max_z=std::max(max_z,v.position.z);
     non_radial|=std::abs(v.normal.x*v.position.y-v.normal.y*v.position.x)>.02f;}
   check(max_z-min_z>.4f&&non_radial&&solid.material.diffuse>.7f,"Solid has no mass or surface lighting");
+  check(!solid.lod_meshes.empty()&&solid.lod_meshes.front()!=solid.mesh&&solid.lod_pixels==56.f&&solid.lod_fade>0,"Small bodies lost the crossfaded detail LOD");
+  renderer.set_scene3d_quality(RenderQuality3D::Low);DrawList low_draw;renderer.render(low_draw,s,spatial,view,{0,0,1920,1080},0,false);
+  const auto low_view=std::ranges::find_if(low_draw.world,[](const WorldCommand&c){return std::holds_alternative<Scene3DView>(c);});
+  check(low_view!=low_draw.world.end()&&std::get<Scene3DView>(*low_view).options.quality==RenderQuality3D::Low,"Small-body view ignored the quality tier");
+  renderer.set_scene3d_quality(RenderQuality3D::High);
   DrawList paused;renderer.render(paused,s,spatial,view,{0,0,1920,1080},0,false);
   const auto repeat=scene_of(paused);check(repeat->instances().front().mesh==solid.mesh&&repeat->instances().front().material.texture==solid.material.texture,"Paused rendering regenerated immutable geometry");
   check(repeat->instances().front().rotation.w==solid.rotation.w,"Paused spin drifted");
+  s.stellar_object=generate_stellar_physics(3,StellarObjectType::OHotBlueStar);
+  DrawList hot;renderer.render(hot,s,spatial,view,{0,0,1920,1080},0,false);
+  const auto& lit=scene_of(hot)->instances().front().material;
+  check(lit.linear_light,"Small bodies did not move to linear-light shading");
+  check(lit.light_color.z>lit.light_color.x,"Blue-hot star failed to tint belt lighting");
+  check(lit.light_intensity>=.22f&&lit.light_intensity<=1.15f,"Heliocentric falloff escaped bounds");
+  // A belt bound to a companion star must inherit THAT star's physics —
+  // same direction (belt-host position) but the companion's blackbody.
+  StellarOrbitArchitecture architecture;architecture.companions.push_back(generate_stellar_physics(3,StellarObjectType::MRedDwarf));
+  s.stellar_orbits=architecture;auto companion_spatial=spatial;companion_spatial.belt_host=1;
+  DrawList companion;renderer.render(companion,s,companion_spatial,view,{0,0,1920,1080},0,false);
+  const auto& companion_lit=scene_of(companion)->instances().front().material;
+  check(companion_lit.light_color.x>companion_lit.light_color.z,"Companion-host belt kept the primary's blackbody tint");
+  s.stellar_orbits.reset();s.stellar_object.reset();
   // Keep a single identified body in view so changed orientation cannot be
   // confused with a different selected instance after sorting by size.
   auto one=s;one.small_body_fields.resize(1);one.small_body_fields[0].visible_count=1;

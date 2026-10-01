@@ -85,6 +85,15 @@ int main(int argc,char** argv)try {
   }
   const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);bool found=false;double time=0;
   while(!found){DrawList draw;background.append(draw,{200,200},60,art.manifest().begin()->first,time);found=detailed(draw)!=nullptr;time+=.01;check(std::chrono::steady_clock::now()<deadline,"Background decoding completed");check(background.pending_count()<=Artwork::maximum_pending,"Queue admission bounded");std::this_thread::yield();}
+  {
+    // A completed ticket must drain via poll() while no star is being drawn;
+    // otherwise its queue reservation stays held and pending_count() wedges
+    // the frame-readiness diagnostic.
+    Artwork off_view(argv[1]);off_view.use_queue(std::make_shared<ImagePreparationQueue>());
+    DrawList seed;off_view.begin_frame();off_view.append(seed,{200,200},60,"red-giant",0.);
+    const auto drain_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(15);
+    while(off_view.pending_count()>0){off_view.poll();check(std::chrono::steady_clock::now()<drain_deadline,"Off-view stellar ticket did not drain via poll");std::this_thread::yield();}
+  }
   if(argc>3){
     Window window("Stellar Continuum - stellar artwork validation",1280,720,false,std::filesystem::path(argv[1])/"assets/visual/fonts/Rajdhani-SemiBold.ttf");
     window.set_frame_cap(60);Artwork visual(argv[1]);

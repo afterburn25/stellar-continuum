@@ -3,9 +3,11 @@
 #include "native_system_travel.hpp"
 #include "native_fleet_controller.hpp"
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
+#include <stellar/engine/localization.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -74,6 +76,86 @@ int main(int argc,char**argv)try{
       require(std::ranges::any_of(solids->instances(),[](const auto& instance){return instance.material.dielectric.has_value();}),"Focused icy solid lost its dielectric optics");
   }
   {
+    NativeSystemWorkspace keys;keys.open(reference,1920,1080);
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kRight=0x4000004fu,kHome=0x4000004au,kEnd=0x4000004du;
+    const auto key=[&](std::uint32_t code){InputEvent e{InputEventType::KeyPressed};e.key=code;return keys.handle(e,1920,1080);};
+    const auto field_rect=SystemWorkspaceLayout::for_viewport(1920,1080).world_field;
+    const float s=NativeUiLayout::for_viewport(1920,1080).scale;
+    const UiRect motion{field_rect.x+field_rect.width-168*s,field_rect.y+field_rect.height-69*s,156*s,29*s};
+    const UiRect launcher{field_rect.x+12*s,field_rect.y+field_rect.height-35*s,180*s,29*s};
+    const auto ring_at=[&](const DrawList&scene,UiRect r){return std::ranges::any_of(scene.overlay,[&](const UiOverlayCommand&item){const auto*stroke=std::get_if<StrokedRectangle>(&item);return stroke&&stroke->bounds.x==r.x&&stroke->bounds.y==r.y&&stroke->bounds.width==r.width&&stroke->color.r==stellar::native_ui::color::focus.r;});};
+    require(!keys.small_body_keyboard_focus(),"small-body ring started focused");
+    require(keys.focused()<0&&keys.focused_label(1920,1080).empty(),"unfocused workspace reported a label");
+    require(key(kTab).captured&&keys.small_body_keyboard_focus(),"Tab did not focus the small-body ring");
+    require(keys.focused()==0&&keys.focused_label(1920,1080)=="Paused / Resume","focused_label did not name the motion toggle");
+    DrawList closed_draw;keys.render(closed_draw,1920,1080);
+    require(ring_at(closed_draw,motion),"focus ring did not land on the motion toggle first");
+    require(key(kReturn).kind==SystemWorkspaceCommandKind::toggle_motion,"Return did not activate the focused motion toggle");
+    require(keys.focused()==0&&keys.focused_label(1920,1080)=="Paused / Resume","activation lost the motion toggle's focus label");
+    require(key(kEnd).captured,"End did not reach the launcher");
+    require(keys.focused_label(1920,1080)=="BELTS & DEBRIS  "+std::to_string(reference.small_body_fields.size()),"focused_label did not name the launcher");
+    (void)key(kReturn);
+    require(key(kHome).captured,"Home did not reach the close control");
+    require(keys.focused_label(1920,1080)=="Close","focused_label did not name the panel close control");
+    DrawList open_draw;keys.render(open_draw,1920,1080);
+    require(has_overlay_text(open_draw,"SMALL-BODY SURVEY"),"Return on the launcher did not open the survey panel");
+    const UiRect close_rect{field_rect.x+12*s+std::min(450*s,field_rect.width-24*s)-65*s,field_rect.y+8*s+9*s,55*s,25*s};
+    require(ring_at(open_draw,close_rect),"open-panel ring did not follow focus onto the close control");
+    require(key(kRight).captured&&key(kRight).captured,"ring traversal across the panel headers failed");
+    const auto next_id=reference.small_body_fields[1%reference.small_body_fields.size()].id;
+    (void)key(kReturn);
+    DrawList next_draw;keys.render(next_draw,1920,1080);
+    require(has_overlay_text(next_draw,"#"+std::to_string(next_id)),"Return on Next field did not cycle the surveyed field");
+    (void)keys.handle({InputEventType::LeftPressed,{field_rect.x+20*s,field_rect.y+200*s}},1920,1080);
+    require(!keys.small_body_keyboard_focus(),"pointer press did not reset the small-body ring");
+    require(key(kTab).captured&&keys.small_body_keyboard_focus(),"Tab did not refocus the small-body ring");
+    (void)keys.handle({InputEventType::PointerCancelled},1920,1080);
+    require(!keys.small_body_keyboard_focus(),"pointer cancel did not reset the small-body ring");
+    keys.close();
+  }
+  {
+    // Compact viewport: the open inspector is an overlay that must stay inside
+    // the drawable and claim its own bounds even where HUD plates sit below it.
+    NativeSystemWorkspace compact;compact.open(reference,640,360);
+    const auto compact_field=SystemWorkspaceLayout::for_viewport(640,360).world_field;
+    const auto compact_scale=NativeUiLayout::for_viewport(640,360).scale;
+    const UiRect launcher{compact_field.x+12*compact_scale,compact_field.y+compact_field.height-35*compact_scale,180*compact_scale,29*compact_scale};
+    (void)compact.handle({InputEventType::LeftPressed,center(launcher)},640,360);
+    DrawList compact_draw;compact.render(compact_draw,640,360);
+    require(has_overlay_text(compact_draw,"SMALL-BODY SURVEY"),"compact launcher did not open the small-body panel");
+    const auto panel_fill=std::ranges::find_if(compact_draw.overlay,[](const UiOverlayCommand&item){const auto*fill=std::get_if<FilledRectangle>(&item);return fill&&fill->color.r==5&&fill->color.g==17&&fill->color.b==28&&fill->bounds.width>200.f;});
+    require(panel_fill!=compact_draw.overlay.end(),"compact small-body panel was not rendered");
+    const auto bounds=std::get_if<FilledRectangle>(&*panel_fill)->bounds;
+    require(bounds.x>=0.f&&bounds.y>=0.f&&bounds.x+bounds.width<=640.f&&bounds.y+bounds.height<=360.f,"small-body panel escaped the compact drawable");
+    const Point inside{bounds.x+bounds.width*.5f,bounds.y+bounds.height*.5f};
+    require(compact.small_body_panel_owns(inside,640,360)&&!compact.small_body_panel_owns({bounds.x-4.f,bounds.y+bounds.height*.5f},640,360),"small-body panel did not claim exactly its own compact bounds");
+    compact.close();
+  }
+  {
+    // The field type, body size/material and resource rows must resolve through
+    // the active locale rather than leaking raw English enum names.
+    stellar::engine::LocalizationTable locale("de","en");
+    locale.load_json(R"({"locale":"de","strings":{
+      "SMALLBODY_TYPE_ROCKY":"ZZZ","SMALLBODY_TYPE_METALLIC":"ZZZ","SMALLBODY_TYPE_CARBONACEOUS":"ZZZ",
+      "SMALLBODY_TYPE_MIXED":"ZZZ","SMALLBODY_TYPE_ICE":"ZZZ","SMALLBODY_TYPE_DEBRIS_DISK":"ZZZ",
+      "SMALLBODY_TYPE_SHATTERED":"ZZZ","SMALLBODY_TYPE_CRACKED":"ZZZ","SMALLBODY_TYPE_PLANETARY_HALO":"ZZZ",
+      "SMALLBODY_MAT_ROCK":"ZZZ","SMALLBODY_MAT_METAL":"ZZZ","SMALLBODY_MAT_CARBON":"ZZZ",
+      "SMALLBODY_MAT_WATER_ICE":"ZZZ","SMALLBODY_MAT_METHANE_ICE":"ZZZ","SMALLBODY_MAT_AMMONIA_ICE":"ZZZ",
+      "SMALLBODY_MAT_ROCK_ICE":"ZZZ","SMALLBODY_MAT_VOLATILES":"ZZZ",
+      "SMALLBODY_RES_MINERALS":"ZZZ","SMALLBODY_RES_METALS":"ZZZ","SMALLBODY_RES_ORGANICS":"ZZZ",
+      "SMALLBODY_RES_WATER":"ZZZ","SMALLBODY_RES_HYDROGEN":"ZZZ","SMALLBODY_RES_DEUTERIUM":"ZZZ",
+      "SMALLBODY_RES_VOLATILES":"ZZZ","SMALLBODY_RES_SALVAGE":"ZZZ","SMALLBODY_RES_EXOTICS":"ZZZ",
+      "SMALLBODY_SIZE_HUGE":"ZZZ","SMALLBODY_SIZE_LARGE":"ZZZ","SMALLBODY_SIZE_MEDIUM":"ZZZ","SMALLBODY_SIZE_SMALL":"ZZZ"}})");
+    NativeSystemWorkspace localized;localized.set_localization(&locale);localized.open(reference,1920,1080);
+    const auto field_rect=SystemWorkspaceLayout::for_viewport(1920,1080).world_field;
+    const float scale=NativeUiLayout::for_viewport(1920,1080).scale;
+    (void)localized.handle({InputEventType::LeftPressed,center({field_rect.x+12*scale,field_rect.y+field_rect.height-35*scale,180*scale,29*scale})},1920,1080);
+    DrawList localized_draw;localized.render(localized_draw,1920,1080);
+    require(has_overlay_text(localized_draw,"ZZZ  #"+std::to_string(reference.small_body_fields.front().id)),"small-body field type did not resolve through the locale");
+    require(has_overlay_text(localized_draw,"/ ZZZ / ZZZ"),"small-body size/material did not resolve through the locale");
+    localized.close();
+  }
+  {
     NativeSystemWorkspace tracked;tracked.open(reference,1920,1080);
     const auto earth=std::ranges::find_if(reference.bodies,[](const auto& b){return b.sol_texture_key==std::optional<std::string>{"earth"};});require(earth!=reference.bodies.end(),"Earth missing for hourly motion test");
     require(tracked.select_body(earth->id),"Could not select Earth");
@@ -113,9 +195,27 @@ int main(int argc,char**argv)try{
   (void)artwork_ui.handle({InputEventType::Wheel,star_position,{},1000},1280,720);
   legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(artwork_ui.viewport()->scale==55.f&&observed_radius<=350.f&&observed_radius>=300.f,"Maximum system zoom invalid: scale="+std::to_string(artwork_ui.viewport()->scale)+" star radius="+std::to_string(observed_radius));
+  float g_quadratic=0;
+  {
+    const auto photosphere=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.limb_darkening>0;});});
+    require(photosphere!=legacy_draw.world.end(),"Spectral Sol emitted no limb-darkened photosphere");
+    const auto&star_material=std::get<Scene3DView>(*photosphere).scene->instances().front().material;
+    require(star_material.limb_darkening_q>0&&star_material.limb_darkening_mid>0,"Photosphere lost its three-term limb profile");
+    g_quadratic=star_material.limb_darkening_q;
+  }
   legacy.stellar_object=generate_stellar_physics(1,StellarObjectType::OHotBlueStar);
   artwork_ui.refresh(legacy);observed_art.clear();legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(observed_art=="o-hot-blue","Physical stellar identity must take precedence over legacy class");
+  {
+    const auto o_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.limb_darkening>0;});});
+    require(o_view!=legacy_draw.world.end(),"O-class primary emitted no limb-darkened photosphere");
+    const auto&o_material=std::ranges::find_if(std::get<Scene3DView>(*o_view).scene->instances(),[](const auto&i){return i.material.limb_darkening>0;})->material;
+    require(o_material.limb_darkening_q>g_quadratic,"Hot-star nonlinear limb term should exceed the cooler Sun's");
+  }
   for(const auto survey:{SystemSurveyLevel::unknown,SystemSurveyLevel::detected,SystemSurveyLevel::partially_surveyed}){
     require(!stellar::native_stellar::observed_stellar_artwork(survey,legacy.stellar_object,legacy.primary_stellar_class),"Incomplete survey leaked supplied stellar identity");
     if(survey==SystemSurveyLevel::partially_surveyed){
@@ -127,6 +227,61 @@ int main(int argc,char**argv)try{
     const auto value=static_cast<StellarClass>(spectral);
     const auto art=stellar::native_stellar::observed_stellar_artwork(SystemSurveyLevel::fully_surveyed,std::nullopt,value);
     require(art.has_value()==(value!=StellarClass::Protostar),"Legacy stellar class lost its supplied artwork mapping");
+  }
+  {
+    legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::BlackHole;
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto disc_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(disc_view!=legacy_draw.world.end(),"Black-hole primary emitted no beamed accretion disc");
+    const auto&disc_material=std::ranges::find_if(std::get<Scene3DView>(*disc_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
+    require(disc_material.texture&&disc_material.texture->height()==64,"Accretion disc did not bake its spiral-arm texture");
+    require(disc_material.orbital_beaming_tint>0,"Accretion disc lost its paired doppler tint");
+    // legacy_draw is cleared below for each re-render — capture the quiescent
+    // tint by value; the material reference dangles once the world vector frees.
+    const float quiescent_tint=disc_material.orbital_beaming_tint;
+    legacy.stellar_object=generate_stellar_physics(7,StellarObjectType::AccretingBlackHole);
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto active_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(active_view!=legacy_draw.world.end(),"Accreting black hole emitted no beamed disc");
+    const auto&active_material=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
+    require(active_material.orbital_beaming_tint>quiescent_tint,"Accreting and quiescent discs are not differentiated");
+    const auto active_rotation=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->rotation;
+    artwork_ui.advance_tumble(4,true);
+    legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto spun_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(spun_view!=legacy_draw.world.end(),"Accreting disc vanished while the clock ran");
+    const auto spun_rotation=std::ranges::find_if(std::get<Scene3DView>(*spun_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->rotation;
+    require(spun_rotation.w!=active_rotation.w||spun_rotation.x!=active_rotation.x||spun_rotation.y!=active_rotation.y||spun_rotation.z!=active_rotation.z,"Accretion spiral did not revolve with game time");
+    require(std::get<Scene3DView>(*spun_view).options.time>0.f,"Star scene carries no scene clock for animated material terms");
+    legacy.stellar_object=generate_stellar_physics(13,StellarObjectType::JetBlackHole);
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto jet_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
+        return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});});
+    require(jet_view!=legacy_draw.world.end(),"Jet black hole emitted no luminous jet spindle");
+    const auto&jet_instance=*std::ranges::find_if(std::get<Scene3DView>(*jet_view).scene->instances(),[](const auto&i){
+      return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});
+    require(jet_instance.material.texture&&jet_instance.material.texture->height()==64,"Jet spindle lost its base-glow gradient");
+    require(jet_instance.scale>0,"Jet spindle submitted with no authoritative reach");
+    legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::Protostar;
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto proto_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(proto_view!=legacy_draw.world.end(),"Protostar emitted no protoplanetary debris disc");
+    const auto&proto_scene=std::get<Scene3DView>(*proto_view).scene->instances();
+    require(std::ranges::any_of(proto_scene,[](const auto&i){return i.material.limb_darkening_mid>0;}),"Protostar lost its physical photosphere beneath the debris disc");
+    const auto&proto_disc=*std::ranges::find_if(proto_scene,[](const auto&i){return i.material.orbital_beaming>0;});
+    require(proto_disc.material.orbital_beaming_tint>0&&proto_disc.material.orbital_beaming_tint<quiescent_tint,
+      "Protoplanetary disc should carry a gentler doppler split than a relativistic flow");
+    legacy.primary_stellar_class=StellarClass::GYellowDwarf;
   }
   // Read-only preparation is bound to the exact admitted body and observer.
   NativeSystemWorkspace preparation_ui;
@@ -359,8 +514,49 @@ int main(int argc,char**argv)try{
       require(std::ranges::any_of(draw.world,[&](const auto& command){const auto* text=std::get_if<Text>(&command);return text&&text->value.find(stellar_host_name(component))!=std::string::npos&&text->align==TextAlign::Center&&text->at.y>p.y;}),"Triple omitted its below-object component label");
     }
   }
+  // Minimum-resolution sweep: the naming contract survives a compact field —
+  // component labels shrink and clamp into the field instead of disappearing.
+  for(const auto days:{0.,100000.}){
+    workspace.set_simulation_days(days);workspace.reset_fit(640,360);draw={};workspace.render(draw,640,360);
+    const auto compact_chart=project_system(*workspace.snapshot());const auto compact_field=SystemWorkspaceLayout::for_viewport(640,360).world_field;
+    for(int component=0;component<3;++component){const auto p=workspace.viewport()->world_to_screen(compact_chart.stellar_hosts[component].x,compact_chart.stellar_hosts[component].y);
+      require(compact_field.contains({p.x,p.y}),"Compact fit cropped a moving stellar component");
+      require(std::ranges::any_of(draw.world,[&](const auto& command){const auto* text=std::get_if<Text>(&command);return text&&text->value.find(stellar_host_name(component))!=std::string::npos&&text->align==TextAlign::Center;}),"Compact field dropped a component star label");
+    }
+  }
   const auto fitted_scale=workspace.viewport()->scale;const auto field=SystemWorkspaceLayout::for_viewport(1280,720).world_field;
   (void)workspace.handle({.type=InputEventType::Wheel,.position=center(field),.wheel_y=.1f},1280,720);
   require(workspace.viewport()->scale>fitted_scale&&workspace.viewport()->scale<fitted_scale*1.1f,"Wide-system zoom jumped to the old minimum scale");
+  {
+    // Order-result notices wrap to several lines — the banner must grow to fit
+    // the measured text, stay inside the inspector panel, and never reach the
+    // command HUD's bottom-center context plate.
+    const auto stub_measure=[](const Text& t){
+      const auto per_line=std::max(1,static_cast<int>(t.wrap_width/7.f));
+      const auto lines=std::max(1,static_cast<int>((t.value.size()+per_line-1)/per_line));
+      return TextExtent{per_line*7,lines*16};};
+    const std::string long_notice="Pioneer One: colony mission approved for Neris in SYS-019 with 250.0 million "
+        "Terran Baseline colonists aboard. Neris is currently available through the prototype "
+        "habitat-supported fallback for Terran Baseline. Route: 3 lane legs, total 511.3 ly; "
+        "expedition funded for $1.2B UED.";
+    for(const auto [vw,vh]:std::array<std::pair<int,int>,4>{{{1280,720},{1920,1080},{2560,1440},{3840,2160}}}){
+      NativeSystemWorkspace notice_workspace({},stub_measure);
+      notice_workspace.open(reference,vw,vh);
+      notice_workspace.set_notice(long_notice);
+      DrawList notice_draw;notice_workspace.render(notice_draw,vw,vh);
+      const auto banner=std::ranges::find_if(notice_draw.overlay,[&](const UiOverlayCommand& item){
+        const auto* label=std::get_if<Text>(&item);return label&&label->value==long_notice;});
+      require(banner!=notice_draw.overlay.end(),"Long order notice text was not rendered in full");
+      const auto* notice_label=std::get_if<Text>(&*banner);
+      require(notice_label->clip.has_value(),"Order notice rendered without a bounds clip");
+      const auto bounds=*notice_label->clip;const auto panel=SystemWorkspaceLayout::for_viewport(vw,vh).inspector;
+      const auto plate=CommandHudLayout::make(vw,vh).context;
+      require(bounds.y>=panel.y&&bounds.y+bounds.height<=panel.y+panel.height&&bounds.x>=panel.x&&bounds.x+bounds.width<=panel.x+panel.width,
+          "Grown order notice escaped the inspector panel");
+      const auto needed=stub_measure(Text{{},long_notice,{},13,bounds.width-16.f});
+      require(bounds.height>=static_cast<float>(needed.height),"Order notice banner is shorter than its measured wrapped text");
+      require(!overlaps(bounds,plate),"Order notice underlaps the command HUD context plate");
+    }
+  }
   std::cout<<"native system workspace cases passed\n";return 0;
 }catch(const std::exception&e){std::cerr<<"native system workspace failed: "<<e.what()<<'\n';return 1;}

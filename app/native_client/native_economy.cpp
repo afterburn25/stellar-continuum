@@ -1,4 +1,5 @@
 #include "native_economy.hpp"
+#include "native_currency_format.hpp"
 
 #include <stellar/core/campaign_economy.hpp>
 #include <stellar/core/construction_state.hpp>
@@ -47,6 +48,44 @@ constexpr std::size_t maximum_diagnostic_bytes = 256;
       out.replace(at, marker.size(), arg);
   }
   return out;
+}
+
+// Core industry-allocation results are stable English literals or a fixed
+// skeleton carrying the display_priority name. Recompose them through the
+// locale table at the controller boundary so notices and notifications stay
+// localized without changing the authoritative result or saves.
+[[nodiscard]] std::string localized_allocation_message(
+    const stellar::engine::LocalizationTable *locale,
+    std::string_view message) {
+  if (!locale || message.empty()) return std::string(message);
+  if (message == "Only the owning civilization can set its industry priority.")
+    return tr_at(locale, "ECONOMY_ERR_OWNER",
+                 "Only the owning civilization can set its industry "
+                 "priority.");
+  if (message == "Unknown civilization economy.")
+    return tr_at(locale, "ECONOMY_ERR_UNKNOWN_ECONOMY",
+                 "Unknown civilization economy.");
+  static const std::pair<std::string_view, std::string_view> priorities[] = {
+      {"Infrastructure first", "ECONOMY_PRIORITY_NAME_INFRASTRUCTURE"},
+      {"Shipbuilding first", "ECONOMY_PRIORITY_NAME_SHIPBUILDING"},
+      {"Balanced", "ECONOMY_PRIORITY_NAME_BALANCED"},
+  };
+  if (const auto name =
+          message.starts_with("Industry priority set to ")
+              ? std::optional<std::string_view>{message.substr(25)}
+              : std::nullopt;
+      name)
+    if (const auto tail =
+            name->ends_with(".")
+                ? std::optional<std::string_view>{name->substr(0, name->size() - 1)}
+                : std::nullopt;
+        tail)
+      for (const auto &[literal, key] : priorities)
+        if (*tail == literal)
+          return trf_at(locale, "ECONOMY_MSG_PRIORITY_SET",
+                        {tr_at(locale, key, literal)},
+                        "Industry priority set to {0}.");
+  return std::string(message);
 }
 
 [[nodiscard]] bool finite(const double value) noexcept { return std::isfinite(value); }
@@ -147,17 +186,19 @@ struct EconomyContext {
   return result;
 }
 
-[[nodiscard]] std::string material_rate(const double value) {
+[[nodiscard]] std::string material_rate(const stellar::engine::LocalizationTable* locale,
+                                        const double value) {
   if (!finite(value)) throw std::runtime_error("A displayed material rate is non-finite.");
-  return std::format("{:+.2f} / DAY", value);
+  return stellar::native_currency_format::format_material_rate_localized(locale, value);
 }
 
-[[nodiscard]] std::string rate(const SovereignCurrencyDefinition& currency,
+[[nodiscard]] std::string rate(const stellar::engine::LocalizationTable* locale,
+                               const SovereignCurrencyDefinition& currency,
                                const double value) {
   if (!finite(value)) throw std::runtime_error("A displayed credit rate is non-finite.");
   if (std::abs(value) > std::numeric_limits<double>::max() / currency.local_units_per_budget_unit)
     throw std::runtime_error("A displayed credit rate exceeds safe currency formatting range.");
-  return currency.format_rate(value);
+  return stellar::native_currency_format::format_rate_localized(locale, currency, value);
 }
 
 [[nodiscard]] std::string amount(const SovereignCurrencyDefinition& currency,
@@ -228,12 +269,18 @@ NativeEconomyView build_economy_view(
     view.player_civilization_id = player;
     view.message = tr_at(locale, "ECONOMY_VIEW_READY",
         "Live civilian revenue and operating commitments.");
-    view.cards = {{{tr_at(locale, "ECONOMY_CARD_RESERVES", "RESERVES"), amount(currency, context.economy.credits)},
-                   {tr_at(locale, "ECONOMY_CARD_NET", "NET / DAY"), rate(currency, flow.net_credits_per_day), flow.net_credits_per_day < 0.},
-                   {tr_at(locale, "ECONOMY_CARD_INCOME", "INCOME / DAY"), rate(currency, flow.gross_income_per_day)},
-                   {tr_at(locale, "ECONOMY_CARD_COSTS", "COSTS / DAY"), rate(currency, -flow.operating_costs_per_day), true},
-                   {tr_at(locale, "ECONOMY_CARD_MATERIALS", "MATERIALS IN STORAGE"), grouped(context.economy.industry) + " / " + grouped(capacity)},
-                   {tr_at(locale, "ECONOMY_CARD_RATE", "MATERIALS / DAY"), material_rate(context.economy.last_industry_per_second)}}};
+    view.cards = {{{tr_at(locale, "ECONOMY_CARD_RESERVES", "RESERVES"), amount(currency, context.economy.credits),
+                    tr_at(locale, "ECONOMY_TIP_RESERVES", "Credits in the treasury. Construction and ship orders draw on reserves.")},
+                   {tr_at(locale, "ECONOMY_CARD_NET", "NET / DAY"), rate(locale, currency, flow.net_credits_per_day),
+                    tr_at(locale, "ECONOMY_TIP_NET", "Income minus operating costs per day. Negative values drain reserves."), flow.net_credits_per_day < 0.},
+                   {tr_at(locale, "ECONOMY_CARD_INCOME", "INCOME / DAY"), rate(locale, currency, flow.gross_income_per_day),
+                    tr_at(locale, "ECONOMY_TIP_INCOME", "Gross civilian revenue collected each day.")},
+                   {tr_at(locale, "ECONOMY_CARD_COSTS", "COSTS / DAY"), rate(locale, currency, -flow.operating_costs_per_day),
+                    tr_at(locale, "ECONOMY_TIP_COSTS", "Daily operating commitments: research, operations and upkeep."), true},
+                   {tr_at(locale, "ECONOMY_CARD_MATERIALS", "MATERIALS IN STORAGE"), grouped(context.economy.industry) + " / " + grouped(capacity),
+                    tr_at(locale, "ECONOMY_TIP_MATERIALS", "Stockpiled industrial materials against storage capacity.")},
+                   {tr_at(locale, "ECONOMY_CARD_RATE", "MATERIALS / DAY"), material_rate(locale, context.economy.last_industry_per_second),
+                    tr_at(locale, "ECONOMY_TIP_RATE", "Daily materials produced by the current industry allocation.")}}};
     const auto health = assess_treasury(context.economy.credits, flow.net_credits_per_day,
                                         context.economy.operating_arrears);
     view.treasury_healthy = health.state == TreasuryHealthState::Surplus;
@@ -278,8 +325,8 @@ NativeEconomyView build_economy_view(
     else
       view.priority_status += tr_at(locale, "ECONOMY_PRIORITY_NOTE",
           " It applies when demand competes; spare materials go to other work.");
-    view.income_rows = {{tr_at(locale, "ECONOMY_ROW_COLONY", "COLONY ECONOMY"), rate(currency, flow.colony_revenue_per_day), {}, true},
-                        {tr_at(locale, "ECONOMY_ROW_TRADE", "SURFACE TRADE"), rate(currency, flow.trade_revenue_per_day), {}, true}};
+    view.income_rows = {{tr_at(locale, "ECONOMY_ROW_COLONY", "COLONY ECONOMY"), rate(locale, currency, flow.colony_revenue_per_day), {}, true},
+                        {tr_at(locale, "ECONOMY_ROW_TRADE", "SURFACE TRADE"), rate(locale, currency, flow.trade_revenue_per_day), {}, true}};
     double reserved{};
     if (research) for (const auto& funding : research->project_funding(player)) {
       const auto remaining = funding.reserved_milestone_credits - funding.consumed_milestone_credits;
@@ -287,13 +334,13 @@ NativeEconomyView build_economy_view(
       reserved += std::max(0., remaining);
     }
     if (!finite(reserved)) throw std::runtime_error("Research reservation is non-finite.");
-    view.cost_rows = {{tr_at(locale, "ECONOMY_ROW_ADMIN", "COLONY ADMINISTRATION"), rate(currency, -flow.colony_administration_per_day)},
-      {tr_at(locale, "ECONOMY_ROW_SERVICES", "POPULATION SERVICES"), rate(currency, -flow.population_services_per_day)},
-      {tr_at(locale, "ECONOMY_ROW_HABITAT", "HABITAT SUPPORT"), rate(currency, -flow.habitat_support_per_day)},
-      {tr_at(locale, "ECONOMY_ROW_FLEET", "FLEET OPERATIONS"), rate(currency, -flow.fleet_operations_per_day)},
-      {tr_at(locale, "ECONOMY_ROW_ORBITAL", "ORBITAL MAINTENANCE"), rate(currency, -flow.orbital_maintenance_per_day)},
-      {tr_at(locale, "ECONOMY_ROW_SURFACE", "SURFACE MAINTENANCE"), rate(currency, -flow.surface_maintenance_per_day)},
-      {tr_at(locale, "ECONOMY_ROW_RESEARCH", "RESEARCH PROGRAMS"), rate(currency, -flow.research_operations_per_day),
+    view.cost_rows = {{tr_at(locale, "ECONOMY_ROW_ADMIN", "COLONY ADMINISTRATION"), rate(locale, currency, -flow.colony_administration_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_SERVICES", "POPULATION SERVICES"), rate(locale, currency, -flow.population_services_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_HABITAT", "HABITAT SUPPORT"), rate(locale, currency, -flow.habitat_support_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_FLEET", "FLEET OPERATIONS"), rate(locale, currency, -flow.fleet_operations_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_ORBITAL", "ORBITAL MAINTENANCE"), rate(locale, currency, -flow.orbital_maintenance_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_SURFACE", "SURFACE MAINTENANCE"), rate(locale, currency, -flow.surface_maintenance_per_day)},
+      {tr_at(locale, "ECONOMY_ROW_RESEARCH", "RESEARCH PROGRAMS"), rate(locale, currency, -flow.research_operations_per_day),
        trf_at(locale, "ECONOMY_ROW_RESERVED", {amount(currency, reserved)}, " · {0} RESERVED")}};
     return view;
   } catch (const EconomyUnavailable& error) {
@@ -377,7 +424,7 @@ IndustryPriorityChangeResult NativeEconomyController::change_priority(
     return stale();
   const auto result = set_industry_priority(campaign.economies, *observer_, *observer_, priority);
   if (result.accepted) view_.revision = 0;
-  return result;
+  return {result.accepted, localized_allocation_message(locale_, result.message)};
 }
 
 void NativeEconomyController::clear() {

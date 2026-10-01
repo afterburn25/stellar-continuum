@@ -5,7 +5,9 @@
 #include "native_startup_artwork.hpp"
 #include "native_startup_session.hpp"
 
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <filesystem>
 #include <optional>
@@ -73,6 +75,34 @@ public:
   void set_operation(stellar::native_startup::NativeStartupView);
   void show_failure(std::string message);
   [[nodiscard]] StartupScreen screen() const noexcept { return screen_; }
+  // On the Setup screen the delegated new-game workspace owns the ring.
+  [[nodiscard]] int focused() const noexcept {
+    return screen_ == StartupScreen::Setup ? setup_.focus() : focus_;
+  }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Delegating variant — on the Setup screen the new-game workspace owns the
+  // ring, so its label needs the text measurer.
+  [[nodiscard]] std::string focused_label(int width, int height,
+                                          const TextMeasurer &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  // The delegating variant forwards to the new-game workspace on Setup.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height, const TextMeasurer &) const;
+  // UIA control kind of the ringed control — the workspace's own ring has
+  // no text fields; the delegating variant forwards to the new-game
+  // workspace on Setup (its seed field announces Edit).
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height) const;
+  [[nodiscard]] stellar::engine::AnnouncementControl
+  focused_control(int width, int height, const TextMeasurer &) const;
+  // Current text of the ringed Edit — null outside Setup; the setup
+  // workspace's seed field reports its text read-only.
+  [[nodiscard]] std::optional<stellar::engine::AnnouncementValue>
+  focused_value(int width, int height, const TextMeasurer &) const;
   [[nodiscard]] bool wants_text_input() const noexcept;
   [[nodiscard]] StartupIntent handle(const stellar::native_map::InputEvent &,
                                      int width, int height,
@@ -84,6 +114,16 @@ public:
               const StartupArtworkProvider *, bool backdrop_only = false) const;
 
 private:
+  // Keyboard focus contract: Tab/arrow ring over each screen's live
+  // controls (LoadSlots rows included), Return/Space activate through the
+  // same dispatch as a pointer press at the control's center.
+  struct Focusable {
+    stellar::native_map::UiRect rect;
+    std::uint64_t cue{};
+    std::string label;
+  };
+  [[nodiscard]] std::vector<Focusable> collect_focusables(
+      const StartupLayout &, int width, int height) const;
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
@@ -92,7 +132,7 @@ private:
   stellar::native_setup_ui::NativeNewGameWorkspace setup_;
   stellar::native_startup::NativeStartupSaveSlots slots_;
   std::optional<std::size_t> selected_slot_;
-  float load_scroll_{};
+  mutable stellar::engine::VirtualizedList load_scroll_{};
   stellar::native_startup::NativeStartupView operation_;
   StartupArtworkKind busy_artwork_{StartupArtworkKind::NewGalaxyGeneration};
   std::string loading_tip_;
@@ -103,6 +143,7 @@ private:
   std::string diagnostics_;
   std::filesystem::path continue_save_;
   stellar::native_map::Point pointer_{};
+  int focus_{-1};
   bool return_to_campaign_available_{};
   const stellar::engine::LocalizationTable *locale_{};
 };

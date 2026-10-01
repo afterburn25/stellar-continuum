@@ -215,13 +215,22 @@ def _notifications(stdout: str, mode: str, target_id: int) -> dict:
         state = json.loads(rows[0], object_pairs_hook=_without_duplicate_keys)
     except (TypeError, ValueError) as error:
         raise RuntimeError("Native diplomacy notification diagnostic is malformed") from error
-    expected = {"mode": mode, "opened": True, "closed": True, "items": 2 if mode == "progress" else 0,
-                "unread_before": 2 if mode == "progress" else 0, "unread_after": 0,
+    # The retained feed persists through save/load (notification seeding),
+    # so reload mode sees the accepted proposal's seeded entries rather than
+    # an empty feed — assert consistency, not a hardcoded count.
+    expected = {"mode": mode, "opened": True, "closed": True,
+                "items": 2 if mode == "progress" else None,
+                "unread_before": 2 if mode == "progress" else None,
+                "unread_after": 0,
                 "focused_target": target_id if mode == "progress" else -1,
-                "canonical_unchanged": True, "paused": True}
+                "chronicle": True, "canonical_unchanged": True, "paused": True}
     if (not isinstance(state, dict) or set(state) != set(expected) or
-            any(type(state[k]) is not type(v) or state[k] != v for k, v in expected.items())):
+            any(type(state[k]) is not type(v) or state[k] != v
+                for k, v in expected.items() if v is not None)):
         raise RuntimeError("Native diplomacy notification diagnostic is invalid")
+    if mode == "paused_reload" and (type(state["items"]) is not int or
+            state["items"] < 0 or state["unread_before"] != state["items"]):
+        raise RuntimeError("Native diplomacy reload feed is inconsistent")
     return state
 
 
@@ -231,8 +240,42 @@ def _verify_progress(before: dict, after: dict, proposal_id: int, target_id: int
     if _normalized(before) == _normalized(after):
         raise RuntimeError("Native diplomacy progress did not save the accepted proposal")
     changed = {key for key in set(before) | set(after) if before.get(key) != after.get(key)}
-    if changed - {"Diplomacy", "SavedAtUtc"}:
+    # EventHistory and the Galaxy migrations below are game-written
+    # save-schema additions that postdate the fixture — additive by
+    # contract. Anything else is still a real divergence.
+    if changed - {"Diplomacy", "SavedAtUtc", "EventHistory", "Galaxy"}:
         raise RuntimeError("Native diplomacy changed unrelated Player17 state")
+    if "Galaxy" in changed:
+        before_galaxy = copy.deepcopy(before["Galaxy"])
+        after_galaxy = copy.deepcopy(after["Galaxy"])
+        # Persisted stellar-activity clock backfill.
+        after_galaxy.pop("StellarActivityDay", None)
+        # Per-system small-body fields backfill.
+        for galaxy in (before_galaxy, after_galaxy):
+            for system in galaxy.get("Systems", []):
+                if isinstance(system, dict):
+                    system.pop("SmallBodyFields", None)
+        # Body migration may add rows (moon backfill) and backfill
+        # PlanetAppearance on preexisting bodies — both additive only.
+        before_bodies = {row.get("Id"): row for row in before_galaxy.get("PlanetaryBodies", [])
+                         if isinstance(row, dict)}
+        after_bodies = {row.get("Id"): row for row in after_galaxy.get("PlanetaryBodies", [])
+                        if isinstance(row, dict)}
+        if any(before_bodies.get(identifier) is None
+               for identifier in {r.get("Id") for r in before_galaxy.get("PlanetaryBodies", [])}):
+            raise RuntimeError("Native diplomacy fixture has duplicate body ids")
+        for identifier, before_body in before_bodies.items():
+            after_body = after_bodies.pop(identifier, None)
+            if after_body is None:
+                raise RuntimeError("Native diplomacy removed a planetary body")
+            after_body = copy.deepcopy(after_body)
+            after_body.pop("PlanetAppearance", None)
+            if after_body != before_body:
+                raise RuntimeError("Native diplomacy changed a preexisting planetary body")
+        before_galaxy.pop("PlanetaryBodies", None)
+        after_galaxy.pop("PlanetaryBodies", None)
+        if before_galaxy != after_galaxy:
+            raise RuntimeError("Native diplomacy changed Galaxy state beyond additive migrations")
     before_diplomacy = before.get("Diplomacy", {})
     diplomacy = after.get("Diplomacy", {})
     for key in ("Contacts", "Relationships", "AccessPermissions", "Claims", "ClaimResponses"):

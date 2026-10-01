@@ -1,5 +1,6 @@
 #include "native_diplomacy_controller.hpp"
 
+#include <stellar/engine/localization.hpp>
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
 #include <stellar/core/diplomacy_simulation.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
@@ -157,6 +158,18 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
           "observer history diverged");
   require(!selected.recent_events.empty(),
           "recent pair history was lost");
+  // Blocker reasons ride the same sealed projection: a disabled action now
+  // carries a machine-readable why instead of a repurposed status string.
+  using enum stellar::core::DiplomacyActionBlocker;
+  require(selected.communication_blocker == channel_open &&
+              selected.declare_war_blocker == none &&
+              selected.offer_non_aggression_blocker == none &&
+              selected.request_access_blocker == access_granted &&
+              selected.offer_peace_blocker == not_hostile &&
+              selected.offer_ceasefire_blocker == not_hostile &&
+              selected.set_access_blocker == none &&
+              selected.negotiate_blocker == none,
+          "blocker projection diverged for a channelled contact");
 
   // Selection-independent signature: rebuilding for another index keeps the
   // same revision until the world changes.
@@ -168,6 +181,12 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
               !clamped.selected.has_visible_communication &&
               clamped.selected.political_status == "No formal relationship",
           "no-channel contact selection diverged");
+  require(clamped.selected.communication_blocker == none &&
+              clamped.selected.set_access_blocker == no_channel &&
+              clamped.selected.negotiate_blocker == no_channel &&
+              clamped.selected.offer_peace_blocker == no_channel &&
+              clamped.selected.declare_war_blocker == none,
+          "blocker projection diverged for a contact without a channel");
 
   const auto unidentified =
       controller.build(frame, 7, beta.source_index).selected;
@@ -177,6 +196,12 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
               unidentified.access_summary.find("unavailable") !=
                   std::string::npos,
           "unidentified selection leaked counterpart state");
+  // No availability row exists for an unidentified contact: every blocker
+  // stays none so the workspace falls back to the identity status text.
+  require(unidentified.communication_blocker == none &&
+              unidentified.negotiate_blocker == none &&
+              unidentified.declare_war_blocker == none,
+          "unidentified contact reported blocker detail beyond the seal");
 
   // An unchanged proposal id/status does not authorize changed terms. Even a
   // sub-display-precision relationship change invalidates the displayed quote.
@@ -270,10 +295,40 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
   require(at_war.contacts.front().status == "AtWar" &&
               at_war.selected.political_status == "AtWar",
           "war declaration did not update the projected political state");
+  require(at_war.selected.declare_war_blocker == already_at_war &&
+              at_war.selected.offer_non_aggression_blocker == already_at_war &&
+              at_war.selected.offer_peace_blocker == none &&
+              at_war.selected.offer_ceasefire_blocker == none,
+          "war-state blocker projection diverged");
   require(std::ranges::any_of(at_war.history, [](const auto &event) {
             return event.kind == "War Declared";
           }),
           "war declaration missing from observer history");
+
+  // Command results recompose through a bound locale table; unmatched and
+  // unbound messages keep the authoritative English text.
+  stellar::engine::LocalizationTable german("de", "en");
+  std::string locale_error;
+  require(german.load_json(R"json({"locale":"de","strings":{
+      "DIPLOMACY_MSG_WAR_DECLARED":"Krieg erklaert.",
+      "DIPLOMACY_ERR_ACTION":"Diese diplomatische Aktion ist derzeit nicht verfuegbar."
+    }})json",
+                          &locale_error),
+          "German diplomacy locale failed to load");
+  controller.set_localization(&german);
+  const auto war_again = controller.execute(
+      frame, 7, controller.build(frame, 7, 0).diplomacy_revision,
+      DiplomacyWorkspaceAction::declare_war, foreign->id, std::nullopt);
+  require(war_again.accepted && war_again.message == "Krieg erklaert.",
+          "German diplomacy result kept the English literal");
+  const auto missing_withdraw = controller.execute(
+      frame, 7, controller.build(frame, 7, 0).diplomacy_revision,
+      DiplomacyWorkspaceAction::withdraw_proposal, std::nullopt, 424242);
+  require(!missing_withdraw.accepted &&
+              missing_withdraw.message ==
+                  "Diese diplomatische Aktion ist derzeit nicht verfuegbar.",
+          "German withdraw denial kept the English literal");
+  controller.set_localization(nullptr);
 
   // Contact filters.
   const auto all = filter_native_diplomacy_contacts(

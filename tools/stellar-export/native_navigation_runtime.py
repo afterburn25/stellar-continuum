@@ -37,7 +37,22 @@ def navigation_proof(stdout):
     return proof
 
 
-def validate_native_navigation_export(folder: Path, env: dict[str, str]):
+def _replay_verified(stdout: str) -> dict:
+    match = re.search(r"(?:^|\s)replay_verified=(\{[^{}]*\})(?:\s|$)", stdout)
+    if not match:
+        raise RuntimeError("Native navigation replay did not report replay_verified")
+    try:
+        proof = json.loads(match.group(1))
+    except ValueError as error:
+        raise RuntimeError("Native navigation replay_verified is malformed") from error
+    if (type(proof.get("commands")) is not int or proof["commands"] <= 0 or
+            type(proof.get("checkpoints")) is not int or proof["checkpoints"] <= 0):
+        raise RuntimeError("Native navigation replay verified no commands or checkpoints")
+    return proof
+
+
+def validate_native_navigation_export(folder: Path, env: dict[str, str],
+                                      *, replay_check: bool = False):
     folder = folder.resolve()
     with tempfile.TemporaryDirectory(prefix="stellar-native-navigation-") as temporary:
         work = Path(temporary)
@@ -75,5 +90,93 @@ def validate_native_navigation_export(folder: Path, env: dict[str, str]):
             shutil.copy2(capture, evidence)
             captures.append(str(evidence))
             diagnostics.append(result.stdout.strip())
+        if not replay_check:
+            return {"nativeNavigationInput": True, "nativeNavigationPausedReload": True,
+                    "navigationCaptures": captures, "navigationDiagnostics": diagnostics}
+        # Record the same smoke on the loaded anchor, restore the anchor, then
+        # replay the journal — the recorded F6 must reproduce every save
+        # section checkpoint through the real input path.
+        journal = work / "navigation.replay"
+        anchor = save.read_bytes()
+        record = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                                 "--asset-root", str(folder),
+                                 "--save-path", str(save), "--load",
+                                 "--width", "1280", "--height", "720",
+                                 "--navigation-smoke", str(work / "recorded.bmp"),
+                                 "--record", str(journal)],
+                                cwd=work, env=clean_env, capture_output=True,
+                                text=True, timeout=90)
+        if record.returncode:
+            raise RuntimeError(f"Native navigation record failed ({record.returncode}): {record.stderr}")
+        navigation_proof(record.stdout)
+        recorded = re.search(r"(?:^|\s)replay=(\{[^{}]*\})(?:\s|$)", record.stdout)
+        if not recorded:
+            raise RuntimeError("Native navigation record did not report its journal")
+        recorded = json.loads(recorded.group(1))
+        # The recorded F6 rewrote the anchor's atomic sidecars — restore the
+        # pre-run primary and clear them so replay loads the recorded start.
+        save.write_bytes(anchor)
+        for sidecar in save.parent.glob(save.name + ".*"):
+            sidecar.unlink()
+        replay = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                                 "--asset-root", str(folder),
+                                 "--save-path", str(save), "--load",
+                                 "--width", "1280", "--height", "720",
+                                 "--replay", str(journal), "--replay-exit"],
+                                cwd=work, env=clean_env, capture_output=True,
+                                text=True, timeout=90)
+        if replay.returncode:
+            raise RuntimeError(f"Native navigation replay failed ({replay.returncode}): {replay.stderr}")
+        verified = _replay_verified(replay.stdout)
+        if (verified["commands"] != recorded.get("commands") or
+                verified["checkpoints"] != recorded.get("checkpoints")):
+            raise RuntimeError(
+                "Native navigation replay verified a different journal than recorded")
+        # --replay-info re-verifies each retained expected sidecar against the
+        # journaled section hashes — a stale capture poisons later leaf-diffs.
+        info = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                               "--asset-root", str(folder),
+                               "--replay-info", str(journal)],
+                              cwd=work, env=clean_env, capture_output=True,
+                              text=True, timeout=90)
+        if info.returncode:
+            raise RuntimeError(f"Native navigation replay-info failed ({info.returncode}): {info.stderr}")
+        inventory = re.search(r"replay_info=(\{[^\n]+\})\s*$", info.stdout, re.MULTILINE)
+        if not inventory:
+            raise RuntimeError("Native navigation replay-info did not report its inventory")
+        inventory = json.loads(inventory.group(1))
+        if (inventory.get("commands") != recorded.get("commands") or
+                not inventory.get("commands_ordered") or
+                not inventory.get("checkpoints_ordered") or
+                inventory.get("pointer_out_of_bounds") != 0 or
+                inventory.get("unverified_tail_commands") != 0):
+            raise RuntimeError("Native navigation replay-info reported an unsound journal")
+        checkpoints = inventory.get("checkpoints")
+        if (not isinstance(checkpoints, list) or not checkpoints or
+                any(not row.get("expected_document") or not row.get("expected_verified")
+                    for row in checkpoints)):
+            raise RuntimeError("Native navigation replay-info found a stale expected sidecar")
+        # --replay-until dumps the canonical doc at the first checkpoint tick
+        # and leaf-diffs it against the retained expected sidecar — the
+        # bisect tool's match path must produce an identical document.
+        stop_tick = checkpoints[0].get("tick")
+        if type(stop_tick) is not int:
+            raise RuntimeError("Native navigation replay-info did not report checkpoint ticks")
+        until = subprocess.run([str(folder / "stellar-continuum-native.exe"),
+                                "--asset-root", str(folder),
+                                "--save-path", str(save), "--load",
+                                "--width", "1280", "--height", "720",
+                                "--replay", str(journal),
+                                "--replay-until", str(stop_tick)],
+                               cwd=work, env=clean_env, capture_output=True,
+                               text=True, timeout=90)
+        if until.returncode:
+            raise RuntimeError(f"Native navigation replay-until failed ({until.returncode}): {until.stderr}")
+        if "matches expected sidecar" not in until.stdout:
+            raise RuntimeError("Native navigation replay-until did not match the expected sidecar")
         return {"nativeNavigationInput": True, "nativeNavigationPausedReload": True,
+                "nativeNavigationReplayVerified": True,
+                "nativeNavigationReplay": verified,
+                "nativeNavigationReplayInfoVerified": True,
+                "nativeNavigationReplayUntilVerified": True,
                 "navigationCaptures": captures, "navigationDiagnostics": diagnostics}

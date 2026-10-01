@@ -1,4 +1,5 @@
 #include "native_colony_controller.hpp"
+#include "native_data_names.hpp"
 #include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/adaptive_research_authority.hpp>
@@ -6,15 +7,18 @@
 #include <stellar/core/adaptive_research_expertise.hpp>
 #include <stellar/core/freight.hpp>
 #include <stellar/core/surface_construction.hpp>
+#include <stellar/engine/localization.hpp>
 
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
 #include <locale>
 #include <ranges>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_set>
+#include <vector>
 
 namespace stellar::native_colony {
 namespace {
@@ -33,6 +37,8 @@ struct Context {
   CivilizationEconomy &economy;
   ConstructionReadView construction;
 };
+
+
 
 Context context(CampaignFrame &frame) {
   auto &runtime = frame.runtime();
@@ -211,6 +217,13 @@ std::string signature(const NativeColonyView &view) {
 
 } // namespace
 
+std::string NativeColonyController::tr(std::string_view key,
+                                       std::string_view fallback) const {
+  if (locale_ && locale_->contains(key))
+    return std::string(locale_->translate(key));
+  return std::string(fallback);
+}
+
 void NativeColonyController::require_owner() const {
   if (std::this_thread::get_id() != owner_)
     throw std::logic_error(
@@ -245,11 +258,11 @@ NativeColonyViewResult NativeColonyController::build(
       system.observer_civilization_id != current.player.id ||
       observation_survey_level(current.world, current.player.id, system.system_id) <
           SystemSurveyLevel::partially_surveyed)
-    return {{}, "The campaign changed; refresh the known system first."};
+    return {{}, tr("COLONY_MSG_CAMPAIGN", "The campaign changed; refresh the known system first.")};
   const auto shown_body = std::ranges::find(system.bodies, selected_body_id,
                                              &native_system::NativeSystemBody::id);
   if (shown_body == system.bodies.end())
-    return {{}, "Select a known body before opening its settlement."};
+    return {{}, tr("COLONY_MSG_SELECT_BODY", "Select a known body before opening its settlement.")};
   const auto colony = std::ranges::find_if(
       current.world.colonies, [&](const Colony &candidate) {
         return can_inspect_settlement(current.world, current.player.id, candidate) &&
@@ -257,14 +270,14 @@ NativeColonyViewResult NativeColonyController::build(
                candidate.planetary_body_id == selected_body_id;
       });
   if (colony == current.world.colonies.end())
-    return {{}, "The selected known body has no owned settlement."};
+    return {{}, tr("COLONY_MSG_NO_SETTLEMENT", "The selected known body has no owned settlement.")};
 
   const auto *owner = find_one(current.world.civilizations, colony->civilization_id,
                                 &Civilization::id);
   const auto *economy = find_one(current.world.economies, colony->civilization_id,
                                   &CivilizationEconomy::civilization_id);
   if (!owner || !economy)
-    return {{}, "The settlement owner or economy is unavailable."};
+    return {{}, tr("COLONY_MSG_OWNER_UNAVAILABLE", "The settlement owner or economy is unavailable.")};
 
   const auto output = surface_colony_output(*colony);
   const auto specialization = surface_colony_specialization(*colony);
@@ -312,7 +325,10 @@ NativeColonyViewResult NativeColonyController::build(
   view.colony_name = colony->name;
   view.body_display_name = shown_body->name;
   view.population_species_id = colony->population_species_id;
-  view.population_species_name = species_environment_profile(colony->population_species_id).display_name;
+  view.population_species_name =
+      stellar::native_data::species_display_name(
+          locale_, colony->population_species_id,
+          species_environment_profile(colony->population_species_id).display_name);
   view.resource_outpost = colony->kind == SettlementKind::ResourceOutpost;
   if (system.system_id == owner->home_system_id) {
     // Use the same Core body resolution as campaign seeding, never display names.
@@ -391,8 +407,34 @@ NativeColonyViewResult NativeColonyController::build(
   }
   view.cargo_transfer_capacity_per_day =
       FreightSimulation::port_transfer_capacity_per_day(*colony);
-  view.specialization_name = specialization.name;
-  view.specialization_description = specialization.description;
+  view.specialization_name = stellar::native_data::data_name(
+      locale_, stellar::native_data::key_of("DATA_SPEC_", specialization.id),
+      specialization.name);
+  {
+    const auto fmt = [&](std::string_view key,
+                         std::initializer_list<std::string> args) {
+      if (locale_ && locale_->contains(key)) {
+        const std::vector<std::string> values(args.begin(), args.end());
+        return locale_->format(key, std::span<const std::string>(values));
+      }
+      return specialization.description;
+    };
+    if (specialization.id == "general")
+      view.specialization_description =
+          tr("DATA_SPEC_GENERAL_DESC", specialization.description);
+    else if (specialization.active)
+      view.specialization_description = fmt(
+          "DATA_SPEC_DESC_ACTIVE",
+          {stellar::native_data::data_name(
+              locale_,
+              stellar::native_data::key_of("DATA_SPEC_OUT_",
+                                           specialization.id),
+              specialization.id)});
+    else
+      view.specialization_description = fmt(
+          "DATA_SPEC_DESC_DEVELOPING",
+          {std::to_string(specialization.completed_complexes)});
+  }
   view.specialization_complexes = specialization.completed_complexes;
   view.specialization_active = specialization.active;
   view.has_confirmed_deposit = outpost.has_confirmed_deposit;
@@ -439,7 +481,9 @@ NativeColonyViewResult NativeColonyController::build(
       hub_upgrade ? hub_upgrade->credit_cost : 0.;
   view.hub_upgrade_industry_cost =
       hub_upgrade ? hub_upgrade->industry_cost : 0.;
-  view.hub_upgrade_lock_reason = hub_lock.value_or("");
+  view.hub_upgrade_lock_reason =
+      hub_lock ? stellar::native_data::surface_lock_reason(locale_, *hub_lock)
+               : "";
   view.can_afford_hub_upgrade =
       view.hub_upgrade_available && !hub_lock &&
       economy->credits + .0001 >= hub_upgrade->credit_cost &&
@@ -463,7 +507,8 @@ NativeColonyViewResult NativeColonyController::build(
     view.construction_sites.push_back(
         {.building_id = building.id,
          .type_id = building.type_id,
-         .name = definition->name,
+         .name = stellar::native_data::surface_building_name(locale_,
+                                                            *definition),
          .x = building.x,
          .z = building.z,
          .rotation_degrees = building.rotation_degrees,
@@ -484,21 +529,32 @@ NativeColonyViewResult NativeColonyController::build(
                            ? 0.
                            : .5 + .5 * building.condition,
          .stored_power_days = building.stored_power_days,
-         .construction_stage = stage.name,
+         .construction_stage =
+             stellar::native_data::data_name(
+                 locale_,
+                 stellar::native_data::key_of("DATA_STAGE_", stage.id),
+                 stage.name),
          .construction_stage_progress = stage.phase_progress,
          .remaining_construction_materials = stage.remaining_materials,
          .pending_upgrade_type_id = building.pending_upgrade_type_id,
          .upgrade_days_remaining = building.upgrade_days_remaining,
          .can_upgrade = building.is_complete && upgrade &&
                         !building.pending_upgrade_type_id,
-         .upgrade_name = upgrade ? upgrade->name : "",
+         .upgrade_name = upgrade
+                             ? stellar::native_data::surface_building_name(
+                                   locale_, *upgrade)
+                             : "",
          .upgrade_credit_budget_units = upgrade_authorization,
          .upgrade_industry_cost = definition->upgrade_industry_cost,
          .can_afford_upgrade = building.is_complete && upgrade &&
              economy->credits + .0001 >= upgrade_authorization &&
              economy->industry + .0001 >=
                  definition->upgrade_industry_cost,
-         .upgrade_lock_reason = upgrade_lock.value_or(""),
+         .upgrade_lock_reason =
+             upgrade_lock
+                 ? stellar::native_data::surface_lock_reason(locale_,
+                                                             *upgrade_lock)
+                 : "",
          .repair_industry_cost = repair_cost,
          .can_afford_repair = repair_cost > 0. &&
              economy->industry + .0001 >= repair_cost,
@@ -513,8 +569,11 @@ NativeColonyViewResult NativeColonyController::build(
         surface_authorization_cost(current.construction, *colony, definition);
     view.available_buildings.push_back(
         {.type_id = definition.id,
-         .name = definition.name,
-         .description = definition.description,
+         .name = stellar::native_data::surface_building_name(locale_,
+                                                           definition),
+         .description =
+             stellar::native_data::surface_building_description(locale_,
+                                                                definition),
          .industry_cost = definition.industry_cost,
          .authorization_budget_units = authorization,
          .formatted_authorization = view.currency.format(authorization),

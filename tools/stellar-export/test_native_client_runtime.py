@@ -247,6 +247,24 @@ class NativeClientDependencyTests(unittest.TestCase):
         (self.root / "export/native-environment-assets.json").write_text(
             json.dumps({"schemaVersion": 1, "files": environment_records}))
 
+        # Moon package: one reviewed moon entry exercises the audit-driven
+        # expectation and manifest hash verification.
+        moon_audit = {"images": [{"id": "sol-fixture", "status": "accepted"}]}
+        (self.root / "data/planets/moon-asset-audit-v1.json").write_text(
+            json.dumps(moon_audit))
+        moon_records = []
+        for name in ("albedo", "normal", "properties"):
+            relative = f"assets/visual/moons/sol-fixture/{name}.png"
+            asset = fixture_asset(relative, "moon map " + name)
+            moon_records.append({"path": relative,
+                                 "sha256": hashlib.sha256(asset.read_bytes()).hexdigest()})
+        (self.root / "export/native-moon-assets.json").write_text(
+            json.dumps({"schemaVersion": 1, "files": moon_records}))
+
+        # Locale catalogs ship as Data/locale/<id>.json in the package.
+        (self.root / "data/locale").mkdir(parents=True, exist_ok=True)
+        (self.root / "data/locale/en.json").write_text("{}")
+
         # Stellar artwork manifest, population registry and the 204-entry
         # eruption sequence registry (empty texture lists need no files).
         stellar_dir = self.root / "assets/visual/stellar"

@@ -82,6 +82,55 @@ inline std::shared_ptr<const Mesh3D> annulus_mesh(float inner,float outer,int se
   return Mesh3D::create(std::move(vertices),std::move(indices));
 }
 
+// Flared annulus: two mirrored sheets curving off the midplane like a
+// trumpet bell — height h(r)=flare·(r/outer)^exponent — so the outer rim
+// silhouettes above and below the inner gap the way optically thick
+// young-star discs and slim accretion flows do. U stays radial [0,1]
+// inner→outer and V azimuthal [0,1], matching annulus_mesh, so the
+// accretion material's radial gradient, spiral bake, shear and doppler
+// terms read identically; a double-sided material also silhouettes the
+// far rim through the gap. `flare` is the rim height in mesh units;
+// `radial` subdivides the flare profile, `azimuthal` the ring.
+inline std::shared_ptr<const Mesh3D> flared_annulus_mesh(
+    float inner,float outer,float flare,float exponent=2.f,
+    int azimuthal=192,int radial=8){
+  if(!std::isfinite(inner)||!std::isfinite(outer)||inner<=0||outer<=inner||
+     !std::isfinite(flare)||flare<=0||flare>outer||
+     !std::isfinite(exponent)||exponent<.25f||exponent>8.f||
+     azimuthal<8||azimuthal>4096||radial<1||radial>256)
+    throw std::invalid_argument("Invalid flared annulus geometry");
+  std::vector<Vertex3D> vertices;std::vector<std::uint32_t> indices;
+  const int cols=azimuthal+1;
+  vertices.reserve(2ull*(radial+1)*cols);
+  indices.reserve(2ull*radial*azimuthal*6);
+  for(int sheet=0;sheet<2;++sheet){
+    const float s=sheet?-1.f:1.f;
+    const auto base=static_cast<std::uint32_t>(vertices.size());
+    for(int i=0;i<=radial;++i){
+      const float t=static_cast<float>(i)/static_cast<float>(radial);
+      const float r=inner+(outer-inner)*t;
+      const float h=flare*std::pow(r/outer,exponent);
+      const float dh=flare*exponent*std::pow(r/outer,exponent-1.f)/outer;
+      const float inv=1.f/std::sqrt(1.f+dh*dh);
+      for(int j=0;j<cols;++j){
+        const float angle=static_cast<float>(j)*2.f*std::numbers::pi_v<float>/static_cast<float>(azimuthal);
+        const float c=std::cos(angle),sn=std::sin(angle);
+        vertices.push_back({{r*c,s*h,r*sn},{-dh*c*inv,s*inv,-dh*sn*inv},
+            {t,static_cast<float>(j)/static_cast<float>(azimuthal)}});
+      }
+    }
+    for(int i=0;i<radial;++i)for(int j=0;j<azimuthal;++j){
+      const auto a=base+static_cast<std::uint32_t>(i*cols+j),b=a+1,
+                 c=a+static_cast<std::uint32_t>(cols),d=c+1;
+      // Same grid winding as the flat annulus on top; the lower sheet
+      // reverses so both faces point away from the midplane.
+      if(sheet==0)indices.insert(indices.end(),{a,b,c, c,b,d});
+      else        indices.insert(indices.end(),{a,c,b, c,d,b});
+    }
+  }
+  return Mesh3D::create(std::move(vertices),std::move(indices));
+}
+
 // Convex counter-clockwise XY profile, extruded along Z. Flat face normals
 // keep hard hull edges; top UVs address a nose-right unit-square texture.
 inline std::shared_ptr<const Mesh3D> extruded_convex_mesh(
@@ -166,6 +215,9 @@ inline std::optional<MeshSegmentHit3D> intersect_mesh_segment(
     const Mesh3D& mesh,stellar::engine::CollisionVector3 from,stellar::engine::CollisionVector3 to) {
   using namespace stellar::engine;
   if(!segment_sphere(from,to,{},mesh.bounding_radius()))return {};
+  // The local AABB culls elongated meshes the sphere admits.
+  {const auto mn=mesh.bounds_min(),mx=mesh.bounds_max();
+   if(!segment_aabb(from,to,{mn.x,mn.y,mn.z},{mx.x,mx.y,mx.z}))return {};}
   std::optional<MeshSegmentHit3D> closest;
   const auto& indices=mesh.indices();const auto& vertices=mesh.vertices();
   const auto vertex=[&](std::uint32_t i){const auto p=vertices[i].position;return CollisionVector3{p.x,p.y,p.z};};

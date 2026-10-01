@@ -10,21 +10,53 @@
 #include <fstream>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
+#include <utility>
 
 namespace stellar::engine {
 namespace {
 
-template <class T> std::vector<std::uint8_t> encode_pod(const T &v) {
-  std::vector<std::uint8_t> bytes(sizeof(T));
-  std::memcpy(bytes.data(), &v, sizeof(T));
+// Snapshots must be byte-deterministic — memcpy'ing an object with
+// padding (or an empty marker struct) leaks uninitialized bytes into
+// snapshots and replay checkpoint hashes. encode_fields serializes each
+// listed member instead of the object representation: the sizeof check
+// statically requires the member list to cover the whole struct, so a
+// new member trips it until added to the codec and padding can never
+// reach the output. For the current padding-free layouts the byte
+// stream is identical to a whole-struct memcpy.
+template <class T, auto M>
+using member_t = std::remove_cvref_t<decltype(std::declval<T &>().*M)>;
+
+template <class T, auto... M>
+std::vector<std::uint8_t> encode_fields(const T &v) {
+  static_assert(sizeof...(M) > 0,
+                "encode_fields cannot serialize empty markers — use a "
+                "fixed-byte codec");
+  static_assert(sizeof(T) == (sizeof(member_t<T, M>) + ...),
+                "encode_fields must list every member in order; an "
+                "omitted member or layout padding trips this check");
+  std::vector<std::uint8_t> bytes;
+  bytes.reserve(sizeof(T));
+  const auto put = [&bytes](const auto &f) {
+    const auto *p = reinterpret_cast<const std::uint8_t *>(&f);
+    bytes.insert(bytes.end(), p, p + sizeof(f));
+  };
+  (put(v.*M), ...);
   return bytes;
 }
 
-template <class T> T decode_pod(const std::vector<std::uint8_t> &b) {
+template <class T, auto... M>
+T decode_fields(const std::vector<std::uint8_t> &b) {
   T v{};
-  if (b.size() == sizeof(T)) std::memcpy(&v, b.data(), sizeof(T));
+  if (b.size() != sizeof(T)) return v;
+  std::size_t at = 0;
+  const auto get = [&b, &at](auto &f) {
+    std::memcpy(&f, b.data() + at, sizeof(f));
+    at += sizeof(f);
+  };
+  (get(v.*M), ...);
   return v;
 }
 
@@ -188,23 +220,30 @@ Anim decode_anim(const std::vector<std::uint8_t> &b) {
 } // namespace
 
 void register_scene_components(World &world) {
-  world.register_component<Transform2D>("transform", encode_pod<Transform2D>,
-                                        decode_pod<Transform2D>);
-  world.register_component<Velocity2D>("velocity", encode_pod<Velocity2D>,
-                                       decode_pod<Velocity2D>);
-  world.register_component<Extent2D>("extent", encode_pod<Extent2D>,
-                                     decode_pod<Extent2D>);
-  world.register_component<Tint>("tint", encode_pod<Tint>, decode_pod<Tint>);
+  world.register_component<Transform2D>(
+      "transform", encode_fields<Transform2D, &Transform2D::x, &Transform2D::y>,
+      decode_fields<Transform2D, &Transform2D::x, &Transform2D::y>);
+  world.register_component<Velocity2D>(
+      "velocity",
+      encode_fields<Velocity2D, &Velocity2D::dx, &Velocity2D::dy>,
+      decode_fields<Velocity2D, &Velocity2D::dx, &Velocity2D::dy>);
+  world.register_component<Extent2D>(
+      "extent", encode_fields<Extent2D, &Extent2D::w, &Extent2D::h>,
+      decode_fields<Extent2D, &Extent2D::w, &Extent2D::h>);
+  world.register_component<Tint>(
+      "tint", encode_fields<Tint, &Tint::r, &Tint::g, &Tint::b>,
+      decode_fields<Tint, &Tint::r, &Tint::g, &Tint::b>);
   world.register_component<EntityName>("name", encode_name, decode_name);
   world.register_component<SpriteRef>("sprite", encode_sprite, decode_sprite);
-  world.register_component<Layer>("layer", encode_pod<Layer>,
-                                  decode_pod<Layer>);
-  world.register_component<Parallax>("parallax", encode_pod<Parallax>,
-                                     decode_pod<Parallax>);
+  world.register_component<Layer>("layer", encode_fields<Layer, &Layer::value>,
+                                  decode_fields<Layer, &Layer::value>);
+  world.register_component<Parallax>(
+      "parallax", encode_fields<Parallax, &Parallax::value>,
+      decode_fields<Parallax, &Parallax::value>);
   world.register_component<Label>("label", encode_label, decode_label);
-  world.register_component<GravityScale>("gravityScale",
-                                         encode_pod<GravityScale>,
-                                         decode_pod<GravityScale>);
+  world.register_component<GravityScale>(
+      "gravityScale", encode_fields<GravityScale, &GravityScale::value>,
+      decode_fields<GravityScale, &GravityScale::value>);
   world.register_component<Solid>("solid",
                                   [](const Solid &) {
                                     return std::vector<std::uint8_t>{1};
@@ -213,24 +252,38 @@ void register_scene_components(World &world) {
                                     return Solid{};
                                   });
   world.register_component<Anim>("anim", encode_anim, decode_anim);
-  world.register_component<Rotation>("rotation", encode_pod<Rotation>,
-                                     decode_pod<Rotation>);
-  world.register_component<Spin>("spin", encode_pod<Spin>,
-                                 decode_pod<Spin>);
-  world.register_component<Lifetime>("lifetime", encode_pod<Lifetime>,
-                                     decode_pod<Lifetime>);
-  world.register_component<Flip>("flip", encode_pod<Flip>,
-                                 decode_pod<Flip>);
-  world.register_component<Hidden>("hidden", encode_pod<Hidden>,
-                                   decode_pod<Hidden>);
-  world.register_component<Oneway>("oneway", encode_pod<Oneway>,
-                                   decode_pod<Oneway>);
-  world.register_component<NoBounce>("nobounce", encode_pod<NoBounce>,
-                                     decode_pod<NoBounce>);
+  world.register_component<Rotation>(
+      "rotation", encode_fields<Rotation, &Rotation::value>,
+      decode_fields<Rotation, &Rotation::value>);
+  world.register_component<Spin>("spin", encode_fields<Spin, &Spin::value>,
+                                 decode_fields<Spin, &Spin::value>);
+  world.register_component<Lifetime>(
+      "lifetime", encode_fields<Lifetime, &Lifetime::remaining>,
+      decode_fields<Lifetime, &Lifetime::remaining>);
+  world.register_component<Flip>("flip",
+                                 encode_fields<Flip, &Flip::x, &Flip::y>,
+                                 decode_fields<Flip, &Flip::x, &Flip::y>);
+  // Marker components carry no data — encode_fields cannot serialize an
+  // empty struct (it would emit zero bytes, indistinguishable from a
+  // truncated payload). Emit a fixed byte like Solid/DoubleSided;
+  // decode ignores the payload so existing saves still load.
+  const auto encode_marker = [](const auto &) {
+    return std::vector<std::uint8_t>{1};
+  };
+  world.register_component<Hidden>(
+      "hidden", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return Hidden{}; });
+  world.register_component<Oneway>(
+      "oneway", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return Oneway{}; });
+  world.register_component<NoBounce>(
+      "nobounce", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return NoBounce{}; });
   world.register_component<UserData>("userdata", encode_user_data,
                                      decode_user_data);
-  world.register_component<Opacity>("opacity", encode_pod<Opacity>,
-                                    decode_pod<Opacity>);
+  world.register_component<Opacity>(
+      "opacity", encode_fields<Opacity, &Opacity::value>,
+      decode_fields<Opacity, &Opacity::value>);
   world.register_component<Tilemap>("tilemap", encode_tilemap,
                                     decode_tilemap);
   world.register_component<Parent>("parent", encode_parent, decode_parent);
@@ -242,15 +295,58 @@ void register_scene_components(World &world) {
       [](const std::vector<std::uint8_t> &b) {
         return VfxRef{{b.begin(), b.end()}};
       });
-  world.register_component<Camera3DState>("camera3d",
-                                          encode_pod<Camera3DState>,
-                                          decode_pod<Camera3DState>);
-  world.register_component<Transform3D>("transform3",
-                                        encode_pod<Transform3D>,
-                                        decode_pod<Transform3D>);
-  world.register_component<Velocity3D>("velocity3",
-                                       encode_pod<Velocity3D>,
-                                       decode_pod<Velocity3D>);
+  // AnimTimeline codec: NUL-terminated clip id, then the playhead time and
+  // playing flag into saved_* scratch — the timeline re-attaches by id on
+  // restore. A still-detached component re-encodes its scratch verbatim.
+  world.register_component<AnimTimeline>(
+      "animtimeline",
+      [](const AnimTimeline &a) {
+        std::vector<std::uint8_t> out{a.id.begin(), a.id.end()};
+        out.push_back(0);
+        const float time =
+            a.player.timeline() != nullptr ? a.player.time() : a.saved_time;
+        const bool playing = a.player.timeline() != nullptr
+                                 ? !a.player.paused()
+                                 : a.saved_playing;
+        put_f32(out, time);
+        out.push_back(playing ? 1 : 0);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        AnimTimeline a;
+        const auto nul = std::find(b.begin(), b.end(), std::uint8_t{0});
+        a.id.assign(b.begin(), nul);
+        std::size_t at = static_cast<std::size_t>(nul - b.begin()) + 1;
+        if (at + 4 <= b.size()) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&a.saved_time, &bits, 4);
+        }
+        if (at < b.size())
+          a.saved_playing = b[at] != 0;
+        return a;
+      });
+  world.register_component<Camera3DState>(
+      "camera3d",
+      encode_fields<Camera3DState, &Camera3DState::x, &Camera3DState::y,
+                    &Camera3DState::z, &Camera3DState::yaw_deg,
+                    &Camera3DState::pitch_deg, &Camera3DState::fov_deg>,
+      decode_fields<Camera3DState, &Camera3DState::x, &Camera3DState::y,
+                    &Camera3DState::z, &Camera3DState::yaw_deg,
+                    &Camera3DState::pitch_deg, &Camera3DState::fov_deg>);
+  world.register_component<Transform3D>(
+      "transform3",
+      encode_fields<Transform3D, &Transform3D::x, &Transform3D::y,
+                    &Transform3D::z, &Transform3D::qx, &Transform3D::qy,
+                    &Transform3D::qz, &Transform3D::qw, &Transform3D::scale>,
+      decode_fields<Transform3D, &Transform3D::x, &Transform3D::y,
+                    &Transform3D::z, &Transform3D::qx, &Transform3D::qy,
+                    &Transform3D::qz, &Transform3D::qw, &Transform3D::scale>);
+  world.register_component<Velocity3D>(
+      "velocity3",
+      encode_fields<Velocity3D, &Velocity3D::dx, &Velocity3D::dy,
+                    &Velocity3D::dz>,
+      decode_fields<Velocity3D, &Velocity3D::dx, &Velocity3D::dy,
+                    &Velocity3D::dz>);
   world.register_component<MeshRef>(
       "meshref",
       [](const MeshRef &m) {
@@ -308,6 +404,357 @@ void register_scene_components(World &world) {
       "doublesided",
       [](const DoubleSided &) { return std::vector<std::uint8_t>{1}; },
       [](const std::vector<std::uint8_t> &) { return DoubleSided{}; });
+  // Scalars first (fixed-size head), then the three map paths as
+  // length-prefixed strings — decode tolerates a truncated tail.
+  world.register_component<MaterialPbr>(
+      "materialpbr",
+      [](const MaterialPbr &m) {
+        std::vector<std::uint8_t> out;
+        for (const float f :
+             {m.metallic, m.roughness, m.emissive_strength,
+              m.night_emissive, m.environment_strength, m.emissive_r,
+              m.emissive_g, m.emissive_b, m.alpha_cutout, m.uv_tile_x,
+              m.uv_tile_y})
+          put_f32(out, f);
+        for (const std::string *s :
+             {&m.metallic_roughness, &m.emissive, &m.environment}) {
+          put_u32(out, static_cast<std::uint32_t>(s->size()));
+          out.insert(out.end(), s->begin(), s->end());
+        }
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MaterialPbr m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        m.metallic = f();
+        m.roughness = f();
+        m.emissive_strength = f();
+        m.night_emissive = f();
+        m.environment_strength = f();
+        m.emissive_r = f();
+        m.emissive_g = f();
+        m.emissive_b = f();
+        m.alpha_cutout = f();
+        m.uv_tile_x = f();
+        m.uv_tile_y = f();
+        for (std::string *s :
+             {&m.metallic_roughness, &m.emissive, &m.environment}) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          s->assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        }
+        return m;
+      });
+  // Same layout convention as MaterialPbr: fixed-size float head, then
+  // length-prefixed map paths — decode tolerates a truncated tail.
+  world.register_component<MaterialSurface>(
+      "materialsurface",
+      [](const MaterialSurface &m) {
+        std::vector<std::uint8_t> out;
+        for (const float f :
+             {m.normal_strength, m.relief, m.cloud_opacity, m.cloud_albedo,
+              m.cloud_offset_x, m.cloud_offset_y, m.terminator_wrap,
+              m.limb_darkening, m.band_shear, m.orbital_beaming,
+              m.forward_scatter, m.band_waves})
+          put_f32(out, f);
+        for (const std::string *s :
+             {&m.normal_map, &m.properties_map, &m.cloud_map}) {
+          put_u32(out, static_cast<std::uint32_t>(s->size()));
+          out.insert(out.end(), s->begin(), s->end());
+        }
+        // cloud_height/band_drift tail the payload so pre-field saves
+        // still decode (a mid-list float would eat the first string's
+        // length prefix).
+        put_f32(out, m.cloud_height);
+        put_f32(out, m.band_drift);
+        put_f32(out, m.band_turbulence);
+        put_f32(out, m.limb_darkening_q);
+        put_f32(out, m.band_diff);
+        put_f32(out, m.forward_scatter_back);
+        put_f32(out, m.forward_scatter_back_mix);
+        put_f32(out, m.limb_darkening_mid);
+        put_f32(out, m.orbital_beaming_tint);
+        put_f32(out, m.forward_scatter_hue);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MaterialSurface m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        m.normal_strength = f();
+        m.relief = f();
+        m.cloud_opacity = f();
+        m.cloud_albedo = f();
+        m.cloud_offset_x = f();
+        m.cloud_offset_y = f();
+        m.terminator_wrap = f();
+        m.limb_darkening = f();
+        m.band_shear = f();
+        m.orbital_beaming = f();
+        m.forward_scatter = f();
+        m.band_waves = f();
+        for (std::string *s :
+             {&m.normal_map, &m.properties_map, &m.cloud_map}) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          s->assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        }
+        if (b.size() - at >= 4) m.cloud_height = f();
+        if (b.size() - at >= 4) m.band_drift = f();
+        if (b.size() - at >= 4) m.band_turbulence = f();
+        if (b.size() - at >= 4) m.limb_darkening_q = f();
+        if (b.size() - at >= 4) m.band_diff = f();
+        if (b.size() - at >= 4) m.forward_scatter_back = f();
+        if (b.size() - at >= 4) m.forward_scatter_back_mix = f();
+        if (b.size() - at >= 4) m.limb_darkening_mid = f();
+        if (b.size() - at >= 4) m.orbital_beaming_tint = f();
+        if (b.size() - at >= 4) m.forward_scatter_hue = f();
+        return m;
+      });
+  world.register_component<AtmosphereShell>(
+      "atmosphere",
+      encode_fields<AtmosphereShell, &AtmosphereShell::r,
+                    &AtmosphereShell::g, &AtmosphereShell::b,
+                    &AtmosphereShell::strength, &AtmosphereShell::power,
+                    &AtmosphereShell::night_floor,
+                    &AtmosphereShell::sunset_r, &AtmosphereShell::sunset_g,
+                    &AtmosphereShell::sunset_b,
+                    &AtmosphereShell::sunset_strength>,
+      [](const std::vector<std::uint8_t> &b) {
+        // The sunset tint tails the six base floats so legacy payloads
+        // keep their authored rim instead of resetting to defaults.
+        AtmosphereShell m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        if (b.size() >= 24) {
+          m.r = f(); m.g = f(); m.b = f();
+          m.strength = f(); m.power = f(); m.night_floor = f();
+        }
+        if (b.size() - at >= 16) {
+          m.sunset_r = f(); m.sunset_g = f(); m.sunset_b = f();
+          m.sunset_strength = f();
+        }
+        return m;
+      });
+  // f32 range + f32 fade — decode tolerates the legacy 4-byte payload so
+  // older saves keep their authored range and the hard cut they had.
+  world.register_component<VisibleRange>(
+      "visiblerange",
+      [](const VisibleRange &v) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, v.range);
+        put_f32(out, v.fade);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        VisibleRange v;
+        std::size_t at = 0;
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.range, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.fade, &bits, 4);
+        }
+        return v;
+      });
+  world.register_component<StarPhotosphere>(
+      "starphotosphere",
+      encode_fields<StarPhotosphere, &StarPhotosphere::kelvin>,
+      decode_fields<StarPhotosphere, &StarPhotosphere::kelvin>);
+  // f32 inner/outer/kelvin/beaming + appended f32 spiral/arms/turns —
+  // decode tolerates the legacy 16-byte payload so older saves keep the
+  // uniform-disc defaults they had.
+  world.register_component<AccretionDisc>(
+      "accretiondisc",
+      [](const AccretionDisc &m) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, m.inner);
+        put_f32(out, m.outer);
+        put_f32(out, m.kelvin);
+        put_f32(out, m.beaming);
+        put_f32(out, m.spiral);
+        put_f32(out, m.spiral_arms);
+        put_f32(out, m.spiral_turns);
+        put_f32(out, m.shear_rate);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        AccretionDisc m;
+        std::size_t at = 0;
+        const auto f = [&b, &at] {
+          float v = 0.f;
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v, &bits, 4);
+          return v;
+        };
+        if (b.size() < 16) return m;
+        m.inner = f();
+        m.outer = f();
+        m.kelvin = f();
+        m.beaming = f();
+        if (b.size() - at >= 4) m.spiral = f();
+        if (b.size() - at >= 4) m.spiral_arms = f();
+        if (b.size() - at >= 4) m.spiral_turns = f();
+        if (b.size() - at >= 4) m.shear_rate = f();
+        return m;
+      });
+  // f32 depth/density/seed/scatter + i32 steps + f32 flow/distort —
+  // decode tolerates the legacy 20-byte payload so older saves keep
+  // their authored volume with the zero-warp defaults they had.
+  world.register_component<EmissionVolume>(
+      "emissionvolume",
+      [](const EmissionVolume &v) {
+        std::vector<std::uint8_t> out;
+        put_f32(out, v.depth);
+        put_f32(out, v.density);
+        put_f32(out, v.seed);
+        put_f32(out, v.scatter);
+        put_u32(out, static_cast<std::uint32_t>(v.steps));
+        put_f32(out, v.flow);
+        put_f32(out, v.distort);
+        put_f32(out, v.blend);
+        put_u32(out, static_cast<std::uint32_t>(v.image2.size()));
+        out.insert(out.end(), v.image2.begin(), v.image2.end());
+        put_f32(out, v.occlude);
+        put_f32(out, v.flow_rate);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        EmissionVolume v;
+        std::size_t at = 0;
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.depth, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.density, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.seed, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.scatter, &bits, 4);
+        }
+        if (b.size() - at >= 4)
+          v.steps = static_cast<int>(get_u32(b, at));
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.flow, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.distort, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.blend, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len <= b.size() - at) {
+            v.image2.assign(reinterpret_cast<const char *>(b.data() + at),
+                            len);
+            at += len;
+          }
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.occlude, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&v.flow_rate, &bits, 4);
+        }
+        return v;
+      });
+  // u32 count + length-prefixed spec strings + f32 switch size — decode
+  // tolerates a truncated tail like MaterialSurface.
+  world.register_component<MeshLods>(
+      "meshlods",
+      [](const MeshLods &m) {
+        std::vector<std::uint8_t> out;
+        put_u32(out, static_cast<std::uint32_t>(m.specs.size()));
+        for (const auto &s : m.specs) {
+          put_u32(out, static_cast<std::uint32_t>(s.size()));
+          out.insert(out.end(), s.begin(), s.end());
+        }
+        put_f32(out, m.pixels);
+        put_f32(out, m.fade);
+        // Appended fields decode as empty/0 on pre-group payloads.
+        put_u32(out, static_cast<std::uint32_t>(m.group.size()));
+        out.insert(out.end(), m.group.begin(), m.group.end());
+        put_u32(out, static_cast<std::uint32_t>(m.proxy.size()));
+        out.insert(out.end(), m.proxy.begin(), m.proxy.end());
+        put_f32(out, m.group_pixels);
+        return out;
+      },
+      [](const std::vector<std::uint8_t> &b) {
+        MeshLods m;
+        std::size_t at = 0;
+        const std::uint32_t count = get_u32(b, at);
+        for (std::uint32_t i = 0; i < count && i < 8; ++i) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) break;
+          m.specs.emplace_back(reinterpret_cast<const char *>(b.data() + at),
+                               len);
+          at += len;
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.pixels, &bits, 4);
+        }
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.fade, &bits, 4);
+        }
+        const auto read_string = [&b, &at](std::string &out) {
+          const std::uint32_t len = get_u32(b, at);
+          if (len > b.size() - at) {
+            at = b.size();
+            return;
+          }
+          out.assign(reinterpret_cast<const char *>(b.data() + at), len);
+          at += len;
+        };
+        read_string(m.group);
+        read_string(m.proxy);
+        if (b.size() - at >= 4) {
+          const std::uint32_t bits = get_u32(b, at);
+          std::memcpy(&m.group_pixels, &bits, 4);
+        }
+        return m;
+      });
+  // Marker components serialize a zero-byte payload — presence is the
+  // flag (same convention as `hidden`/`oneway`).
+  world.register_component<NoShadow>(
+      "noshadow", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return NoShadow{}; });
+  world.register_component<NoShadowReceive>(
+      "noshadowreceive", encode_marker,
+      [](const std::vector<std::uint8_t> &) { return NoShadowReceive{}; });
 }
 
 std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
@@ -360,15 +807,19 @@ std::vector<EntityId> spawn_scene(World &world, const SceneDocument &doc) {
                 Parent{s.parent, s.x - px, s.y - py, px, py, true});
     }
     if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
+    if (!s.anim.empty()) world.add(entity, AnimTimeline{s.anim});
     spawned.push_back(entity);
   }
   // Each tilemap lives on its own entity (not returned) so runtime cell
   // edits snapshot with the world; order matches the document so layer
   // semantics stay stable.
-  for (const auto &s : doc.tilemaps)
-    world.add(world.create(),
+  for (const auto &s : doc.tilemaps) {
+    const auto entity = world.create();
+    world.add(entity,
               Tilemap{s.tileset, s.x, s.y, s.tile_w, s.tile_h, s.columns,
                       s.layer, s.parallax, s.collide, s.cells});
+    if (!s.name.empty()) world.add(entity, EntityName{s.name});
+  }
   return spawned;
 }
 
@@ -388,11 +839,12 @@ SceneDocument scene_from_world(const World &world) {
   SceneDocument doc;
   for (const auto entity : world.entities()) {
     if (const auto *tm = world.get<Tilemap>(entity)) {
-      doc.tilemaps.push_back(SceneTilemap{tm->tileset, tm->x, tm->y,
-                                          tm->tile_w, tm->tile_h,
-                                          tm->columns, tm->layer,
-                                          tm->parallax, tm->collide,
-                                          tm->cells});
+      auto &map = doc.tilemaps.emplace_back(
+          SceneTilemap{tm->tileset, tm->x, tm->y, tm->tile_w, tm->tile_h,
+                       tm->columns, tm->layer, tm->parallax, tm->collide,
+                       tm->cells});
+      if (const auto *n = world.get<EntityName>(entity))
+        map.name = n->value;
       continue;
     }
     const auto *name = world.get<EntityName>(entity);
@@ -445,6 +897,7 @@ SceneDocument scene_from_world(const World &world) {
     if (const auto *o = world.get<Opacity>(entity)) s.opacity = o->value;
     if (const auto *par = world.get<Parent>(entity)) s.parent = par->name;
     if (const auto *vr = world.get<VfxRef>(entity)) s.vfx = vr->name;
+    if (const auto *at = world.get<AnimTimeline>(entity)) s.anim = at->id;
     doc.entities.push_back(std::move(s));
   }
   return doc;
@@ -458,6 +911,17 @@ std::optional<EntityId> find_entity_by_name(const World &world,
       return entity;
   }
   return std::nullopt;
+}
+
+std::optional<std::size_t> tilemap_index(const World &world,
+                                         std::string_view name) {
+  const auto entity = find_entity_by_name(world, name);
+  if (!entity) return std::nullopt;
+  const auto all = tilemap_entities(world);
+  const auto it = std::find(all.begin(), all.end(), *entity);
+  return it != all.end()
+             ? std::optional<std::size_t>{it - all.begin()}
+             : std::nullopt;
 }
 
 void resolve_hierarchy(World &world) {
@@ -547,6 +1011,78 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, Opacity{s.opacity * (s.a / 255.f)});
     if (!s.texture.empty()) world.add(entity, TextureRef{s.texture});
     if (s.double_sided) world.add(entity, DoubleSided{});
+    // Material extension components ride the entity's snapshot stream —
+    // they are only attached when the document opts into them.
+    if (s.metallic != 0.f || s.roughness != 0.55f ||
+        !s.metallic_roughness.empty() || !s.emissive.empty() ||
+        s.emissive_strength != 0.f || s.night_emissive != 0.f ||
+        !s.environment.empty() || s.environment_strength != 0.f ||
+        s.alpha_cutout != 0.f || s.uv_tile_x != 1.f || s.uv_tile_y != 1.f)
+      world.add(entity,
+                MaterialPbr{s.metallic, s.roughness, s.emissive_strength,
+                            s.night_emissive, s.environment_strength,
+                            s.emissive_r, s.emissive_g, s.emissive_b,
+                            s.alpha_cutout, s.uv_tile_x, s.uv_tile_y,
+                            s.metallic_roughness, s.emissive,
+                            s.environment});
+    if (!s.normal_map.empty() || !s.properties_map.empty() ||
+        !s.cloud_map.empty() || s.normal_strength != 0.35f ||
+        s.relief != 0.f || s.cloud_opacity != 0.f || s.cloud_albedo != 0.f ||
+        s.cloud_offset_x != 0.f || s.cloud_offset_y != 0.f ||
+        s.terminator_wrap != 0.f || s.limb_darkening != 0.f ||
+        s.band_shear != 0.f || s.orbital_beaming != 0.f ||
+        s.forward_scatter != 0.f || s.band_waves != 0.f ||
+        s.cloud_height != 0.f || s.band_drift != 0.f ||
+        s.band_turbulence != 0.f || s.limb_darkening_q != 0.f ||
+        s.band_diff != 0.f || s.forward_scatter_back != 0.f ||
+        s.forward_scatter_back_mix != 0.f || s.limb_darkening_mid != 0.f ||
+        s.orbital_beaming_tint != 0.f || s.forward_scatter_hue != 0.f)
+      world.add(entity,
+                MaterialSurface{s.normal_strength, s.relief,
+                                s.cloud_opacity, s.cloud_albedo,
+                                s.cloud_offset_x, s.cloud_offset_y,
+                                s.terminator_wrap, s.limb_darkening,
+                                s.band_shear, s.orbital_beaming,
+                                s.orbital_beaming_tint, s.forward_scatter,
+                                s.forward_scatter_back,
+                                s.forward_scatter_back_mix,
+                                s.forward_scatter_hue, s.band_waves,
+                                s.normal_map, s.properties_map,
+                                s.cloud_map, s.cloud_height,
+                                s.band_drift, s.band_turbulence,
+                                s.limb_darkening_q, s.limb_darkening_mid,
+                                s.band_diff});
+    if (s.atmo_strength != 0.f)
+      world.add(entity, AtmosphereShell{s.atmo_r, s.atmo_g, s.atmo_b,
+                                        s.atmo_strength, s.atmo_power,
+                                        s.atmo_night, s.atmo_sunset_r,
+                                        s.atmo_sunset_g, s.atmo_sunset_b,
+                                        s.atmo_sunset_strength});
+    if (s.visible_range > 0.f)
+      world.add(entity, VisibleRange{s.visible_range, s.visible_fade});
+    if (!s.casts_shadow) world.add(entity, NoShadow{});
+    if (!s.receives_shadow) world.add(entity, NoShadowReceive{});
+    if (s.star_kelvin >= 100.0)
+      world.add(entity, StarPhotosphere{s.star_kelvin});
+    if (s.accretion[2] >= 100.f)
+      world.add(entity, AccretionDisc{s.accretion[0], s.accretion[1],
+                                      s.accretion[2], s.accretion[3],
+                                      s.accretion[4], s.accretion[5],
+                                      s.accretion[6], s.accretion[7]});
+    // The volume's emission image is the entity texture — without one
+    // the component would export a `volume` block that fails to parse.
+    if (s.volume_depth > 0.f && !s.texture.empty())
+      world.add(entity,
+                EmissionVolume{s.volume_depth, s.volume_density,
+                               s.volume_seed, s.volume_scatter,
+                               s.volume_steps, s.volume_flow,
+                               s.volume_distort, s.volume_blend,
+                               s.volume_image2, s.volume_occlude,
+                               s.volume_flow_rate});
+    if (!s.lod_meshes.empty() || !s.lod_group.empty())
+      world.add(entity, MeshLods{s.lod_meshes, s.lod_pixels, s.lod_fade,
+                                 s.lod_group, s.lod_proxy,
+                                 s.lod_proxy_pixels});
     world.add(entity, GravityScale{s.gravity_scale});
     if (s.solid) world.add(entity, Solid{});
     if (s.ttl > 0.f) world.add(entity, Lifetime{s.ttl});
@@ -567,6 +1103,7 @@ std::vector<EntityId> spawn_scene3d(World &world,
       world.add(entity, Parent3D{s.parent, s.x - px, s.y - py, s.z - pz,
                                  px, py, pz, true});
     }
+    if (!s.vfx.empty()) world.add(entity, VfxRef{s.vfx});
     spawned.push_back(entity);
   }
   return spawned;
@@ -607,12 +1144,104 @@ Scene3dDocument scene3d_from_world(const World &world) {
     if (const auto *tx = world.get<TextureRef>(entity))
       s.texture = tx->value;
     s.double_sided = world.get<DoubleSided>(entity) != nullptr;
+    if (const auto *p = world.get<MaterialPbr>(entity)) {
+      s.metallic = p->metallic;
+      s.roughness = p->roughness;
+      s.emissive_strength = p->emissive_strength;
+      s.night_emissive = p->night_emissive;
+      s.environment_strength = p->environment_strength;
+      s.emissive_r = p->emissive_r;
+      s.emissive_g = p->emissive_g;
+      s.emissive_b = p->emissive_b;
+      s.alpha_cutout = p->alpha_cutout;
+      s.uv_tile_x = p->uv_tile_x;
+      s.uv_tile_y = p->uv_tile_y;
+      s.metallic_roughness = p->metallic_roughness;
+      s.emissive = p->emissive;
+      s.environment = p->environment;
+    }
+    if (const auto *sf = world.get<MaterialSurface>(entity)) {
+      s.normal_map = sf->normal_map;
+      s.properties_map = sf->properties_map;
+      s.cloud_map = sf->cloud_map;
+      s.normal_strength = sf->normal_strength;
+      s.relief = sf->relief;
+      s.cloud_opacity = sf->cloud_opacity;
+      s.cloud_albedo = sf->cloud_albedo;
+      s.cloud_offset_x = sf->cloud_offset_x;
+      s.cloud_offset_y = sf->cloud_offset_y;
+      s.terminator_wrap = sf->terminator_wrap;
+      s.limb_darkening = sf->limb_darkening;
+      s.band_shear = sf->band_shear;
+      s.orbital_beaming = sf->orbital_beaming;
+      s.orbital_beaming_tint = sf->orbital_beaming_tint;
+      s.forward_scatter = sf->forward_scatter;
+      s.band_waves = sf->band_waves;
+      s.cloud_height = sf->cloud_height;
+      s.band_drift = sf->band_drift;
+      s.band_turbulence = sf->band_turbulence;
+      s.limb_darkening_q = sf->limb_darkening_q;
+      s.limb_darkening_mid = sf->limb_darkening_mid;
+      s.band_diff = sf->band_diff;
+      s.forward_scatter_back = sf->forward_scatter_back;
+      s.forward_scatter_back_mix = sf->forward_scatter_back_mix;
+      s.forward_scatter_hue = sf->forward_scatter_hue;
+    }
+    if (const auto *at = world.get<AtmosphereShell>(entity)) {
+      s.atmo_r = at->r;
+      s.atmo_g = at->g;
+      s.atmo_b = at->b;
+      s.atmo_strength = at->strength;
+      s.atmo_power = at->power;
+      s.atmo_night = at->night_floor;
+      s.atmo_sunset_r = at->sunset_r;
+      s.atmo_sunset_g = at->sunset_g;
+      s.atmo_sunset_b = at->sunset_b;
+      s.atmo_sunset_strength = at->sunset_strength;
+    }
+    if (const auto *vr = world.get<VisibleRange>(entity)) {
+      s.visible_range = vr->range;
+      s.visible_fade = vr->fade;
+    }
+    if (world.get<NoShadow>(entity)) s.casts_shadow = false;
+    if (world.get<NoShadowReceive>(entity)) s.receives_shadow = false;
+    if (const auto *sp = world.get<StarPhotosphere>(entity))
+      s.star_kelvin = sp->kelvin;
+    if (const auto *ad = world.get<AccretionDisc>(entity))
+      s.accretion = {ad->inner, ad->outer, ad->kelvin, ad->beaming,
+                     ad->spiral, ad->spiral_arms, ad->spiral_turns,
+                     ad->shear_rate};
+    // An orphan volume (no TextureRef) would emit a `volume` block the
+    // parser rejects — skip it rather than write an unloadable document.
+    if (const auto *ev = world.get<EmissionVolume>(entity);
+        ev && !s.texture.empty()) {
+      s.volume_depth = ev->depth;
+      s.volume_density = ev->density;
+      s.volume_seed = ev->seed;
+      s.volume_scatter = ev->scatter;
+      s.volume_steps = ev->steps;
+      s.volume_flow = ev->flow;
+      s.volume_distort = ev->distort;
+      s.volume_blend = ev->blend;
+      s.volume_image2 = ev->image2;
+      s.volume_occlude = ev->occlude;
+      s.volume_flow_rate = ev->flow_rate;
+    }
+    if (const auto *ml = world.get<MeshLods>(entity)) {
+      s.lod_meshes = ml->specs;
+      s.lod_pixels = ml->pixels;
+      s.lod_fade = ml->fade;
+      s.lod_group = ml->group;
+      s.lod_proxy = ml->proxy;
+      s.lod_proxy_pixels = ml->group_pixels;
+    }
     if (const auto *g = world.get<GravityScale>(entity))
       s.gravity_scale = g->value;
     s.solid = world.get<Solid>(entity) != nullptr;
     if (const auto *lt = world.get<Lifetime>(entity)) s.ttl = lt->remaining;
     if (const auto *d = world.get<UserData>(entity)) s.data = d->value;
     if (const auto *p = world.get<Parent3D>(entity)) s.parent = p->name;
+    if (const auto *v = world.get<VfxRef>(entity)) s.vfx = v->name;
     doc.entities.push_back(std::move(s));
   }
   return doc;

@@ -435,7 +435,7 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
     }
   }
 
-  if (fill_image_) {
+  if (fill_image_ && style.draw_ownership) {
     if(auto image=native_map::clip_image_to_viewport(native_map::Image{
         fill_image_,
         rect_for(projection_.fog.position, projection_.fog.size),
@@ -450,6 +450,7 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
 
   // Contours — the same loops that bound the rasterized fill, drawn as lines.
   for (const auto &region : projection_.territories) {
+    if (!style.draw_ownership) break;
     const Color color = map_alpha(
         native_territory_color(region.civilization_id, observer_),
         .72f * detail);
@@ -466,7 +467,7 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
 
   // Region labels are suppressed at the complete-galaxy overview unless a
   // civilization holds more than one anchor, exactly like the reference.
-  if (style.draw_labels) {
+  if (style.draw_labels && style.draw_ownership) {
     for (const auto &region : projection_.territories) {
       if (region.anchors.empty() ||
           (overview > .82f && region.anchors.size() < 2))
@@ -491,6 +492,7 @@ NativeTerritoryDrawStats NativeTerritoryOverlay::append(
   // Territorial claims read as dashed arcs over the claimed system.
   constexpr int segments = 24;
   for (const auto &claim : projection_.claims) {
+    if (!style.draw_ownership) break;
     const Point point = project(claim.position);
     const float radius = claim.radius * scale * world_per_scaled;
     if (radius <= 5.f) continue;

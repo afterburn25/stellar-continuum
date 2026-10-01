@@ -1,4 +1,5 @@
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 
 #include <array>
 #include <cmath>
@@ -159,6 +160,25 @@ void verify(int width, int height, float expected_scale) {
   require(layout.hit({static_cast<float>(width - 1),
                       static_cast<float>(height - 1)}, true) == UiAction::None,
           "Outside point activated the menu.");
+
+  // hud_actions() is the keyboard focus ring's source of truth — every item
+  // must hit-test back to its own action and arrive in (y,x) order.
+  const auto ring = layout.hud_actions();
+  require(ring.size() == 18, "HUD focus ring changed size.");
+  for (std::size_t index = 0; index < ring.size(); ++index) {
+    const auto &[bounds, action] = ring[index];
+    require(contains_rect(viewport, bounds),
+            "A HUD focusable escaped the drawable viewport.");
+    require(layout.hit({bounds.x + bounds.width * .5f,
+                        bounds.y + bounds.height * .5f},
+                       false) == action,
+            "A HUD focusable did not hit-test to its action.");
+    if (index)
+      require(ring[index - 1].first.y < bounds.y ||
+                  (ring[index - 1].first.y == bounds.y &&
+                   ring[index - 1].first.x <= bounds.x),
+              "HUD focusables are not in (y,x) order.");
+  }
 }
 
 void verify_navigation_blockers() {
@@ -173,10 +193,46 @@ void verify_navigation_blockers() {
     require(!blocked, "A menu or modal exposed navigation underneath it.");
 }
 
+void verify_text_scale() {
+  const auto baseline = NativeUiLayout::for_viewport(1920, 1080);
+  NativeUiLayout::set_text_scale(1.5f);
+  const auto scaled = NativeUiLayout::for_viewport(1920, 1080);
+  require(scaled.scale == baseline.scale &&
+              scaled.pause.x == baseline.pause.x &&
+              scaled.menu_panel.width == baseline.menu_panel.width,
+          "Text scale changed layout geometry.");
+  require(scaled.control_font_pixels ==
+                  std::lround(17.f * baseline.scale * 1.5f) &&
+              scaled.metric_font_pixels ==
+                  std::lround(15.f * baseline.scale * 1.5f) &&
+              scaled.heading_font_pixels ==
+                  std::lround(22.f * baseline.scale * 1.5f),
+          "Text scale did not enlarge the shared font metrics.");
+  // The canonical theme ramp and bespoke chrome sizes must carry the same
+  // accessibility multiplier — otherwise workspace text ignores text_scale
+  // while the shared metrics enlarge.
+  require(stellar::native_ui::type::title(1.f) == std::lround(24.f * 1.5f) &&
+              stellar::native_ui::type::body(1.f) ==
+                  std::lround(15.f * 1.5f) &&
+              stellar::native_ui::type::compact_small(1.f) ==
+                  std::lround(11.f * 1.5f) &&
+              stellar::native_ui::type::scaled(18.f, 2.f) ==
+                  std::lround(18.f * 2.f * 1.5f),
+          "Text scale did not reach the canonical workspace type ramp.");
+  NativeUiLayout::set_text_scale(0.5f);
+  require(NativeUiLayout::text_scale() == .75f,
+          "Text scale did not clamp below the accessibility range.");
+  NativeUiLayout::set_text_scale(9.f);
+  require(NativeUiLayout::text_scale() == 2.f,
+          "Text scale did not clamp above the accessibility range.");
+  NativeUiLayout::set_text_scale(1.f);
+}
+
 } // namespace
 
 int main() try {
   verify_navigation_blockers();
+  verify_text_scale();
   verify(640, 360, 324.f/430.f);
   verify(1280, 720, 1.f);
   verify(1920, 1080, 1.f);

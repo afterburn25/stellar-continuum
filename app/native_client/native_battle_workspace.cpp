@@ -1,5 +1,8 @@
 #include "native_battle_workspace.hpp"
 
+#include "native_military_messages.hpp"
+#include "native_ui_theme.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <iomanip>
@@ -43,7 +46,7 @@ constexpr Color success{94, 229, 157, 255};
 constexpr Color unknown{124, 152, 176, 255};
 constexpr Color danger{255, 107, 96, 255};
 constexpr Color caution{245, 177, 82, 255};
-constexpr Color focus{102, 178, 255, 255};
+constexpr Color focus_color{102, 178, 255, 255};
 constexpr Color selected_color{245, 221, 114, 255};
 
 void fill(DrawList &out, UiRect bounds, Color color) {
@@ -189,6 +192,51 @@ std::string order_name(MassiveCombatOrderType type,
   }
   return translate(locale,"BATTLE_ORDER_GENERIC","order");
 }
+// Order literals authored into core event/acknowledgement strings (the
+// engine's PascalCase order_name table), mapped back to their BATTLE_ORDER_*
+// key for recomposition under a locale.
+std::string_view order_word_key(std::string_view word) {
+  static const std::pair<std::string_view, std::string_view> orders[] = {
+      {"Engage","BATTLE_ORDER_ENGAGE"},{"Hold","BATTLE_ORDER_HOLD"},
+      {"Defend","BATTLE_ORDER_DEFEND"},
+      {"AdvanceCautiously","BATTLE_ORDER_ADVANCE_CAUTIOUS"},
+      {"Advance","BATTLE_ORDER_ADVANCE"},
+      {"StandoffAttack","BATTLE_ORDER_STANDOFF"},{"Screen","BATTLE_ORDER_SCREEN"},
+      {"ProtectCriticalAsset","BATTLE_ORDER_PROTECT"},
+      {"FocusFire","BATTLE_ORDER_FOCUS"},
+      {"FlankLeft","BATTLE_ORDER_FLANK_LEFT"},
+      {"FlankRight","BATTLE_ORDER_FLANK_RIGHT"},
+      {"Intercept","BATTLE_ORDER_INTERCEPT"},{"Pursue","BATTLE_ORDER_PURSUE"},
+      {"BreakContact","BATTLE_ORDER_BREAK"},
+      {"Disengage","BATTLE_ORDER_DISENGAGE"},
+      {"EmergencyRetreat","BATTLE_ORDER_EMERGENCY"},
+      {"Retreat","BATTLE_ORDER_RETREAT"},{"Breakout","BATTLE_ORDER_BREAKOUT"},
+      {"Surrender","BATTLE_ORDER_SURRENDER"}};
+  for (const auto &[literal, key] : orders)
+    if (word == literal) return key;
+  return {};
+}
+// Weapon words emitted inside aggregated-volley event strings.
+std::string_view weapon_word_key(std::string_view word) {
+  static const std::pair<std::string_view, std::string_view> weapons[] = {
+      {"Beam","BATTLE_WEAPON_BEAM"},{"Kinetic","BATTLE_WEAPON_KINETIC"},
+      {"Missile","BATTLE_WEAPON_MISSILE"},
+      {"PointDefense","BATTLE_WEAPON_PD"},
+      {"ElectronicWarfare","BATTLE_WEAPON_EW"}};
+  for (const auto &[literal, key] : weapons)
+    if (word == literal) return key;
+  return {};
+}
+std::string localized_order_word(
+    const stellar::engine::LocalizationTable *locale, std::string_view word) {
+  const auto key = order_word_key(word);
+  return key.empty() ? std::string(word) : translate(locale, key, word);
+}
+std::string localized_weapon_word(
+    const stellar::engine::LocalizationTable *locale, std::string_view word) {
+  const auto key = weapon_word_key(word);
+  return key.empty() ? std::string(word) : translate(locale, key, word);
+}
 std::string shape_name(stellar::core::MassiveFormationShape shape,
                        const stellar::engine::LocalizationTable *locale) {
   switch (shape) {
@@ -259,15 +307,24 @@ Point formation_offset(std::int64_t id, int token,
 
 const std::vector<BattleOrderButton> &battle_order_buttons() {
   static const std::vector<BattleOrderButton> buttons{
-      {"Hold", MassiveCombatOrderType::Hold, false, "BATTLE_BTN_HOLD"},
-      {"Defend", MassiveCombatOrderType::Defend, false, "BATTLE_BTN_DEFEND"},
-      {"Advance", MassiveCombatOrderType::Advance, true, "BATTLE_BTN_ADVANCE"},
-      {"Focus fire", MassiveCombatOrderType::FocusFire, true, "BATTLE_BTN_FOCUS"},
-      {"Flank left", MassiveCombatOrderType::FlankLeft, true, "BATTLE_BTN_FLANK_LEFT"},
-      {"Flank right", MassiveCombatOrderType::FlankRight, true, "BATTLE_BTN_FLANK_RIGHT"},
-      {"Intercept", MassiveCombatOrderType::Intercept, true, "BATTLE_BTN_INTERCEPT"},
-      {"Break contact", MassiveCombatOrderType::BreakContact, false, "BATTLE_BTN_BREAK"},
-      {"Retreat", MassiveCombatOrderType::Retreat, false, "BATTLE_BTN_RETREAT"}};
+      {"Hold", MassiveCombatOrderType::Hold, false, "BATTLE_BTN_HOLD",
+       "BATTLE_TIP_HOLD", "Hold position and fight from the current post."},
+      {"Defend", MassiveCombatOrderType::Defend, false, "BATTLE_BTN_DEFEND",
+       "BATTLE_TIP_DEFEND", "Guard this area; intercept attackers that close in."},
+      {"Advance", MassiveCombatOrderType::Advance, true, "BATTLE_BTN_ADVANCE",
+       "BATTLE_TIP_ADVANCE", "Move toward the selected point or contact."},
+      {"Focus fire", MassiveCombatOrderType::FocusFire, true, "BATTLE_BTN_FOCUS",
+       "BATTLE_TIP_FOCUS", "Concentrate batteries on one hostile formation."},
+      {"Flank left", MassiveCombatOrderType::FlankLeft, true, "BATTLE_BTN_FLANK_LEFT",
+       "BATTLE_TIP_FLANK_LEFT", "Swing wide to strike the hostile's left flank."},
+      {"Flank right", MassiveCombatOrderType::FlankRight, true, "BATTLE_BTN_FLANK_RIGHT",
+       "BATTLE_TIP_FLANK_RIGHT", "Swing wide to strike the hostile's right flank."},
+      {"Intercept", MassiveCombatOrderType::Intercept, true, "BATTLE_BTN_INTERCEPT",
+       "BATTLE_TIP_INTERCEPT", "Meet the target on its projected course."},
+      {"Break contact", MassiveCombatOrderType::BreakContact, false, "BATTLE_BTN_BREAK",
+       "BATTLE_TIP_BREAK", "Disengage and pull out of the firing lines."},
+      {"Retreat", MassiveCombatOrderType::Retreat, false, "BATTLE_BTN_RETREAT",
+       "BATTLE_TIP_RETREAT", "Withdraw from the engagement toward the system edge."}};
   return buttons;
 }
 
@@ -300,9 +357,9 @@ BattleWorkspaceLayout BattleWorkspaceLayout::for_viewport(const int width,
   const auto margin = 12.f * scale;
   BattleWorkspaceLayout layout;
   layout.scale = scale;
-  layout.title_font_pixels = static_cast<int>(17.f * scale);
-  layout.body_font_pixels = static_cast<int>(14.f * scale);
-  layout.small_font_pixels = static_cast<int>(11.f * scale);
+  layout.title_font_pixels = stellar::native_ui::type::scaled(17.f, scale);
+  layout.body_font_pixels = stellar::native_ui::type::compact_body(scale);
+  layout.small_font_pixels = stellar::native_ui::type::compact_small(scale);
   layout.surface = {0.f, 0.f, w, h};
   layout.top_row = {margin, margin, w - margin * 2.f, 40.f * scale};
   auto x = layout.top_row.x;
@@ -314,7 +371,7 @@ BattleWorkspaceLayout BattleWorkspaceLayout::for_viewport(const int width,
   };
   layout.play = pitch(44.f);
   layout.speed = pitch(64.f);
-  layout.fit = pitch(52.f);
+  layout.fit = pitch(70.f);
   layout.menu = {w - margin - 74.f * scale, layout.top_row.y, 74.f * scale,
                  34.f * scale};
   const auto &buttons = battle_order_buttons();
@@ -346,10 +403,12 @@ void NativeBattleWorkspace::open(MassiveCombatSnapshot snapshot,
   invalidate_ship_targets();
   observer_civilization_id_ = observer_civilization_id;
   visible_ = true;
+  focus_ = -1;
   if (!camera_initialized_) fit(width, height);
 }
 void NativeBattleWorkspace::close() {
   visible_ = false;
+  focus_ = -1;
   snapshot_.reset();
   selection_.clear();
   visual_events_.clear();
@@ -477,8 +536,91 @@ std::string NativeBattleWorkspace::trf(
   return out;
 }
 
+std::string NativeBattleWorkspace::localized_battle_message(
+    std::string_view message) const {
+  if (!locale_ || message.empty()) return std::string(message);
+  const auto divide = [](std::string_view text, std::string_view infix)
+      -> std::optional<std::pair<std::string_view, std::string_view>> {
+    const auto at = text.find(infix);
+    if (at == std::string::npos) return std::nullopt;
+    return std::pair{text.substr(0, at), text.substr(at + infix.size())};
+  };
+  const auto strip_suffix = [](std::string_view text, std::string_view suffix)
+      -> std::optional<std::string_view> {
+    if (!text.ends_with(suffix)) return std::nullopt;
+    return text.substr(0, text.size() - suffix.size());
+  };
+  // "{name} fired an aggregated {weapon} volley."
+  if (const auto p = divide(message, " fired an aggregated "))
+    if (const auto weapon = strip_suffix(p->second, " volley."))
+      return trf("BATTLE_EVENT_VOLLEY",
+                 {std::string(p->first),
+                  localized_weapon_word(locale_, *weapon)},
+                 "{0} fired an aggregated {1} volley.");
+  // "{name} sustained {damage} aggregate damage and lost {n} ships."
+  if (const auto p = divide(message, " sustained "))
+    if (const auto q = divide(p->second, " aggregate damage and lost "))
+      if (const auto ships = strip_suffix(q->second, " ships."))
+        return trf("BATTLE_EVENT_DAMAGE",
+                   {std::string(p->first), std::string(q->first),
+                    std::string(*ships)},
+                   "{0} sustained {1} aggregate damage and lost {2} ships.");
+  // "{name} point defense intercepted {n} missiles."
+  if (const auto p = divide(message, " point defense intercepted "))
+    if (const auto missiles = strip_suffix(p->second, " missiles."))
+      return trf("BATTLE_EVENT_INTERCEPTED",
+                 {std::string(p->first), std::string(*missiles)},
+                 "{0} point defense intercepted {1} missiles.");
+  // "{name} was destroyed."
+  if (const auto name = strip_suffix(message, " was destroyed."))
+    return trf("BATTLE_EVENT_DESTROYED", {std::string(*name)},
+               "{0} was destroyed.");
+  // "{name} completed warp escape."
+  if (const auto name = strip_suffix(message, " completed warp escape."))
+    return trf("BATTLE_EVENT_ESCAPED", {std::string(*name)},
+               "{0} completed warp escape.");
+  // "{name} surrendered."
+  if (const auto name = strip_suffix(message, " surrendered."))
+    return trf("BATTLE_EVENT_SURRENDERED", {std::string(*name)},
+               "{0} surrendered.");
+  // "{name} acknowledged {order}." — covers the explicit surrender reply.
+  if (const auto p = divide(message, " acknowledged "))
+    if (const auto order = strip_suffix(p->second, "."))
+      return trf("BATTLE_ACK_ORDER",
+                 {std::string(p->first),
+                  localized_order_word(locale_, *order)},
+                 "{0} acknowledged {1}.");
+  // "{name}: {order}." — the order-changed feed entry.
+  if (const auto p = divide(message, ": "))
+    if (const auto order = strip_suffix(p->second, ".");
+        order && !p->first.empty() && !order->empty())
+      return trf("BATTLE_EVENT_ORDER_CHANGED",
+                 {std::string(p->first),
+                  localized_order_word(locale_, *order)},
+                 "{0}: {1}.");
+  // Static skeletons: feed notices and tactical order denials.
+  static const std::pair<std::string_view, std::string_view> statics[] = {
+      {"Warp completion blocked by a hostile interdiction field.",
+       "BATTLE_EVENT_WARP_BLOCKED"},
+      {"Warp preparation started.", "BATTLE_EVENT_WARP_SPOOLING"},
+      {"The combat order contains an invalid tactical mode.",
+       "BATTLE_DENY_MODE"},
+      {"Combat objective must be finite.", "BATTLE_DENY_FINITE"},
+      {"No active owned formation has that identity.",
+       "BATTLE_DENY_IDENTITY"},
+      {"The protected asset must be an active friendly formation.",
+       "BATTLE_DENY_PROTECT"},
+      {"The requested target is not an active hostile formation.",
+       "BATTLE_DENY_HOSTILE"},
+      {"That combat order requires a target formation.",
+       "BATTLE_DENY_TARGET"}};
+  for (const auto &[literal, key] : statics)
+    if (message == literal) return tr(key, literal);
+  return std::string(message);
+}
+
 void NativeBattleWorkspace::set_status(std::string message, bool error) {
-  status_ = std::move(message);
+  status_ = stellar::native_military::localized_message(locale_, message);
   status_error_ = error;
 }
 void NativeBattleWorkspace::set_ship_targets(
@@ -667,6 +809,47 @@ void NativeBattleWorkspace::issue_context(const Point point, int width,
   if(!command.orders.empty())command.kind=BattleWorkspaceCommandKind::IssueOrder;
 }
 
+std::vector<NativeBattleWorkspace::FocusRect>
+NativeBattleWorkspace::focusables(
+    const BattleWorkspaceLayout &layout) const {
+  std::vector<FocusRect> out{
+      {layout.play, tr(tactical_speed_ > 0. ? "BATTLE_PAUSE" : "BATTLE_PLAY",
+                       tactical_speed_ > 0. ? "Pause" : "Play")},
+      {layout.speed,
+       trf("BATTLE_SPEED_LABEL", {std::to_string(tactical_resume_speed_)},
+           "Speed {0}x")},
+      {layout.fit, tr("BATTLE_FIT", "Fit view")},
+      {layout.menu, tr("BATTLE_MENU", "Menu")}};
+  for (std::size_t index = 0; index < layout.order_buttons.size(); ++index)
+    out.push_back({layout.order_buttons[index],
+                   tr(battle_order_buttons()[index].label_key,
+                      battle_order_buttons()[index].label)});
+  std::ranges::sort(out, [](const FocusRect &a, const FocusRect &b) {
+    if (a.bounds.y != b.bounds.y)
+      return a.bounds.y < b.bounds.y;
+    return a.bounds.x < b.bounds.x;
+  });
+  return out;
+}
+
+std::string NativeBattleWorkspace::focused_label(
+    const BattleWorkspaceLayout &layout) const {
+  if (focus_ < 0) return {};
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? items[static_cast<std::size_t>(focus_)].label
+             : std::string{};
+}
+std::optional<stellar::native_map::UiRect> NativeBattleWorkspace::focused_bounds(
+    const BattleWorkspaceLayout &layout) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto items = focusables(layout);
+  return focus_ < static_cast<int>(items.size())
+             ? std::optional<stellar::native_map::UiRect>{
+                   items[static_cast<std::size_t>(focus_)].bounds}
+             : std::nullopt;
+}
+
 BattleWorkspaceCommand
 NativeBattleWorkspace::handle(const InputEvent &event, const int width,
                               const int height) {
@@ -676,6 +859,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
   if(event.type==InputEventType::PointerCancelled){
     panning_=false;box_selecting_=false;gesture_=Gesture::None;
     targeting_source_.reset();hovered_formation_.reset();
+    focus_=-1;
     return command;
   }
   const auto pointer_event=event.type==InputEventType::Wheel||
@@ -701,6 +885,40 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
       set_status(tr("BATTLE_TARGET_CANCELLED","Target selection cancelled."));
     } else {
       command.kind = BattleWorkspaceCommandKind::Menu;
+    }
+    return command;
+  }
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab = 9u, kReturn = 13u, kSpace = 32u;
+    constexpr std::uint32_t kRight = 0x4000004fu, kLeft = 0x40000050u,
+                            kDown = 0x40000051u, kUp = 0x40000052u;
+    constexpr std::uint32_t kHome = 0x4000004au, kEnd = 0x4000004du;
+    const auto items = focusables(layout);
+    const int count = static_cast<int>(items.size());
+    const bool fwd = (event.key == kTab && !event.shift) ||
+                     event.key == kRight || event.key == kDown;
+    const bool bwd = (event.key == kTab && event.shift) ||
+                     event.key == kLeft || event.key == kUp;
+    if (count > 0 && (event.key == kHome || event.key == kEnd)) {
+      focus_ = event.key == kHome ? 0 : count - 1;
+      return command;
+    }
+    if (count > 0 && (fwd || bwd)) {
+      focus_ = focus_ < 0 || focus_ >= count
+                   ? (bwd ? count - 1 : 0)
+                   : (focus_ + (bwd ? -1 : 1) + count) % count;
+      return command;
+    }
+    if ((event.key == kReturn || event.key == kSpace) && focus_ >= 0 &&
+        focus_ < count) {
+      const auto &r = items[static_cast<std::size_t>(focus_)].bounds;
+      InputEvent press{InputEventType::LeftPressed};
+      press.position = {r.x + r.width * .5f, r.y + r.height * .5f};
+      const int keep = focus_;
+      command = handle(press, width, height);
+      focus_ = keep;
+      command.captured = true;
+      return command;
     }
     return command;
   }
@@ -758,6 +976,7 @@ NativeBattleWorkspace::handle(const InputEvent &event, const int width,
     gesture_ = Gesture::None;
     panning_ = false;
     box_selecting_ = false;
+    focus_ = -1;
     const auto chrome_press = [&] {
       gesture_ = Gesture::Chrome;
       pointer_down_ = event.position;
@@ -913,6 +1132,10 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
     text(out, {field.width * .5f, (top + bottom) * .5f},
          tr("BATTLE_NONE","No tactical encounter is active."), text_secondary,
          layout.body_font_pixels, 0.f, TextAlign::Center);
+    text(out, {field.width * .5f, (top + bottom) * .5f +
+                  layout.body_font_pixels * 1.8f},
+         tr("BATTLE_NONE_HINT","Engage a hostile fleet to record an encounter."),
+         unknown, layout.small_font_pixels, 0.f, TextAlign::Center);
     return;
   }
   const auto &formations = snapshot_->formations;
@@ -1027,11 +1250,11 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
                       center.y + std::sin(a0) * 39.f},
                      {center.x + std::cos(a1) * 39.f,
                       center.y + std::sin(a1) * 39.f},
-                     focus, field);
+                     focus_color, field);
       }
     }
     if (targeting_source_ && *targeting_source_ == formation.formation_id)
-      ring(out, center, 43.f, focus, field, 36);
+      ring(out, center, 43.f, focus_color, field, 36);
 
     // Token sample: bounded by zoom tier and the 4096 reference pool cap.
     const auto midpoint=std::max<std::int64_t>(1,
@@ -1270,24 +1493,51 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          text_secondary, layout.body_font_pixels);
   }
 
-  // Recent combat events feed (observer-filtered snapshot tail).
+  // Recent combat events feed (observer-filtered snapshot tail). Severity is
+  // derived from the already-exposed actor/target ids: losses to the observer
+  // read danger, losses inflicted read success, disruption reads caution.
   {
+    const auto event_color=[&](const auto &event){
+      if(!event.details_known)return unknown;
+      using EventType=stellar::core::MassiveCombatEventType;
+      const bool own_actor=event.actor_civilization_id==observer_civilization_id_;
+      const bool own_target=event.target_civilization_id==observer_civilization_id_;
+      switch(event.type){
+        case EventType::Damage:case EventType::FormationDestroyed:
+          return own_target?danger:own_actor?success:caution;
+        case EventType::MissileIntercepted:case EventType::Escaped:
+        case EventType::Surrendered:case EventType::WarpBlocked:
+          return caution;
+        case EventType::WarpSpooling:
+          return own_actor?caution:unknown;
+        default:return text_secondary;
+      }
+    };
     int lines = 0;
     for (auto it = snapshot_->events.rbegin();
          it != snapshot_->events.rend() && lines < 4; ++it, ++lines) {
       const auto row_height = 42.f * layout.scale;
       const auto y = layout.event_feed.y + static_cast<float>(lines) * row_height;
-      clipped_text(out, {layout.event_feed.x, y},
-                   it->details_known ? it->message : tr("BATTLE_INTERCEPT","Signal intercept."),
-                   it->details_known ? text_secondary : unknown,
-                   layout.small_font_pixels, layout.event_feed.width,
-                   {layout.event_feed.x, y, layout.event_feed.width, row_height - 4.f * layout.scale});
+      // Translucent card + severity accent bar keep event text legible over
+      // the starfield — same severity vocabulary as notification cards.
+      const UiRect card{layout.event_feed.x, y, layout.event_feed.width,
+                        row_height - 4.f * layout.scale};
+      fill(out, card, {7, 19, 31, 170});
+      fill(out, {card.x, card.y, 2.5f * layout.scale, card.height},
+           event_color(*it));
+      clipped_text(out, {card.x + 7.f * layout.scale, y},
+                   it->details_known ? localized_battle_message(it->message)
+                                     : tr("BATTLE_INTERCEPT","Signal intercept."),
+                   event_color(*it),
+                   layout.small_font_pixels,
+                   card.width - 7.f * layout.scale, card);
     }
   }
 
   // Status line.
   if (!status_.empty())
-    text(out, {layout.status.x, layout.status.y}, status_,
+    text(out, {layout.status.x, layout.status.y},
+         localized_battle_message(status_),
          status_error_ ? danger : text_secondary, layout.body_font_pixels);
 
   // Top row: play/pause, speed, fit, menu.
@@ -1310,20 +1560,40 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          tactical_speed_ > 0. ? text_primary : caution,
          layout.body_font_pixels, 0.f, TextAlign::Center);
   }
+  const auto chrome_label = [this, &layout](const UiRect &rect,
+                                            std::string value) {
+    int font = layout.body_font_pixels;
+    if (measure_) {
+      // The rasterizer clamps at 8px — measure-shrink down to that floor.
+      while (font > 8) {
+        const stellar::native_map::Text probe{
+            {}, value, {}, font, 0.f, std::nullopt, TextAlign::Center};
+        if (measure_(probe).width <= rect.width - 6.f) break;
+        --font;
+      }
+    }
+    return std::pair{value, font};
+  };
   fill(out, layout.fit,
        layout.fit.contains(pointer_) ? hover_color : button_color);
   stroke(out, layout.fit, border);
-  text(out, {layout.fit.x + layout.fit.width * .5f,
-             layout.fit.y + layout.fit.height * .32f},
-         tr("BATTLE_FIT","FIT"), text_primary, layout.body_font_pixels, 0.f,
-         TextAlign::Center);
+  {
+    const auto [label, font] =
+        chrome_label(layout.fit, tr("BATTLE_FIT", "FIT"));
+    text(out, {layout.fit.x + layout.fit.width * .5f,
+               layout.fit.y + layout.fit.height * .32f},
+         label, text_primary, font, 0.f, TextAlign::Center);
+  }
   fill(out, layout.menu,
        layout.menu.contains(pointer_) ? hover_color : button_color);
   stroke(out, layout.menu, border);
-  text(out, {layout.menu.x + layout.menu.width * .5f,
-             layout.menu.y + layout.menu.height * .32f},
-         tr("BATTLE_MENU","MENU"), text_primary, layout.body_font_pixels, 0.f,
-         TextAlign::Center);
+  {
+    const auto [label, font] =
+        chrome_label(layout.menu, tr("BATTLE_MENU", "MENU"));
+    text(out, {layout.menu.x + layout.menu.width * .5f,
+               layout.menu.y + layout.menu.height * .32f},
+         label, text_primary, font, 0.f, TextAlign::Center);
+  }
 
   // Order column.
   for (std::size_t index = 0; index < layout.order_buttons.size(); ++index) {
@@ -1335,11 +1605,41 @@ void NativeBattleWorkspace::render(DrawList &out, const int width,
          active_targeting ? selected_color
                           : rect.contains(pointer_) ? hover_color
                                                     : button_color);
-    stroke(out, rect, active_targeting ? focus : border);
+    stroke(out, rect, active_targeting ? focus_color : border);
+    const auto label = tr(button.label_key, button.label);
+    // Long localized labels word-wrap inside the button; center the wrapped
+    // block so the second line stays inside the clip instead of bleeding off
+    // the bottom edge.
+    float label_y = rect.y + rect.height * .3f;
+    if (measure_) {
+      const stellar::native_map::Text probe{
+          {}, label, {}, layout.small_font_pixels, rect.width - 6.f,
+          std::nullopt, TextAlign::Center};
+      const auto extent = measure_(probe);
+      if (extent.height > 0)
+        label_y =
+            rect.y + std::max(0.f, (rect.height -
+                                    static_cast<float>(extent.height)) *
+                                       .5f);
+    }
     clipped_text(out,
-                 {rect.x + rect.width * .5f, rect.y + rect.height * .3f},
-                 tr(button.label_key, button.label), text_primary, layout.small_font_pixels,
+                 {rect.x + rect.width * .5f, label_y},
+                 label, text_primary, layout.small_font_pixels,
                  rect.width - 6.f, rect, TextAlign::Center);
+    if (rect.contains(pointer_))
+      stellar::native_ui::hint(
+          out,
+          {pointer_.x + 12.f * layout.scale,
+           pointer_.y + 18.f * layout.scale},
+          tr(button.tip_key, button.tip), width, height,
+          layout.small_font_pixels, layout.scale);
+  }
+
+  if (focus_ >= 0) {
+    const auto items = focusables(layout);
+    if (focus_ < static_cast<int>(items.size()))
+      stellar::native_ui::focus_ring(
+          out, items[static_cast<std::size_t>(focus_)].bounds);
   }
 }
 } // namespace stellar::native_battle_ui

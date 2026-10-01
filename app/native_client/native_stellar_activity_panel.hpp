@@ -1,5 +1,6 @@
 #pragma once
 #include "native_menu_style.hpp"
+#include <stellar/engine/accessibility.hpp>
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/stellar_activity.hpp>
 #include <sstream>
@@ -10,18 +11,51 @@
 namespace stellar::native_map {
 class StellarActivityPanel {
 public:
- void open(stellar::core::CampaignFrame& frame,std::optional<int> selected){visible_=true;system_=selected.value_or(-1);event_=0;ensure_target(frame);}
- void close(){visible_=false;}
+ void open(stellar::core::CampaignFrame& frame,std::optional<int> selected){visible_=true;ring_=-1;system_=selected.value_or(-1);event_=0;ensure_target(frame);}
+ void close(){visible_=false;ring_=-1;}
  bool visible()const{return visible_;}
+ // Keyboard-focus contract: the twenty-four control buttons ring in (y,x)
+ // order and Return/Space replay the same dispatch a pointer press takes
+ // (activate_button runs the identical command switch). Escape releases
+ // the ring before closing.
+ [[nodiscard]] bool wants_keyboard_focus()const noexcept{return ring_>=0;}
+ [[nodiscard]] int focus()const noexcept{return ring_;}
+ [[nodiscard]] std::string focused_label(int,int)const{
+  return ring_>=0&&ring_<static_cast<int>(labels.size())?std::string(labels[static_cast<std::size_t>(ring_)]):std::string{};
+ }
+ [[nodiscard]] std::optional<UiRect> focused_bounds(int w,int h)const{
+  return ring_>=0&&ring_<static_cast<int>(labels.size())?std::optional<UiRect>{button(layout(w,h),ring_)}:std::nullopt;
+ }
+ [[nodiscard]] stellar::engine::AnnouncementControl focused_control(int,int)const{
+  return ring_>=0&&ring_<static_cast<int>(labels.size())?stellar::engine::AnnouncementControl::Button:stellar::engine::AnnouncementControl::Custom;
+ }
  std::optional<int> take_focus(){return std::exchange(focus_,{});}
  bool handle(const InputEvent& input,int width,int height,stellar::core::CampaignFrame& frame){
   using namespace stellar::core;if(!visible_)return false;
-  if(input.type==InputEventType::EscapePressed){close();return true;}
+  if(input.type==InputEventType::EscapePressed){if(ring_>=0){ring_=-1;return true;}close();return true;}
+  if(input.type==InputEventType::PointerCancelled){ring_=-1;return true;}
+  if(input.type==InputEventType::KeyPressed&&input.key){
+   constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+   constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+   constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+   const int count=static_cast<int>(labels.size());
+   const bool fwd=(input.key==kTab&&!input.shift)||input.key==kRight||input.key==kDown;
+   const bool bwd=(input.key==kTab&&input.shift)||input.key==kLeft||input.key==kUp;
+   if(fwd||bwd){if(ring_<0)ring_=bwd?count-1:0;else ring_=(ring_+(fwd?1:count-1))%count;return true;}
+   if(input.key==kHome||input.key==kEnd){ring_=input.key==kHome?0:count-1;return true;}
+   if((input.key==kReturn||input.key==kSpace)&&ring_>=0){activate_button(ring_,frame);return true;}
+  }
   const auto l=layout(width,height);if(input.type!=InputEventType::LeftPressed)return l.panel.contains(input.position);
+  ring_=-1;
   int hit=-1;for(int i=0;i<static_cast<int>(labels.size());++i)if(button(l,i).contains(input.position))hit=i;
   if(hit<0)return l.panel.contains(input.position);
+  activate_button(hit,frame);
+  return true;
+ }
+ void activate_button(int hit,stellar::core::CampaignFrame& frame){
+  using namespace stellar::core;
   try{
-   auto& world=frame.runtime().world().campaign();const double day=frame.runtime().stellar_activity_day();auto* s=target(world);if(!s)return true;
+   auto& world=frame.runtime().world().campaign();const double day=frame.runtime().stellar_activity_day();auto* s=target(world);if(!s)return;
    auto& state=s->stellar_activity->at(component_);StellarActivityCommand cmd;cmd.system_id=system_;cmd.component=component_;cmd.event_id=event_;cmd.variant=variant_;cmd.magnitude=magnitude_;cmd.latitude=latitude_;cmd.longitude=longitude_;cmd.orientation=orientation_;
    if(hit<5){cmd.action=StellarActivityAction::Force;cmd.type=static_cast<StellarEruptionType>(hit);cmd.randomize_position=true;event_=apply_developer_stellar_activity(world,frame.runtime().stellar_activity(),day,cmd);
     const auto& eruption=state.events.back();latitude_=eruption.latitude;longitude_=eruption.longitude;orientation_=eruption.orientation;status_="New eruption at a random surface location.";}
@@ -40,7 +74,6 @@ public:
    else if(hit==22){component_=(component_+1)%static_cast<int>(s->stellar_activity->size());event_=0;}
    else close();
   }catch(const std::exception& e){status_=e.what();}
-  return true;
  }
  void render(DrawList& out,int width,int height,stellar::core::CampaignFrame& frame)const{
   using namespace stellar::core;if(!visible_)return;const auto l=layout(width,height);
@@ -57,6 +90,12 @@ public:
   }
   out.overlay.emplace_back(Text{{l.panel.x+14*l.scale,l.panel.y+42*l.scale},text.str(),{223,233,243,255},font,l.panel.width-28*l.scale,UiRect{l.panel.x,l.panel.y+40*l.scale,l.panel.width,244*l.scale}});
   for(int i=0;i<static_cast<int>(labels.size());++i)native_menu_style::button(out,button(l,i),std::string(labels[i]),font,false,true,l.scale);
+  if(ring_>=0&&ring_<static_cast<int>(labels.size())){
+   const auto r=button(l,ring_);
+   const UiRect outer{r.x-3*l.scale,r.y-3*l.scale,r.width+6*l.scale,r.height+6*l.scale};
+   out.overlay.emplace_back(StrokedRectangle{outer,native_menu_style::cyan});
+   out.overlay.emplace_back(StrokedRectangle{r,native_menu_style::cyan});
+  }
   out.overlay.emplace_back(Text{{l.panel.x+14*l.scale,l.panel.y+710*l.scale},status_,{165,213,204,255},font,l.panel.width-28*l.scale,l.panel});
  }
 private:
@@ -78,6 +117,6 @@ private:
   event_=apply_developer_stellar_activity(world,frame.runtime().stellar_activity(),frame.runtime().stellar_activity_day(),cmd);cmd.event_id=event_;cmd.action=StellarActivityAction::Scrub;cmd.fraction=.35;apply_if_event(frame,cmd);
   focus_=system_;status_="Coverage "+std::to_string(coverage_+1)+" / 420. Next advances type, variant and class.";coverage_=(coverage_+1)%420;
  }
- bool visible_{};int system_{-1},component_{},variant_{},coverage_{};std::uint64_t event_{};double magnitude_{1},fraction_{.35},latitude_{},longitude_{1.35},orientation_{1.57};std::optional<int> focus_;std::string status_="Tools change only this isolated developer campaign.";
+ bool visible_{};int system_{-1},component_{},variant_{},coverage_{},ring_{-1};std::uint64_t event_{};double magnitude_{1},fraction_{.35},latitude_{},longitude_{1.35},orientation_{1.57};std::optional<int> focus_;std::string status_="Tools change only this isolated developer campaign.";
 };
 }

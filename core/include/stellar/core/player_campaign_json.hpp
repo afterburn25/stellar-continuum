@@ -3,6 +3,8 @@
 
 #include <stellar/core/player_campaign_persistence.hpp>
 
+#include <nlohmann/json.hpp>
+
 #include <cstddef>
 #include <functional>
 #include <optional>
@@ -57,6 +59,12 @@ private:
 
 [[nodiscard]] std::string
 encode_player_campaign_v17_json(const PlayerCampaignPayloadV17Dto &payload);
+
+// Document-level counterpart of encode_player_campaign_v17_json — callers
+// that need the canonical DOM (e.g. per-section replay hashing) can build
+// it directly instead of serializing then re-parsing the text form.
+[[nodiscard]] nlohmann::ordered_json
+encode_player_campaign_v17_document(const PlayerCampaignPayloadV17Dto &payload);
 
 [[nodiscard]] RestoredPlayerCampaignV17 restore_player_campaign_v17_json(
     AdaptiveResearchStrategicRuntime research_runtime,

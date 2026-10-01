@@ -319,6 +319,16 @@ void overlay_cache_is_bounded_complete_and_camera_independent() {
   require(resized_stats.fog_images == 1 && resized_stats.fill_images == 1 &&
               overlay.cached_image_bytes() == initial_bytes,
           "panning or resizing rebuilt the retained territory images");
+  stellar::native_map::DrawList hidden;
+  const auto hidden_stats=overlay.append(hidden,camera,1280,720,.2f,
+      {.draw_labels=true,.emphasize_overview=false,.draw_ownership=false});
+  require(hidden_stats.fog_images==1&&hidden_stats.fill_images==0&&
+          hidden_stats.contour_segments==0&&hidden_stats.claim_segments==0,
+          "Territory layer toggle must keep the fog shroud while hiding ownership marks");
+  for(const auto& command:hidden.world)
+    require(!std::holds_alternative<stellar::native_map::Text>(command),
+            "Hidden territory layer still named its regions");
+
   camera.center={0,0};camera.pixels_per_world=1000.;
   stellar::native_map::DrawList magnified;
   const auto magnified_stats=overlay.append(magnified,camera,1280,720,.2f);

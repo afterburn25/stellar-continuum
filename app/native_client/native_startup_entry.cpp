@@ -1,11 +1,16 @@
 #include "native_startup_entry.hpp"
+#include "native_accessibility_bridge.hpp"
 #include "native_audio_settings.hpp"
+#include "native_pad_input.hpp"
 #include "native_settings_hub.hpp"
 #include "native_voice_settings.hpp"
 #include "native_general_settings.hpp"
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
+#include "native_voice_settings_smoke.hpp"
+#include "native_general_settings_smoke.hpp"
+#include "native_settings_hub_smoke.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -63,11 +68,47 @@ StartupEntryResult run_native_startup_entry(Window &window,
   const std::string system_info="Stellar Continuum "+config.host.game_version+"\n"+window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height());
   workspace.set_diagnostics(window.graphics_adapter()+"\nDisplay: "+std::to_string(window.drawable_width())+" x "+std::to_string(window.drawable_height()));
   const auto route_settings = [&](const InputEvent& e,int w,int h) {
-    if(config.voice_settings&&config.voice_settings->visible())return config.voice_settings->handle(e,w,h);
-    if(config.general_settings&&config.general_settings->visible())return config.general_settings->handle(e,w,h);
-    if(config.video_settings&&config.video_settings->visible())return config.video_settings->handle(e,w,h);
-    if(config.audio_settings&&config.audio_settings->visible())return config.audio_settings->handle(e,w,h);
-    return config.settings_hub&&config.settings_hub->handle(e,w,h);
+    const auto route=[&](auto*settings,const auto&label){
+      const int focus_before=settings->focused();
+      const auto snapshot=[&]([[maybe_unused]]std::optional<bool>&checked,
+                              [[maybe_unused]]std::optional<stellar::engine::AnnouncementRange>&range,
+                              [[maybe_unused]]std::optional<bool>&expanded){
+        if constexpr(requires{settings->focused_toggle();})
+          checked=settings->focused_toggle();
+        if constexpr(requires{settings->focused_range();})
+          range=settings->focused_range();
+        if constexpr(requires{settings->focused_expanded(w,h);})
+          expanded=settings->focused_expanded(w,h);
+      };
+      std::optional<bool> checked_before;std::optional<stellar::engine::AnnouncementRange> range_before;std::optional<bool> expanded_before;
+      snapshot(checked_before,range_before,expanded_before);
+      const bool captured=settings->handle(e,w,h);
+      std::optional<bool> checked;std::optional<stellar::engine::AnnouncementRange> range;std::optional<bool> expanded;
+      snapshot(checked,range,expanded);
+      if(config.announcer&&(settings->focused()!=focus_before||checked!=checked_before||range!=range_before||expanded!=expanded_before)){
+        const auto rect=settings->focused_bounds(w,h);
+        stellar::engine::AnnouncementControl control=
+            stellar::engine::AnnouncementControl::Custom;
+        if constexpr(requires{settings->focused_control();})
+          control=settings->focused_control();
+        config.announcer->announce_focus(label(),
+            rect?std::optional<stellar::engine::AnnouncementBounds>{
+                     {rect->x,rect->y,rect->width,rect->height}}
+                :std::nullopt,range,control,checked,std::nullopt,expanded);
+      }
+      return captured;
+    };
+    if(config.voice_settings&&config.voice_settings->visible())
+      return route(config.voice_settings,[&]{return config.voice_settings->focused_label();});
+    if(config.general_settings&&config.general_settings->visible())
+      return route(config.general_settings,[&]{return config.general_settings->focused_label();});
+    if(config.video_settings&&config.video_settings->visible())
+      return route(config.video_settings,[&]{return config.video_settings->focused_label(w,h);});
+    if(config.audio_settings&&config.audio_settings->visible())
+      return route(config.audio_settings,[&]{return config.audio_settings->focused_label();});
+    if(config.settings_hub)
+      return route(config.settings_hub,[&]{return config.settings_hub->focused_label();});
+    return false;
   };
   const auto saved_slots=host.slots();
   if(!saved_slots.slots.empty())workspace.set_continue_save(saved_slots.slots.front().path);
@@ -257,6 +298,58 @@ StartupEntryResult run_native_startup_entry(Window &window,
             window.draw(draw,confirming?automation->video_confirm_screenshot:automation->video_settings_screenshot);
           });
     }
+    if (!automation->voice_settings_screenshot.empty()) {
+      if (!config.voice_settings) throw std::runtime_error("Voice settings validation requires the real overlay.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_audio::check_voice_settings(*config.voice_settings,
+          automation->voice_settings_path,width,height,"startup",
+          [&]{if(config.settings_hub)config.settings_hub->close();
+              route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[3])});},route,
+          [&]{DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.voice_settings->render(draw,width,height);
+            window.draw(draw,automation->voice_settings_screenshot);
+          });
+    }
+    if (!automation->controls_settings_screenshot.empty()) {
+      if (!config.settings_hub) throw std::runtime_error("Controls settings validation requires the settings hub.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_settings::check_controls_help_card(*config.settings_hub,
+          width,height,"startup",
+          [&]{config.settings_hub->close();
+              route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[4])});},route,
+          [&]{DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.settings_hub->render(draw,width,height);
+            window.draw(draw,automation->controls_settings_screenshot);
+          });
+    }
+    if (!automation->general_settings_screenshot.empty()) {
+      if (!config.settings_hub || !config.general_settings)
+        throw std::runtime_error("General settings validation requires the settings hub and overlay.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_general::check_general_settings(
+          *config.general_settings,config.general_settings->path(),width,height,"startup",
+          [&]{
+            config.settings_hub->close();
+            route({InputEventType::LeftPressed,center(entry_layout.settings)});
+            route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
+          },route,
+          [&]{
+            DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.general_settings->render(draw,width,height);
+            window.draw(draw,automation->general_settings_screenshot);
+          });
+    }
     if(config.settings_hub)config.settings_hub->close();
     if (automation->action != StartupEntryAutomationAction::Create) {
       evidence.setup_opened = workspace.screen() == StartupScreen::Setup;
@@ -412,26 +505,112 @@ StartupEntryResult run_native_startup_entry(Window &window,
                      &artwork_provider);
     window.draw(loading_draw, automation->loading_screenshot);
   }
+  stellar::native_client::PadNavigationRepeater pad_nav_repeater;
+  stellar::native_client::PadStickNavigator pad_stick_nav;
+  auto last_frame = std::chrono::steady_clock::now();
   for (;;) {
     if (config.audio.service) config.audio.service();
     const auto input = window.poll();
+    const auto frame_now = std::chrono::steady_clock::now();
+    const auto frame_dt = std::chrono::duration<float>(frame_now - last_frame).count();
+    last_frame = frame_now;
+    std::vector<InputEvent> pad_nav_events;
+    if (!input.focused) {
+      pad_nav_repeater.clear();
+      pad_stick_nav.clear(pad_nav_repeater);
+    }
+    pad_nav_repeater.update(frame_dt, [&](const InputEvent &held) {
+      if (!(config.settings_hub && config.settings_hub->capturing()))
+        if (auto nav = stellar::native_client::pad_navigation_event(held))
+          pad_nav_events.push_back(*nav);
+    });
+    std::vector<InputEvent> frame_events = pad_nav_events;
+    // Assistive-tech Invoke calls queue on the bridge off-thread; each
+    // drains as a Return press+release through normal dispatch.
+    if (config.accessibility_bridge)
+      for (auto n = config.accessibility_bridge->drain_activations(); n > 0; --n) {
+        InputEvent press{InputEventType::KeyPressed}; press.key = 13;
+        InputEvent release{InputEventType::KeyReleased}; release.key = 13;
+        frame_events.push_back(press);
+        frame_events.push_back(release);
+      }
+    // Queued RangeValue SetValue calls route to whichever visible settings
+    // panel owns the focused slider.
+    if (config.accessibility_bridge)
+      if (const auto set_value = config.accessibility_bridge->take_range_set())
+        (void)((config.audio_settings && config.audio_settings->visible() &&
+                config.audio_settings->set_focused_range(*set_value)) ||
+               (config.voice_settings && config.voice_settings->visible() &&
+                config.voice_settings->set_focused_range(*set_value)));
+    frame_events.insert(frame_events.end(), input.events.begin(), input.events.end());
     if (config.video_settings) config.video_settings->service(input.focused, input.renderable());
     if (input.quit_requested) {
       evidence.exit_requested = true;
       return {{}, true, std::move(evidence)};
     }
+    const auto announce_focus=[&]{
+      if(config.announcer){
+        const auto rect=workspace.focused_bounds(input.drawable_width,
+                                                 input.drawable_height,measure);
+        config.announcer->announce_focus(
+            workspace.focused_label(input.drawable_width,input.drawable_height,
+                                    measure),
+            rect?std::optional<stellar::engine::AnnouncementBounds>{
+                     {rect->x,rect->y,rect->width,rect->height}}
+                :std::nullopt,
+            std::nullopt,
+            workspace.focused_control(input.drawable_width,
+                                      input.drawable_height,measure),
+            std::nullopt,
+            workspace.focused_value(input.drawable_width,
+                                    input.drawable_height,measure));
+      }
+    };
     if (!input.renderable()) {
-      for (const auto &event : input.events)
-        if (!route_settings(event,input.drawable_width,input.drawable_height))
+      for (const auto &raw : frame_events) {
+        pad_nav_repeater.note(raw);
+        const bool pad_nav_owned=
+            !(config.settings_hub&&config.settings_hub->capturing());
+        const auto stick_press=
+            raw.type==InputEventType::GamepadAxis
+                ?pad_stick_nav.note(raw,pad_nav_repeater,pad_nav_owned)
+                :std::optional<InputEvent>{};
+        const InputEvent event=[&]{
+          if(stick_press)
+            if(auto nav=stellar::native_client::pad_navigation_event(*stick_press))return *nav;
+          if(raw.type==InputEventType::GamepadPressed&&pad_nav_owned)
+            if(auto nav=stellar::native_client::pad_navigation_event(raw))return *nav;
+          return raw;}();
+        if (!route_settings(event,input.drawable_width,input.drawable_height)) {
+          const int focus_before=workspace.focused();
           (void)workspace.handle(event, input.drawable_width,
                                     input.drawable_height, measure);
+          if(workspace.focused()!=focus_before)announce_focus();
+        }
+      }
       window.set_text_input(workspace.wants_text_input()&&
           !(config.general_settings&&config.general_settings->visible())&&!(config.settings_hub&&config.settings_hub->visible()));
       std::this_thread::sleep_for(std::chrono::milliseconds(16));
       continue;
     }
     bool exit{};
-    for (const auto &event : input.events) {
+    for (const auto &raw : frame_events) {
+      pad_nav_repeater.note(raw);
+      const bool pad_nav_owned=
+          !(config.settings_hub&&config.settings_hub->capturing());
+      const auto stick_press=
+          raw.type==InputEventType::GamepadAxis
+              ?pad_stick_nav.note(raw,pad_nav_repeater,pad_nav_owned)
+              :std::optional<InputEvent>{};
+      // Pad presses become navigation keys on the startup screens — no
+      // gameplay context exists yet — except while a rebind capture in the
+      // settings hub waits for the raw trigger.
+      const InputEvent event=[&]{
+        if(stick_press)
+          if(auto nav=stellar::native_client::pad_navigation_event(*stick_press))return *nav;
+        if(raw.type==InputEventType::GamepadPressed&&pad_nav_owned)
+          if(auto nav=stellar::native_client::pad_navigation_event(raw))return *nav;
+        return raw;}();
       if(is_developer_shortcut(event)){
         if(config.developer_access&&config.developer_access->eligible()&&workspace.screen()!=StartupScreen::Busy){
           const bool enabled=!config.developer_access->active();
@@ -458,8 +637,10 @@ StartupEntryResult run_native_startup_entry(Window &window,
         (void)config.audio_settings->handle(event, input.drawable_width, input.drawable_height);
         continue;
       }
+      const int focus_before=workspace.focused();
       const auto intent = workspace.handle(event, input.drawable_width,
                                            input.drawable_height, measure);
+      if(workspace.focused()!=focus_before)announce_focus();
       switch (intent.kind) {
       case StartupIntentKind::Exit:
         exit = true;

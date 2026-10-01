@@ -13,13 +13,13 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Capability | Status | Owner / important source | Tests | Known limitation / next work |
 | --- | --- | --- | --- | --- |
 | Window and platform | IMPLEMENTED BUT NEEDS POLISH | Engine `native_map_platform.cpp`, runtime paths/lease; App video controller | `native_client_platform`, `native_video_platform`, `native_video_controller` | Verified Windows x64 only; portable platform interface and device recovery need work |
-| Native input | PARTIALLY IMPLEMENTED | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`, action contexts incl. pad buttons/axes); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions`, `native_ui_layout` | No rebinding UI, multi-pad, or accessibility input layer |
+| Native input | IMPLEMENTED (rebinding) / PARTIALLY IMPLEMENTED (device policy) | Engine `native_map_platform.hpp` (keyboard/mouse/gamepad events), `input_actions.hpp` (`InputMapper`: stacked action contexts with exclusive fall-through, Button/Axis1D/Axis2D, chords, held gamepad-axis semantics, runtime `rebind()`, `bindings()` inspection, `save_contexts()` persisting the rebound map through the `load_contexts` schema — `RuntimeHost` feeds all normalized events through it, projects override via input-map JSON); App `map_camera.hpp`, `map_interaction.hpp`, workspaces | `native_client_input`, `input_actions` (incl. rebind + save/load round-trip), `native_ui_layout`, `--controls-settings-check` (live rebind smoke: row capture arm, Escape cancel, probe-key rebind, sibling steal, wheel-scroll to off-page rows incl. live pad-axis capture + steal via synthetic GamepadAxis events + D-key device-pin cycle (any→pad 1..4→any) on the focused row + steal/pin notices peeked through NativeCampaign::announcer() as pending Status announcements + every remaining trigger kind (MouseButton:3 right-click, GamepadPressed, wheel-on-axis, discrete-key swallow, left-click cancel, pointer-loss disarm — the last a live-caught fix), + startup-location help-card leg (mapperless Controls view, zero row hitboxes, Back out — same flag under --new-game-smoke), snapshot restore + persisted-file round-trip; caught and closed a clipped-page render overread, and the shipped list now scrolls on `VirtualizedList` so the pad-axis tail rows are reachable) | In-app rebind UI landed: the settings hub Controls view lists every Button action of the GALAXY context (InputMapper::context/key_name/describe_bindings), activation captures the next non-modifier keypress, right-click or gamepad button as the primary binding (alternates survive, Ctrl/Shift/Alt fold into chord_keys, Escape/left-click/pointer-loss cancel, a conflicting primary is stolen from its sibling action with a "reassigned from" notice), and the client persists the rebound map through save_contexts to galaxy-controls.json loaded over the defaults at startup. GamepadButton/MouseButton feeds are live in the client update loop under the same gameplay gate as keys (releases and axis state feed unconditionally so held bindings clear), and `--record`/`--replay` journals pad/mouse activations as `gamepad_button`/`mouse_button` commands so rebound sessions reproduce. Gamepad camera axes are live: the `GALAXY_PAD` context binds left-stick X/Y to `map_pan_x`/`map_pan_y` and right-stick Y to `map_zoom` (Axis1D over SDL axes 0/1/3, 0.18 dead zone, dt-scaled pan/zoom on the galaxy camera under the same surface gate as wheel input — the navigation smoke verifies stick pan/zoom end-to-end and that system view does not leak a galaxy-camera pan). Axis rebinding is live in the UI: the Controls view lists `GALAXY_PAD` Axis1D rows after the GALAXY buttons (a second context name on `set_input_mapper`), and capturing an axis row accepts a stick deflection past a 0.5 dead zone or a wheel scroll (discrete keys are swallowed — they cannot drive an axis); the same steal-on-conflict and persist path applies, and `load_user_bindings` injects the default pad context only when a saved map lacks it so user axis rebinds survive reload. Multi-pad is plumbed end-to-end: the platform opens up to four pads into stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry the slot, `InputBinding.device` pins a binding to one pad (`device` in the input-map JSON, omitted when unset), device-unset events stay wildcards so replayed recordings still match pinned bindings, and live stick values are keyed per (device, axis) — `input_actions` tests cover pin match/miss, wildcard matching, per-device axis sums and the save/load round-trip. Pad pinning is reachable in the UI: `kGamepadDeviceCount` names the shared slot bound, `describe_binding` renders a pin as `Pad N Btn/Axis M`, and a focused controls row cycles its gamepad-kind bindings through any→pad 1..4→any via D or right-click (`SETTINGS_CONTROLS_DEVICE*` announce/hint keys; the pin persists through the same `save_contexts` path). An accessibility input layer stays open; pin notices name the connected pad via `Window::gamepad_names()` (slot-number fallback) and flag a sibling action answering the same trigger on the target pad (`SETTINGS_CONTROLS_PIN_CONFLICT`). Pad UI navigation landed: `native_pad_input.hpp` translates dpad/south/east/start presses into arrow/Return/Escape events whenever a focus-ring surface owns input (`ui_owns_pad_input` mirrors the gameplay gate; rebind capture exempts itself) or when a navigable surface is merely showing and the pressed button is unbound — bindings win, so mapped gameplay pad actions still fire — giving every keyboard-navigable surface pad navigation without per-surface code; `native_client_input` covers the translation table and the navigation smoke exercises ring arming/back-out plus the bound-button policy. The startup entry loop applies the same translation unconditionally (no gameplay context exists pre-campaign; rebind capture stays exempt), so the entry/setup/settings screens are pad-drivable end-to-end. Held dpad directions auto-repeat as nav keys via `PadNavigationRepeater` (0.45 s initial delay, 0.09 s interval, per-device state, hitch-safe rescheduling, focus-loss disarm, emit-time ownership re-check) in both the campaign and startup loops. `PadStickNavigator` extends this to the left stick: a deflection past 0.5 synthesizes the matching dpad press through the same gate/translation/repeater (0.25 release hysteresis, reversal handling), and the bound-check is axis-aware — a camera-bound stick keeps panning in free play while a UI-owned one navigates (the smoke pins both halves). Still open: a deeper accessibility input layer |
 | 2D/UI renderer | IMPLEMENTED BUT NEEDS POLISH | Engine native map platform, UI skin and text fit | `native_text_measure`, `native_navigation_visual` | Shared helpers, but application-driven widgets/layout and no general UI scene framework |
-| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD) | `engine_scene3d`, `native_scene3d_gpu`, scale3d tests; `engine_project`/`engine_world` 3D doc+component coverage | Bounded CPU submission and fixed caches; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); no render graph/GPU-driven scene |
+| 3D renderer | IMPLEMENTED BUT NEEDS POLISH | Engine `native_scene3d.hpp`, `native_scene3d_gpu.cpp`, `mesh3d_loader` + `box_mesh`/`annulus_mesh`/`flared_annulus_mesh` primitives, `Scene3dDocument` + `RuntimeHost --scene3d` (fly camera, gravity/OBB sim, GPU composite under 2D HUD); **HDR pipeline**: scenes render into RGBA16F targets and resolve through a fullscreen tonemap pass (`tonemap.vert/.frag` — C1-continuous knee+headroom curve preserving the SDR band, premultiply-aware) when `SDL_GPUTextureSupportsFormat` reports float color targets, with automatic UNORM fallback; `Scene3DStatistics::hdr` reports the active path; **PBR + post**: per-material `PbrSurface3D` (metallic/roughness scalar+map, emissive map with nightside gate, equirect IBL for dielectric irradiance + specular, with a scene-level `environment` probe filling mapless opt-ins and an opt-in `environmentCapture` baking six pipeline face views at an anchor into that slot once per scene), `Atmosphere3D` limb scattering, ≤4 `PointLight3D` windowed inverse-square lights (optionally spot-cone gated), alpha cutout + UV tiling; per-view `RenderOptions3D` (quality tier Low/Medium/High/Ultra, exposure, mip-chain bloom, contrast/saturation/sharpen, vignette; Ultra = 4x MSAA when supported) + `DebugView3D` diagnostic shading (Lit/Unlit/Albedo/Normals/Roughness/Metallic/Emissive/LightingOnly/Lod/Residency/Shadows) and per-instance `visible_range` distance culling that also drops TextureStreamer demand; **directional shadow map** (`ShadowMap3D` on `Scene3D::create`): authored ortho coverage volume centred ahead of the camera, depth-only `scene3d_shadow` pass through the RenderGraph, 8-tap PCF at High/Ultra + single tap at Medium, tier-scaled resolution (1024/2048/4096), Low skips, up to four optional wider cascade tiers (`cascade_extents`, shared depth-array target + `sampler2DArray`) with margin crossfades, `Scene3DStatistics::shadow_casters` + per-tier `shadow_cascade_casters[]` workload counters; **surface detail**: `SurfaceResponse3D` subsets (normal/properties/cloud maps flag-gated, cloud-only legal), `cloud_albedo` lit deck composite over emissive under the atmosphere rim, `Material3D::terminator_wrap` wrap-diffuse across key/fill/point lights, `limb_darkening`/`limb_darkening_q` two-term (linear+quadratic transit law) N·V falloff for self-luminous discs (stars), `band_shear`+`band_waves` two-harmonic longitude warp (gas-giant differential rotation + zonal jets), `band_drift`/`band_turbulence` time-evolving deck scroll + warp, `band_diff` latitude-differential drift term (equatorial super-rotation), `orbital_beaming` first-order doppler asymmetry about local +Y (accretion discs), `accretion_disc_material3d` + `accretion`/`AccretionDisc` Shakura–Sunyaev radial-blackbody disc preset, `volume_scatter` directional limb-scatter for emission volumes, `forward_scatter`/`forwardScatter` Henyey–Greenstein phase (backlit dusty rings / opposition surge) with optional `forwardScatterBack`/`forwardScatterBackMix` second-lobe mix (narrow forward spike + broad weak back lobe), authored via `surface` + `terminatorWrap`/`limbDarken`/`bandShear`/`bandWaves`/`orbitalBeam` doc keys and `MaterialSurface`; **screen-space mesh LOD** — `MeshInstance3D::lod_meshes`/`lod_pixels` chains (≤8 halving levels) picked per-view from the projected bounding-sphere diameter via `select_lod3d_level`, shared between streamer demand and draw submission, `Scene3DStatistics::lod_instances` audit counter, `lods`/`lodPixels` doc keys + `MeshLods` component; tier gates: Low disables aniso/cubic sampling + caps volume ray-march at 16, Medium 32 — all authored through `Scene3dDocument` + components + editor controls | `engine_scene3d`, `native_scene3d_gpu` (incl. HDR-engaged pixel assertions, PBR/point-light/atmosphere/post probes + budget accounting), scale3d tests; `engine_project`/`engine_world`/`engine_runtime` 3D doc+component coverage | Bounded CPU submission; SAT OBB collision over mesh local bounds (no per-triangle or rigid-body solver); key-light ortho shadow map with up to two optional far cascade tiers + up-to-4 shadowed spot cones sharing one depth atlas + `casts_shadow` omni lights sharing a cube-face atlas (`casts_shadow`, per-instance `casts_shadow`/`receives_shadow` opt-outs); omni point lights unshadowed, capped at 4; atmosphere is a limb approximation; instancing + DrawBatcher ordering + RenderGraph scheduling + TextureStreamer residency incl. partial mip tails wired (no indirect draw — per-batch pipeline/sampler binds keep draw_count=1) |
 | Mesh/geometry and culling | IMPLEMENTED BUT NEEDS POLISH | Engine solid/triangle meshes, billboard batch, scene bounds | scene/triangle/scale tests | Procedural geometry and conservative limits, not a general imported geometry cooker |
 | Lighting/materials | IMPLEMENTED BUT NEEDS POLISH | Engine scene material/fragment shader; spherical material preparation | `engine_spherical_material`, `native_scene3d_gpu`, `native_planet_materials` | Approximate illumination/response from artwork; no full physically calibrated renderer |
 | Canonical planet classification/art | IMPLEMENTED | Core `planet_appearance.hpp/.cpp`, taxonomy/art catalogs | `planet_appearance`, `native_planet_materials` | Scoped registry/generation contract; 66 definitions do not mean every subclass has admitted art |
-| Planet globes and inspection | IMPLEMENTED BUT NEEDS POLISH | App native planet globe/materials/planetary screen, shared appearance | `native_planetary_screen`, `native_giant_visual` | Broad developer smoke material assertion remains open; inspect identity/resolution before claiming full visual parity |
+| Planet globes and inspection | IMPLEMENTED BUT NEEDS POLISH | App native planet globe/materials/planetary screen, shared appearance | `native_planetary_screen`, `native_giant_visual` | Developer smoke asserts canonical material identity at the globe LOD for nine authored Sol bodies and eight forced imports, and a broad sweep resolves the canonical albedo for every generation-enabled subclass (64) through the real cache; inspect identity/resolution before claiming full visual parity |
 | Giant replacement/rings | IMPLEMENTED BUT NEEDS POLISH | Core `planetary_rings.cpp`; Engine ring material; App ring assembly | `giant_ring_rules`, `engine_ring_material`, `native_giant_visual` | Accepted art and angular detail integrated; approximate shadow/optics, limited physical evolution |
 | Satellite orbit/pose | IMPLEMENTED BUT NEEDS POLISH | Core `planetary_satellites.cpp`; Engine `analytic_orbit.hpp`; App system view | `sol_catalog`, `native_moons` | Mean elements/chart spacing, not ephemerides or full perturbations |
 | Multiple-star orbits | IMPLEMENTED BUT NEEDS POLISH | Core `stellar_orbits.cpp`, App system view | `stellar_orbits`, `native_system_view` | Analytic binary/hierarchical triple model, not general N-body dynamics |
@@ -29,38 +29,2239 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 | Stars / SMBH / coverage | IMPLEMENTED BUT NEEDS POLISH | Core stellar object/coverage; App star markers/celestial appearance | `stellar_objects`, `stellar_developer_coverage`, native star-art tests | Game-tuned populations and artistic LODs, not a calibrated census |
 | Phenomena and skies | IMPLEMENTED BUT NEEDS POLISH | Core galaxy phenomena/system background; Engine organic region/background; App consumers | `galaxy_phenomena`, `system_background`, backdrop tests | One admitted faint sky; local decorative gas is separate from physical phenomenon metadata |
 | Stellar activity scheduler | IMPLEMENTED | Core `stellar_activity.cpp`, `CampaignFrame` independent clock | `stellar_activity`, persistence tests | Scoped event timeline/history and CME hooks; damage/space-weather game effects remain unfinished |
-| Stellar VFX rendering | IMPLEMENTED BUT NEEDS POLISH | App eruption art/effects; Engine surface attachments/curved mesh | `native_stellar_eruptions`, scene GPU tests | Image-derived curved surfaces; blurry ray-marched production mode retired; general particle framework absent |
-| Entity identity | PARTIALLY IMPLEMENTED | Engine `EntityRegistry` in `foundation.hpp`; Core domain IDs | `foundation`, persistence tests | No unified World/component store or full entity lifecycle across game domains |
-| Clocks/scheduling | PARTIALLY IMPLEMENTED | Engine `FixedClock`; Core strategic/tactical/developer clocks, campaign phases | `foundation`, `strategic_clock_parity`, `campaign_frame_parity` | No reusable dependency scheduler or simulation LOD |
+| Stellar VFX rendering | IMPLEMENTED BUT NEEDS POLISH | App eruption art/effects; Engine surface attachments/curved mesh; engine `VfxSystem` general framework — shared `EmitterDefinition`s, deterministic fixed-capacity pools, per-instance LOD rate fade, entity attachments, global particle budget (demand-proportional rate taper + hard headroom; `RuntimeHost` defaults to 64k) | `native_stellar_eruptions`, scene GPU tests, `render_pipeline` (budget/LOD/determinism), `engine_vfx` (spawn/drain lifecycle, budget taper, LOD scale, lifetime, curves, determinism) | Image-derived curved surfaces; client eruption art still bespoke rather than authored on `VfxSystem` |
+| Entity identity | PARTIALLY IMPLEMENTED | Engine `EntityRegistry` in `foundation.hpp`; `World` component store (`world.hpp`: components, hierarchy, queries, binary snapshot/restore, per-type `component_hashes()` divergence sections, `bind_legacy` namespaced IDs, generational `EntityId`s); Core `campaign_world_projection` adapts authoritative `FreshCampaignState` containers into the typed store as a read model — `sync_campaign_world` reconciles incrementally (stable `EntityId`s across refreshes, campaign-namespaced sweep only) and feeds the developer report census | `foundation`, `engine_world`, `campaign_world_projection`, `campaign_diagnostics` tests | Projection is a read model over authoritative Core containers — no full entity lifecycle/write path across game domains yet |
+| Clocks/scheduling | IMPLEMENTED BUT NEEDS POLISH | Engine `FixedClock`; `SimulationScheduler`/`SimulationExecutor` tiered LOD with dependency-chained tasks, dirty/event wakeups, `consume_tick` abort semantics, capture/restore; Core strategic/tactical/developer clocks; `GalaxySimulationStepCoordinator` routes all 12 phases through the executor preserving order — phase cadence policy (`set_phase_tier`/`wake_phase`, elapsed-span scaling) gated by the seeded `campaign_phase_cadence_oracle`; event-driven wake wiring — accepted `issue_*` commands wake the dormant domains they feed (military→combat+exploration, colony/outpost→colonization+exploration, freight→freight+exploration, civilian→freight+colonization(+exploration on return)); the oracle pins the per-phase activity matrix for both the minimal and seeded worlds (7 phases provably inert in fresh campaigns) plus command-wake exactly-once semantics | `foundation`, `strategic_clock_parity`, `campaign_frame_parity`, `simulation_executor`, `simulation_persistence`, `simulation_scale_*`, `campaign_coordinator*`, `campaign_phase_cadence_oracle` | Phases remain sequential (one dependency chain); all phases still Active in production — demotion policies must clear the parity oracle per phase before adoption; intra-step parallelism unexercised |
 | Jobs/threading | PARTIALLY IMPLEMENTED | Engine `JobSystem` (priorities, cancel tokens, `submit_graph` dependency graphs, per-tag stats); save writer, image preparation, audio director, territory overlay, campaign session, planet-material decode queue | `job_system`, `foundation`, image preparation, campaign session, planet-material tests | Bounded specialized consumers; no work-stealing or affinity policy |
 | Events | PARTIALLY IMPLEMENTED | Engine owner-thread `EventQueue<T>` + `event_bus.cpp` typed subscriptions; Core domain events | `foundation`, `event_bus`, `mission_graph`, notification/activity tests | Event bus library unconsumed by the game; no cross-thread dispatch policy |
-| Physics utilities | PARTIALLY IMPLEMENTED | Engine `physics3d.hpp`, `analytic_orbit.hpp` | scene/triangle/orbit/scale tests | Kinematics and continuous primitive queries; no general rigid-body/constraint/N-body world |
-| Spatial queries | PARTIALLY IMPLEMENTED | Engine point/region/3D indices, parent chains; Core batch indices | `engine_parent_chain_index`, scale/survey/economy tests | Reusable pieces; no unified query scheduler or stable world-wide index lifetime policy |
-| Navigation/logistics | IMPLEMENTED BUT NEEDS POLISH | Core lane network, reach, exploration, freight/logistics | route/reach/freight/exploration parity | Domain-specific rules, not generic Engine route service; combined fleet stress still needed |
+| Physics utilities | PARTIALLY IMPLEMENTED | Engine `physics3d.hpp`, `analytic_orbit.hpp`, `broadphase.hpp` (`UniformBroadphase<2|3>` uniform-grid candidate pairs — sorted/deduplicated, never misses a true AABB overlap; `RuntimeHost` 2D+3D contact scans consume it, replacing O(n²) pairwise enumeration); `PhysicsWorld` (`physics.hpp`: circle/AABB/segment primitives, broadphase overlap/raycast/sweep, trigger enter/stay/exit, versioned capture/restore round-tripping the live overlap set) — consumed by the engine-shell PHYSICS inspector | scene/triangle/orbit/scale tests; `render_pipeline` broadphase correctness; `engine_world` collision/landing | Kinematics, continuous primitive queries and AABB broadphase; no general rigid-body/constraint/N-body world |
+| Spatial queries | PARTIALLY IMPLEMENTED | Engine point/region/3D indices, parent chains; `SpatialGrid` (deterministic cell order, insert/remove/update, radius/AABB/ray queries) — galaxy-map `system_hit` hit-tests through a lazily rebuilt `SpatialGrid<int>`; Core batch indices | `engine_parent_chain_index`, `spatial_physics`, scale/survey/economy tests | Reusable pieces; no unified query scheduler or stable world-wide index lifetime policy |
+| Navigation/logistics | IMPLEMENTED BUT NEEDS POLISH | Core lane network, reach, exploration, freight/logistics; `CivilizationLogisticsCoverage::external_links` projects sealed prospective corridor edges (endpoints, capacity, demand, transit days, represented/enabled) consumed by the supply workspace's INTERSTELLAR LINKS section and the colony catalog | route/reach/freight/exploration parity, `native_logistics` edge-identity/name-resolution coverage | Domain-specific rules, not generic Engine route service; combined fleet stress still needed |
 | Knowledge/observation | IMPLEMENTED BUT NEEDS POLISH | Core knowledge, campaign observation, observer commands | knowledge/diplomacy invariants | Game-scoped privacy model; no general fog engine |
 | Economy/production | IMPLEMENTED BUT NEEDS POLISH | Core economy/industry/construction/shipbuilding/biology | economy/production parity, 5k colony scale | Not a generic resource graph; combined late-game load unverified |
 | Research | IMPLEMENTED BUT NEEDS POLISH | Core `adaptive_research_*` catalogs/services/snapshots | native adaptive research parity family | Existing domain runtime, not proof that every advanced research design is fully exposed in UI |
 | Strategic AI | PARTIALLY IMPLEMENTED | Core strategic intent/planning and fleet intelligence | strategic/campaign/exploration tests | Correctness coverage does not demonstrate effective complete long-game AI |
-| Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
-| Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace | combat/massive persistence/engine/lifecycle tests | Large combined AI/fleet/tactical performance and final gameplay breadth unverified |
+| Diplomacy | IMPLEMENTED BUT NEEDS POLISH | Core diplomacy lifecycle/runtime/observer commands; App workspace; `ObserverDiplomacyActionAvailability` carries a constant-size `DiplomacyActionBlocker` per action (`can_* == (blocker == none)`), propagated through `NativeDiplomacySelected` to disabled-slot/term hovers localized via `DIPLOMACY_BLOCKER_*` | diplomacy parity and native controller/workspace | Current game feature set, not all design ambitions |
+| Combat | PARTIALLY IMPLEMENTED | Core combat/massive combat state and 3D motion; App battle workspace; Core `fleet_composition` projects per-fleet member vessels (`FleetCompositionMember` — tactical vessel id, resolved design, role flags, subsystem/hull fractions, battle record, embarked payload) in deterministic vessel-id order through the sealed `NativeOwnFleet::members` view-model to the fleet workspace roster and controlled-assets count | combat/massive persistence/engine/lifecycle tests, `fleet_composition`, `native_fleet_controller`/`native_fleet_workspace` member coverage | Large combined AI/fleet/tactical performance and final gameplay breadth unverified; canonical fleets field one vessel so member lists are single-entry under the current fidelity contract |
 | Save/recovery | IMPLEMENTED BUT NEEDS POLISH | Core Player17 DTO/JSON/recovery; Engine atomic files | persistence/recovery/save tests | Large JSON latency/memory, no incremental world DB/cloud-save service |
-| Replay | PARTIALLY IMPLEMENTED | Engine `replay.cpp` command journal consumed by the client (`--record`/`--replay`, verified `diverged:false`); deterministic parity fixtures, QA checkpoints | QA/persistence/parity tests, replay smoke | No interactive divergence-localization tooling |
+| Replay | PARTIALLY IMPLEMENTED | Engine `replay.cpp` command journal consumed by the client (`--record`/`--replay`, verified `diverged:false`); deterministic parity fixtures, QA checkpoints; `document_section_checkpoints` + `verify_checkpoint_sequence` localize save-checkpoint divergence to the named JSON section (`save:World.Fleets`) instead of a whole-document hash; `--record` also retains each capture's canonical document under `<recording>.expected/<tick>.json`; on divergence the client dumps the actual document to `replay-divergence-<tick>.json` and leaf-diffs it against the retained expected sidecar via `document_leaf_diff` (member/array index paths with expected/actual values, bounded at 32 leaves) into `replay-divergence-<tick>.diff.txt`; `--replay-until <tick>` stops a replay at a chosen tick and dumps the canonical document to `replay-until-<tick>.json` next to the recording — leaf-diffed immediately against the expected sidecar when one exists (writes `replay-until-<tick>.diff.txt`, prints the first leaf), giving a bisect tool for isolating which tick introduces divergence; `--replay-info <file>` prints a headless JSON inventory (header seed/build/version, command count + tick span + per-kind counts, `truncated`, `memory_bytes` occupancy, `commands_ordered`/`checkpoints_ordered` monotonicity (the feed and cursor verifier assume non-decreasing ticks — a hand-edited recording is flagged), per-tick checkpoint section counts, and which `<tick>.json` expected sidecars are on disk) and exits before window creation, so it runs in scripts without a GPU; each present sidecar is verified — `expected_verified` recomputes `document_section_checkpoints` from the retained document and compares against the recorded hashes, flagging a stale or mismatched sidecar that would silently poison a later leaf-diff, and `expected_mismatch` names the first diverging section label (`<unparseable>`/`<section count>` for structural failures); `--record` bounds the journal — a 128 MiB `ReplayRecorder::set_memory_budget` truncates to an honest prefix (later commands/checkpoints drop, no gaps) and serializes `truncated:true`, which `parse` round-trips, `--replay-info` reports, and `--replay` advisories on stderr at load (nothing past the prefix is verified; non-monotonic streams warn that out-of-order entries never fire); once the whole recorded stream is consumed and every recorded checkpoint verifies without divergence, `--replay` prints a one-shot `replay_verified={"commands":N,"checkpoints":M}` line — a success signal for scripted runs instead of only an absence of failure; `--replay-exit` turns it into a verification command (exit 0 on verify, divergence/stall throws — a run whose tick or cursors stall 600 frames with pending work reports the stall rather than hanging); pointer input journals as `pointer_button` commands carrying the raw event type, drawable-pixel position and drag deltas (moves record only while a button is held — accumulated drag motion decides drag-vs-click at release, hovers are cosmetic), and replay merges them as real `InputEvent`s ahead of the frame’s live event stream so hit-testing and UI dispatch run the identical path as live input (right-clicks no longer double-journal as `mouse_button` bindings); the header records the drawable size at record time, `--replay-info` reports it and counts `pointer_out_of_bounds` commands whose coordinates can never hit the same UI cell and `unverified_tail_commands` past the last checkpoint tick (they replay but prove nothing), and `--replay` warns when the current drawable differs since hit positions move; `replay_verified` flushes immediately for scripted watchers, and `--replay` without `--load` or a smoke session fails fast instead of idling on the interactive startup screen; the inventory renderer is shared engine code — `replay_info_json(recording, path)` in `replay.cpp` — and `RuntimeHost` generated games accept `--replay-info <file>` with the same schema, exiting before window creation; internal smoke saves that never entered the input stream are journaled by `NativeCampaign::request_internal_save()` — it records a synthetic press of the active `quicksave` binding while a recorder is attached, so boundary/`request_smoke_save`/pending-drain/profile saves replay through the real save path and reproduce their checkpoints (input-driven saves already journal their own command; strategic-day autosaves reproduce deterministically) | QA/persistence/parity tests, replay smoke, `replay` unit tests (incl. leaf-diff path/value/absent-side cases and budget truncation/round-trip), `--replay-info` verified against a synthesized fixture incl. matching/stale/unparseable sidecars and error paths; the navigation smoke injects a recorded `pointer_button` click through the replay feed and asserts the real dispatch path opens and closes the HUD menu | `--replay-until` guards against a stalled tick: 600 frames without progress (paused campaign or exhausted command stream — pending commands key off the same tick, so a frozen tick can never unpause) reports the stall and exits instead of hanging; no interactive viewer yet |
 | Asset registry/packages | IMPLEMENTED | Engine `asset_registry.cpp`, checksummed aliases/chunks | `engine_asset_cooker`, cooked validation evidence | Shipping marker forbids loose fallback; missing/corrupt content is an error |
 | Asset cooker/compression | IMPLEMENTED BUT NEEDS POLISH | Engine asset cooker/texture cook/XPRESS+LZMS codecs, `StellarCooker`; **generic `scan_content` project mode** recursively indexes any content root into a project-namespaced package — no reviewed SC export manifests required | `engine_asset_cooker` (incl. scan-mode cook: namespaced package, texture cook, byte round-trip), image/GPU tests | HDR/mesh cooking absent; ~1,011 legitimate quality-gate fallbacks remain (LZMS cut stored bytes ~12%) |
 | Texture streaming/residency | PARTIALLY IMPLEMENTED | Metadata/mip selection, bounded preparation and image/GPU caches | image preparation/GPU/cooked flare regressions | No virtual textures or adaptive device VRAM budget |
-| Audio | PARTIALLY IMPLEMENTED | Engine native audio + Windows media decode; App director/settings | `native_audio`, `native_audio_director`, settings tests | Current-track PCM and bounded queues; incremental/spatial/bus architecture unfinished |
-| Cosmetic animation | PARTIALLY IMPLEMENTED | Shared axis/phase, slow spin/tumble and event interpolation | moon/small-body/activity tests | Specialized consumers, no general animation graph/tracks |
+| Audio | PARTIALLY IMPLEMENTED | Engine native audio + Windows media decode; incremental pull streaming (`AudioStreamDecoder` + `open_audio_stream`: lazy Media Foundation reader bound on first `read`, normalized 48 kHz stereo F32 chunks, `rewind()` for looping, `AudioStreamError` typed failures; no 16 MiB source / 96 MiB decoded caps — bounded memory for arbitrary track length) feeding `AudioOutput::play_music` under the same 0.75 s bounded SDL queue; App director streams its music track through it (`stats().music_streaming`) with stream failures classified permanent vs recoverable device faults; device-fault recovery — device-level failures (unplugged/default-device/SDL stream faults) arm a bounded 5 s retry that rebuilds `AudioOutput`, restores persisted volumes, resubmits the decode job when needed, and resumes music via the normal `menu_ready` path (`stats().device_recoveries` counts rebuilds) | `native_audio` (chunked-decode PCM parity vs whole-file, rewind replay, oversized-source streaming, streamed-music queue + diagnostics, effect pan validation), `native_audio_director` (injected-fault recovery + decode-no-retry), settings tests | Whole-file decode remains for effects/voice; `play_effect(clip, pan, gain)` applies an equal-power stereo pan and a distance gain at queue time (RuntimeHost pans the bounce cue by the entity's camera-relative screen position and attenuates it by normalized distance from the view center — a corner impact plays at half gain); mixer buses remain open |
+| Cosmetic animation | PARTIALLY IMPLEMENTED | Engine `FloatCurve`/`Timeline`/`AnimationPlayer` (eased keyframes, loop/pingpong, event markers, playhead lifecycle with speed/pause/seek/finish); scene documents author `animations` clips — `RuntimeHost` steps `AnimTimeline` components in sim time across x/y/w/h/vx/vy/opacity/rotation/spin/tintRGB channels, emits crossed events via `on_anim_event`, snapshots the playhead; celestial slow-spin/orbit/event interpolation unchanged | `economy_animation` (curve/timeline/player lifecycle), `engine_world` (clip codec + component + playhead save/load) | Skeletal/transform blending and LOD contracts open; channel ownership is per-track (a track sets its field each step) |
 | Developer tools | IMPLEMENTED BUT NEEDS POLISH | Core developer indices/control; App diagnostics panel; QA host | developer index/coverage/host/fault tests | Not a complete editor, profiler or AI decision journal |
 | Diagnostics/crash reports | IMPLEMENTED BUT NEEDS POLISH | Engine runtime diagnostics/log/bundle; App context and support service | `engine_runtime_diagnostics`, developer fault/support tests | Local/bounded/best-effort; forced kill/power loss not guaranteed, no automatic upload |
-| Profiling/memory accounting | PARTIALLY IMPLEMENTED | Engine phase timing, queue/cache ledgers; QA process samples | diagnostics/scale tests | No integrated GPU timeline or allocator-tag census |
+| Profiling/memory accounting | PARTIALLY IMPLEMENTED | Engine phase timing, queue/cache ledgers; `Window::draw` attributes the scene3d backend's resident texture/mesh/render-target VRAM plus the 2D image/text caches to MemoryTracker subsystems (`scene3d-textures`/`-meshes`/`-targets`, `ui-image-cache`, `ui-text-cache`) once per draw; World occupancy census — `World::estimated_memory_bytes()`/`EntityRegistry::memory_bytes()`/component-store `memory_bytes()` measure container capacities (sparse/dense vectors, hierarchy + legacy maps, codecs, membership) for `MemoryTracker::report`; the developer report registers the projected campaign world as `campaign-world-projection` and carries `worldProjection.estimatedMemoryBytes`; `EventHistory::estimated_memory_bytes()` counts inline deque storage plus per-event string/vector payloads — the diagnostic monitor reports it as `campaign-event-history` on the daily inspection cadence so chronicle growth over long campaigns is visible; `ReplayRecorder::estimated_memory_bytes()` counts command-payload growth and the client reports it as `replay-recorder` while a recorder is active; the client's `--record` recorder carries a 128 MiB `set_memory_budget` — past it the recorder keeps an honest prefix (no later commands/checkpoints claim fidelity) and serializes a `truncated` flag; the audio director reports bounded queue occupancy as `audio-queues` (queued music+voice bytes against their combined queue limit, refreshed per frame after `service()`); the client's per-update census also reports `territory-overlay` (cached overlay image bytes against the 16 MiB bound) and `image-preparation` (outstanding decode reservations against the 32 MiB bound), and the map smoke asserts all three client cache subsystems register | diagnostics/scale tests; `native_scene3d_gpu` (attributed bytes equal renderer residency, all five subsystems present); `engine_diagnostics` (World + EventHistory census growth), `campaign_world_projection` (census footprint scales with entities) | No integrated GPU timeline; census is container-capacity occupancy, not allocator truth |
 | Versioned Windows maintenance | IMPLEMENTED BUT NEEDS POLISH | Engine product version/lease; `installer/`; update scripts | `engine_windows_maintenance`, `engine_windows_maintenance_os` | Offline unsigned dev, exact-base whole-file updates; no remote updater or rollback after successful cleanup |
-| Localization | PARTIALLY IMPLEMENTED | Engine `LocalizationTable`/`LocalizationService` (fallback chain, format/plural, reload); the startup screens, new-game setup (species details, galaxy selection, sandbox configuration), diplomacy, research (workspace plus the projection's purpose/benefit text, action reasons, domain tabs and notices), fleet, construction, inspection, economy (workspace plus the treasury view-model's cards, treasury/priority status, flow rows and notices), supply, colony-roster, colony-workspace, planetary-screen, system (including the small-body survey panel), battle, shipyard, overview, notification-feed, command-HUD, planet-globe, controlled-assets, settlement, galaxy-phenomena hover/label surfaces (secrecy labels preserved), the setup controller's preset labels and validation messages, and the startup/generation session status strings, pause menu, settings hub, and General/Audio/Video/Voice panels plus voice-cue subtitles consume `data/locale/en.json` | `localization`, `native_general_settings`, `native_audio_settings`, `native_video_settings`, `native_voice_settings`, `native_settings_hub`, `native_startup_workspace`, `native_new_game_workspace`, `native_diplomacy_workspace`, `native_research_workspace`, `native_research_controller`, `native_fleet_workspace`, `native_construction_workspace`, `native_inspection`, `native_economy_workspace`, `native_economy`, `native_logistics_workspace`, `native_colony_roster`, `native_colony_workspace`, `native_planetary_screen`, `native_system_workspace`, `native_small_body_panel`, `native_body_inspection`, `native_battle_workspace`, `native_shipyard_workspace`, `native_overview`, `native_notifications`, `native_command_hud`, `native_planet_globe`, `native_controlled_assets`, `native_settlement_workspace`, `native_phenomena`, `native_new_campaign_setup`, `native_new_campaign_generation`, `native_startup_session`, `native_voice_playback` | Startup chrome, setup wizard (including producer-side preset labels and validation messages), diplomacy/research/fleet/construction/inspection/economy/supply/colony-roster/colony/planetary/system/battle/shipyard/overview surfaces, small-body survey panel, phenomena hover cards (knowledge-gated labels resolve only at presentation), navigation/resource HUD chrome, notification feed (categories stay stable publisher IDs — only display labels translate), menus, and voice cue keys resolve through the catalog, English only; test-only dead presentation code and a few HUD surfaces remain literal |
+| Localization | PARTIALLY IMPLEMENTED | Engine `LocalizationTable`/`LocalizationService` (fallback chain, format/plural, reload); the startup screens, new-game setup (species details, galaxy selection, sandbox configuration), diplomacy, research (workspace plus the projection's purpose/benefit text, action reasons, domain tabs and notices), fleet, construction, inspection, economy (workspace plus the treasury view-model's cards, treasury/priority status, flow rows and notices), supply, colony-roster, colony-workspace, planetary-screen, system (including the small-body survey panel), battle, shipyard, overview, notification-feed, command-HUD, planet-globe, controlled-assets, settlement, galaxy-phenomena hover/label surfaces (secrecy labels preserved), the setup controller's preset labels and validation messages, and the startup/generation session status strings, pause menu, settings hub, and General/Audio/Video/Voice panels plus voice-cue subtitles consume `data/locale/en.json` | `localization`, `native_general_settings`, `native_audio_settings`, `native_video_settings`, `native_voice_settings`, `native_settings_hub`, `native_startup_workspace`, `native_new_game_workspace`, `native_diplomacy_workspace`, `native_research_workspace`, `native_research_controller`, `native_fleet_workspace`, `native_construction_workspace`, `native_inspection`, `native_economy_workspace`, `native_economy`, `native_logistics_workspace`, `native_colony_roster`, `native_colony_workspace`, `native_planetary_screen`, `native_system_workspace`, `native_small_body_panel`, `native_body_inspection`, `native_battle_workspace`, `native_shipyard_workspace`, `native_overview`, `native_notifications`, `native_command_hud`, `native_planet_globe`, `native_controlled_assets`, `native_settlement_workspace`, `native_missions`, `native_phenomena`, `native_new_campaign_setup`, `native_new_campaign_generation`, `native_startup_session`, `native_voice_playback`, `native_missions` | Startup chrome, setup wizard (including producer-side preset labels and validation messages), diplomacy/research/fleet/construction/inspection/economy/supply/colony-roster/colony/planetary/system/battle/shipyard/overview surfaces, small-body survey panel, phenomena hover cards (knowledge-gated labels resolve only at presentation), navigation/resource HUD chrome, notification feed (categories stay stable publisher IDs — only display labels translate), menus, and voice cue keys resolve through the catalog. **Second shipped locale**: `data/locale/de.json` (full 1418-key German table, `fallback: en`) — every `Data/locale/<id>.json` is staged by `stellar_runtime_data` and enumerated at startup; General Settings persists `GeneralPreferences::locale` with a LANGUAGE button cycling discovered ids, and saving rebuilds the live `LocalizationTable` in place (selected table + English fallback map — surfaces keep their borrowed pointers, so the switch applies mid-session). The `localization` test validates every shipped non-baseline catalog covers all baseline keys with matching placeholders; research card state badges and queue status resolve through the catalog too; the HUD's remaining literals (system-environment loading banner, central-object galaxy label, map-zoom readout, star-chart status, diagnostic-export notices, and the three nav labels that bypassed `tr()`) now resolve through the catalog, and `SessionNotice` carries a `message_key` so every fixed session notice (save/load/recover/exit/wait flows) translates at display time while dynamic failure text stays literal; the keyboard-candidate status lines (`STATUS_*` — research/construction candidate cycling and selection denials, colony-world unavailability) resolve at their call sites, as do the planetary order outcome notices, the construction loading notice, the unknown-system display name, the diplomacy unsurveyed-destination notice, the freight-restored notice, and the system-view phenomena band (uncharted placeholder + sensor/survey suffixes reuse the `PHENOMENA_*` keys); the campaign-feedback toast's category labels (`FEEDBACK_*`), the home-logistics producer's node-kind/status/unavailable/legend strings (`SUPPLY_*`), and the system-travel observer/survey denials (`TRAVEL_DENY_*`) resolve through `set_localization` on their controllers; the command controllers' fixed denial/result messages and display labels resolve the same way — fleet (`FLEET_MSG_*`), outpost freight (`FREIGHT_MSG_*`), surface construction (`SURFACE_*` action labels, confirmation descriptions, and result messages incl. the `{n}`-day hub-expansion format), shipyard (`SHIPYARD_*` yard name, unavailable-design placeholder, and stale-queue denials), settlement missions (`SETTLE_*` denials plus the three live-status labels), system view (`SYSTEM_DENY_*`), and diplomacy (`DIPLOMACY_*` contact/relationship/access/agreement display vocabularies and stale-state message) — diplomacy filters compare the raw `political_state`/`agreement_status` enum fields instead of localized display text, and proposal summaries persisted into simulation records stay literal (determinism); construction's stale denial (`CONSTRUCTION_MSG_STALE`), the colony controller's four build denials (`COLONY_MSG_*`), the audio/voice panel status lines (`SETTINGS_AUDIO_STATUS_*`/`SETTINGS_VOICE_STATUS_*`), and the video controller's classified recovery/save/rejection notices (`SETTINGS_VIDEO_NOTICE_*`) resolve the same way; the missions producers' composed text resolves through a locale-injected signature — `evaluate()`'s per-fleet status sentences (`MISSION_SUMMARY_*`/`MISSION_ESTIMATE_*`/`MISSION_FOLLOWUP_*`), the colony-site browser's action labels/headings/aboard/viability/authorization/affordability lines (`MISSIONS_*`), `build_mission_board`'s card ETA/destination fallbacks, and `build_owned_colony_rows`' orbital-habitat/deep-space/freight strand `build_owned_colony_rows`' orbital-habitat/deep-space/freight strings; the notification feed carries a `message_key`/`message_arg` pair so the seven coalesced feedback headlines (`NOTIFY_MSG_*`) and the diplomatic-event messages (`NOTIFY_DIP_*`, including the unidentified-contact signal) translate at display time while chronicle/core summaries stay literal, and `observer_safe_fleet_message` resolves its `Unknown system` redaction token through `SYSTEM_NAME_UNKNOWNthrough `SYSTEM_NAME_UNKNOWN`; `VoiceCaption` carries `speaker_key`/`text_key` so the legacy `VoiceCue` subtitles (`VOICE_CUE_*`/`VOICE_SPEAKER_SCIENTIST`) translate at caption-render time like the keyed cue scripts; voice-dialogue cue text resolves through `dialogue_key` cue scripts (a separate voice-data channel), and test-only dead presentation code, developer-tool surfaces (English-only by convention), command-outcome text emitted by core controllers, and the core load-pipeline status detail remain literal. The `localization` test additionally audits source references: a single-pass scanner over `app/native_client` (comments, strings, char literals, raw strings and digit separators handled) requires every `ALL_CAPS_WITH_UNDERSCORES` literal to exist in the baseline catalog — a missing key fails with `file:line`. Dynamic `PREFIX_ + value` families are skipped; the five intentional non-key identifiers (input-context names, env vars, dataset tokens) carry an explicit allowlist so adding a new non-key literal is a conscious act; the audit caught and closed 44 previously-silent gaps (a11y focus labels across chronicle/roster/assets/logistics/construction/economy/inspection/research/notifications panels, `SETTINGS_SCALE_*`/`SETTINGS_COLORBLIND_*` option names, `BATTLE_*` transport labels, `NAV_*`/`SETUP_*_LABEL` chrome); a second check walks the embedded input-context JSON (`R"json(...)` blobs) and requires a `SETTINGS_ACTION_<UPPER(name)>` entry for every declared `InputMapper` action — it caught the three un-cataloged `GALAXY_PAD` axis actions (`map_pan_x`/`map_pan_y`/`map_zoom`), now keyed; a third pins `native_chronicle::category_label`'s return labels to `NOTIFY_CATEGORY_<UPPER(label)>` entries so a new event-domain prefix can't silently render English |
 | Steam/platform services | PARTIALLY IMPLEMENTED | Engine `PlatformServices` facade + `NullPlatformBackend`; client reports backend status in support bundles | `package_platform` | No Steamworks backend yet; standalone behavior unchanged |
-| Standalone engine shell | IMPLEMENTED BUT NEEDS POLISH | `app/engine_main.cpp` (`stellar-engine.exe`) links only `stellar_engine` + `stellar_native_platform` — windowed Vulkan tools host (Projects/Dashboard/Assets/Profiler/Localization sidebar), JobSystem demo work, Profiler aggregates/frame graph, `VirtualizedList` asset browser with image preview, `LocalizationTable` catalog inspector, diagnostics install. The Projects tool runs the complete game loop: create -> author (Scene tool: ~30-field entity+tilemap property list, animated/flipped/rotated/tilemap preview, drag-move, undo, duplicate, reorder) -> cook -> build -> test -> run -> package. **Projects tool** creates/opens `EngineProject` game projects (`project.stellar.json` manifest, scaffolded `packages/<id>` base package owning the project namespace, starter `src/main.cpp`), resolves their content packages through `PackageRegistry`, and re-roots the asset browser at the project's own content tree; **COOK** runs the asset cooker's generic `scan_content` mode on the JobSystem, producing `build/cooked` packages + validated manifest + cook report under the project directory, streaming per-asset progress (done/total) via `AssetCookOptions::progress`; **BUILD** configures/compiles the project's generated `CMakeLists.txt` + windowed `src/main.cpp` host (opens a `stellar::platform` Window, renders package status, Escape quits) against the exported `engine-sdk/` (headers, prebuilt libs, SDL3 runtime + default font, `StellarEngineSdk.cmake` consumer targets `stellar::engine`/`stellar::cooker`/`stellar::platform`/`stellar::audio`, staged by the `stellar-engine-sdk` target); **RUN** launches the built host with the project root as working directory; **IMPORT** copies a file into `packages/<id>/content/`; **NEW PACKAGE** scaffolds additional content packages under the project namespace with a dependency on the base; **EDITOR** launches `stellar-editor.exe --project <root>` (its document directory becomes `<project>/editor/`, the manifest seeds the project name); **TEST** smoke-runs the built host hidden for `--frames N` frames and reports pass/fail (30s timeout); **PACKAGE** assembles a distributable `dist/<name>/` folder (host exe + SDL3 runtime + default font + cooked `Content/` + source `packages/`); the starter host is a live ECS demo (`World` entities with Transform/Velocity components ticked per frame, rendered square) and validates cooked content via a local `AssetRegistry` probing `Content/` beside the exe (packaged layout) then `build/cooked/` (dev layout) — not the global mount, which would break loose-file font loading; scaffolded layout includes a `mods/` directory scanned after the project's protected namespace so mod packages cannot override the base | `engine_project` tests (scaffold layout incl. consumer CMakeLists, manifest round-trip, malformed rejection, discovery); `engine_asset_cooker` scan-mode coverage; verified end-to-end: scaffold → cook → configure against engine-sdk → build → run → windowed render | Tools host foundation: full create → open → browse → import → cook → build → run → edit → package loop works end-to-end and was verified on external projects via both the UI and the headless CLI (`--create/--cook/--build/--test/--package/--run`, plus `--project`/`--tool` deep-links); the Scene tool authors `editor/scene.json` with bounded whole-document undo/redo (engine `UndoHistory`, Ctrl+Z/Y + UNDO/REDO buttons) — (engine `SceneDocument`: named entities with position/extent/velocity/tint/optional content-relative `sprite` an integer `layer` draw order — higher layers render on top, stable within a layer; the tool exposes layer/parallax fields and preview/hit-test honor draw order — plus a per-entity `parallax` camera-scroll factor (0 pins to screen) a document `background` clear color, and a `text` field whose Label component draws a centered caption inside the entity rect (sprite/tint + text = buttons and HUD banners) — all honored by RuntimeHost and the tool preview; a document-level `gravity` (px/s^2) turns the host into a platformer sim — gravity-scaled entities integrate downward, rest on the floor instead of bouncing, up/W becomes a grounded jump impulse (grounded = resting on the world floor or a platform top), held-key vertical velocity only applies when gravity is off, and entities marked `solid` act as static platforms — downward movers land on their tops, movers stop against their sides and bump their heads underneath (all-direction blocking works in top-down scenes too, not just under gravity) (full AABB blocking for gravity-affected entities; `oneway` entities are landable from above but never side-block); solids with velocity are kinematic moving platforms — they integrate, stop at world bounds, and carry riders standing on their tops), sprite-sheet animation (`frames`/`fps`/`fcols` — frame index from accumulated sim time, deterministic under --fixed-hz; `fcols` slices grid sheets row-major, 0 = horizontal strip; `animLoop` false holds the last frame for one-shots), and sprite `rotation` (degrees about the rect center; tinted rects cannot rotate), and entity `ttl` — a sim-time countdown that self-destructs spawned effects (the starter demo's Space-fired spark expires after 3s if it never collides), and sprite `flipX`/`flipY` mirroring (new `Image` flip fields route through SDL_RenderTextureRotated even at 0 degrees), and a `visible` flag — hidden entities simulate and collide but are skipped by the renderer (ghosted in the Scene tool preview, which also now shows live frame animation/rotation/flip), and entity `parent` — name-keyed attachment resolved by `resolve_hierarchy` each sim step: the child keeps its authored offset and follows the resolved parent (chains resolve root-first, cycles/missing parents keep the last position), while the child's own world-space motion (velocity, collisions, game writes) re-bakes into its stored offset — verified end-to-end with a turret tracking a moving ship)) which the windowed starter spawns into its `World` — sprites decode once under the base package's content dir, the starter polls the document for changes so Scene-tool saves hot-reload into the running game, and the entity named `player` is driven by WASD/arrow keys (held-key velocity control fed by KeyPressed/KeyReleased events); `audio/bounce.wav|mp3` under the base package content decodes through `engine::audio::decode_audio_clip` and plays via `AudioOutput::play_effect` when the player bounces; `runtime_host.hpp` (`stellar::runtime`) is a ready-made windowed game host owning the SDL loop, package scan + namespace protection, ECS world, scene hot-reload, WASD player input, velocity/bounce integration, sprite rendering, audio and F5/F9 quicksave — games customize via on_update/on_event/on_status/on_draw callbacks, so a scaffolded main.cpp is ~20 lines; options support fixed-timestep simulation (`--fixed-hz`; frame-limited runs step once per frame so `--frames N --fixed-hz R --snapshot-out <path>` produces byte-identical world dumps across runs — verified deterministic), bounce clamps position to the frame, for deterministic ticks and CI smoke tests, P toggles a sim pause (rendering continues), `time_scale`/`--speed` scales sim dt, and game code can drive the loop through `request_quit`/`set_paused`/`set_scene` (project-relative scene switching — level loads); `--scene <path>`/`--width`/`--height`/`--fullscreen`/`--speed` adjust the scene, window and sim rate, F12 screenshots land in project `screenshots/`, `rng()` exposes a host-owned `DeterministicRandom` living on a world entity so its state snapshots with F5/F9 saves — same `--seed` reproduces the same stream, verified across runs; generated games install `RuntimeDiagnostics` (session log + crash minidumps under `logs/`), and `spawn_entity`/`destroy_entity`/`on_collision`/`on_collision_exit`/`on_land`/`on_tile_land` give dynamic entity spawning plus AABB contact enter/exit and touchdown events (once per landing, not per resting step; tile events identify map/cell/tile); `entities_in_rect`/`entities_in_radius` run world-space region queries over tracked entities (AoE, aggro, selection boxes — Hidden entities included, tilemap carriers excluded); `vfx()`/`spawn_emitter()` run the deterministic particle framework inside the sim step; a scene `vfx` field auto-attaches a named emitter (VfxRef component — re-anchored each step, stopped when the entity dies, re-attached on save restore), and a document-level `emitters` array declares full `EmitterDefinition`s (rate/lifetime/velocity range/spread/gravity/over-life scale+opacity+tint curves/max/LOD) in JSON so particles need no game code at all; `on_spawn` fires per spawned scene entity so games attach custom components keyed off `name`/`data`; `set_camera`/`camera_x/y/zoom`/`viewport_width/height` provide a world-space 2D view transform (entities draw at (world - camera) * zoom, off-screen entities culled, HUD stays screen-space) so generated games can scroll/zoom — the starter demo centers the camera on the player from on_update; `world_width`/`world_height` (`--world-w`/`--world-h`/`--move-speed`/`--jump`/`--save`) bound the built-in wall bounce independently of the window so camera games can build levels larger than one screen; `content_resolver.hpp` gives hosts a single content-path API over cooked manifests (packaged `Content/` then dev `build/cooked/`) and loose `packages/<id>/content/` files, with package-qualified overloads (`"pkg:path"` or explicit package arguments) so mod packages resolve through the same API; `scene_components.hpp` ships the canonical scene component set (Transform2D, Velocity2D, Extent2D, Tint, EntityName, SpriteRef, Layer, Parallax, Label, GravityScale, Solid, Anim, Rotation, Lifetime, Flip, Hidden, Oneway, NoBounce, UserData, Opacity, Spin, Parent, Tilemap) with `register_scene_components` codecs, `spawn_scene`, `find_entity_by_name`, and file-backed `save_world_to_file`/`load_world_from_file` (atomic write, safe false on corrupt/missing) so hosts no longer hand-roll ECS spawn/persistence; the starter registers codecs for its components (transform, velocity, extent, tint, name, sprite path) and quicksaves via `World::snapshot()` to `saves/quicksave.stw` on F5, restoring on F9 (player handle re-resolved by name so no stale `EntityId` survives); starter templates: `windowed` (platform + ECS demo) or `blank` (console); positional hierarchy is name-keyed only (no parent rotation/scale propagation, no cascade destroy — use World::set_parent for structural grouping); no custom scene-field extensibility or debugger attach; SDK is Windows/Release-only |
-| Native engine editor | PARTIALLY IMPLEMENTED | `app/editor_main.cpp` + `app/editor_project.cpp` (`stellar-editor.exe`) links engine + core + platform — galaxy workspace running the full authoritative world-assembly pipeline (catalog, planetary bodies, stellar physics, small-body fields, orbit init, activity) on a JobSystem worker (250/500/1000/2500 sizes, seed regen), pannable/zoomable class-colored star map, system orbit workspace (Kepler ring polylines via `analytic_orbit_position`, companion hosts, small-body bands, time-scrubbed body markers/labels), **body workspace** (per-body satellite view: moon orbit rings via `planetary_satellite_orbit`, positions via `satellite_relative_position`, km-scale camera, Galaxy→System→Body view descent), click-select system inspector and body inspector (physical properties, environment, orbit/exposure, flags), searchable virtualized systems list, **system- and body-level annotation layer** (display-name/note/bookmark per record, body rows clickable to a body inspector context, bookmark markers on list rows and orbit markers) with bounded undo/redo over the whole project document (engine `UndoHistory`, Ctrl+Z/Y), editable project name, atomic JSON project save/load (`write_file_atomically`, schemaVersion 1, all-or-nothing parse, additive `bodyEdits`/`name` keys); succeeds the stranded 0.1.9 WPF editor on `work/stellar-engine-editor` (PR #326) | `editor_project` document tests (round-trip incl. body edits + project name + malformed rejection), `undo_history` engine tests; generation path covered by `galaxy_catalog`/planetary/orbit family tests; manual launch for UI | Authoring foundation: no multi-file projects/Save-As picker, asset embedding, or property mutation yet — generated data is read-only |
-| Mods/accessibility/editor | PLANNED / PARTIALLY IMPLEMENTED foundations | Data catalogs, input/settings, Developer tools/import CLI | Existing scoped tests only | These pieces do not constitute a complete mod/accessibility/editor product; see the 30-item roadmap |
+| Standalone engine shell | IMPLEMENTED BUT NEEDS POLISH | `app/engine_main.cpp` (`stellar-engine.exe`) links only `stellar_engine` + `stellar_native_platform` — windowed Vulkan tools host (Projects/Dashboard/Assets/Profiler/Localization sidebar), JobSystem demo work, Profiler aggregates/frame graph with `ProfileCapture` save/load + `compare_captures` A-vs-B delta table, `VirtualizedList` asset browser with image preview, `LocalizationTable` catalog inspector, diagnostics install. The Projects tool runs the complete game loop: create -> author (Scene tool: ~30-field entity+tilemap property list, animated/flipped/rotated/tilemap preview, drag-move, undo, duplicate, reorder) -> cook -> build -> test -> run -> package. **Projects tool** creates/opens `EngineProject` game projects (`project.stellar.json` manifest, scaffolded `packages/<id>` base package owning the project namespace, starter `src/main.cpp`), resolves their content packages through `PackageRegistry`, and re-roots the asset browser at the project's own content tree; **COOK** runs the asset cooker's generic `scan_content` mode on the JobSystem, producing `build/cooked` packages + validated manifest + cook report under the project directory, streaming per-asset progress (done/total) via `AssetCookOptions::progress`; **BUILD** configures/compiles the project's generated `CMakeLists.txt` + windowed `src/main.cpp` host (opens a `stellar::platform` Window, renders package status, Escape quits) against the exported `engine-sdk/` (headers, prebuilt libs, SDL3 runtime + default font, `StellarEngineSdk.cmake` consumer targets `stellar::engine`/`stellar::cooker`/`stellar::platform`/`stellar::audio`, staged by the `stellar-engine-sdk` target); **RUN** launches the built host with the project root as working directory; **IMPORT** copies a file into `packages/<id>/content/`; **NEW PACKAGE** scaffolds additional content packages under the project namespace with a dependency on the base; **EDITOR** launches `stellar-editor.exe --project <root>` (its document directory becomes `<project>/editor/`, the manifest seeds the project name); **TEST** smoke-runs the built host hidden for `--frames N` frames and reports pass/fail (30s timeout) — it passes `--headless` so the smoke works on display-free machines (older SDK hosts ignore the flag and still run hidden); **PACKAGE** assembles a distributable `dist/<name>/` folder (host exe + SDL3 runtime + default font + cooked `Content/` + source `packages/`); the starter host is a live ECS demo (`World` entities with Transform/Velocity components ticked per frame, rendered square) and validates cooked content via a local `AssetRegistry` probing `Content/` beside the exe (packaged layout) then `build/cooked/` (dev layout) — not the global mount, which would break loose-file font loading; scaffolded layout includes a `mods/` directory scanned after the project's protected namespace so mod packages cannot override the base | `engine_project` tests (scaffold layout incl. consumer CMakeLists, manifest round-trip, malformed rejection, discovery); `engine_asset_cooker` scan-mode coverage; `engine_runtime` (headless run covering the public surface: per-frame stepping, 2D/3D region queries, entity_at/entity3d_at picking, raycast3d, spawn/destroy + on_spawn/on_spawn3d, collision enter/exit, tilemap land, 3D ground-plane land, anim-event markers, injected F5/F9 quicksave-load + on_event, save_data/load_data, scene switching, pause/time-scale/camera/viewport accessors, VFX emitter stepping, byte-identical snapshots, record→replay→diverge); verified end-to-end: scaffold → cook → configure against engine-sdk → build → run → windowed render | Tools host foundation: full create → open → browse → import → cook → build → run → edit → package loop works end-to-end and was verified on external projects via both the UI and the headless CLI (`--create/--cook/--build/--test/--package/--run`, plus `--project`/`--tool` deep-links); the Scene tool authors `editor/scene.json` with bounded whole-document undo/redo (engine `UndoHistory`, Ctrl+Z/Y + UNDO/REDO buttons) — (engine `SceneDocument`: named entities with position/extent/velocity/tint/optional content-relative `sprite` an integer `layer` draw order — higher layers render on top, stable within a layer; the tool exposes layer/parallax fields and preview/hit-test honor draw order — plus a per-entity `parallax` camera-scroll factor (0 pins to screen) a document `background` clear color, and a `text` field whose Label component draws a centered caption inside the entity rect (sprite/tint + text = buttons and HUD banners) — all honored by RuntimeHost and the tool preview; a document-level `gravity` (px/s^2) turns the host into a platformer sim — gravity-scaled entities integrate downward, rest on the floor instead of bouncing, up/W becomes a grounded jump impulse (grounded = resting on the world floor or a platform top), held-key vertical velocity only applies when gravity is off, and entities marked `solid` act as static platforms — downward movers land on their tops, movers stop against their sides and bump their heads underneath (all-direction blocking works in top-down scenes too, not just under gravity) (full AABB blocking for gravity-affected entities; `oneway` entities are landable from above but never side-block); solids with velocity are kinematic moving platforms — they integrate, stop at world bounds, and carry riders standing on their tops), sprite-sheet animation (`frames`/`fps`/`fcols` — frame index from accumulated sim time, deterministic under --fixed-hz; `fcols` slices grid sheets row-major, 0 = horizontal strip; `animLoop` false holds the last frame for one-shots), and sprite `rotation` (degrees about the rect center; tinted rects cannot rotate), and entity `ttl` — a sim-time countdown that self-destructs spawned effects (the starter demo's Space-fired spark expires after 3s if it never collides), and sprite `flipX`/`flipY` mirroring (new `Image` flip fields route through SDL_RenderTextureRotated even at 0 degrees), and a `visible` flag — hidden entities simulate and collide but are skipped by the renderer (ghosted in the Scene tool preview, which also now shows live frame animation/rotation/flip), and entity `parent` — name-keyed attachment resolved by `resolve_hierarchy` each sim step: the child keeps its authored offset and follows the resolved parent (chains resolve root-first, cycles/missing parents keep the last position), while the child's own world-space motion (velocity, collisions, game writes) re-bakes into its stored offset — verified end-to-end with a turret tracking a moving ship)) which the windowed starter spawns into its `World` — sprites decode once under the base package's content dir, the starter polls the document for changes so Scene-tool saves hot-reload into the running game, and the entity named `player` is driven by WASD/arrow keys (held-key velocity control fed by KeyPressed/KeyReleased events); `audio/bounce.wav|mp3` under the base package content decodes through `engine::audio::decode_audio_clip` and plays via `AudioOutput::play_effect` when the player bounces; `runtime_host.hpp` (`stellar::runtime`) is a ready-made windowed game host owning the SDL loop, package scan + namespace protection, ECS world, scene hot-reload, WASD player input, velocity/bounce integration, sprite rendering, audio and F5/F9 quicksave — games customize via on_update/on_event/on_status/on_draw callbacks, so a scaffolded main.cpp is ~20 lines; options support fixed-timestep simulation (`--fixed-hz`; frame-limited runs step once per frame so `--frames N --fixed-hz R --snapshot-out <path>` produces byte-identical world dumps across runs — verified deterministic; `--record <file>`/`--replay <file>` give generated games the client's replay contract — the host journals every input event against its frame index plus a world-snapshot hash every 30 frames through the engine `ReplayRecorder` format — each checkpoint also carries one labeled `world:<component>` section per registered component type present (`World::component_hashes()` folds each type's canonical encoded bytes in entity order), so `replay_diverged` names the diverging subsystem, the same section-localization contract the client's document checkpoints provide, replay injects the recorded stream ahead of live input, applies the recorded header seed (the RNG lives on a world entity, so a mismatched seed diverges even when the game never draws), verifies each checkpoint (`replay_diverged` on stderr + exit 1 on mismatch), and prints `replay_verified` once the stream and checkpoints are consumed clean — verified end-to-end on a scaffolded project: recorded run, replayed run byte-identical, an injected Escape dispatched early, a corrupted checkpoint exited 1; `--replay-info <file>` prints the shared `replay_info_json` inventory headless — no window, exit 0 on success / 1 on unreadable or unparseable input); `--replay-exit` ends a replay at the verdict (0 after `replay_verified`, 1 at the first divergent checkpoint) for scripted checks; `--replay-until N` dumps the canonical world snapshot to `<replay>.until-N.stw` when journal tick N completes (loadable via `load_world_from_file`) so a divergent replay can be bisected to the exact tick; journaled runs step once per rendered frame and the journal tick advances every frame regardless of `--frames` — before, an unbounded `--record`/`--replay` pinned every entry at tick 0 and the wall-clock accumulator made checkpoints unverifiable; replaying without `--fixed-hz` now warns that wall-clock stepping cannot verify); `--headless` runs the whole loop with no Window/Vulkan/audio — a synthetic input snapshot at the configured drawable size, one sim step per rendered frame (fixed-hz when set, a nominal 1/60 otherwise) so `--frames N` advances exactly N deterministic steps regardless of host speed — making generated games CI-testable and letting `engine_runtime` exercise the 2D/3D region queries, byte-identical snapshots and the record→verify→diverge contract on display-free machines (a run without `--frames`/`--replay-exit` warns that only a recorded Escape or external stop ends it); `--dump-bindings` prints the resolved action map — every context's actions with type and `describe_bindings` text — and exits before the loop (pair with `--headless` to skip window creation), bounce clamps position to the frame, for deterministic ticks and CI smoke tests, P toggles a sim pause (rendering continues), `time_scale`/`--speed` scales sim dt, and game code can drive the loop through `request_quit`/`set_paused`/`set_scene` (project-relative scene switching — level loads); `--scene <path>`/`--width`/`--height`/`--fullscreen`/`--speed` adjust the scene, window and sim rate, F12 screenshots land in project `screenshots/`, `rng()` exposes a host-owned `DeterministicRandom` living on a world entity so its state snapshots with F5/F9 saves — same `--seed` reproduces the same stream, verified across runs; generated games install `RuntimeDiagnostics` (session log + crash minidumps under `logs/`), and `spawn_entity`/`destroy_entity`/`on_collision`/`on_collision_exit`/`on_land`/`on_tile_land` give dynamic entity spawning plus AABB contact enter/exit and touchdown events (once per landing, not per resting step; tile events identify map/cell/tile; destroying an overlapped member fires the exit with stale ids rather than dropping the pair); `entities_in_rect`/`entities_in_radius` run world-space region queries over tracked entities (AoE, aggro, selection boxes — Hidden entities included, tilemap carriers excluded); `vfx()`/`spawn_emitter()` run the deterministic particle framework inside the sim step; a scene `vfx` field auto-attaches a named emitter (VfxRef component — re-anchored each step, stopped when the entity dies, re-attached on save restore); scene3d entities carry the same `vfx` field — their emitters anchor at the camera-projected screen position and feed camera distance into the emitter LOD fade, and a document-level `emitters` array declares full `EmitterDefinition`s (rate/lifetime/velocity range/spread/gravity/over-life scale+opacity+tint curves/max/LOD) in JSON so particles need no game code at all; `on_spawn` fires per spawned scene entity so games attach custom components keyed off `name`/`data`; `set_camera`/`camera_x/y/zoom`/`viewport_width/height` provide a world-space 2D view transform (entities draw at (world - camera) * zoom, off-screen entities culled, HUD stays screen-space) so generated games can scroll/zoom — the starter demo centers the camera on the player from on_update; `world_width`/`world_height` (`--world-w`/`--world-h`/`--move-speed`/`--jump`/`--save`) bound the built-in wall bounce independently of the window so camera games can build levels larger than one screen; `content_resolver.hpp` gives hosts a single content-path API over cooked manifests (packaged `Content/` then dev `build/cooked/`) and loose `packages/<id>/content/` files, with package-qualified overloads (`"pkg:path"` or explicit package arguments) so mod packages resolve through the same API; `scene_components.hpp` ships the canonical scene component set (Transform2D, Velocity2D, Extent2D, Tint, EntityName, SpriteRef, Layer, Parallax, Label, GravityScale, Solid, Anim, Rotation, Lifetime, Flip, Hidden, Oneway, NoBounce, UserData, Opacity, Spin, Parent, Tilemap) with `register_scene_components` codecs (marker components encode a fixed byte — empty-struct memcpy leaked uninitialized padding into snapshots and replay checkpoint hashes; `encode_fields`/`decode_fields` serialize each listed member and static_assert the member list covers the whole struct, so padding can never reach a snapshot and an added member fails the build until its codec is updated), `spawn_scene`, `find_entity_by_name`, and file-backed `save_world_to_file`/`load_world_from_file` (atomic write, safe false on corrupt/missing) so hosts no longer hand-roll ECS spawn/persistence; the starter registers codecs for its components (transform, velocity, extent, tint, name, sprite path) and quicksaves via `World::snapshot()` to `saves/quicksave.stw` on F5, restoring on F9 (player handle re-resolved by name so no stale `EntityId` survives); starter templates: `windowed` (platform + ECS demo) or `blank` (console); positional hierarchy is name-keyed only (no parent rotation/scale propagation, no cascade destroy — use World::set_parent for structural grouping); no custom scene-field extensibility or debugger attach; headless mode still builds the full DrawList — `on_draw`/`on_status` fire (the list is simply never submitted to a GPU); `audio()` remains windowed-only and must be gated on `has_audio()`; SDK is Windows/Release-only |
+| Native engine editor | PARTIALLY IMPLEMENTED | `app/editor_main.cpp` + `app/editor_project.cpp` (`stellar-editor.exe`) links engine + core + platform — galaxy workspace running the full authoritative world-assembly pipeline (catalog, planetary bodies, stellar physics, small-body fields, orbit init, activity) on a JobSystem worker (250/500/1000/2500 sizes, seed regen), pannable/zoomable class-colored star map, system orbit workspace (Kepler ring polylines via `analytic_orbit_position`, companion hosts, small-body bands, time-scrubbed body markers/labels), **body workspace** (per-body satellite view: moon orbit rings via `planetary_satellite_orbit`, positions via `satellite_relative_position`, km-scale camera, Galaxy→System→Body view descent), click-select system inspector and body inspector (physical properties, environment, orbit/exposure, flags), searchable virtualized systems list, **system- and body-level annotation layer** (display-name/note/bookmark per record, body rows clickable to a body inspector context, bookmark markers on list rows and orbit markers) with bounded undo/redo over the whole project document (engine `UndoHistory`, Ctrl+Z/Y), editable project name, atomic JSON project save/load (`write_file_atomically`, schemaVersion 1, all-or-nothing parse, additive `bodyEdits`/`name` keys); succeeds the stranded 0.1.9 WPF editor on `work/stellar-engine-editor` (PR #326) | `editor_project` document tests (round-trip incl. body edits + project name + malformed rejection), `undo_history` engine tests; generation path covered by `galaxy_catalog`/planetary/orbit family tests; manual launch for UI | Authoring foundation: named Save-As writes `<name>.json` into the projects directory with a picker-based open; trait-override mutation landed (per-system/body anomaly, rare-resource and pre-warp-civilization flags cycle AUTO→YES→NO through the annotation layer — overrides win over generated records, re-apply deterministically after regeneration, round-trip through the codec, and ride the shared undo history); **multi-file projects** landed (a `<slug>/` directory holds `project.json` + `assets/`; the picker lists both flat and directory forms, saving upgrades flat→directory when an `assets/` folder exists and retires the stale `.json`, and embedded pngs are discovered by scan — the folder is the manifest — with the first image previewed in the inspector); **numeric mutation**: a body `radiusEarth` override edits generated `radius_earth` and an `orbitAu` override edits the stellar orbit radius, and a `massEarth` override edits generated `mass_earth` — all run through the same annotation layer (validated positive input, empty restores AUTO, undo rides history, codec round-trips), and every consumer reads the effective value (radius: detail rows, body-view disc sizing, camera fit; orbit: Kepler ring, day-phased position via a patched `AnalyticOrbit`, inspector + list AU values — moons excluded since they ride satellite orbits; habitable-zone tagging stays generated); an `eccentricity` override edits the patched orbit's shape the same way (validated 0 ≤ e < 0.95 — zero is a meaningful circular orbit — ring, day-phased position and inspector row all read the effective value), as does an `inclinationDeg` override bounded to the generated 0-180 domain (retrograde values past 90 are legal); a `satelliteOrbitKm` override rescales a moon's satellite orbit radius (validated positive — the generated `SatelliteOrbit.relative` elements stay and only the radius wins; the effective orbit drives the ring, the day-phased marker, click picking, the body-view camera fit and the inspector's moon orbit row); **system-level position overrides** move a star on the galaxy map (`positionX`/`positionY`, unbounded finite — the map is origin-centered — and every consumer reads the effective axis: markers, click picking, camera fit and the inspector row); **derived consistency**: surface gravity everywhere the editor reports it (inspector row + system body rows) recomputes as effective_mass / effective_radius² — the same relationship generation applies — so radius or mass overrides never leave a stale gravity reading; the remaining displayed body fields (temperature, pressure, radiation, atmosphere class) are derived environment outputs with no independent editor consumer, so the override set is complete for consumed properties — broader authoring (gizmo manipulation, structural add/remove) remains open |
+| Mods/accessibility/editor | IMPLEMENTED / PARTIALLY IMPLEMENTED foundations | Package system (`PackageRegistry`, `mods/` scan, `write_save_package_manifest`/`verify_save_package_manifest` save attestation), input/settings, Developer tools/import CLI, standalone editor | `package_platform` (incl. manifest attestation cases), editor + settings tests | Mod loading is content-only: namespaced package ids, priority-based overrides, semver dependency constraints and protected base namespaces resolve through `PackageRegistry::resolve`; world saves record the resolved load plan in a `<save>.packages.json` sidecar and `RuntimeHost` verifies it on F9/`load_world_from_file` restores — missing or version-mismatched packages log through `RuntimeDiagnostics` (report-only; loading proceeds). Executable plugins stay untrusted by design. Accessibility/editor remain partial — see the roadmap |
 
 ## Implementation records (newest first)
+
+## Starfield-quality live propagation + streamer budget (2026-09-29)
+
+- **Purpose:** the STARFIELD QUALITY video setting was wired to the
+  3D renderers in name only — `NativeCampaign` pushed
+  `RenderQuality3D` once in its constructor while `video_settings_`
+  was still null (so the saved tier never applied), and no Apply or
+  Revert path ever re-pushed it. Separately,
+  `Window::set_scene3d_texture_budget` was silently dropped when
+  called before the lazily-created renderer existed, leaving the
+  documented runtime-retune knob unreachable from settings.
+- **Modules:** `app/native_client/main.cpp`
+  (`NativeCampaign::sync_scene3d_quality`,
+  `scene3d_texture_budget_for`),
+  `engine/src/native_map_platform.cpp` (`Storage::scene3d_texture_budget`,
+  persisted into the lazy `Scene3DRenderer`),
+  `engine/include/stellar/engine/native_map_platform.hpp`.
+- **Public interface:** `Window::set_scene3d_texture_budget` persists
+  the request on `Window::Storage` so a renderer created on the first
+  3D frame inherits the last requested budget;
+  `NativeCampaign` re-pushes `RenderQuality3D` to all six 3D consumers
+  (system/fleet/battle/globe/phenomena/small-body) whenever
+  `video_settings_->active().starfield_quality` drifts from the last
+  pushed tier — Apply, preview and Revert all take effect live.
+  `Scene3DStatistics::texture_budget_bytes` reports the live streamer
+  budget so the MemoryTracker overlay attributes texture residency
+  against the active tier's budget, not the hard 192 MiB cache cap.
+- **Consumers:** the video-settings apply callback additionally calls
+  `window.set_scene3d_texture_budget` with
+  `scene3d_texture_budget_for(quality)` — Low 48 MiB, Medium 96 MiB,
+  High/Ultra the full 192 MiB streamer budget — so lower quality tiers
+  shed VRAM residency by degrading to coarser mip tails.
+- **Tests:** `native_scene3d_gpu_tests` — a budget set to zero before
+  the first 3D frame reaches the lazily created renderer (denied bind
+  serves the pinned fallback) and `texture_budget_bytes` reports both
+  the zeroed and restored budgets; existing streaming-pressure cases
+  still pass. `--video-settings-check` smoke exercises Apply/preview/
+  Revert/Keep end-to-end and cycles every non-display choice row —
+  V-Sync, Frame Cap, EDGE SMOOTHING/SCENE RESOLUTION (the
+  `set_scene_quality` reallocation path), STARFIELD QUALITY and
+  STARFIELD DENSITY — in both harness locations: `startup`
+  (pre-renderer budget persistence) and `pause` (live
+  `sync_scene3d_quality` drift through a real campaign scene capture).
+- **Save/performance impact:** settings-only; the persisted
+  `video-settings.json` schema is unchanged (starfield_quality already
+  serialized). Lower tiers trade texture residency for VRAM.
+- **Limitations:** budget changes apply at the next `prepare()`
+  (streamer residency recomputes per frame); tiers above High cannot
+  exceed the hard 192 MiB texture-cache cap.
+- **Future reuse:** a dedicated quality preset or auto-tuner can drive
+  both `render_scale` and the streamer budget through the same knobs.
+
+## Scene3DView render-scale under the target budget (2026-09-29)
+
+- **Purpose:** the renderer enforces a 128 MiB aggregate cap on 3D
+  render-target memory, and at ≥2560×1440 a frame carrying several
+  fullscreen views (celestial dome, emission volumes) plus content
+  views blew past it — forcing an all-or-nothing drop to authored 2D
+  layers that discarded volumetric/warped shading entirely. A
+  reduced-resolution target upscaled during composition keeps the
+  shading model at a fraction of the memory.
+- **Modules:** `engine/include/stellar/engine/native_map_platform.hpp`
+  (`Scene3DView::render_scale`, `scene3d_view_target_extent`,
+  `scene3d_view_target_bytes`, `Window::scene3d_target_bytes`),
+  `engine/include/stellar/engine/native_scene3d.hpp`
+  (`Scene3DStatistics::renderer_active`),
+  `engine/src/native_scene3d_gpu.cpp` (validation, scaled allocation,
+  scaled stream/LOD demand),
+  `engine/src/native_map_platform.cpp` (accounting accessor),
+  `app/native_client/main.cpp` (budget gates, final clamp).
+- **Public interface:** `Scene3DView::render_scale` (default 1,
+  [0.25,1], finite — `prepare()` throws otherwise) sizes the
+  offscreen target at `ceil(destination*scale)` per axis, one pixel
+  minimum; `composite()` still blits the full destination rect via
+  the existing `SDL_SCALEMODE_LINEAR` pass. `scene3d_view_target_*`
+  helpers share the accounting formula (`prepare()`'s charge is
+  literally `extent[0]*extent[1]*bpp`); `Window::scene3d_target_bytes`
+  evaluates a whole `DrawList` at the device's real bytes-per-pixel
+  (HDR 16 / UNORM 8, worst-case 16 before the renderer exists).
+  `Scene3DStatistics::renderer_active` marks statistics from a live
+  renderer so pre-first-3D-draw estimates cannot silently halve.
+- **Consumers:** `NativeCampaign` mirrors the accounting via
+  `scene3d_bytes_per_pixel_` (refreshed from `statistics().hdr` only
+  when `renderer_active`); `fit_backdrop_within_budget` scales the
+  system/battle backdrop (iterating past ceil-rounding overshoots)
+  and attaches a floored backdrop whenever the whole frame could fit
+  at .25 — the authored-2D fallback runs only when
+  `scene3d_min_target_bytes` of backdrop+frame exceeds the cap —
+  while `scene()` runs a final multiplicative clamp so developer-panel
+  views appended after the gates cannot push a frame over the cap.
+- **Tests:** `native_scene3d_tests` — extent/bytes formula (default,
+  .25/.5/interior, odd-size ceil, invalid scales estimate unscaled);
+  `native_scene3d_gpu_tests` — half-scale allocates the expected
+  target, the estimator equals `statistics().target_bytes`, the
+  upscale fills and clips at the destination rect, out-of-range/
+  NaN/inf scales throw.
+- **Save/performance impact:** none persisted; strictly reduces
+  target memory and rasterization cost (the upscale is the one blit
+  `composite()` already performed); mip/LOD demand follows the
+  rendered resolution.
+- **Limitations:** uniform scale only (aspect preserved);
+  destination-space input/picking unaffected; pathological frames
+  that cannot fit even at .25 still throw (with a byte/view
+  diagnostic) — the per-layer 2D fallback covers reachable cases.
+- **Future reuse:** any view layer under memory or bandwidth
+  pressure can trade resolution for retained 3D shading —
+  picture-in-picture globes, diagnostics panels, low-spec tiers.
+
+## Flared annulus mesh primitive (2026-09-29)
+
+- **Purpose:** `annulus_mesh` produces a flat coplanar sheet, but
+  protoplanetary debris and accretion discs are physically flared —
+  scale height grows with radius — and a flat sheet cannot show the
+  trumpet rim silhouette or the far-rim view through the inner gap
+  that makes protostars and black holes read correctly.
+- **Modules:** `engine/include/stellar/engine/native_geometry3d.hpp`
+  (`flared_annulus_mesh`), `engine/src/mesh3d_loader.cpp`
+  (`flared_annulus` spec).
+- **Public interface:**
+  `flared_annulus_mesh(inner, outer, flare, exponent=2,
+  azimuthal=192, radial=8)` builds two mirrored curved sheets
+  y = ±flare·(r/outer)^exponent; `radial` subdivides the flare
+  profile, `azimuthal` the ring. Radial-U/azimuthal-V
+  coordinates match `annulus_mesh` exactly, so
+  `accretion_disc_material3d`, the spiral bake, `orbital_beaming`,
+  and Keplerian shear transfer verbatim; mirrored winding keeps the
+  lower sheet front-facing (double-sided silhouette through the
+  inner gap) and normals follow the true surface slope for correct
+  rim lighting. Loader spec
+  `flared_annulus:i,o,flare[,exponent[,azimuthal[,radial]]]`
+  (exponent defaults to 2, azimuthal to 192, radial to 8).
+- **Consumers:** `native_system_workspace.cpp` — protostar debris
+  (flare .16, exponent 2 — puffy rim) and both black-hole flow
+  regimes (flare .07, exponent 1.6 — subtle slim-disc curve);
+  straight `annulus_mesh` swaps, one mesh instance per star.
+- **Tests:** `native_scene3d_tests` — geometry invariants (paired
+  mirrored sheets, radial height progression, winding/normals) +
+  malformed-input rejection; `engine_world_tests` resolves the
+  `flared_annulus` spec; `native_scene3d_gpu_tests`
+  `accretion-flare` asserts the flared rim silhouette extends beyond
+  the flat disc's while the inner gap stays open.
+- **Save/performance impact:** none persisted; one extra vertex batch
+  per consuming star (~2× annulus vertex count for the mirrored
+  sheet); no new shaders or simulation data.
+- **Limitations:** height follows a pure power law (no taper toward
+  the inner rim); both sheets share one material — independent
+  rim-surface shading would need a second material slot.
+- **Future reuse:** any radial flow visual that benefits from
+  thickness — circumplanetary rings seen edge-on, galactic dust
+  lanes, fictional ringworlds.
+
+## Material3D Keplerian accretion shear (2026-09-28)
+
+- **Purpose:** accretion discs rotated their baked spiral texture
+  rigidly — inner and outer rims orbited at the same angular rate,
+  physically wrong for a Keplerian flow. A differential shear term
+  scrolls the azimuthal texture coordinate at `rho^(-3/2)` so the hot
+  inner rim laps the cool outer edge.
+- **Modules:** `engine/include/stellar/engine/native_scene3d.hpp`
+  (`Material3D::shear_rate`/`shear_ratio`, `accretion_disc_material3d`
+  parameter), `engine/src/native_scene3d.cpp` (validation),
+  `engine/src/native_scene3d_gpu.cpp` (`drift_options.y/z` fill),
+  `engine/shaders/scene3d.frag` (azimuth scroll),
+  `engine/src/spherical_material_preparation.cpp` (factory).
+- **Public interface:** `shear_rate` is rad/s at the inner edge
+  ([-8,8], signed for retrograde); `shear_ratio` is the annulus's
+  outer/inner radius ([1,1024], 1 = uniform scroll). The shader adds
+  `t·rate·rho^(-3/2)` to V with `rho = 1+(ratio-1)·u`; the disc bake
+  is V-periodic (integral arm count) so `fract()` keeps the wrap
+  seamless under clamped sampling. `accretion_disc_material3d`
+  accepts a trailing `shear_rate` and derives `shear_ratio` itself.
+- **Consumers:** `native_system_workspace.cpp` — BH annulus `.8`
+  active / `.4` quiescent, protostar debris `.12`, all layered on the
+  authored rigid spins (the doppler lane is unaffected either way).
+- **Tests:** `native_scene3d_tests` validation (rate/ratio bounds,
+  NaN, round-trip); `native_scene3d_gpu_tests` — sheared t0/t4 frames
+  diverge with the inner-rim band changing more than the outer, and a
+  zero-rate disc is bit-identical across scene time.
+- **Save/performance impact:** none persisted; one gated
+  `pow`+`fract` per fragment on sheared materials only; freezes on
+  pause via the shared `options.time` clock.
+- **Limitations:** the `options.time` 512 s wrap produces a sub-frame
+  snap in the scrolled phase (same convention as every animated term).
+- **Follow-up (2026-09-29):** the ECS `AccretionDisc` component and
+  the `accretion` document key expose `shear_rate` as an appended
+  eighth float ([-8,8]; 4/7/8-entry payloads all decode), so
+  document-authored discs carry Keplerian shear without hand-built
+  materials — `runtime_host` passes it through
+  `accretion_disc_material3d`'s trailing parameter.
+
+## RenderOptions3D post-tonemap color matrix (2026-09-28)
+
+- **Purpose:** the color-blind accessibility modes remap every CPU-drawn
+  surface through `apply_color_blind`, but GPU-rendered `Scene3DView`
+  content kept its authored channel balance — a low-vision player saw an
+  inconsistent frame. A reusable 3×3 channel-remap matrix closes the gap
+  and serves any caller needing display-space recoloring (per-view color
+  grading, faction tinting, additional accessibility filters).
+- **Modules:** `engine/include/stellar/engine/native_map_platform.hpp`
+  (`RenderOptions3D::color_matrix`), `engine/src/native_scene3d_gpu.cpp`
+  (`PostUniform` fill + gate), `engine/shaders/tonemap.frag` (remap).
+- **Public interface:** `color_matrix` is a column-major 3×3
+  (`c' = M·c`) applied to the resolved LDR display color after
+  contrast/saturation/sharpen and before vignette; alpha is untouched.
+  Identity (default) or any non-finite element disables the multiply —
+  the default path is bit-identical to before.
+- **Consumers:** `native_ui_theme.hpp` `apply_color_blind` composes the
+  same linear map it applies to CPU colors (Machado simulation + error
+  redistribution) onto every `Scene3DView` in `world` and `overlay`.
+- **Tests:** `native_scene3d_gpu_tests` `post_gpu` block verifies a
+  red↔green swap through the real shader; `native_general_settings_tests`
+  asserts the pass sets a non-identity matrix on a view and that `None`
+  leaves it identity. End-to-end `--system-smoke` under `colorBlind:2`
+  remapped 82% of lit 3D-region pixels vs baseline.
+- **Save/performance impact:** none persisted; +48 B uniform and one
+  gated mat3 multiply per resolved fragment when active.
+- **Limitations:** operates in display space post-tonemap, so the matrix
+  sees tonemapped [0,1] rather than HDR values — correct for
+  display-referred accessibility maps; out-of-range results clamp at the
+  output attachment.
+
+## SurfaceEffect3D nullable `next_texture` (2026-09-29)
+
+- **Purpose:** single-texture effects — the nebula emission volume uses
+  only the `volume_*` fields — had to bind a meaningless second texture
+  to pass `Scene3D::create` validation, reading as a two-image sequence
+  where none exists.
+- **Modules:** `engine/src/native_scene3d.cpp` (validation),
+  `engine/include/stellar/engine/native_scene3d.hpp` (field contract).
+- **Public interface:** `next_texture` may be null whenever `blend <= 0`;
+  a non-blended effect never samples it. `blend > 0` still requires the
+  texture — the two-image sequence contract is unchanged for actual
+  blends. All downstream consumers were already null-safe: `texture()`,
+  `mip_for`, `stream_request` fall back to the white placeholder and
+  `texture_mip_layout3d` accounts a null as 1×1.
+- **Consumers:** `native_phenomena.cpp` local-nebula emission volume
+  (double-bind removed). `runtime_host.cpp`/`engine_main.cpp` still
+  assign `next_texture` for their authored blends.
+- **Tests:** `native_scene3d_tests` rejects `null + blend>0` and accepts
+  `null + blend=0`; GPU suite unchanged. `--developer-smoke` verifies
+  `local_nebula=emission_volume_submitted_passed`.
+- **Save/performance impact:** none — validation-only change; the bound
+  slot was already the white placeholder at `blend=0`.
+- **Limitations:** `effect_options.x>0.5` still gates the margin taper
+  and occlusion sphere on the primary texel — intended, since those
+  apply to the emitted image regardless of blending.
+
+## Scene3D screen-space mesh LOD chains (2026-09-25)
+
+- **Purpose:** strategy fleets need vertex throughput to scale with
+  pixels on screen, not authored distance tables — a zoomed-out cruiser
+  at 30px should not submit its 60k-triangle hi-res mesh; and the level
+  swap must not pop when a fleet crosses a threshold.
+- **Modules:** `native_scene3d.hpp` (`MeshInstance3D::lod_meshes` +
+  `lod_pixels` + `lod_fade` + `lod_group`/`lod_group_proxy`/
+  `lod_group_pixels`, `select_lod3d_level`, `lod3d_fade_share`,
+  `Scene3DStatistics::lod_instances`/`lod_fades`/`lod_groups`),
+  `native_scene3d.cpp` (validation + selection/band policy),
+  `native_scene3d_gpu.cpp` (per-view pick in the streamer demand pass
+  and the draw loop, dual submission inside the band),
+  `scene3d.frag` (early screen-door discard on `uv_options.w`),
+  `scene_document.*` (`lods`/`lodPixels`/`lodFade` entity
+  keys), `scene_components.*` (`MeshLods` component + codec),
+  `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interface:** `lod_meshes[i]` substitutes for `mesh` once the
+  projected bounding-sphere diameter drops below `lod_pixels/2^i` pixels
+  (≤ 8 levels, all non-null, `lod_pixels` in [1,4096], `lod_fade` in
+  [0,.5] — else `Scene3D::create` throws). `select_lod3d_level` is pure
+  policy shared by the streamer demand and the draw submission so both
+  agree which level is resident; the demand pass charges only the
+  submitted levels' geometry bytes. `lod_fade` widens each threshold
+  into a transition band of `lod_fade`×threshold pixels above it:
+  `lod3d_fade_share` returns the coarser level's share `p` rising
+  0→1 across the band, and inside it the view submits both levels with
+  complementary keep probabilities — the shader's signed IGN mask keeps
+  `1-p` of the selected level's pixels and `p` of the coarser's, an
+  exact per-pixel partition so opaque geometry crossfades with no
+  blending and no z-fighting.
+- **Policies:** selection is per-view screen space — identical footprint
+  convention as the texture streamer (px-per-world-unit × bounding
+  diameter / distance). Shadow casters share the lit pass's pick — a
+  chained instance casts its selected level (the shadow volume tracks
+  the camera, so a tiny-on-screen caster's shadow only carries
+  low-poly silhouette where its texels are already coarse) and a
+  collapsed group casts one light-facing proxy from the representative.
+  Each caster carries the lit pass's signed screen-door keep mask into
+  the depth pass, so banded transitions thin the shadow in lockstep;
+  `card:` impostor casters face the light like the proxy does.
+  Low tier and `lod_fade=0` keep the hard
+  switch (single draw, zero fade cost). A `visible_fade` band degrades a
+  fading pair to the selected level's single thinned draw — which level
+  shows stops mattering while the whole object dithers out.
+  `lod_instances`/`lod_fades` on
+  `Scene3DStatistics` audit substitutions and dual submissions per
+  frame. `lod_group` names a cluster impostor: every contributing
+  member (frustum- and range-visible, non-volume) merges its view-space
+  bounding sphere into a group sphere; once that sphere's projected
+  diameter drops below `lod_group_pixels` [1,4096] the whole group
+  renders as one view-aligned `lod_group_proxy` draw centred on the
+  merged sphere, scaled to cover it, shaded with the representative
+  member's material. The representative's `lod_fade` widens the
+  collapse into a screen-door band — members thin by `1-p` while the
+  proxy keeps the complementary `p` (audited via `lod_fades`); Low
+  tier and `lod_fade=0` keep the hard switch. The representative is
+  the first contributing member in instance order; `lod_groups` audits
+  replaced members.
+- **Persistence:** entity `lods` (spec array, ≤ 8 bounded strings) +
+  `lodPixels` [1,4096] + `lodFade` [0,.5] + `lodGroup` (≤64 chars) +
+  `lodProxy` (≤256-char spec) + `lodProxyPixels` [1,4096] round-trip
+  through `Scene3dDocument`; `MeshLods` component codecs spec count +
+  strings + switch size + fade + group name + proxy spec + collapse
+  size (truncated tails decode with defaults);
+  `spawn_scene3d` attaches it when `lods` or `lodGroup` is non-empty
+  and `scene3d_from_world` exports it back. Runtime/editor resolve specs
+  through the same path as `MeshRef` — an unresolvable spec drops just
+  that level; an unresolvable proxy drops just the collapse.
+- **Editor:** Scene3D tool `meshLods` (csv specs), `lodPixels`,
+  `lodFade` and `lodGroup` (`name;proxySpec;px`) rows edit the live
+  preview.
+- **Tests:** `native_scene3d_gpu` — silhouette probe: a quad proxy
+  exposes the swap (sphere pixels beyond the quad edge go background),
+  `lod_instances` stat delta, above-threshold frames keep the full mesh;
+  screen-door probe: a sphere fading to a quad inside the band dithers
+  its sphere-only silhouette (~2/3 lit of 80px vs fully lit hard-switch
+  control) and counts one `lod_fades` submission; impostor probe: an
+  edge-on `billboard_card` still renders face-on while an ordinary quad
+  at the same rotation vanishes; `fleet3d` benchmark
+  block — a 1024-ship depth-sweep fleet, 60 timed frames reporting
+  `cpu_submit_mean_ms`/`frame_wall_mean_ms` plus
+  `draw_calls`/`lod_instances` assertions (one instanced draw per LOD
+  level, depth-partitioned picks); group probe: two member spheres
+  below the authored merged diameter collapse into one proxy card —
+  `lod_groups` counts both and the seam pixel between the members
+  lights only under the collapse;
+  `engine_scene3d` — level-pick policy, band-share ramp across two
+  levels, zero-width disable, bound rejects;
+  `engine_project` — `lods`/`lodPixels`/`lodFade` round-trip + malformed
+  rejections; `engine_world` — `MeshLods` spawn/codec/export
+  round-trips.
+- **Impostors:** `Mesh3D::billboard_card(w,h)` (mesh spec `card:w,h`)
+  builds a camera-facing quad — `billboard()` collapses its view-space
+  rotation to uniform scale at draw time, so a chain's last level can be
+  an always-facing impostor card, and a primary `card:` mesh doubles as
+  a sprite marker. The flag is per-mesh, so a fading pair can mix a
+  card with solid geometry.
+- **Limitations:** flat halving chain — no mesh decimation or deeper
+  LOD trees beyond the named group collapse; the proxy shades with the
+  representative member's material, so groups should share materials;
+  merged members
+  still pay CPU prepare work (the collapse saves vertex/fragment and
+  uniform-record load, not the per-instance iteration); impostor cards
+  are flat quads (no baked view-dependent shading); the crossfade is a
+  per-pixel dither (stable while the camera holds still; reads as fine
+  noise on stills when a coarse proxy diverges sharply); shadow
+  casters carry the same signed keep mask through the depth pass, so
+  silhouettes dither in lockstep with the lit draw (each in-band level
+  adds one shadow submission — banded group members keep their own
+  casters while the representative adds the proxy's complementary
+  share).
+- **Consumers:** `Scene3dDocument` entities, `MeshLods` components and
+  the editor Scene3D tool are the intended drivers. The game client's
+  chart views (`native_small_body_renderer`, `native_battle_sprites`,
+  `native_system_workspace`, `native_stellar_eruptions`) deliberately
+  do not populate these fields: they all run top-down orthographic
+  cameras where `visible_range` can't express zoom culling (the camera
+  distance is fixed — `orthographic_height` carries the zoom), and
+  each already clip-culls instances against the viewport with
+  `view.scale`-driven size thresholds of its own; no alternate LOD or
+  proxy mesh content exists in shipped game assets. `visible_fade`/
+  `lod_*` remain perspective-scene features — the native globe view is
+  a single-instance closeup where they are inapplicable.
+
+## Scene3D surface detail — cloud decks and terminator wrap (2026-09-25)
+
+- **Purpose:** close the planet-detail gap in the generic renderer —
+  authored normal/property/cloud maps were already evaluated in the
+  shader but unreachable from authored scenes, and the terminator was a
+  hard Lambert edge.
+- **Modules:** `native_scene3d.hpp` (`SurfaceResponse3D::cloud_albedo`,
+  `Material3D::terminator_wrap`), `native_scene3d.cpp` (validation),
+  `scene3d.frag` (`response_options` uniform, wrap-diffuse lighting,
+  cloud-deck composite), `native_scene3d_gpu.cpp` (uniform fill, map
+  presence flags), `scene_document.*` (entity `surface` block +
+  `terminatorWrap`), `scene_components.*` (`MaterialSurface`),
+  `runtime_host.cpp`, `app/engine_main.cpp`, `CMakeLists.txt`
+  (`stellar_scene3d_tests` now links `stellar_native_image`).
+- **Public interface:** `SurfaceResponse3D` gains `cloud_albedo` [0,1] —
+  the cloud map's RGB composites as a lit deck over the surface at
+  `cloud_opacity` coverage; 0 keeps the map shadow-only (the pre-existing
+  behaviour). `Material3D::terminator_wrap` [0,1] widens the diffuse
+  lobe — `(N·L+w)/(1+w)` — applied identically to the key light,
+  additional directionals and point lights. `Material3D::limb_darkening`
+  [0,1] applies linear limb darkening `1 - u(1 - N·V)` to the body's
+  outgoing radiance (Sun ≈ 0.6) — the photosphere profile that keeps
+  emissive star discs from clipping flat; `limb_darkening_q` [0,1] adds
+  the standard quadratic term `q(1-μ)²` (two-parameter transit law),
+  steepening the very edge while mid-disc stays untouched, and
+  `limb_darkening_mid` [0,1] adds the Sing three-parameter law's
+  mid-curve term `m(1-μ^{3/2})` — a shallower falloff reaching further
+  inward for photospheres that flatten before the rim — the product
+  clamps at zero so aggressive coefficients never invert. Applied after
+  the cloud deck with the additive atmosphere rim exempt, on the
+  geometric normal.
+- **Map subset rule:** `SurfaceResponse3D` now accepts any single map —
+  a cloud-only or normal-only material is legal. The shader receives
+  presence flags (normal/properties/cloud bits in `response_options.z`)
+  and skips sampling absent maps; `SurfaceResponse3D` with no maps is
+  still rejected.
+- **Deck ordering:** the cloud composite runs after surface emissive —
+  cloud cover occludes night-side city lights — and before the
+  atmosphere rim so limb scatter stays above the deck. The deck is lit
+  by the same wrapped sunlight and shadowed by the same
+  analytic/shadow-map visibility as the surface.
+- **Persistence:** entity `surface` block `{normal, properties, cloud,
+  normalStrength, relief, cloudOpacity, cloudAlbedo, cloudHeight,
+  cloudOffset:[x,y]}` plus flat `terminatorWrap`/`limbDarken`/`limbDarkenQ`/`limbDarkenMid` round-trip
+  through `Scene3dDocument`; `surface` requires at least one map and
+  rejects out-of-range scalars. `MaterialSurface` component codecs the
+  same fields (`cloud_height` tails the payload after the map strings so
+  pre-field saves still decode); `spawn_scene3d` attaches it when any
+  field differs from defaults and `scene3d_from_world` exports it back.
+- **Deck height:** `SurfaceResponse3D::cloud_height` [0,.1] (object
+  units, scaled like `relief`) lifts the deck off the surface. In the
+  shader a least-squares UV jacobian maps view-space displacements to UV
+  shifts: the deck texel shifts by the projected normal offset (limb
+  parallax — limb clouds peek past the silhouette, disc centre stays
+  registered), the ground shadow samples `h·tan(zenith)` sunward along
+  the tangential light component (capped 4h), and a sin²(zenith)-gated
+  sunward tap shades the deck itself — overhead sun stays fully lit.
+  `texture_options.z` carries the world-space height; 0 keeps the
+  texture-space deck path untouched.
+- **Editor:** Scene3D tool entity rows `surfMaps`, `surfShape`,
+  `cloudDeck` (5th field = height), `termWrap`, `limbDark` (`u[,q[,m]]`)
+  edit the live preview.
+- **Tests:** `native_scene3d_gpu` — deck compositing brightness,
+  `cloud_albedo` scaling, wrap-diffuse lighting at the geometric
+  terminator, wrap invariance at the fully lit pole, limb-darkened disc
+  edge with unchanged centre, a quadratic-coefficient capture that
+  deepens the extreme limb while mid-disc stays untouched, a
+  three-term capture whose mid-curve coefficient dims mid-disc past
+  the quadratic profile, and a
+  `cloud_height` capture showing
+  limb-ring parallax against an unchanged disc centre; `engine_scene3d`
+  — cloud-only acceptance + scalar bound rejects; `engine_project` —
+  document round-trip + `surface`/`terminatorWrap`/`limbDarken`/
+  `limbDarkenQ`/`limbDarkenMid`/`cloudHeight` rejections; `engine_world` —
+  `MaterialSurface` spawn/codec/export round-trips.
+- **Limitations:** the deck remains a texture-space composite — the
+  height term is a bounded parallax/shadow approximation, not a
+  volumetric shell (no ray-marched interior, no per-layer thickness);
+  wrap is a single-coefficient law and limb darkening stops at the
+  three-term model — no wavelength-dependent or four-term (Claret)
+  laws yet.
+
+### Follow-up: `Material3D::band_shear` (same change set's successor)
+
+- Latitude-weighted longitude shear `u += s·(cos(2πv) + w·cos(6πv))`
+  applied to every equirect surface sample — the gas-giant
+  differential-rotation signature; equator-symmetric and zero-mean so
+  maps stay registered. `band_shear` [-0.5,0.5] is the amplitude,
+  `band_waves` [0,1] the zonal-jet harmonic share (w = 0 keeps the
+  single pole-vs-equator profile; w → 1 gives alternating mid-latitude
+  jets). Rides `emissive_tint.w` + `texture_options.y`; authored via
+  `bandShear`/`bandWaves` doc keys, `MaterialSurface::band_shear`/
+  `band_waves`, runtime + editor `bandShear`/`bandWaves` rows. GPU
+  probes assert antisymmetric equator/pole displacement plus a
+  harmonic-reshaped profile on a striped sphere; `engine_scene3d`
+  bounds, `engine_project`/`engine_world` round-trips.
+
+### Follow-up: `RenderOptions3D::time` render-time animation (same change set's successor)
+
+- A per-view scene-time scalar (`RenderOptions3D::time`, carried on
+  the free `ViewUniform::debug_mode.y`) drives two authored visual-only
+  rates through a new `anim_options` material lane: `band_drift`
+  [-0.25,0.25] scrolls equirect longitude at uv/s (super-rotating
+  decks slide over a fixed lit limb; the sampler's REPEAT wrap makes
+  the unbounded scroll safe), and `SurfaceEffect3D::flow_rate`
+  [-64,64] advances the volume march's filament phase so nebulae
+  churn instead of freezing. `RuntimeHost` accumulates
+  `time += dt·time_scale` per frame (so `--speed` slows animation
+  with the simulation clock) and the engine-shell preview keeps its
+  own accumulator; **default 0 keeps every capture deterministic** —
+  animation is purely visual, never read by the simulation or saves.
+  Authored via `bandDrift` / `volume.flowRate` doc keys,
+  `MaterialSurface::band_drift` / `EmissionVolume::flow_rate`
+  components, runtime + editor `bandDrift` row and the volume CSV's
+  11th field. GPU probes assert time-zero frames are pixel-identical
+  to static captures and nonzero time shifts >3000 band pixels /
+  re-poses >300 filament pixels while silhouettes stay fixed;
+  `engine_scene3d` bounds, `engine_project`/`engine_world`
+  round-trips including legacy-payload codec tails.
+  `Material3D::band_turbulence` [-8,8] (`anim_options.z`, rad/s)
+  evolves the warp itself — a propagating `cos(4πv + t·rate)`
+  mid-latitude wave at half the shear amplitude reshapes the jet
+  profile over time while staying zero-mean and equator-symmetric;
+  authored via `bandTurbulence` (entity doc field, `MaterialSurface`
+  tail slot, `bandDrift` row's second CSV term). GPU probes assert
+  the turbulence frame differs from the static warp at t=0, keeps
+  evolving at t>0, and returns to the static profile at rate 0.
+  `Material3D::band_diff` [-8,8] (`drift_options.x`) is the
+  latitude-differential term: the scroll multiplies by
+  `1 + diff·cos²(latitude)`, so equatorial belts super-rotate past
+  the poles like a real gas giant (diff<0 counter-rotates them);
+  diff=0 keeps the rigid scroll, silhouettes and registration are
+  untouched since it only retimes longitude uv. Authored via
+  `bandDiff` (entity doc field, `MaterialSurface` tail slot,
+  `bandDrift` row's third CSV term). GPU probe counter-rotates the
+  equatorial belt and asserts it diverges >3× from the rigid frame
+  vs the polar rows; `engine_scene3d` bounds,
+  `engine_project`/`engine_world` round-trips.
+  Remaining: volume churn is phase-only (the authored warp shape
+  persists).
+
+### Follow-up: `Material3D::orbital_beaming` (same change set's successor)
+
+- First-order orbital doppler asymmetry `1 + s·(v̂·V̂)` [-1,1] for
+  material orbiting local +Y — accretion discs get their asymmetric
+  approaching lane, rings their forward-scatter bias; face-on discs stay
+  symmetric since orbital velocity is perpendicular to the view. Rides
+  `uv_options.z`, reusing the stored model-view inverse
+  (`effect_from_view`, now also filled for beam-only materials).
+  `orbital_beaming_tint` [0,1] adds the paired spectral shift on the
+  `scatter_options.w` lane: the approaching lane blueshifts (red
+  depletes, blue gains) and the receding lane redshifts by the same
+  signed v̂·V̂ alignment — a linear wavelength-shift approximation
+  clamped so a channel can deplete but never invert. Authored via
+  `orbitalBeam`/`orbitalBeamTint` doc keys,
+  `MaterialSurface::orbital_beaming`/`_tint`,
+  runtime + editor `orbitalBeam` CSV row. GPU probe asserts
+  receding-dims/approaching-brightens on a tilted annulus, face-on
+  symmetry, and per-lane blue/red channel shifts; `engine_scene3d`
+  bounds, doc/component round-trips.
+  Remaining: first-order shift only — no gravitational redshift,
+  relativistic aberration or lensing.
+
+### Follow-up: `star_photosphere3d` spectral-class preset
+
+- `star_photosphere3d(kelvin)` derives a physically plausible star
+  material: blackbody disc tint (sRGB + `linear_light`), `ambient=1`
+  emissive-dominant response, the blackbody as `light_color`, and a
+  temperature-graded limb coefficient (`2.762 − 0.55·log10 K`, clamped
+  [0.2,0.95]). Games own the class-letter→kelvin mapping; the engine
+  takes kelvin. Authored via `starKelvin` doc key [100,100000] +
+  `StarPhotosphere` component (codec/spawn/export), runtime applies the
+  preset before explicit components so authored fields still win;
+  editor `starKelvin` row. GPU probe: a 3200 K sphere reads red with a
+  measurably darkened limb. Remaining: the two-term law ends at
+  quadratic (no three-term/nonlinear coefficients); no granulation or
+  activity variation (deliberately anti-procedural).
+
+### Follow-up: `accretion_disc_material3d` disc preset
+
+- `accretion_disc_material3d(inner,outer,kelvin,beaming)` generates the
+  radial blackbody column for an `annulus` mesh: Shakura–Sunyaev
+  `T ∝ r^(−3/4)`, flux ∝ T⁴, sRGB-encoded for `linear_light`;
+  emissive-dominant, double-sided, anisotropic, orbital-beaming seeded.
+  Implemented in `spherical_material_preparation.cpp` — generated
+  textures need `RgbaImage::create` (`stellar_native_image`), which
+  cannot be linked back into `stellar_engine` (it depends on it).
+  Optional `spiral`/`spiral_arms`/`spiral_turns` bake grand-design
+  density-wave arms into a 256×64 texture: the arm phase winds
+  `turns`× along the log spiral `arms·φ + turns·ln(r/in)/ln(out/in)`
+  (integral m-mode keeps the azimuth wrap seamless), and compressional
+  heating perturbs the local temperature `T·(1+0.25·spiral·cos)` so
+  crests read hotter and brighter while troughs cool — flux and hue
+  follow the same perturbation and mean flux is preserved. Zero depth
+  keeps the compact one-row texture. Authored via
+  `accretion:[i,o,k,b[,spiral,arms,turns]]` doc key + `AccretionDisc`
+  component (append-only codec tail/spawn/export), runtime + editor
+  `accretion` CSV row. CPU test covers bounds/determinism/profile plus
+  azimuthal variance and wrap seam; GPU probe asserts the radial
+  falloff, the beamed lane asymmetry, and crest/trough modulation vs a
+  uniform twin on a tilted annulus.
+  Remaining: static baked arms (no live shear or turbulence evolution),
+  no relativistic ray-bending, and the radii must be re-stated in the
+  `annulus:i,o` mesh spec — the engine does not derive them.
+
+### Follow-up: `SurfaceEffect3D::volume_scatter` directional scatter
+
+- Emission volumes gain a [0,1] directional single-scatter term: a limb
+  gradient against the object-space key light (`mix(1, .35+1.3·facing)`)
+  makes the star-facing side of a nebula ~1.65× brighter and the far
+  side ~0.35×, so volumes read illuminated instead of flat emissive.
+  Rides `atmo_shape.z` (inert on volume materials — `main()` early-
+  returns into `emission_volume`); validated [0,1]. The facing boost
+  now rides a coarse secondary-extinction march — four taps toward the
+  light through the same density field give `exp(-σ·τ)` transmittance
+  over the authored optical density, so deep filaments behind a dense
+  core keep only the residual base while the lit limb stays bright;
+  an authored occluder sphere (`effect_sphere`) crossing the light
+  path blocks the boost entirely. `engine_scene3d` bounds + GPU probe
+  measuring a ~4× lit/dark limb gradient, a ~0.6× interior shadow
+  factor, and a ~0.28× occluder shadow factor with light from view +x.
+  Remaining: the shadow taps are a coarse 4-sample estimate — no
+  multi-scatter or shadow-map-grade resolution.
+
+### Follow-up: `Material3D::forward_scatter` phase function
+
+- Henyey–Greenstein single-scatter phase
+  `(1−g²)/(1+g²+2g·(V̂·L̂))^(3/2)`, g in [-1,1]: positive peaks a sheet
+  when backlit (dusty-ring forward scatter — the E-ring look) with a
+  lobe that sharpens as |g|→1; negative inverts to an opposition surge
+  for icy regolith. Unit-mean over directions, so sheet luminance is
+  preserved on average; |g| clamps to .95 in the shader so the
+  singular peak stays finite. Complements `orbital_beaming` (velocity
+  asymmetry) — this term is the view/light phase, so a face-on ring
+  still responds. Rides `atmo_shape.w` (the atmosphere branch reads
+  only `.x/.y`). `forward_scatter_back` + `forward_scatter_back_mix`
+  add the optional second lobe — the phase becomes
+  `(1−w)·HG(g)+w·HG(g2)` so real dust sheets pair the narrow forward
+  spike with a broad weak back lobe (face-lit sides keep a faint
+  residual glow; g2=0 degenerates to the isotropic filler and mix=0
+  keeps the single-lobe path identical). `forward_scatter_hue` [0,1]
+  adds the wavelength dependence on the `wave_options.x` lane: the
+  phase product is weighted by the mean-normalized Rayleigh spectrum
+  `(450/λ)⁴` → `vec3(0.395,0.881,1.724)`, so luminance is preserved
+  while hue redistributes the scattered light blueward — icy dust
+  reads blue instead of achromatic white. Authored via
+  `forwardScatter`/`forwardScatterBack`/`forwardScatterBackMix`/
+  `forwardScatterHue` doc keys + `MaterialSurface` fields, runtime +
+  editor `fwdScatter` CSV row. GPU probe measures the backlit boost,
+  face-lit dim, the two-term back-lobe face-lit lift, and the
+  unsaturated blue/red shift on a tilted annulus.
+  Remaining: two-term HG maximum — one Rayleigh weight shared by both
+  lobes (no per-lobe spectra, no Mie size-parameter split, no
+  multi-term phase functions); radiance only (alpha untouched).
+
+### Follow-up: `EmissionVolume` document/component authoring
+
+- `SurfaceEffect3D`'s emission-volume march becomes authorable: the
+  `volume` entity block (`{depth,density,seed,steps,scatter,flow,
+  distort,blend,image2,occlude}`) maps to a new `EmissionVolume` component
+  (tolerant codec reads legacy 20-byte and 28-byte payloads with
+  zero-warp/no-blend defaults + spawn + world export), and
+  `RuntimeHost`/editor preview attach the surface effect using the
+  entity's own texture as the emission image — transparency is enabled
+  automatically, and a `volume` block without a `texture` fails parse.
+  `flow`/`distort` drive the shader's filament phase and UV warp lanes
+  so sibling volumes stop sharing a silhouette; `image2`+`blend` mix a
+  second authored emission image at the same warped UV — a morph
+  between two nebula silhouettes (`blend` requires `image2`; an
+  unloadable `image2` keeps the primary). Nebulae/star-lit plasma
+  clouds are document-authored instead of C++-only. Validated: doc
+  bounds (depth (0,.75], steps [8,64], scatter/blend [0,1], flow
+  |f|≤1e4, distort [0,.1]), `engine_project` round-trip + rejects,
+  `engine_world` codec/spawn/export, and GPU probes showing a
+  flow/distort re-pose, a blend=1 emission swap, and an authored
+  `occlude` sphere (corona masking the volume centre) change the marched
+  pixels. Remaining: explicit view-space sphere placement stays
+  C++-only (`SurfaceEffect3D::view_sphere_center`/`sphere_radius` still
+  win when set).
+- **Camera-inside volumes:** when the camera crosses the proxy's
+  bounding sphere the draw flips to the double-sided pipeline slot and
+  bit 7 of `volume_options.y` lifts the fragment's front-face gate; the
+  march then originates at the camera (ortho rays at their own x,y —
+  `view_position.xy,0`) instead of the exit-wall backface, so flying
+  through a nebula keeps rendering interior filaments instead of
+  popping to black. GPU probe: `plasma-inside.png` fills ~20k px where
+  the pre-change path discarded every fragment.
+
+## Scene3D directional shadow mapping (2026-09-25)
+
+- **Purpose:** give the generic renderer a real directional shadow path
+  sized for strategy scenes — ship/station occlusion under a sun key
+  light — with authored coverage that stays stable at system scale
+  (and an optional `camera_fit` mode that tracks zoom via footprint
+  multipliers instead of frustum-slice fitting).
+- **Modules:** `native_scene3d.hpp` (`ShadowMap3D`, `Scene3D::create`
+  parameter, `Scene3DStatistics::shadow_casters`/`spot_shadow_casters`/`omni_shadow_casters`),
+  `native_scene3d.cpp`
+  (validation), `scene3d_shadow.vert/.frag` (depth-only pass),
+  `scene3d.frag` (view→shadow-clip transform + PCF block),
+  `native_scene3d_gpu.cpp` (ortho fit, caster culling, depth pipeline,
+  RenderGraph pass, tier policy), `scene_document.*`
+  (`render.shadow` block), `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interface:** `ShadowMap3D` — `extent` (ortho half-size),
+  `distance` (box centre along camera forward), `depth` (light-axis
+  range), `strength` [0,1], `bias` (NDC units), `resolution` (0 =
+  tier default: Medium 1024 / High 2048 / Ultra 4096),
+  `cascade_extents` (empty disables; up to
+  `maximum_scene3d_shadow_cascades`=4 progressively wider ortho tiers
+  sharing the same centre/depth so coverage survives extreme zoom-out —
+  entries must be finite, strictly increasing and each past `extent`),
+  `softness`
+  ([0,8] penumbra multiplier on the tier PCF radius — 0 forces the
+  hard single-tap edge),
+  `normal_offset` ([0,8] receiver-side lift along the shading normal in
+  map texels — clears slope-scaled self-shadow acne on surfaces angled
+  to the light without raising the constant `bias`; each cascade tier
+  applies its own texel-scaled amount),
+  `camera_fit` (reinterprets every authored extent as a multiplier of
+  the camera's visible half-height at the box centre —
+  `orthographic_height`/2 orthographic or `distance`·tan(fov/2)
+  perspective — so the chain tracks zoom with stable texel density).
+  Coverage is an authored policy: receivers outside every box stay lit;
+  the outermost covering band (the near map alone, or the widest
+  cascade tier) fades its term to lit over its outer 10% margin so the
+  authored boundary doesn't hard-clip the umbra; the box tracks the
+  camera so mid-zoom strategy views keep stable texel density.
+- **Shader contract:** view-level fragment uniform carries the
+  view→shadow-clip matrix plus {texel, PCF radius in texels, strength,
+  bias} and the world-units normal-offset lift; the fragment adds
+  `normal × lift` to its view-space position before projecting into
+  every tier (cascade tiers carry their own texel-scaled value in
+  `cascade_options`). 8-tap kernel at High (1-texel) and Ultra (1.5), single tap at
+  Medium. Per-tier matrix/options arrays (sized to the four-tier bound)
+  feed the cascade tiers: every tier renders its caster list into its
+  own layer of one shared depth-texture array, and the fragment folds
+  the enabled tiers widest→narrowest — sampling the tightest covering
+  layer and crossfading over each tier's outer 10% margin — before the
+  crisp near map's own margin handoff; fragments past every tier stay
+  lit. Depth-only pipeline shares the scene vertex layout
+  and a transform SSBO; fragments outside the ortho box are exempt.
+- **Policies:** Low tier skips the pass entirely; `transparent` blends
+  never cast; `visible_range`-culled instances don't cast (identical
+  rule to the camera draw); light-space AABB culls off-volume casters
+  while off-camera casters still write the map; casters share the lit
+  pass's screen-space LOD pick (a chained instance submits its selected
+  level; a collapsed `lodGroup` submits one light-facing proxy scaled
+  to the merged sphere from the representative member); billboard card
+  casters collapse rotation to face the light; `alpha_threshold`
+  casters bind their base texture per batch and the depth fragment
+  discards the same texels the lit pass drops (cutout parameter +
+  UV tiling ride the `ShadowCast` record), so a holed texture casts
+  a perforated silhouette instead of its full quad; casters batch
+  through `DrawBatcher` with the same instancing convention as the
+  scene pass (material_id interns the caster texture, so distinct
+  cutout images split batches but share instanced draws).
+- **Persistence:** `render.shadow` document block round-trips; extent
+  ≤ 0 disables. The authored chain emits as `cascades: […]` plus the
+  legacy `cascade`/`cascade2` scalars as a mirror; documents authoring
+  only the legacy scalars parse into the same vector. Rejects
+  nonpositive `depth`, `strength` outside [0,1],
+  `bias` outside [0,0.1], `resolution` outside [64,8192], any cascade
+  extent that is non-finite or not strictly past the previous tier, a
+  cascade list longer than four, `softness` outside [0,8], and
+  `normalOffset` non-finite or outside [0,8].
+- **Editor:** Scene3D tool `shadow` row edits all fields against
+  the live preview, trailing fields carrying up to four cascade tiers
+  then the normal-offset lift and camera-fit flag.
+- **Tests:** `native_scene3d_gpu` — casters/bias/direction/tiers/range
+  block with pixel probes (open vs blocked receiver, moved blocker
+  relocates the shadow, Low-tier skip, PCF tap delta, out-of-range
+  caster culling) + `shadow-open/blocked/reference/moved/low/pcf/
+  culled` captures; LOD probes (annulus chain substitute writes a ring
+  shadow with a hole where the full quad was solid; a collapsed group
+  shares one proxy caster — `shadow_casters` drops N+1→2 — and still
+  shadows the receiver) + `shadow-lod/group` captures; cutout probe
+  (`shadow-cutout` — a half-alpha-masked occluder keeps shading its
+  opaque side's footprint while the transparent half reopens); cascade
+  probe (`shadow-near-only`/`shadow-cascade` — an umbra outside the
+  near window stays lit single-tier and darkens through the far tier,
+  while a lit receiver inside the empty near window keeps its value);
+  three-tier probe (`shadow-cascade-mid`/`shadow-cascade2` — an umbra
+  between the mid and widest windows stays lit at two tiers and darkens
+  only once the widest layer covers it; per-tier
+  `shadow_cascade_casters[t]` attribution asserted);
+  softness probe (`shadow-soft-0/4` — a zero multiplier collapses the
+  penumbra to a binary edge, 4× grows an 80-pixel blend band while the
+  umbra core keeps its full cut); `fleet3d_shadow` benchmark — the
+  1024-instance fleet re-submitted through the directional box plus a
+  shadowed spot cone, printing timing + `shadow_casters` next to the
+  unshadowed `fleet3d` baseline, and a `fleet3d_shadow_cascade` variant
+  adding all four far tiers so per-tier caster overhead prints
+  separately (the `cascades=` counter list), plus a `fleet3d_shadow_omni`
+  variant showing omni caster work scales with covering faces (≈1 per
+  fleet caster for a near-planar fleet) rather than a flat six;
+  `engine_project` document round-trip + rejection coverage.
+- **Infrastructure fix bundled:** SDL fragment-set resource order —
+  the materials SSBO sits after the sampled textures (now binding 14)
+  because set 2 requires samplers to precede storage buffers; the
+  earlier collision produced `VK_ERROR_DEVICE_LOST`.
+- **Limitations:** key-light only — the chain is fixed at three
+  bands (near + up to two far tiers, no arbitrary split count), so
+  extreme zoom ranges still pick an authored coverage policy; authored
+  `bias` is a constant receiver-side NDC term (the rasterizer applies
+  a fixed 1.5 slope bias at cast time — no authored slope term);
+  analytic blockers remain the ring↔planet path; spot lights have a
+  separate one-map path (next record).
+
+## Scene3D spot-light shadow mapping (2026-10-07)
+
+- **Purpose:** let a spot cone cast a real umbra — a `casts_shadow`
+  spot light renders the scene's casters once from its own position
+  through a cone frustum, so occlusion, not just cone attenuation,
+  decides which receivers take the light.
+- **Modules:** `native_scene3d.hpp` (`PointLight3D::casts_shadow`),
+  `native_scene3d.cpp` (validation), `native_scene3d_gpu.cpp` (shared
+  depth-atlas target + RenderGraph pass sharing the `scene3d_shadow`
+  pipeline and the lit pass's caster policy via a shared collection),
+  `scene3d.frag` (`spot_shadow_map` sampler at `set=2,binding=11`,
+  plus `spot_from_view`/`spot_options`/`spot_bounds` arrays in the
+  view uniform),
+  `scene_document.*` (`castShadow`/`shadowStrength`/`shadowSoftness`
+  keys), `runtime_host.cpp`, `app/engine_main.cpp` (`pointLights`
+  row's 14th/15th/16th CSV fields; `shadowNormalOffset` rides the
+  17th on both spot and omni rows).
+- **Public interface:** set `casts_shadow` on a `PointLight3D` with a
+  nonzero `spot_direction` (omni casters take the cube-atlas path in
+  the next record). Every shadowed spot shares one depth atlas — a
+  full-size map for a single light, a quadrant each when more than
+  one casts (up to the four point-light slots). `shadow_strength`
+  [0,1] blends the umbra like `ShadowMap3D::strength` (1 = full cut);
+  `shadow_softness` [0,8] scales the PCF penumbra like
+  `ShadowMap3D::softness`; `shadow_normal_offset` [0,8] lifts
+  receivers along their shading normal in map texels — the upload
+  carries a per-unit-distance world scale (perspective texel size
+  grows with depth) the shader multiplies by the fragment's light
+  distance before projecting. The cone frustum spans the authored outer
+  cone (clamped to ~150 degrees map fov) out to `range`.
+- **Shader contract:** `spot_options[i]` carries {texel, PCF radius,
+  strength, bias} per light index and `spot_bounds[i]` clamps each
+  sample to its atlas cell so out-of-cone fragments stay lit instead
+  of sampling a neighbour quadrant; `spot_advanced[i]` supplies the
+  per-unit-distance world lift the shader applies along the shading
+  normal before projecting. The point-light loop blends the
+  sampled visibility into each flagged light's window.
+- **Policies:** identical caster rules to the directional pass —
+  no transparent casters, `visible_range` culls, shared LOD pick,
+  collapsed groups cast one light-facing proxy, billboards face the
+  light, keep masks partition banded transitions. Low tier skips;
+  tier-scaled resolution (512/1024/2048); bias is texel-scaled
+  (perspective depth compresses distant differences, so a flat NDC
+  bias eats narrow umbras — slope bias handles the geometric term);
+  alpha-cutout casters share the directional pass's texel masking
+  (the shared `collect_casters` feeds both).
+- **Persistence:** `castShadow` document key round-trips on coned and
+  omni lights alike. `shadowStrength` round-trips and rejects
+  outside [0,1]; `shadowNormalOffset` round-trips and rejects
+  outside [0,8].
+- **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed vs
+  half-strength spot captures (`point-light-spot-noshadow/shadow/
+  softshadow.png`) with a lit-cone umbra census, right-of-umbra lit
+  check and a ~half-latency umbra texel probe; the tilted-receiver
+  `shadow_normal_offset` probe (`point-light-spot-off0/off8.png`)
+  asserts the authored lift translates the projected lookup — a move
+  no constant bias can produce; a two-spot atlas probe
+  (`point-light-spot2-*.png`) censuses both umbrae, a lit rim outside
+  them, and the second light's umbra through the single-map path;
+  `engine_scene3d` accepts two shadowed spots and out-of-range
+  `shadow_strength` rejections; `engine_project` parses,
+  round-trips and rejects `castShadow`/`shadowStrength`.
+- **Limitations:** the shared atlas halves per-light resolution once
+  a second spot casts (2048² → 1024² cells at Ultra).
+
+## Scene3D omni point-light cube shadows (2026-10-08)
+
+- **Purpose:** close the point-light shadow gap — an omni `PointLight3D`
+  flagged `casts_shadow` (no `spot_direction`) now casts a real umbra
+  in every direction instead of being rejected, so station bays,
+  explosion lights and unshadowed interiors can opt into occlusion.
+- **Modules:** `native_scene3d.cpp` (omni `casts_shadow` accepted),
+  `native_scene3d_gpu.cpp` (shared cube atlas target + `omni-shadow`
+  RenderGraph pass sharing the `scene3d_shadow` pipeline and the same
+  `collect_casters` evaluation the directional/spot paths memoize),
+  `scene3d.frag` (`omni_shadow_map` at `set=2,binding=14`, analytic
+  dominant-axis face selection + projective-depth rebuild, the
+  materials SSBO moved to binding 15 to keep samplers ahead of
+  storage), `scene_document.cpp` (`castShadow` parses without
+  `spotDir`), `app/engine_main.cpp` (`pointLights` row accepts the
+  `0,0,0,1,0` cone sentinel so shadow fields can follow an omni light).
+- **Public interface:** set `casts_shadow` on a `PointLight3D` with no
+  `spot_direction`. Each shadowed omni light owns a row of six
+  90-degree cube faces in a shared atlas — one row per light, up to
+  the four point-light slots — with cell resolution tier-scaled
+  (256/512/1024). `shadow_strength`/`shadow_softness` keep the spot
+  semantics; `shadow_normal_offset` lifts receivers along their
+  shading normal in map texels, scaled by the fragment's dominant-axis
+  (face) distance; `range` bounds the face frusta (0 → 4096 fallback
+  like the spot path).
+- **Shader contract:** `omni_options[i]` = {atlas texel width (>0
+  enabled), PCF radius in cell texels, umbra strength, depth bias};
+  `omni_atlas[i]` = {row v0, row v1, pn, pq} — the light's view-space
+  position already lives in `material.point_position[i]`, so the
+  receiver picks its face by the dominant axis of the offset and
+  rebuilds `ndc_z = pn + pq/t` with no per-face matrices riding the
+  uniform. Face cells bake their NDC offset into each face's
+  `light_mvp` exactly like spot quadrants. `omni_advanced[i]` carries
+  the per-unit-distance world lift for `shadow_normal_offset` — the
+  shader scales it by the fragment's dominant-axis face distance
+  before offsetting the receiver.
+- **Policies:** identical caster rules to the other depth passes —
+  transparents never cast, `casts_shadow`/`receives_shadow` opt-outs,
+  `visible_range` culling, shared LOD pick, collapsed-group proxies,
+  billboard-facing, keep-mask thinning, alpha-cutout texel masking.
+  Low tier skips the atlas; the memoized per-view caster evaluation
+  is shared, so each light's six collections only transform, volume
+  test and emit.
+- **Persistence:** `castShadow`/`shadowStrength`/`shadowSoftness`/
+  `shadowNormalOffset` round-trip with or without `spotDir`; the
+  `0,0,0,1,0` CSV sentinel keeps the editor row unambiguous.
+- **Tests:** `native_scene3d_gpu` — unshadowed vs shadowed omni
+  captures (`point-light-omni-noshadow/shadow.png`) with the umbra
+  census and a lit-footprint non-vacuity check, the
+  `omni_shadow_casters` counter asserted non-zero, and a
+  `receives_shadow=false` fold-to-lit probe
+  (`point-light-omni-noreceive.png`); the tilted-receiver
+  `shadow_normal_offset` probe (`point-light-omni-off0/off8.png`)
+  asserts the authored lift translates the cube-face lookup;
+  `engine_scene3d` accepts a shadowed omni light; `engine_project`
+  parses + round-trips omni `castShadow`.
+- **Performance:** six depth collections per shadowed omni light
+  against the shared caster evaluation — a light near dense geometry
+  submits each caster into every face it crosses;
+  `Scene3DStatistics::omni_shadow_casters` audits the summed
+  submissions.
+- **Limitations:** face seams can alias at exact 45-degree splits
+  (standard cube-map behaviour, PCF stays inside the cell); faces are
+  view-space-locked, so map content rotates with the camera basis;
+  unbounded `range==0` lights cap the frusta at 4096 units.
+
+## Scene3D scene-level environment probe (2026-10-07)
+
+- **Purpose:** one shared equirect IBL probe per scene (a system view's
+  starfield) instead of every PBR material authoring its own map.
+- **Modules:** `native_scene3d.hpp` (`Scene3D::create` sixth parameter +
+  `environment()`), `native_scene3d_gpu.cpp` (env-slot fallback at draw
+  record + full-chain residency/streaming for the probe),
+  `scene_document.*` (top-level `environment` key), `runtime_host.cpp`,
+  `app/engine_main.cpp` (`environment` scene row).
+- **Semantics:** the probe fills the environment slot only for PBR
+  materials that opted in (`environment_strength > 0`) and authored
+  no `environment` map — authored maps always win, strength zero still
+  disables IBL, dielectrics keep requiring their own map.
+- **Persistence:** top-level `environment` string round-trips; absent
+  key means no probe (all prior documents load identically).
+- **Tests:** `native_scene3d_gpu` — red probe lights a mapless
+  opt-in material, authored green map wins over the probe, no probe +
+  no map stays dark (`pbr-ibl-none/scene/own.png`); `engine_scene3d`
+  accessor round-trip; `engine_project` `environment` key round-trip.
+- **Limitations:** static authored equirect — a captured bake
+  (`environmentCapture`) overrides it when enabled; no per-view probe
+  selection (the probe is scene state, not a render option).
+
+## Scene3D captured environment probe (2026-10-21)
+
+- **Purpose:** let opt-in PBR materials reflect the local scene (sun
+  disc, lit planets, nebulae) instead of only an authored starfield —
+  the renderer bakes a probe once per scene rather than every
+  reflective material authoring a fake map.
+- **Modules:** `native_scene3d.hpp` (`EnvironmentCapture3D` +
+  `Scene3D::create` eighth parameter + `environment_capture()` +
+  `Scene3DStatistics::probe_bakes`), `native_map_platform.hpp`
+  (`Scene3DView::probe_epoch`), `native_scene3d_gpu.cpp`
+  (`Storage::bake_probe` + epoch/weak-scene-keyed `probe_cache`),
+  `undo_history.hpp` (`revision()` mutation serial),
+  `scene_document.*` (`probeCapture`/`probeAnchor`/`probeResolution`
+  keys), `runtime_host.cpp` (`Impl::probe3` + `scene3_epoch`),
+  `app/engine_main.cpp` (preview create + `probeCapture` scene row,
+  editor case 75, epoch from `scene3_history.revision()`).
+- **Semantics:** when enabled the renderer renders six 90-degree face
+  views at the anchor through the full pipeline (lights, shadows,
+  emission volumes, authored env response on opt-in materials),
+  downloads each face, CPU-resamples into the equirect layout
+  `environment()` samples, and binds it as the scene env slot —
+  overriding the authored `environment` map for mapless opt-ins while
+  authored maps still win. On HDR-capable devices the faces download
+  the pre-tonemap RGBA16F target and encode RGBM (rgb*a*8 — up to 8x
+  display white survives), so a captured sun or emissive body keeps
+  real radiance headroom that specular reflection and bloom can pick
+  up; `RgbaImage::hdr_rgbm` marks the image and a per-draw
+  `env_flags` lane selects the decode, leaving authored maps literal.
+  Without float-target support the bake keeps the tonemapped UNORM
+  composite. The authored key light is rotated through
+  world space so all faces light identically. The bake caches once per
+  key: `probe_epoch == 0` keys on the scene instance (weak, so a freed
+  scene's probe can never alias), while a nonzero epoch keys on the
+  caller's declared generation — hosts that rebuild `Scene3D` per frame
+  pass a stable serial so one logical scene bakes once, and bumping it
+  (runtime document load, editor history commit/undo/redo/clear)
+  refreshes the probe.
+- **Validation:** `Scene3D::create` rejects non-finite anchors and
+  face resolutions outside [16,512]; the document codec applies the
+  same bound on parse.
+- **Performance:** one-shot cost — six small renders + readbacks at
+  first frame (default 128px faces, 256x128 out). Per-frame cost is
+  the same env-texture bind the authored path already pays. The
+  bake's texture/mesh uploads join the persistent cache counters
+  while per-frame stats (draw calls, casters) are restored so a bake
+  never inflates frame audit counters; `probe_bakes` is cumulative.
+- **Persistence:** `probeCapture` bool, `probeAnchor` [x,y,z] and
+  `probeResolution` keys round-trip; absent keys mean no capture
+  (prior documents load identically).
+- **Tests:** `native_scene3d_gpu` — a red emissive sphere behind the
+  camera dominates the +Z face; a mapless opt-in quad reflects red
+  with capture on but authored-map blue with capture off, and
+  `probe_bakes` advances exactly once (`pbr-probe-off/on.png`); the
+  HDR probe asserts an emissive-6 sun decodes brighter than an
+  authored clamped-white map can reflect (`pbr-probe-hdr/ldr.png`,
+  `probe_bakes_hdr` gates the strict margin on HDR-capable devices);
+  the
+  epoch probe rebuilds the scene thrice under one epoch and asserts a
+  single bake, then asserts a bumped epoch rebakes
+  (`pbr-epoch-*.png`); `engine_scene3d` rejects bad
+  anchors/resolutions and round-trips the struct; `engine_project`
+  round-trips the document keys and rejects out-of-range resolution;
+  `undo_history` asserts `revision()` is monotonic across
+  commit/undo/redo/clear.
+- **Limitations:** static snapshot per declared epoch — orbiting
+  emitters and camera-fit shadow chains keep their bake-time pose
+  until the caller bumps the epoch (no per-frame auto-refresh by
+  design); one probe per scene, no probe grid or per-instance
+  selection; equirect output is bilinear-resampled (roughness response
+  shares the authored path's box-mip prefilter, not a true GGX
+  convolution); RGBM quantizes radiance into 8x display white — a
+  sun brighter than that still clips, and authored env maps remain
+  8-bit by provenance; each bake downloads six faces synchronously —
+  a hitch when an epoch flips, so editors should bump it per commit,
+  not per frame.
+
+## Scene3D debug views, quality gates and distance culling (2026-09-25)
+
+- **Purpose:** close the remaining phase-2 polish items for the Scene3D
+  renderer — diagnostic shading for material/lighting review, complete
+  the quality-tier policy so expensive sampling degrades by tier, and
+  add per-instance distance culling as the first LOD-policy hook for
+  strategy-scale scenes.
+- **Modules:** `native_map_platform.hpp` (`DebugView3D` +
+  `RenderOptions3D::debug_view`), `native_scene3d.hpp`
+  (`MeshInstance3D::visible_range`/`visible_fade`/`casts_shadow`/
+  `receives_shadow`,
+  `Scene3DStatistics::visible_fades`), `native_scene3d.cpp`
+  (validation + cull in `prepare_instance3d`),
+  `native_scene3d_gpu.cpp` (per-view debug uniform, tier-gated samplers,
+  volume step caps, culled instances skip streamer demand, range-fade
+  keep mask, cast-opt-out caster filter, receive flag on
+  `shadow_radii.w`),
+  `scene3d.frag` (diagnostic shading branches),
+  `scene_document.*`/`scene_components.*` (`range`/`castsShadow`/
+  `receivesShadow` entity keys, `VisibleRange`/`NoShadow`/
+  `NoShadowReceive` components, `render.debug`),
+  `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interfaces:** `DebugView3D` — Lit (default), Unlit, Albedo,
+  Normals, Roughness, Metallic, Emissive, LightingOnly, Lod, Residency,
+  Shadows — applies per view inside the production fragment path. `Lod` tints each
+  draw by its submitted LOD class (gray full mesh, blue→green→
+  yellow→orange ramp for chain levels 1–4+, magenta group proxy) so
+  `lodPixels`/`lodGroup` thresholds and transitions can be tuned
+  visually; a screen-door band shows its dithered member/proxy
+  partition with both shares lifted toward white, so an
+  in-transition draw reads differently from a hard LOD pick. `Residency` tints by the surface texture's resident base
+  mip (green full chain, lime→amber→orange→red deeper tails, magenta
+  pinned fallback when a bind is denied outright) so streamer budget
+  pressure is visible per object. Both share the `texture_options.w`
+  class lane — the per-view mode selects the meaning. `Shadows` shows
+  the key-light occlusion term as grayscale (analytic blockers × the
+  directional map's visibility, strength-blended) folded with the
+  product of spot depth-map terms, so authored `extent`/`bias`/
+  `strength` and each `casts_shadow` cone's footprint read as umbra
+  extent rather than darkened albedo.
+  `visible_range` = world-unit
+  camera distance beyond which the instance culls (bounding-sphere
+  surface distance; 0 = unlimited; validated finite ≥ 0 ≤ 1e12).
+  `visible_fade` [0,.5] = fraction of `range` ahead of the cull edge over
+  which the draw dithers out via the same screen-door mask as the LOD
+  crossfade — no alpha blending, no extra submission; the disappearance
+  distance is unchanged. Low tier and `visible_fade=0` keep the hard
+  cut; a LOD pair inside the band degrades to one thinned draw;
+  `visible_fades` audits thinned submissions.
+  `casts_shadow` = per-instance shadow-cast opt-out (default true):
+  false keeps an opaque mesh out of the directional and spot depth
+  passes so backdrop shells/markers stay lit-only; a collapsed LOD
+  group casts only when its representative member does.
+  `receives_shadow` = per-instance shadow-receive opt-out (default
+  true): false folds the key-light and shadowed-spot depth-map terms
+  to fully lit on this mesh (rides the free `shadow_radii.w` material
+  lane into `mix(1, lit, strength*receive)`), so self-lit markers and
+  UI shells ignore umbrae while still casting and still receiving
+  analytic ellipsoid/annulus blocker attenuation — which is a material
+  property, not the flag's business.
+  Quality gates: Low disables anisotropic + cubic-magnification sampling
+  and caps emission-volume ray marching at 16 steps; Medium caps at 32;
+  bloom remains Medium+, sharpen High+, MSAA Ultra.
+- **Persistence:** entity `range` key (`>0` only is serialized; negative
+  rejected) plus `visibleFade` [0,.5] map to the `VisibleRange` world
+  component — its codec carries a trailing f32 fade that legacy 4-byte
+  payloads decode as 0 (the hard cut they were authored with);
+  `castsShadow` (bool, serialized only when false) maps to the
+  `NoShadow` marker component and `receivesShadow` (same convention)
+  to `NoShadowReceive` — zero-byte payloads like `hidden`/`oneway`;
+  `render.debug` validates against the eleven mode names (`lod`/
+  `residency`/`shadows` map to `DebugView3D::Lod`/`Residency`/`Shadows`
+  — the LOD/residency class travels on the per-draw `texture_options.w`
+  lane).
+- **Editor:** Scene3D tool gains `debugView` (scene), `visRange`,
+  `visFade`, `castShadow` and `receivesShadow` (entity) rows driving
+  the real preview path.
+- **Tests:** `engine_scene3d` (range validation + `prepare_instance3d`
+  cull), `native_scene3d_gpu` (debug-view pixel probes per channel,
+  culled-instance accounting, Lod view: a collapsed group proxy covers
+  its merged footprint in magenta while a chain-substituted mesh tints
+  by level; a banded collapse shows the white-lifted transition tint on
+  both the member and proxy shares; Residency view: denied bind
+  magenta, mip-3 tail orange, mip-0 green; Shadows view: the mapped
+  umbra goes black against the lit receiver and both spot-atlas umbrae
+  darken while the lit rim stays white; a `receives_shadow=false`
+  receiver stays at its open value inside the same umbra footprint),
+  `engine_project` (document round-trip +
+  malformed rejection), `engine_world` (`VisibleRange`/`NoShadow`/
+  `NoShadowReceive` spawn/codec/
+  export round-trip), `engine_runtime`; range-fade census probe — a
+  sphere halfway through the band lights ~1/2 its pixels (798/1600)
+  vs the hard-cut control's full disc and a fully culled zero.
+- **Bug fix bundled:** `native_scene3d_gpu.cpp` streamer registration is
+  now owner-verified via `weak_ptr` — a new `RgbaImage` reusing a dead
+  image's address no longer inherits the stale `TextureId` (wrong mip
+  desc/residency → missing promotions, the intermittent
+  "Footprint growth did not promote the resident mip tail" failure).
+- **Limitations:** debug views are per-view diagnostics only —
+  `Residency` reports the surface texture's resident tail, not
+  secondary map residency or evicted-not-yet-rebound states;
+  `visible_range` is distance culling, not
+  geometric LOD/impostors; LightingOnly divides by sampled albedo so
+  untextured surfaces clip to black.
+
+## Scene3D PBR/post/lighting overhaul (2026-09-25)
+
+- **Purpose:** extend the generic Scene3D renderer from a directional-only
+  diffuse path into a physically plausible material/post/lighting stack
+  for space-strategy consumers — ship/station metals, emissive windows
+  and colony lights, environment response, atmosphere limbs, HDR
+  post-processing and quality tiers — without a game-specific renderer
+  and without touching authored art.
+- **Modules:** `engine/include/stellar/engine/native_scene3d.hpp`
+  (`PbrSurface3D`, `Atmosphere3D`, `PointLight3D`, `Material3D`
+  extensions), `engine/include/stellar/engine/native_map_platform.hpp`
+  (`RenderOptions3D` on `Scene3DView`), `engine/src/native_scene3d.cpp`
+  (validation/budgets), `engine/src/native_scene3d_gpu.cpp` (HDR mip
+  chain, MSAA, extra samplers, per-view options), shaders
+  `scene3d.frag`/`tonemap.frag` + regenerated
+  `src/generated/scene3d_shaders.hpp`, `scene_document.*`,
+  `scene_components.*`, `runtime_host.cpp`, `app/engine_main.cpp`.
+- **Public interfaces:** `Material3D::pbr` (scalar metallic/roughness
+  plus optional metallic-roughness map, emissive map × `emissive_tint` ×
+  `emissive_strength` with `night_emissive` nightside gate, equirect
+  `environment` map with `environment_strength` driving dielectric
+  diffuse irradiance + roughness-mapped mip-prefiltered specular
+  response, split energy-conserving: the specular fresnel share is
+  subtracted from the diffuse irradiance term), `Material3D::atmosphere`
+  (wavelength-tinted `(1-N·V)^power` limb scattering, day-side weighting,
+  `night_floor`, opt-in `sunset`/`sunset_strength` terminator tint — the
+  rim blends toward a transmitted dusk color where limb meets
+  terminator), `alpha_threshold` cutout, `texture_tiling`;
+  `Scene3D::create(...)` accepts up to
+  `maximum_scene3d_point_lights` = 4 `PointLight3D`s (position/color/
+  intensity/range, windowed inverse-square with hard cutoff — range 0 =
+  unbounded; `spot_direction`+`spot_inner`/`spot_outer` cosines gate
+  any of them to a smooth spot cone — zero direction stays omni);
+  `RenderOptions3D` per view — `quality` (Low/Medium/High/
+  Ultra), `exposure`, `bloom`/`bloom_threshold` (HDR mip-chain bloom
+  that lifts alpha so halos composite over background), `contrast`,
+  `saturation`, `sharpen`, `vignette` (post-tonemap corner falloff —
+  free multiply, so all tiers keep it). Ultra requests 4x MSAA when
+  the device supports it; Low runs tonemap-only.
+- **Persistence:** `Scene3dDocument` gains per-entity material fields
+  (`metallic`, `roughness`, `metallic_roughness`, `emissive*`,
+  `environment*`, `alpha_cutout`, `uv_tile_*`, `atmo_*`), scene
+  `point_lights[]` and a `render` block; unknown quality tiers,
+  over-budget point lights and malformed arrays are rejected; unset
+  fields keep neutral defaults so existing documents load unchanged.
+  `MaterialPbr`/`AtmosphereShell` components snapshot/restore through
+  the world codec; `spawn_scene3d`/`scene3d_from_world` round-trip them;
+  `RuntimeHost` maps them onto `Material3D`, `PointLight3D` and
+  `Scene3DView::options`.
+- **Editor:** the engine-shell Scene3D tool exposes the new fields —
+  entity rows for PBR maps/scalars, emissive tint/strength/night gate,
+  environment, cutout, tiling, atmosphere tint/params; scene rows for
+  exposure, bloom, grading, quality tier and point-light entry
+  (pos/color/intensity/range + optional spot cone tail); the preview
+  renders through the same `Scene3D` path as `RuntimeHost`.
+- **Tests:** `engine_scene3d` (validation rejects for out-of-range
+  metallic/roughness/emissive/environment/atmosphere/cutout/tiling and
+  point-light count/fields), `native_scene3d_gpu` (pixel probes:
+  emissive map masking, metallic specular tinting + off-axis diffuse
+  loss, alpha cutout, UV tiling, IBL response, point-light
+  color/falloff/range, atmospheric limb + day weighting, exposure,
+  bloom spread, Low-tier gating, MSAA, spot cone axis/penumbra/
+  behind-cone and omni-restore probes), `engine_project` (document
+  round-trip + malformed rejection), `engine_world` (component spawn/
+  codec/export round-trip), `engine_runtime`.
+- **Save/performance impact:** +2 texture slots per material
+  (metallic-roughness, emissive) +1 shared environment sampler managed
+  by the same streamer/budgets; HDR mip chain adds ~33% of target bytes
+  only when bloom is on; MSAA 4x is Ultra-only and device-gated; PBR
+  environment/emissive/atmosphere fields are opt-in (zero-strength
+  defaults) so existing content renders identically.
+- **Limitations:** (superseded 2026-10-07 — the directional shadow map
+  and one `casts_shadow` spot cone now land real depth-map shadows; see
+  the newer records.) Point lights are capped at 4; atmosphere is a limb
+  approximation (no multi-scatter); bloom mips are box-blitted (no
+  wide-kernel polish); environment IBL is a single shared equirect per
+  material, not probes; Low tier disables bloom/sharpen rather than
+  degrading them; editor preview debug-view modes landed in the
+  follow-up record above.
+
+## Native missions panel integration (2026-09-24)
+
+- **Purpose:** wire the previously tested-but-uninstantiated
+  `NativeMissionView` (missions/settlement board over authoritative
+  campaign state) into the native client behind a rail affordance.
+- **Modules:** `app/native_client/native_ui_layout.hpp` (new
+  `UiAction::Missions` + rail rect via `secondary(5)`, hit test and
+  `hud_actions()` ring entry), `app/native_client/main.cpp`
+  (routing/event/render/refresh + command dispatch),
+  `app/native_client/native_missions.*` (view — unchanged),
+  `data/locale/{en,de}.json` (`NAV_MISSIONS`).
+- **Public interfaces:** the MISSIONS rail button toggles the panel
+  through the same `route_navigation` dispatch as the other workspaces
+  (mutually exclusive, closes on Map/Home/system entry/menu). The view's
+  commands route to authoritative paths: FocusFleet →
+  `fleet_controller_.select` + camera center, OpenColony → the existing
+  overview entry (`enter_system` + body select), LandColony → planetary
+  surface entry via `open_colony_from_system`, CollectOutpostFreight →
+  surface entry plus the outpost freight preview through
+  `outpost_freight_controller_.preview` (pause + UI gesture capture).
+- **Data feed:** `refresh_missions` rebuilds the mission board, active
+  settlement fleet views and owned-colony rows each frame the panel is
+  open, gated on the session cache generation.
+- **Keyboard contract:** the panel rings its actionable controls in
+  (y,x) order (close, tabs, enabled site pagers, select-ship, colony
+  View/Land/Collect — display-only mission cards and disabled controls
+  stay out); Return/Space replay the matched press/release dispatch so
+  the emitted commands are identical to pointer clicks, Escape releases
+  a live ring before the host closes the panel, `map_hud_visible()`
+  excludes it so the map focus groups cannot preempt its keys, and
+  `focused_label`/`focused_bounds` feed `announce_focus` as Button
+  announcements.
+- **Tests:** `native_missions` (view behavior + ring order/activation/
+  release/reset), `native_ui_layout` (18-item HUD ring incl. the new
+  rect's hit-test round-trip and (y,x) ordering), `localization`, and
+  the `--navigation-smoke` end-to-end pass (exclusive open, rail toggle,
+  ring arming, Escape layering).
+- **Localization:** panel chrome (title, tabs, pager/select/row buttons,
+  empty state, focus labels, phase labels — roles reuse `FLEET_ROLE_*`)
+  resolves through `set_localization` like the other workspaces.
+- **Limitations:** the rail affordance renders a text glyph because no
+  missions navigation art asset exists; producer-built data strings
+  (card summaries, site details, freight reasons) remain authored
+  English — `build_mission_board`/`colony_site_selection`/
+  `build_owned_colony_rows` are catalog-free builders.
+
+## Galaxy map framework + engine-shell Galaxy tool (2026-09-24)
+
+- **Purpose:** the pending engine-level galaxy model for space-strategy
+  consumers — a reusable, game-agnostic star chart (systems positioned
+  in light-year space, lane links, fleet/colony/outpost/anomaly markers)
+  with deterministic queries for rendering, selection and debugger
+  surfaces. Closes the "Galaxy debugger pending an engine-level galaxy
+  model" gap.
+- **Modules:** `engine/include/stellar/engine/galaxy_map.hpp`,
+  `engine/src/galaxy_map.cpp` (`GalaxyMap`, `GalaxySystem`,
+  `GalaxyLane`, `GalaxyMarker`). Core projection:
+  `core/include/stellar/core/galaxy_projection.hpp`,
+  `core/src/galaxy_projection.cpp` (`project_galaxy_map`). Shell:
+  GALAXY tab in `app/engine_main.cpp`.
+- **Public interfaces:** `add_system/add_lane/add_marker` (caller ids,
+  duplicate rejection), `remove_system` (drops incident lanes, detaches
+  anchored markers), `set_lane_enabled`, `update_marker_position`,
+  `set_marker_system`/`set_marker_destination`; ascending-id accessors;
+  `neighbors`/`lanes_for` over a lazily rebuilt enabled-lane adjacency;
+  `systems_in_radius`, `nearest_system` (id tie-break),
+  `markers_in_system`, `markers_for_owner`, `distance_light_years`
+  (3D euclidean); `find_route`/`route_length_light_years` — weighted
+  Dijkstra over enabled lanes with lowest-id tie-breaks, so non-Core
+  games get deterministic routing without `InterstellarLaneNetwork`;
+  versioned `capture_state`/`restore_state` (v1) that rejects duplicate
+  ids and dangling lane endpoints atomically.
+  `project_galaxy_map(const FreshCampaignState&)` maps systems (name,
+  position, stellar-class label, habitable/anomaly/rare/pre-warp tags),
+  `InterstellarLaneNetwork::build()` lanes, colonies (anchored markers)
+  and fleets (anchored or free-floating, destination preserved) —
+  read-only, full-authority view; player-facing maps must apply
+  observer knowledge rules first.
+- **Consumers:** engine-shell GALAXY tab (deterministic synthetic
+  chart — golden-angle spiral, two-nearest-neighbor lanes deduplicated,
+  colony markers every fifth system, three fleet travellers hopping the
+  lane graph; left-click selects the nearest system, right-click sets a
+  route target with the `find_route` path highlighted, wheel zooms,
+  STEP DAY/RUN/RESET; detail panel lists class/tags/lane
+  neighbors/markers-in-system plus the weighted route). `project_galaxy_map` is the Core-side
+  adapter a game/map surface feeds through — first consumer wiring
+  beyond tests is the shell demo + adapter tests.
+- **Tests:** `galaxy_map` (topology, deterministic ordering, adjacency
+  laziness, spatial queries, markers, persistence round-trip +
+  corruption rejection), `galaxy_projection` (mapping, lanes from the
+  authoritative network, anchored/transit fleets, orphan colony skip,
+  determinism), `framework_state_codec` (GalaxyMap JSON codec),
+  `engine_shell_tool_galaxy` smoke test.
+- **Save/performance impact:** map state is a presentation/projection
+  model — `capture_state`/`restore_state` exist for embedders that
+  persist charts; the Core projection allocates per call and is not on
+  the per-frame path.
+- **Limitations:** routing is lane-length-weighted only (no
+  fuel/range/policy constraints — those stay with
+  `InterstellarLaneNetwork`'s RoutePolicy/FuelRouteRequest); markers are
+  render data — no gameplay rules; the projection is omniscient,
+  observer filtering stays a consumer responsibility; no native-client
+  consumer yet (the client's own star map predates the framework —
+  migration is a separate decision).
+- **Future reuse:** 4X/strategy star charts, jump-lane editors,
+  sector/region overlays (tags + radius queries already support them),
+  and the pending galaxy debugger tool in the standalone editor.
+
+## Engine-shell Simulation tool + Core executor adoption (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestones 1/12 — make the
+  simulation LOD machinery (a) authoritative in Stellar Continuum and
+  (b) inspectable in the standalone engine shell as a genre tool.
+- **Core adoption:** `GalaxySimulationStepCoordinator::advance` runs all
+  12 strategic phases (economy → strategic_ai → automatic_orders →
+  industry_allocation → construction → shipbuilding → legacy_research →
+  exploration → freight → combat → colonization → economy_storage) as
+  Active-tier `SimulationExecutor` tasks, dependency-chained to preserve
+  the exact original ordering. Phase bodies capture the coordinator
+  through bound lambdas — the coordinator's move constructor rebinds
+  them so moved instances keep running phases against live context.
+  `phase_executor()` exposes the executor for diagnostics; the
+  executor's per-domain run statistics make phase activity observable.
+- **Tool:** the SIMULATION tab in `stellar-engine.exe` hosts a live
+  executor driving real framework state — three `Population` cohort
+  settlements, a power `FlowNetwork` and a `LogisticsNetwork` freight
+  route across Active/Normal/Background/Dormant tiers. STEP advances
+  one tick, RUN auto-advances with the frame delta, WAKE exercises the
+  event-wakeup path, TIER live-promotes/demotes the selected task; the
+  panel shows tick, last-step report (eligible/ran/deferred/wakes/
+  wall), tier counts and per-domain statistics. The COLONY tab is a
+  working settlement designer over `engine::Colony` — a spec catalog
+  (2 district types, 6 structures) builds against a real `Inventory`
+  stockpile, districts/structures are inspected and toggled/demolished,
+  and ADV 1D/30D reports jobs, housing, completions, outputs, upkeep/
+  input shortfalls and utility balance. The ECONOMY tab inspects the
+  economy framework: `EconomyCatalog` validation (with an injectable
+  dangling recipe), `to_runtime_recipe` bridging into a live
+  `ResourceNetwork` (producers, transfer lane, shortages) and an
+  `analyze_economy` bottleneck table rolled up from real network state.
+  The WARFARE tab is a theater inspector over `WarfareModel` — three
+  ship classes (line/escort/transport), two hostile fleets and an
+  interdictor on a strategic plane; rows select a fleet, ORDER cycles
+  Hold/Move/Interdict/Retreat (Move steers at the opposing fleet),
+  ENGAGE runs deterministic Lanchester resolution between the two
+  combatants, STEP 5D/RUN advance movement + supply burn, and the panel
+  shows per-fleet aggregate reports, cohort detail and whether the
+  hostile fleet's position is interdiction-gated. The MISSIONS tab is a
+  `MissionRuntime` debugger over a real `EventBus` — two mission
+  definitions parsed from JSON (trigger conditions, stage timers,
+  timeout stages, choice effects), FIRE EVENT cycles canned domain
+  events through `handle_event` (including a non-matching one), rows
+  select an instance for CHOOSE, STEP 10D/RUN advance stage timers, and
+  SAVE/LOAD exercise `serialize()`/`restore()`; every
+  `MissionEffectEvent` the runtime publishes lands in the effect log —
+  the first consumer of the previously unwired `mission_graph`
+  framework. The PHYSICS tab is a `PhysicsWorld` inspector — a
+  drifting mover crossing a trigger volume (enter/exit events logged
+  from `advance()`), layer-masked bodies, RAYCAST/SWEEP queries from
+  the selected body to the target, STEP/RUN integration and a body
+  table — the first consumer of the previously unwired `physics`
+  framework.
+  Generated game projects scaffold a `SimulationExecutor` demo — new
+  games start with deterministic LOD scheduling wired into the loop —
+  plus a persistence example: the starter host captures/restores
+  `SimulationExecutor::State` through `framework_state_json` codecs into
+  `RuntimeHost::save_data`/`load_data` slots (F5/F9 alongside the world
+  quicksave, corrupt blobs fall back to fresh state), so the
+  capture→serialize→restore contract is demonstrated for game-defined
+  state rather than left as an undocumented gap.
+- **Consumers/tests:** `campaign_coordinator` tests assert all 12 phase
+  domains execute through the executor, empty campaigns advance safely,
+  and scheduler state survives coordinator moves; the 28-case
+  coordinator parity matrix, fresh/persistable/integrated-adaptive
+  campaign parity and player17 v17 parity all pass unchanged (behavior
+  identical — only the dispatch mechanism changed). The shell tools are
+  UI inspectors over real engine state; `--frames N` renders N frames
+  and exits, and ctest `engine_shell_tool_*` smoke-runs every tool's
+  init+render path (all tools pass; the GALAXY tab added later brings
+  the count to 16).
+- **Save/performance impact:** executor state (tick, task elapsed/
+  deferred/dirty/wake flags) is runtime-only — coordinator saves were
+  already driven by authoritative domain state; `capture_state`/
+  `restore_state` exist for embedders that persist the executor itself.
+  Per-phase dispatch adds one executor advance per strategic step —
+  negligible vs. phase work.
+- **Limitations:** phases remain sequential (dependencies form one
+  chain — no intra-step parallelism yet); the Simulation tool scenario
+  is fixed/synthetic, not a save-loaded game.
+
+## Event history framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 14 — the
+  authoritative strategic chronicle: recorded happenings with
+  observer-filtered queries, feeding chronicles and the M15 news
+  substrate. See [HISTORY_FRAMEWORK.md](HISTORY_FRAMEWORK.md).
+- **Engine APIs/ownership:** `HistoryEvent` (day, category, summary,
+  actors, location, significance, visible_to privacy list, tags);
+  `EventHistory` bounded store with monotonic ids, `query()`
+  (category/tag/actor/time/significance + observer + limit),
+  `feed(observer, since, min_significance)`, `prune_before` with a
+  significance floor, and versioned `capture_state`/`restore_state`
+  (codec in `framework_state_json.hpp`). Privacy is a query projection
+  — records keep full truth for developer/omniscient views.
+- **Core consumer:** `core/campaign_event_history` maps each
+  authoritative `IntegratedAdaptiveCampaignStepResult` onto records —
+  stable category vocabulary (construction.project, shipbuilding.ship,
+  research.legacy/adaptive, exploration.\*, war.\*, colony.founded),
+  involved-civilization visibility widened to observers that know the
+  event's system (`widen_history_visibility` over
+  `CivilizationKnowledgeState`), entity ids as tags, at_day = step
+  end day. Discrete diplomatic journal entries join the same record
+  path: after each step's diplomacy phase the runtime pulls the new
+  journal tail via `DiplomacyState::history_events_since(watermark)`
+  (monotonic event-id watermark baselined at runtime construction —
+  restored journals never re-record), mapped to `diplomacy.<kind>`
+  categories with the entry's own journal timestamp
+  (campaign-milli-days → day), per-kind significance (war 0.95,
+  agreements 0.8, routine 0.3–0.5), `civ:`/`system:` tags and the
+  journal's authoritative `known_to_civilization_ids` audience —
+  exempt from knowledge widening so excluded observers never learn
+  identities; summaries are generic kind text (the journal's raw
+  phrasing is internal). `IntegratedAdaptiveCampaignRuntime` owns an
+  `EventHistory`
+  and records every completed advance automatically — all callers
+  (CampaignFrame, tests, tools) get the chronicle for free; exposed as
+  `runtime().history()` / `frame().history()`. The chronicle serializes
+  into the v17 save payload (`"EventHistory"`, PascalCase, strict
+  ordered decode, absent = empty in older saves) for both player and
+  developer saves.
+- **Consumers/tests:** `history` tests — id assignment/lookup,
+  every filter axis, observer privacy (public vs allow-listed),
+  news feed, capacity bound, significance-aware pruning, bit-equal
+  determinism, 200k-event scale, persistence round-trip + malformed
+  rejection. `campaign_event_history` tests — category mapping for
+  every step event type plus diplomatic journal kinds,
+  actor/visibility/tags/at_day, journal-watermark accessors,
+  widening-exempt diplomacy audience, feed privacy.
+  `framework_state_codec` covers the JSON codec.
+  **Presentation consumers (M15):** `seed_chronicle_notifications` in
+  `native_notification_events` seeds the player notification feed from
+  `history().feed()` at campaign admission — recorded dates/summaries
+  survive load, category labels mapped, observer filtering delegated to
+  the chronicle; located seeded reports carry `system_id` and render a
+  VIEW SYSTEM action navigating via `enter_system`
+  (`native_notification_events`/`native_notification` tests).
+  `native_chronicle` adds the scrollable chronicle browser —
+  `snapshot()` projects the observer-safe `query()` (feed()'s
+  projection plus before_day) newest-first (4000-entry cap applied
+  after optional category-domain, significance-floor,
+  involved-actor, tag, time-window and search filters, true filtered
+  total reported) and
+  `NativeChronicleView` renders it as an overlay opened from the
+  notification panel's CHRONICLE button with on-demand refresh, domain
+  cycling, a significance cycle (0.0 → 0.3 → 0.5 → 0.7), an actor
+  cycle (all intel → MINE → each civ appearing in the visible feed,
+  names resolved from campaign state), a recency window (all → 30d →
+  1y → 10y off a live campaign-day source) with ◀ ▶ window paging
+  (`since_day` + `before_day` as a closed range — the whole timeline
+  is pageable) and a header search field (case-insensitive substring
+  over summary/category/tags, gated by `wants_text_input()`);
+  clicking a located entry
+  navigates the map to its system
+  via `navigation()` → `enter_system` (the workspace re-applies the
+  observation check) and single-foreign-actor entries expose a DIP
+  action opening the diplomacy workspace on that contact; recorded
+  reference tags render as clickable chips — clicking one applies
+  `HistoryQuery::tag`'s exact-match focus ("everything fleet:12 did
+  that we can see"), toggleable via the chip or an X focus button
+  (`native_chronicle` tests). Admission
+  seeding applies a fixed 0.35 report floor so high-volume trivia
+  (damage ticks, detections) stays out of the transient feed. Voice
+  announcement of the same step events already runs through
+  `NativeGameplayVoiceBridge::route_events`.
+- **Save/performance impact:** `EventHistory` field on the v17 payload
+  (optional — absent in pre-chronicle saves); strict ordered decode
+  with 1M-event bound and id-ordering validation on restore. Recording
+  is O(1) append per emitted event — zero cost when a step emits none;
+  queries are O(n) scans with sorted output.
+- **Limitations:** opaque summary strings (no structured localization
+  binding). Visibility widens at known-system granularity — no
+  delayed/degraded intel or sensor-range falloff. Aggregate phase
+  counters (sensor-contact recordings, diplomacy maintenance) are not
+  discrete events and are not recorded. History capacity is fixed at
+  100k records; retention (`maintain_chronicle`) prunes routine records
+  older than 365 days once 90% full so capacity eviction cannot discard
+  majors, but sustained record volume above ~0.35 significance still
+  evicts oldest-first.
+
+## Combined simulation scale benchmark (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 13 (partial) —
+  prove the specialization frameworks compose deterministically under
+  one scheduler.
+- **What it exercises:** `combined_scale` ctest — 400 settlements each
+  running `Population` + `Colony`, 8 regional `FlowNetwork` power
+  grids (400 nodes), a `LogisticsNetwork` freight web (400 waypoints,
+  400 routes, 2000 shipments), 200 `WarfareModel` fleets under move
+  orders, 50 `StrategicMind` factions — six task domains at Active/
+  Nearby/Normal/Background tiers through one `SimulationExecutor`.
+- **Result:** 240 ticks, mean ~870µs/p50 ~560µs/p95 ~1.9ms on the dev
+  machine; FNV-1a state checksums bit-identical across two full runs.
+- **Limitations:** synthetic flat workload — real campaigns have
+  heterogeneous settlement sizes and event spikes; parallel
+  (advance_parallel) parity not exercised here (covered by
+  simulation_scale_*); not yet wired to Core game state.
+
+## Strategic warfare model (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 10 — fleets as
+  cohort aggregates for thousands-of-fleets scale, with explicit
+  deterministic engagement resolution and interdiction zones. See
+  [WARFARE_FRAMEWORK.md](WARFARE_FRAMEWORK.md).
+- **Engine APIs/ownership:** `ShipClass` templates, `ShipCohort`
+  (class × count × condition × experience aggregates with weighted
+  merge), `FleetState` (owner/position/order: Hold/Move/Interdict/
+  Retreat). `report()` aggregates strength/speed/supply. `advance`
+  moves fleets at slowest-cohort speed with arrival clamping.
+  `interdicted()` gates hostile movement inside Interdict-order zones
+  only — presence never blocks. `resolve()` is Lanchester-style
+  attrition: aggregate attack distributed by hull share, net of
+  per-ship defense; symmetric pre-resolution strengths.
+- **Consumers/tests:** `warfare` tests — validation, cohort merge,
+  movement/clamp, interdiction ownership and order gating, engagement
+  attrition/destruction, defense absorption, bit-equal determinism,
+  2000-fleet scale. **Core consumer:** `project_warfare_theater`
+  (`campaign_warfare_projection`) reshapes authoritative
+  fleets+systems into the engine theater — read-only, hulls
+  preserved as cohorts — and `inspect_campaign_operations` emits
+  `foreign_armed_presence` findings from it. Direct authority
+  adoption still pending the DECISION_LOG graduation criteria.
+- **Save/performance impact:** plain data with caller ids; O(fleets +
+  cohorts) advance, O(cohorts²-free) aggregate resolve.
+- **Limitations:** 2D plane, aggregate dps without range/arcs, no
+  morale/retreat policy or supply settlement inside the model, no
+  reinforcement semantics during engagement.
+
+## Strategic AI decision machinery (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 9 — deterministic
+  utility-based action selection for civilizations/factions; the
+  decision machinery, not the policy. See
+  [STRATEGIC_AI.md](STRATEGIC_AI.md).
+- **Engine APIs/ownership:** `StrategicMind` — `UtilityAction`s
+  (caller scorers + commit effects, cooldowns, weights, enable) grouped
+  by domain; `decide(domain, day, min_utility, hysteresis)` evaluates
+  in ascending id order, incumbent hysteresis prevents oscillation,
+  argmax with smallest-id tie-break commits and journals a bounded
+  `Decision` ring buffer (day/domain/action/utility/candidates/
+  switched). Planning cadence is caller-owned — intended as
+  `SimulationExecutor` domain tasks at different tiers.
+- **Consumers/tests:** `strategic_ai` tests — argmax, id tie-break,
+  hysteresis hold/switch, min-utility gate, cooldowns, domain
+  independence, disabled actions, bounded journal, bit-equal
+  determinism, 200-action × 5000-decision scale. **Core consumer:**
+  `inspect_campaign_operations` runs a per-civ advisor spotlight each
+  pass — the pass's own operational findings register as scored
+  candidates (severity-weighted), `decide()` commits the argmax once,
+  and the commit emits an `advisor_spotlight` record naming the top
+  priority. A fresh mind per pass keeps the evaluation stateless —
+  hysteresis/cooldowns are temporal semantics a one-shot ranking does
+  not exercise. Core faction AI adoption still pending the
+  DECISION_LOG graduation criteria.
+- **Save/performance impact:** actions are code (re-register on load);
+  persistent state is per-domain incumbent + per-action last-commit
+  day. Decide cost is O(actions in domain).
+- **Limitations:** flat scoring — no goal decomposition, opponent
+  modeling or action budgets; fog-of-war/privacy filtering is the
+  scorer's contract; journal is memory-only.
+
+## Planetary habitability + terraforming (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestones 7–8 — adapter
+  surface for authoritative Core planet state: physical environment
+  description, species-relative habitability queries, staged
+  terraforming projects. See
+  [TERRAFORMING_FRAMEWORK.md](TERRAFORMING_FRAMEWORK.md).
+- **Engine APIs/ownership:** `PlanetEnvironment` (temperature,
+  atmosphere, gravity, water fraction, sorted environment tags);
+  `HabitabilityProfile` (hard ranges + `tolerance` soft margins, water
+  floor, required/forbidden tags); `evaluate_habitability` pure
+  function → suitability/habitable/unmet reasons. `Terraforming` per
+  planet owns the adapted environment; `TerraformProject` stages apply
+  linear deltas over durations and discrete tag changes at completion;
+  cancel preserves applied deltas; multi-stage completion per step.
+- **Core adapter:** `stellar::core::to_engine_environment(PlanetaryBody)`
+  (`core/planetary_adapter.*`) projects authoritative environment data
+  into `PlanetEnvironment` — direct temperature/gravity, kPa→atm
+  pressure, binary water-solvent presence, deterministic sorted tags
+  (`atmosphere.*`, `solvent.*`, `high_radiation` at Core's >0.10
+  threshold, `immersed`, `gas_giant`, `anomaly`, `cracked`,
+  `rare_resource`, `native_civilization`). Core
+  `assess_species_planet`/`species_environment` remains authoritative
+  for campaign suitability; the engine evaluator serves reusable
+  framework consumers (population needs, colony tags, terraforming).
+- **Consumers/tests:** `planetary` tests — range scoring, soft margins,
+  tag gates, water floor, determinism. `terraforming` tests — staged
+  progression, interpolation, tag mutation, habitability improvement,
+  cancel persistence, step-size invariance, determinism.
+  `planetary_adapter` tests — field conversion, tag vocabulary,
+  sorted-tag invariant, and `evaluate_habitability` over a projected
+  real body.
+- **Save/performance impact:** plain data everywhere; per-advance cost
+  is O(stages completed), evaluation O(tags + params).
+- **Limitations:** linear deltas only — no feedback loops, atmosphere
+  composition, or cost/upkeep inside the framework; one active project
+  per planet; tags are unvalidated free-form strings.
+
+## Strategic logistics framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 6 — freight
+  moving between settlements over explicit multi-leg routes with
+  transit time and route capacity. See
+  [LOGISTICS_FRAMEWORK.md](LOGISTICS_FRAMEWORK.md).
+- **Engine APIs/ownership:** `LogisticsNetwork` — caller-owned waypoint
+  nodes, `FreightRoute` explicit paths with per-leg transit days and
+  in-flight capacity, `dispatch`/`cancel` shipment queue draining in
+  ascending id order as capacity frees, `advance` delivering in
+  (eta, id) order. Cargo accounting stays with the owner (deliveries
+  are records, not inventory mutation); pathfinding stays with the
+  caller's routing engine.
+- **Consumers/tests:** `logistics` tests — route validation, transit
+  timing, capacity queueing, disabled-route hold/resume, cancellation
+  bounds, delivery ordering, bit-equal determinism, 20k-shipment scale.
+  **Core consumer:** `campaign_logistics_projection` — the authoritative
+  `HomeSystemLogisticsNetwork` (links, daily-flow allocations) restores
+  into a `LogisticsNetwork` snapshot where route capacity/in-flight are
+  committed tonnage (`per_day × transit_days`), so
+  `route_utilization()` reports per-corridor saturation; campaign
+  diagnostics emits `logistics_link_saturated` findings for links at
+  ≥99.9% committed capacity — per-link bottleneck detail the
+  colony-level snapshots cannot express. `campaign_logistics_projection`
+  tests cover utilization math, over-commit (>1.0), disabled and
+  zero-capacity links, the in-transit manifest, and post-projection
+  `advance` delivery ordering. Direct authority adoption still pending
+  the DECISION_LOG graduation criteria.
+- **Save/performance impact:** routes/queue/transit are plain
+  caller-id data; `now()` plus the manifests serialize directly.
+  Per-advance cost is O(queue + transit).
+- **Limitations:** no pathfinding/rerouting; no per-leg positions,
+  convoy composition, edge loss/latency, or interdiction hooks;
+  `remove_route` loses in-flight cargo.
+
+## Infrastructure flow networks (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 5 — reusable
+  single-resource distribution graphs (power/water/data/freight) with
+  dirty-tracked topology and flow diagnostics. See
+  [INFRASTRUCTURE_FRAMEWORK.md](INFRASTRUCTURE_FRAMEWORK.md).
+- **Engine APIs/ownership:** `FlowNetwork` — caller-supplied node/edge
+  ids, per-node supply/demand/storage rates, directed capacity edges
+  (duplicate direction pairs rejected), topology mutations dirty a lazy
+  union-find `components()` cache, rate/storage updates do not.
+  `advance(days)` is a three-pass deterministic transport: local
+  serve+storage release, greedy edge rebalancing in ascending id order,
+  surplus storage absorption; `FlowAdvanceResult` reports totals plus
+  nonzero per-node unmet and per-edge flow.
+- **Consumers/tests:** `flow_network` tests — local serve, edge
+  transfer, capacity saturation, storage buffering, islanded demand,
+  component caching on enable/disable, documented no-same-tick-chaining
+  behavior, bit-equal determinism, 10k-node/20k-edge scale. Colony
+  utility pools and Core grids adoption pending.
+- **Save/performance impact:** nodes/edges are plain caller-id data;
+  component cache is derived, never persisted. Per-advance cost is
+  O(nodes + edges).
+- **Limitations:** greedy single-pass transport, not max-flow — flow
+  doesn't chain through relays within one step; no shared corridor
+  capacity across resources, edge latency or loss factors; storage is
+  per-node.
+
+## Colony/settlement structural framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 4 — the reusable
+  substrate a settlement is built from (districts host structures;
+  structures draw utilities, offer jobs/housing, consume inputs and
+  produce outputs). See [COLONY_FRAMEWORK.md](COLONY_FRAMEWORK.md).
+- **Engine APIs/ownership:** `DistrictSpec`/`StructureSpec` (data-driven
+  templates: slots, build cost/time, utility demand+supply, upkeep,
+  inputs/outputs per day, jobs, housing, condition decay/repair,
+  `required_tags`); `Colony` (caller-supplied instance ids, district
+  slot enforcement, construction inside `advance`, shared utility
+  satisfaction pools, uniform workforce scaling, `Inventory`-backed
+  upkeep/input draws and output depositing, condition decay/repair,
+  district gating of hosted structures). `ColonyDelta` reports jobs,
+  housing, outputs, shortfalls, utility balance and completions.
+- **Consumers/tests:** `colony` tests — spec validation, district slots,
+  requirement tags, construction timing, utility/workforce/input gating,
+  condition repair, bit-equal determinism, 1000-colony × 30-tick scale
+  (~4µs per colony-tick). Core `Colony`/`surface_economy` remain
+  authoritative; adoption pending.
+- **Save/performance impact:** specs and instances are plain data with
+  caller-supplied ids — serialize directly; per-advance cost is
+  structures × elapsed-steps with two sorted passes.
+- **Limitations:** utility supply ignores `operating` (no supply →
+  operating circularity; disable structures to cut supply); mid-step
+  completions produce for the whole step; no spatial adjacency or
+  upgrade chains; workforce is one undifferentiated pool.
+
+## Population cohort framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 3 — aggregate
+  demographics for colonies/civilizations without per-citizen entities.
+  See [POPULATION_FRAMEWORK.md](POPULATION_FRAMEWORK.md).
+- **Engine APIs/ownership:** `DemographicProfile` (data-driven
+  species/culture template: fertility/mortality/lifespan, consumption,
+  workforce participation, migration tendency, education rate),
+  `CohortKey`/`PopulationCohort` (species × culture × occupation ×
+  education × wealth aggregate with health/happiness/morale, housing,
+  employment, environment suitability, 8-bucket age distribution),
+  `Population` (cohort set) advancing under `SettlementConditions`:
+  births, attributed deaths (starvation/environmental/overcrowding/
+  insecurity/unhoused, healthcare-relieved), aging, quality drift with
+  a hard food cap on happiness, equal-share employment, education-level
+  cohort migration, explicit `take_emigrants`/`take_immigrants` slices
+  and `migration_pressure` reporting.
+- **Consumers/tests:** `population` tests — growth/decline accounting,
+  starvation and environmental mortality, cohort merge, workforce and
+  unemployment, education progression, aging, migration slices,
+  determinism, 17M-headcount scale run.
+  `population_habitability.hpp` resolves `environment_needs` into a
+  `HabitabilityProfile` (hard `required_tags`, open ranges) evaluated
+  through `evaluate_habitability`, producing the suitability scalar +
+  "requires:<tag>" unmet reasons callers feed into
+  `SettlementConditions`/`Cohort::environment_suitability`;
+  `population_habitability` tests cover satisfied/missing/no-need
+  environments and profile passthrough.
+  **Core consumer:** `campaign_population_projection` — each colony
+  projects into a single-cohort `Population` plus the
+  `SettlementConditions` its authoritative systems already compute
+  (sustenance-capacity chain → food/goods/housing ratios and
+  overcrowding, `colony_labor` → employment, `stability` → wellbeing,
+  `colony_habitat_support` → natural habitability, species biology →
+  demographic template). Campaign diagnostics emits `population_unrest`
+  when `migration_pressure()` — a const query, no competing growth
+  authority — reports ≥10%/year emigration pressure. Depopulated
+  colonies project neutral fit (no evaluable habitat); unknown species
+  still propagates as corrupt state. `campaign_population_projection`
+  tests cover the condition mapping, threshold crossing, automation
+  relief, species-template carry, invariant propagation, and the
+  empty-colony edge. Direct authority adoption still pending the
+  DECISION_LOG graduation criteria.
+- **Save/performance impact:** plain data state, serializes directly;
+  cost scales with cohort count (hundreds), not headcount.
+- **Limitations:** uniform (not per-bucket) mortality draw; equal-share
+  job allocation; culture/wealth mobility beyond education TBD.
+
+## Generic resource + economy catalog framework (2026-09-23)
+
+- **Purpose:** space-strategy specialization milestone 2 — a reusable,
+  data-driven economy definition layer over the runtime
+  `ResourceNetwork`. See [ECONOMY_FRAMEWORK.md](ECONOMY_FRAMEWORK.md).
+- **Engine APIs/ownership:** `ResourceSpec` (id, localization key,
+  category, physical flag, mass/volume, storage class, perishability,
+  transportability, base valuation, substitution group, tags, unit) and
+  `RecipeSpec` (inputs/outputs/catalysts/byproducts, labor, energy,
+  facility tags, duration, efficiency, substitution). `EconomyCatalog`
+  validates without throwing — malformed/duplicate ids, unknown
+  references, nonpositive quantities, zero-output recipes, dependency
+  cycles and unreachable production chains (fixpoint over chain
+  categories). `EconomyGraph` answers producers/consumers/downstream/
+  upstream/unproducible and exposes edges for editor graphs.
+  `analyze_economy` turns demand + caller observations into per-resource
+  bottleneck/unmet/reserve/utilization/import-dependence diagnostics.
+  `to_runtime_recipe` bridges specs into `ResourceNetwork` recipes.
+- **Consumers/tests:** `economy_catalog` tests — valid catalog clean,
+  graph closures, every validation class, diagnostics math, live
+  `ResourceNetwork` production through the bridge, deterministic issue
+  ordering. **Core consumer:** `sustenance_economy_catalog()` +
+  `analyze_colony_sustenance` (`campaign_economy_projection`) run
+  `analyze_economy` over authoritative colony sustenance state —
+  `inspect_campaign_operations` emits `sustenance_shortfall`/
+  `power_shortfall` findings from it. Editor economy tool and direct
+  authority adoption still pending the DECISION_LOG graduation
+  criteria.
+- **Save/performance impact:** pure data + derived immutable graph —
+  catalog contents serialize through the package/data layer, nothing
+  runtime-persistent. Validation and fixpoint are catalog-scale
+  (resources × recipes), not per-tick.
+- **Limitations:** substitution groups validated but not resolved at
+  runtime; catalysts/labor/facility tags are metadata until the colony
+  framework gates on them; diagnostics consume caller-supplied
+  observations (no automatic rollup yet).
+
+## Core campaign economy projection + sustenance diagnostics (2026-09-24)
+
+- **Purpose:** make the engine economy-analysis framework reachable over
+  authoritative campaign state without creating a second economy
+  authority. Core's macro colony economy (surface production,
+  sustenance capacity, reserves) stays authoritative; the projection
+  reshapes that state into `ResourceObservation`s so `analyze_economy`
+  produces per-resource bottleneck/reserve/unmet diagnostics.
+- **Core adapter:** `core/campaign_economy_projection.*` —
+  `sustenance_economy_catalog()` builds a small `EconomyCatalog`
+  (`res.food`, `res.water`, `res.power`); `colony_resource_observations`
+  maps `surface_colony_output`, `surface_sustenance_projection`,
+  `colony_sustenance_capacity` and `preview_colony_reserves` (clamped
+  reserve semantics preserved) into observations; the power axis maps
+  installed grid supply vs staffed building demand, with
+  `stored_power_days × demand` as stock so `reserve_days` equals Core's
+  authoritative storage days exactly.
+  `analyze_colony_sustenance` runs them through `analyze_economy` sorted
+  deterministically by resource id. No engine `Population`/`Colony`
+  objects are instantiated for campaign authority.
+- **Consumers/tests:** `inspect_campaign_operations` emits
+  `sustenance_shortfall` findings for food/water and `power_shortfall`
+  findings for brownouts (entity/civilization/system identity +
+  demand/supply/reserve values) for colonies whose demand outruns
+  installed supply over a 30-day horizon — consumed by the
+  campaign diagnostic monitor, developer diagnostic report and QA host.
+  `campaign_economy_projection` tests — healthy/hostile bodies,
+  reserve-day parity with `preview_colony_reserves`, building
+  contribution, power-grid deficit + `stored_power_days` reserve parity,
+  determinism, legacy body-less colonies, and the
+  operations-finding path; `campaign_diagnostics` tests updated for the
+  new finding class (seeded worlds legitimately contain under-provisioned
+  colonies).
+- **Save/performance impact:** read-only projection — zero new
+  persistent state; scans colonies once per daily diagnostics check with
+  a cached static catalog (O(colonies), tiny resource set).
+- **Limitations:** sustenance + grid power only — broader Core resource
+  flows (industry, trade goods, freight contents) are not projected;
+  power has no generation-headroom analog so `capacity_per_day`/
+  utilization stay 0; findings describe shortfalls, they do not
+  prescribe fixes; engine-side economy framework adoption into Core
+  authority remains future work.
+
+## Core campaign warfare projection + presence diagnostics (2026-09-24)
+
+- **Purpose:** make the engine strategic-warfare framework reachable
+  over authoritative campaign fleets without a second combat authority.
+  Core combat resolution, military orders and transit stay
+  authoritative; `core/campaign_warfare_projection.*` projects fleets +
+  `CombatProfileDefinition`s into a `WarfareModel` theater so
+  `FleetReport` aggregates and `resolve()` Lanchester previews serve
+  diagnostics and tooling on copies — never mutating campaign state.
+- **Core adapter:** `project_warfare_theater(fleets, systems)` — one
+  fleet → one engine fleet with a single-ship cohort; ShipClass per
+  combat profile (attack = `sustained_damage_per_day`, hull =
+  shields+armor+hull, defense/interdiction = 0 — no Core analog;
+  interdiction is tactical-only). Order mapping: retreating → Retreat,
+  transit/destination → Move at the destination system, Attack +
+  resolvable target → Move at the target fleet, else Hold. Cohort
+  condition = live hull fraction; experience = 0.15/battle fought
+  (documented display scale).
+- **Consumers/tests:** `inspect_campaign_operations` emits
+  `foreign_armed_presence` findings when an armed fleet is stationed in
+  a system whose colonies it does not own (projected attack/hull/speed
+  in `values`); consumed by the diagnostic monitor, developer report
+  and QA host. `campaign_warfare_projection` tests — stat fidelity,
+  order mapping precedence, unarmed/inactive handling, deterministic
+  `resolve` previews that leave campaign state untouched, and the
+  consumer path (only stationed armed foreign fleets flagged).
+- **Save/performance impact:** read-only projection — zero persistent
+  state; theater build is O(fleets + systems) once per daily
+  diagnostics pass.
+- **Limitations:** one ship per cohort (Core fleets are single
+  vessels — no squadron scale); class speed binds per profile id;
+  engagement previews are what-if math, not committed combat outcomes;
+  no strategic interdiction radius exists in Core to project.
+
+## Core campaign colony projection + degraded-structure diagnostics (2026-09-24)
+
+- **Purpose:** make the engine Colony settlement framework (M4:
+  spec/structure/utility substrate) reachable over authoritative
+  campaign colonies without a second settlement authority. Core surface
+  economy (`surface_economy.hpp`) stays authoritative;
+  `core/campaign_colony_projection.*` reshapes `SurfaceBuilding`s +
+  `surface_building_catalog()` definitions + the authoritative
+  power/staffing allocation into an `engine::Colony` so aggregate
+  structure/utility/workforce accounting serves diagnostics and tooling
+  on a copy — never mutating campaign state.
+- **Core adapter:** `project_colony_settlement(colony)` — one
+  `SurfaceBuilding` → one standalone `Structure` (Core has no
+  districts); spec `surface.<type_id>` synthesized from the catalog row
+  (power → `power` utility supply/demand, workforce → jobs, housing,
+  per-day outputs, `credits` upkeep, `industry` build cost);
+  unknown type ids fall back to a bare `surface.unknown` spec. Flags
+  map exactly (`is_complete`/`is_enabled`/`condition`); in-progress
+  buildings carry `construction_remaining` in Core industry units;
+  `operating` mirrors the authoritative `surface_colony_output()`
+  powered set (zero when the allocator cannot run on unknown types);
+  `standalone_slots` = `surface_building_capacity`, floored to the
+  structure count for hub-less colonies (engine 0 == unlimited).
+- **Consumers/tests:** `inspect_campaign_operations` emits
+  `degraded_structures` findings — complete+enabled structures at or
+  below `minimum_operational_condition` silently contribute nothing to
+  surface output; the finding reports count and worst condition per
+  colony. The same pass gained authoritative logistics findings:
+  `logistics_strained`/`logistics_critical` per colony the economy
+  logistics model rates under-covered (import requirement + coverage
+  ratio in `values`; severity stays Warning — Critical is reserved for
+  invariants) and `freight_corridor_gap` when a civilization's
+  external colonies import support no represented corridor carries
+  (skipped for homebound civs — coverage is only meaningful with
+  external systems), `logistics_link_saturated` for home-system
+  corridors at ≥99.9% committed capacity via the
+  `campaign_logistics_projection` utilization view,
+  `population_unrest` for colonies whose projected cohort shows
+  ≥10%/year emigration pressure via `campaign_population_projection`,
+  `advisor_spotlight` naming each civ's single top-priority finding
+  (the pass's findings scored through `StrategicMind`'s argmax commit),
+  and `treasury_arrears`/`treasury_depleted` from
+  the authoritative `assess_treasury` — all previously surfaced only
+  in workspace view-models or a player-scoped voice event, never in
+  developer diagnostics. Corrupt classifier inputs (non-finite/negative
+  credits or arrears) are skipped rather than thrown; `inspect_campaign_invariants`
+  now also covers colony `stability`/`stored_extracted_materials`,
+  building `condition`/`stored_power_days`, and economy
+  `operating_arrears` so such corruption is caught as a Critical
+  invariant finding instead of escaping the operations pass.
+  The same hardening applies to the reference surface the
+  authoritative queries validate: the orphaned-body check is now
+  system-scoped (a body id that exists in another system is still
+  unresolvable for the colony), populated colonies flag
+  `unknown_species`, surface buildings flag `unknown_building_type`,
+  negative colony ids flag `invalid_nonnegative_value`, and fleet
+  `strategic_speed` must be finite positive (`invalid_positive_value`
+  — the warfare projection's class definitions reject `<= 0`). The
+  remaining state surfaces are covered too: civilization
+  `home_system_id` (`orphaned_home` — the loader already enforces it,
+  the invariant catches hand-built/corrupt in-memory state),
+  and civilization `species_id` must resolve in the species
+  catalog (`unknown_species` — the loader's `require_species`
+  rejects blank and uncatalogued ids), and leadership entries flag
+  `invalid_character` when office, character id, display name,
+  voice profile or portrait metadata violate the persisted
+  blank/UTF-16-length bounds,
+  research/construction/shipyard rows (duplicate civilization ids,
+  `orphaned_research`/`orphaned_construction`/`orphaned_shipyard`,
+  non-negative progress/authorization/reserved-population fields,
+  `unknown_technology` for uncatalogued completed or active research,
+  `queue_overflow` past `maximum_queued_construction_projects`,
+  shipyard `unknown_species` and `orphaned_colony` reservation refs,
+  plus the capture-time shipyard accounting checks: positive
+  `next_order_sequence`, `inconsistent_build` for active accounting
+  without a design, `unknown_ship_design` when an unknown design
+  carries refund metadata, build progress bounded by the design's
+  industry cost, `invalid_order_id`/`inconsistent_sequence` for
+  malformed or non-monotonic order identities, and
+  `invalid_reservation` via the guarded population-safety
+  validator). Economy DTO bounds also flag non-negative
+  `last_research_spending_per_day` and both funding fractions.
+  Construction project collections mirror `validate_construction`:
+  `unknown_project` for uncatalogued active/completed/queued ids,
+  `inconsistent_project` for active-without-project state and
+  active/queued/completed overlap, `duplicate_id` per collection,
+  `out_of_range` for progress beyond the catalog build cost, and
+  non-negative queued authorization credits.
+  Fleet state is covered end-to-end: transit/settlement/reconnaissance
+  progress, leg range, fuel and cargo capacities, embarked-species
+  catalog refs, destination/settlement body refs, reconnaissance
+  system refs, freight outpost/home-colony refs, and the combat
+  block's shield/armor/hull/cooldown/retreat magnitudes plus
+  `orphaned_target`/`orphaned_defense`/`orphaned_disengagement`
+  order refs, plus local-transit vector finiteness, `sensor_range`,
+  `mission_order_revision`, `orphaned_route_hop` for planned-route
+  systems that no longer exist, and `route_overflow` past the 132-entry
+  persisted path bound. Persisted observer/intelligence state is
+  covered too: knowledge snapshot entries flag `orphaned_observer`/
+  `orphaned_known_system`/`orphaned_known_civilization`, per-civ survey
+  rows flag `orphaned_known_system` plus defensive level-range/
+  progress-bound/`inconsistent_survey` checks (the writers and restore
+  path clamp and normalize, so violations are memory/hand-built
+  corruption), and `galactic_core_observers` flag `orphaned_observer`,
+  combat
+  intelligence flags `orphaned_observer`/`orphaned_observed_fleet`
+  plus `observation_overflow` past the 2048 per-observer bound and
+  non-negative power/day, and an active massive encounter flags
+  `orphaned_encounter`/`orphaned_encounter_vessel` for absent
+  systems and vessel-bound fleets. Planetary bodies now mirror
+  `validate_planetary_body`'s authoritative bounds: strictly-positive
+  radius/mass (`invalid_positive_value` — `nonnegative` accepted 0),
+  `orbit_index`, `invalid_body_parent` for parentless Moons and
+  parented primaries, eccentricity outside [0,1) and inclination
+  outside [0,180] as `out_of_range`; `validate_environment` bounds
+  (gravity/pressure non-negative, temperature above absolute zero,
+  radiation hazard in [0,1]) and `validate_stellar_planet` exposure
+  fields (finite-positive orbit AU, non-negative flux/approach);
+  top-level state adds `stellar_activity_day`, galactic-core
+  position/exclusion radius and `engulfed_planets`. The stellar
+  catalog checks mirror the persistence validators too: stellar
+  class range, companion ordering and the Sol singleton
+  (`invalid_kind`/`invalid_companion`), region index bounds,
+  guarded `validate_stellar_physics`/`validate_stellar_orbits`/
+  `validate_stellar_activity` per system (`invalid_stellar`),
+  plus a guarded `capture_galaxy_persistence_metadata` umbrella that
+  flags `invalid_generation_metadata` when the generation record
+  disagrees with the galaxy (seed, system count, configuration,
+  phenomena or core-landmark agreement). Developer provenance mirrors
+  `validate_developer_simulation_state` (fixed-tick speed/backlog
+  consistency → `invalid_simulation`) and `validate_developer_coverage`
+  (coverage version, forced-system refs, required stellar types →
+  `invalid_coverage`). Diplomatic state — which lives on the campaign
+  runtime, outside `FreshCampaignState` — is covered by the companion
+  `inspect_diplomacy_invariants(diplomacy, world, …)` pass: it mirrors
+  `DiplomacySnapshotInvariantValidator` as a guarded umbrella
+  (`invalid_state`) and adds the campaign-entity refs the snapshot
+  validator cannot see (`orphaned_observer`/`orphaned_civilization`/
+  `orphaned_system` across contacts, relationships, access grants,
+  claims/responses, agreements, proposals and history). Adaptive
+  research state is covered by `inspect_research_invariants(research,
+  runtime, world, …)`: captures through
+  `AdaptiveResearchCampaignSnapshotCodec` and replays the codec's
+  save-path `restore` validation so in-memory corruption surfaces before
+  the next save/load cycle, plus `orphaned_civilization` for rows the
+  codec maps to absent empires. A fourth pass,
+  `inspect_continuation_invariants(runtime, …)`, captures
+  `runtime.continuation()` — the strategic coordinator's cached plans
+  and the diplomacy schedule — and replays
+  `validate_campaign_runtime_continuation`, the same validator the
+  save/restore path applies, emitting `invalid_continuation` plus a
+  precise `orphaned_plan` when a cached plan references an absent or
+  non-planning civilization. The monitor,
+  developer report and QA host compose all four passes.
+  `CampaignFrame::advance` also retains a `CampaignAdvanceFailure`
+  on the frame when an authoritative step throws mid-step: every
+  `runtime->advance` call passes the `IntegratedAdaptiveCampaignAdvanceTrace`,
+  and `campaign_advance_failure_phase` attributes the throw to the first
+  phase whose output is absent (`core`/`sensor`/`research`/`diplomacy`,
+  `chronicle` when all four completed but post-step recording threw;
+  `tactical` for the combat route and `stellar_activity` for the
+  weather-clock advance) plus the exception message —
+  `frame.last_advance_failure()` clears on the next attempt; the QA
+  host records it as a `simulation/step_failure` critical finding before
+  attempting the critical checkpoint, and the native client routes a
+  developer-session step throw through
+  `CampaignDiagnosticMonitor::observe_advance_failure` (critical record
+  under the same first-critical capture as `observe`) into the fault
+  capture's pause + diagnostic-bundle path instead of crashing — player
+  sessions still throw. `campaign_frame_parity`'s
+  StrategicFailure contract row asserts the record exists with an
+  attributed phase on a real throw, and the moved-owner row asserts a
+  successful advance leaves none,
+  cross-system orbit bindings via `validate_stellar_orbit_catalog`
+  (`invalid_orbit_binding`), `validate_central_black_hole` on the
+  galactic-core metadata (`invalid_black_hole`), galactic-core
+  metadata position/exclusion-radius magnitudes, the persisted
+  activity-clock bound (`invalid_activity_clock`), and the whole
+  small-body catalog (`invalid_small_body` via
+  `validate_small_body_catalog` — region/profile bounds,
+  composition sums, ids, parent refs and cycles). Loader-enforced
+  enum bounds flag `invalid_kind` for fleet `transit_phase` and
+  economy `industry_priority`. Semantic bounds are flagged as `out_of_range`:
+  `transit_progress` beyond 1 (the loader enforces [0,1]),
+  `fuel_remaining_light_years` beyond `fuel_capacity_light_years`
+  (refuel caps at capacity×service), `cargo_materials` beyond
+  `cargo_material_capacity` (freight loads clamp at capacity), and
+  the economy `last_research_funding_fraction`/
+  `last_base_operations_funding_fraction` beyond 1 (authoritative
+  writes clamp to [0,1]). The pass now mirrors the remaining
+  `validate_galaxy_references` surface: settlement `kind` validity
+  (`invalid_kind`), `surface_hub_level` outside [0,3]
+  (`out_of_range`), buildings past `surface_building_capacity`
+  (`capacity_overflow`), buildings without an exact body
+  (`missing_surface_body`) or on a body without solid ground
+  (`invalid_surface_site`), and `missing_economy` when a civilization
+  runs surface construction with no authoritative economy. Fleets
+  mirror the same validator: strictly-positive leg range and fuel
+  capacity, `settlement_days_completed`/`reconnaissance_days_completed`
+  bounded by `establishment_days`/`scout_reconnaissance_days`,
+  `unknown_ship_design`/`incompatible_design` catalog checks,
+  `invalid_loadout`/`invalid_vessel`/`inconsistent_vessel` for
+  tactical state, `invalid_freight` for freight state on
+  non-logistics fleets or wrong-kind/foreign-owner targets,
+  `inconsistent_route` for waypoints without a destination or
+  routes not ending at the mission destination, `invalid_order` for
+  civilian hold/return orders on military fleets,
+  `inconsistent_order` for work progress without a matching order,
+  and `invalid_settlement`/`invalid_reconnaissance`/
+  `invalid_destination` for role- or system-mismatched work sites.
+  Combat intelligence additionally flags `duplicate_id` observation
+  pairs, `invalid_evidence` for blank evidence, and the 4096-entry
+  persisted total bound via `observation_overflow`. Per-building
+  checks mirror `validate_surface_construction`: `invalid_slot` for
+  out-of-range or duplicate slot indices (the canonical allocator
+  throws), `invalid_placement` via the authoritative
+  `surface_placement_error` (boundary, hub clearance, slope,
+  overlap — only fully-valid buildings join the overlap set),
+  `invalid_positive_value` for missing building ids,
+  `inconsistent_progress` when `is_complete` disagrees with
+  `industry_progress` versus the catalog cost, `inconsistent_upgrade`
+  for pending-upgrade/progress mismatches or hub expansion past the
+  level cap, and `out_of_range` for `operating_priority` outside
+  [0,1], `condition` above 1, `industry_progress` above the build
+  cost, and `stored_power_days` above the catalog storage.
+  Resource outposts bound `stored_extracted_materials` against the
+  represented capacity and `remaining + stored` against the
+  represented deposit via `resource_outpost_snapshot` (guarded —
+  unresolved inputs already carry their own findings). The active
+  massive encounter is validated on a clone through
+  `validate_campaign_massive_encounter` (`invalid_encounter`) — the
+  canonical validator mutates, so diagnostics stay read-only while
+  still surfacing deep battle-state corruption. Every
+  throwing call in the operations pass is now wrapped — sustenance
+  analysis, the warfare theater projection, lane-network construction
+  and reach assessment, the logistics snapshot/coverage/home-network
+  queries, credit flow and the population projection — so a corrupt
+  entity degrades to "invariant finding + skipped entity" instead of
+  discarding the entire pass's findings (the monitor collects
+  invariants and operations in one batch, so an escape previously
+  lost both). Both passes also surface truncation honestly: when the
+  `maximum_findings` bound is reached mid-scan a `findings_truncated`
+  marker is appended (Critical for invariants with the dropped count,
+  Warning for operations), so a capped pass cannot hide findings
+  silently — callers may see `maximum`+1 records.
+  `campaign_colony_projection`
+  tests — spec synthesis, flag fidelity, remaining-industry accounting,
+  powered-set operating flags, unknown-type fallback, hub-less capacity
+  floor, and the consumer paths (only worn/under-covered colonies
+  flagged; civs missing economy/construction rows are skipped, not
+  thrown; corrupt stability/condition/arrears flag invariants).
+- **Save/performance impact:** read-only projection — zero persistent
+  state; settlement build is O(buildings) once per colony per daily
+  diagnostics pass.
+- **Limitations:** `utility_balance()` reports nameplate spec
+  supply/demand — Core's effective supply is condition-efficiency
+  scaled plus a base 2, so the balances differ by design (documented in
+  the adapter contract); food/water capacity and credit/industry build
+  *time* have no engine analog; the projection carries no districts —
+  Core's flat building list maps to standalone slots only.
+
+## Massive simulation scheduler + simulation LOD executor (2026-09-23)
+
+- **Purpose:** the space-strategy specialization's foundation — drive
+  thousands of systems/colonies/fleets at relevance-scaled cadences
+  without per-frame cost or nondeterminism. See
+  [SIMULATION_LOD.md](SIMULATION_LOD.md) and
+  [SPACE_STRATEGY_ENGINE.md](SPACE_STRATEGY_ENGINE.md).
+- **Engine APIs/ownership:** `SimulationScheduler`
+  (simulation_scheduler.hpp) — the existing tier-cadence core, now with
+  deterministic sorted due lists and a peek/mark split
+  (`begin_tick`/`collect_due`/`mark_ran`/`elapsed_since_run`/
+  `dormant_keys`) so deferred and event-woken execution keeps exact
+  elapsed accounting. `SimulationExecutor` (simulation_executor.hpp) —
+  registers `SimulationTask`s (callback + `SimulationTier` +
+  `JobPriority` + domain tag + `depends_on` ordering edges) and runs
+  authoritative ticks: eligibility = cadence-due + `mark_dirty` +
+  `wake`/`wake_domain`/`wake_all` (Dormant items are the event-driven
+  tier — a wake runs them once with accumulated dormant elapsed);
+  ordering = topo over due dependencies, ties by priority then **aging**
+  (largest elapsed first — sustained budgets cannot starve keys) then
+  key; `SimulationBudget{max_wall_time, max_tasks}` defers overflow with
+  `elapsed_ticks` catch-up; `advance_parallel(JobSystem&)` executes
+  dependency waves as tagged/prioritized jobs; `set_paused` freezes the
+  tick; `set_tier`/`evaluate_tiers` handle LOD promotion/demotion;
+  `dormant_items()` feeds bulk analytic propagation. Reports/stats:
+  `SimulationStepReport` (eligible/ran/deferred/wakeups/wall/jobs),
+  per-domain run/ns stats, `tick_history` percentiles, `tier_counts`,
+  `total_wakeups`. Persistence: `capture_state`/`restore_state` on both
+  layers carry tick, tiers, last-run/dormant bookkeeping, pending
+  dirty/event wakeups and pause — taskless snapshot keys are reported
+  unmatched instead of scheduled. The same versioned
+  capture/restore contract covers every specialization framework
+  (`Population`, `Colony`, `FlowNetwork`, `LogisticsNetwork`,
+  `WarfareModel`, `StrategicMind`, `ResourceNetwork`): runtime state
+  round-trips, definitions (profiles/specs/recipes/classes/actions)
+  are re-registered code-side, and unknown references throw.
+  `framework_state_json.hpp` provides the byte-level layer —
+  templated `to_json`/`from_json` codecs (nlohmann-compatible,
+  matching `galaxy_phenomena_json.hpp`) for all of those State
+  structs so campaign save codecs can embed framework state without
+  hand-written field lists.
+  `SimulationExecutor::consume_tick()` marks every task as having
+  consumed the current tick — the aborted-step contract: a mid-pipeline
+  exception followed by a retry of the same logical step must not let
+  un-run tasks double-integrate the aborted span.
+- **Consumers/tests:** `simulation_executor` functional tests (cadence,
+  elapsed catch-up, dirty/event/dormant wakes, ordering, budgets,
+  pause, promotion, parallel≡serial state, consume_tick abort/retry
+  semantics),
+  `stellar_simulation_persistence_tests` (struct round-trip),
+  `stellar_framework_persistence_tests` (all frameworks),
+  `stellar_framework_state_codec_tests` (JSON round-trip through
+  dump→parse→restore→re-capture equality plus version/enum negative
+  cases) and `stellar_simulation_scale_tests` benchmarks registered as
+  ctest `simulation_scale_250/500/1000/2500/5000` — serial and parallel
+  checksums verified identical. **Core consumer:** the 12
+  `GalaxySimulationStepCoordinator` phases (economy → economy_storage)
+  run as executor tasks dependency-chained in the historical
+  order; `campaign_coordinator_parity` (28 step + 8 combat cases)
+  verifies identical behavior. **Phase cadence policy** is now
+  coordinator-owned data: `set_phase_tier`/`phase_tier`/`wake_phase`
+  demote any phase (Dormant = event-driven), day-integrating phases
+  scale their span by `elapsed_ticks` so coarse runs conserve simulated
+  time, and `coordinator.advance()` consumes the tick on exception so a
+  retried step cannot double-integrate. The **seeded parity oracle**
+  (`campaign_phase_cadence_oracle` ctest) captures a GalaxyPayloadV16
+  digest after every step and proves all-active determinism,
+  byte-exact parity for phases inert across the trace, honest
+  divergence when a live phase is demoted, and dormant→wake accounting
+  — the gate any real demotion policy must pass before adoption.
+- **Save/performance impact:** tasks are code — re-registered on load,
+  never serialized; cadence bookkeeping is derivable. 5000-task
+  registration ≈ 320 KB task-state in the benchmark model; serial
+  5000-system tick ≈ 536 µs mean on the dev machine.
+- **Limitations:** ordering-only dependencies (no cross-tick dataflow);
+  wall budget checked between tasks/waves (a single oversized task is
+  never preempted); parallel waves wait fully between levels; cadence is
+  owner policy, not adaptive. The coordinator runs serial with all
+  phases Active — tick-count-driven phases (automatic_orders,
+  legacy_research, economy_storage) have no day parameter to scale, so
+  their demotion accrues at run cadence only; no production phase is
+  demoted yet — each adoption must clear the parity oracle.
+- **Future reuse:** the executor is the intended host for economy,
+  population, colony, logistics and civilization-AI cadences in
+  milestones 2–9 of the space-strategy specialization.
 
 Records below retain purpose, API, consumers, tests, save/performance impact and
 limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
@@ -90,6 +2291,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
 - **Mesh sources:** `MeshRef::spec` accepts `box[:sx,sy,sz]` and
   `annulus:inner,outer[,segments]` primitives
   (native_geometry3d.hpp), `sphere[:cols,rows]` (`Mesh3D::uv_sphere`),
+  `card[:w,h]` (`Mesh3D::billboard_card` — a camera-facing quad for
+  impostor/marker use),
   or a content-relative `.obj` path loaded through `ContentResolver`
   (cooked bytes or loose file) by `load_obj_mesh` — a minimal Wavefront
   OBJ parser (v/vn/vt/f, fan triangulation, generated flat normals).
@@ -99,13 +2302,18 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   tracked set), hot-reloads it with the 2D scene poll, flies the camera
   with the rebindable "game" context (WASD move, Space/C up/down,
   right-drag look, wheel fov), integrates gravity + velocity at the
-  fixed timestep, rests entities on `groundY` by their mesh's scaled
+  fixed timestep (solids are kinematic — gravity-exempt, matching the
+  2D scene mode — while authored velocity still integrates for moving
+  platforms), rests entities on `groundY` by their mesh's scaled
   world-AABB bottom, clamps/bounces at `bounds` (`NoBounce` opts out),
   ticks `Lifetime`, resolves `Parent3D` follow, and runs contact events
   — solid movers push out along the least-penetrated axis and zero
   inward velocity; `on_collision`/`on_collision_exit`/`on_land` fire for
   the 3D set. Public API: `scene3d()`, `entities3d()`,
-  `entities3d_in_radius`, `spawn_entity3d`, `on_spawn3d`,
+  `entities3d_in_radius`, `entities3d_in_box`, `spawn_entity3d`,
+  `on_spawn3d`, `destroy_entity` (also untracks 3D entities and ends
+  their contacts — `on_collision_exit` fires with the stale ids while
+  grounded bookkeeping is purged),
   `set_camera3d` + getters, `gravity3d()`, `ground_y()`, `raycast3d`,
   `entity3d_at`. F5/F9 snapshots capture the 3D set —
   including a `Camera3DState` carrier that restores the fly camera — and
@@ -124,7 +2332,9 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   mesh triangles — shared `raycast_world3d` (scene_components) +
   `resolve_mesh_spec` (mesh3d_loader) transform the ray into each
   mesh's local frame (rotation + scale aware) and test triangles via
-  `intersect_mesh_segment` (bounding-sphere reject); the nearest hit
+  `intersect_mesh_segment` (bounding-sphere reject, then a slab-test
+  reject against the mesh's local AABB — strictly tighter on elongated
+  meshes where the sphere encloses large empty volumes); the nearest hit
   returns `{entity, distance, world point}`. `entity3d_at(sx, sy)`
   builds the camera ray through a viewport pixel for mouse picking.
   Both shared functions are reusable by tools — e.g. a scratch world
@@ -141,7 +2351,8 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   through `Scene3DView` under the 2D HUD.
 - **Save/performance impact:** 3D components are POD/string codecs in
   the same snapshot stream; meshes/textures cache per spec; contact scan
-  is O(n²) over the 3D set (small scene counts); rendering reuses the
+  runs through the Broadphase3D uniform grid + AABB reject before the
+  SAT narrow-phase; rendering reuses the
   existing bounded `Scene3D` submission path.
 - **Limitations:** collision is OBB over the mesh's local AABB (not
   per-triangle — a sphere mesh still collides as its box); solids are
@@ -150,11 +2361,15 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   use the world AABB; `physics3d` kinematics/`spatial_index3d` exist
   engine-side but are not wired into this mode (raycast uses
   `segment_triangle` via `intersect_mesh_segment`); the Scene3D editor
-  tab covers entity + document fields with a live preview/pick but has
-  no transform gizmos or light/emitter authoring UI; lighting is one key
-  light + up to two directional fills per material; raycast is
-  O(triangles) per entity with no spatial partition — fine for queries,
-  not per-frame sweeps.
+  tab covers entity + document fields with a live preview/pick and
+  authors up to two fill lights (direction + r,g,b,intensity fields map
+  to `Scene3dDocument::lights` slots A/B, empty direction removes the
+  slot) but has no transform gizmos or emitters-table editor (the entity `vfx` attach field is exposed); lighting is
+  one key light + up to two directional fills per material; raycast is
+  O(triangles) per surviving entity — sphere + local-AABB rejects cull
+  most meshes, but there is no entity-level spatial partition, so a
+  scene of many meshes still pays a ray transform per entity — fine
+  for queries, not per-frame sweeps.
 
 ## Authored tilemap layers for generated 2D games (2026-09-21)
 
@@ -208,9 +2423,10 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   Covered by `input_actions` tests (context_names enumeration, pad button
   press/release edges, axis persistence/update across frames, plus the
   existing feed/axis/chord/rebind suite); verified `--input-map` loads and
-  degrades to defaults on missing/malformed files. Remaining gap: no
-  rebinding UI or pad-specific glyphs in the tools; only the first pad is
-  used.
+  degrades to defaults on missing/malformed files. The in-app Controls
+  view rebinds Button and Axis1D actions (see the Native input record);
+  remaining gap: no pad-specific glyphs in the tools and only the first
+  pad is used.
 - **Scene music:** `SceneDocument::music` names a content-relative track the
   host plays when the scene loads — per-level music for `set_scene()`
   switching and hot reload (a change to the field restarts the new track;
@@ -276,10 +2492,17 @@ limitations. Current [architecture](ENGINE_ARCHITECTURE.md) and
   the first map's floor when the platform map is removed.
 - **Limits/reuse:** `tile_at`/`set_tile_at` take a document-order map index
   (`tilemap_count()` reports the layer count) and `tilemap_entities()`
-  exposes the carriers — but there is no named-map lookup; the editor
-  selects but cannot reorder tilemap layers (edit `layer` for draw order);
+  exposes the carriers; `SceneTilemap::name` attaches `EntityName` to the
+  carrier so `tilemap_index(world, name)` / `RuntimeHost::tilemap_index`
+  resolve authored layers ("ground", "decor") by name — the index feeds
+  the indexed tile calls, and `tile_at`/`set_tile_at` name overloads
+  cover infrequent queries directly; the editor selects but cannot reorder
+  tilemap layers (edit `layer` for draw order);
   collision is cell-level solid only (no per-tile slopes/one-way flags);
-  paint strokes fill single cells (no brush size or fill tool). Other
+  paint strokes stamp an NxN brush (1..8, `brushsz` field — the footprint
+  outlines in the preview, one undo step per stroke) or, with the FILL
+  toggle, flood the 4-connected same-value region under the click
+  (bounded to existing cells, one undo step). Other
   RuntimeHost consumers (2D platformers, top-down maps, puzzle boards)
   reuse the same path.
 
@@ -1046,7 +3269,7 @@ static portraits and the policy against added cloud layers remain unchanged.
   resource generation is deterministic; GPU submission stays on the owner thread.
 - **Performance:** no additional targets or passes; optical maps share the
   existing 128-entry/192 MiB texture budget, checked across all views before upload.
-  Optical pixels use bounded environment cone filtering; disabled materials skip it.
+  Optical pixels use the prefiltered environment mip chain (roughness-mapped lod); disabled materials skip it.
 - **Tests:** actual `native_scene3d_gpu` checks Fresnel, Snell bending, absorption,
   frost, GGX roughness, invalid optics and reuse; small-body tests cover real
   material integration, elongated forms and inclined chart-band alignment.
@@ -1335,7 +3558,9 @@ callers. Remaining gaps below are work outstanding, not approved deferrals.
   `campaign_diagnostics`, opt-in `CampaignFrame` profiling; Application
   `developer_qa_host`. Research fingerprints delegate to the same byte digest.
 - **Interfaces:** `DiagnosticLog::append/flush`, `DiagnosticLogPolicy`, typed
-  `DiagnosticRecord`, `inspect_campaign_invariants`, `campaign_step_diagnostics`,
+  `DiagnosticRecord`, `inspect_campaign_invariants`,
+  `inspect_diplomacy_invariants`, `inspect_research_invariants`,
+  `campaign_step_diagnostics`,
   `CampaignFrame::set_profiling_enabled`, `tick_execution_nanoseconds`.
 - **Purpose/users:** The developer headless host runs the authoritative campaign
   frame, AI and research implementation. It records real events and measurements
@@ -2678,15 +4903,15 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 
 | # | Capability | Prior state | Current state | Files | Tests |
 |---|---|---|---|---|---|
-| 1 | Unified entity/world | PARTIAL — `EntityId`/`EntityRegistry` only | **ENGINE-COMPLETE** — `World` store: components, hierarchy, queries, binary snapshot/restore, legacy ID map. Game-side adoption pending. | `engine/…/world.hpp`, `engine/src/world.cpp` | `engine_world` |
-| 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock`, frame routing | **ENGINE-COMPLETE** — `SimulationScheduler`: tier policies (ACTIVE/NEARBY/NORMAL/BACKGROUND/DORMANT), cadence, deterministic ordering, dormant analytic skip. Integration into campaign frame pending. | `engine/…/simulation_scheduler.hpp` | `simulation_scheduler` |
+| 1 | Unified entity/world | PARTIAL — `EntityId`/`EntityRegistry` only | **ENGINE-COMPLETE + BRIDGE** — `World` store: components, hierarchy, queries, binary snapshot/restore, legacy ID map. `campaign_world_projection` adapts authoritative `FreshCampaignState` containers into the typed store as a read model — namespaced legacy ids (`campaign_legacy_id`, no cross-domain collisions), POD tag components per domain, honest containment hierarchy (moons→host bodies, civ-scoped economy/technology/construction/shipyard rows→their civilization, colonies→occupied body or system, fleets→current system; unresolved/cyclic refs stay unparented, never fabricated). Invariant pass adds `cyclic_parent` for body parent chains that revisit a body. Save identity rides `bind_legacy` + world snapshots; generational `EntityId`s invalidate stale handles on destroy. `sync_campaign_world` reconciles a projected world incrementally — rows matched by legacy id keep stable `EntityId`s across refreshes (created/updated/destroyed/reparented counts returned), removed rows retire their entity, and only campaign-namespaced bindings are swept (consumer-owned entities untouched). Core containers remain authoritative — no blanket rewrite; `campaign_world_projection_census` feeds the developer report's `session.json`. | `engine/…/world.hpp`, `engine/src/world.cpp`, `core/…/campaign_world_projection.hpp`, `core/src/campaign_world_projection.cpp`, `core/src/campaign_diagnostics.cpp`, `app/developer_diagnostic_report.hpp` | `engine_world`, `campaign_world_projection`, `campaign_diagnostics`, `developer_diagnostic_report` |
+| 2 | Simulation scheduler + LOD | PARTIAL — `StrategicClock`, frame routing | **ENGINE-COMPLETE + LIVE CONSUMER** — `SimulationScheduler`/`SimulationExecutor`: tier policies (ACTIVE/NEARBY/DORMANT…), cadence, deterministic ordering, dormant analytic skip, budget-capped deferred execution, event/dirty wakes, versioned capture/restore. `GalaxySimulationStepCoordinator` runs the 12 step phases as Active-tier executor tasks dependency-chained in historical order (`campaign_coordinator_parity` verifies identical behavior). Phase tier demotion and parallel waves are future tuning, not yet enabled. | `engine/…/simulation_scheduler.hpp`, `simulation_executor.hpp` | `simulation_scheduler`, `simulation_executor`, `campaign_coordinator_parity` |
 | 3 | Job/threading system | PARTIAL — FIFO+futures | **ENGINE-COMPLETE + LIVE CONSUMERS** — priorities, cooperative cancellation, dependency graphs, named workers, per-tag stats, error propagation. All app/core/engine `std::async` sites migrated: save-writer (`PlayerCampaignSaveController`), image preparation, audio director, territory overlay, planet-material decode queue (`MaterialCache` — persistent tagged worker replacing a fresh thread per decode; `job_stats()` exposes per-tag counts), support-bundle export, and campaign-session load. Voice synthesis keeps a dedicated COM-initialized thread (SAPI apartment requirement). | `engine/…/foundation.hpp`, `foundation.cpp` | `job_system` |
-| 4 | Render graph | MISSING | **ENGINE-COMPLETE (policy layer)** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. Backend adoption pending (DrawList layer today; SDL_GPU follow-on). | `engine/…/render_graph.hpp` | `render_pipeline` |
-| 5 | GPU-driven rendering | MISSING | **PARTIAL** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. True indirect draw requires the SDL_GPU pipeline follow-on. | `engine/…/draw_batcher.hpp` | `batcher_ui` |
-| 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE (policy layer)** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. Backend consumption pending. | `engine/…/texture_streaming.hpp` | `render_pipeline` |
+| 4 | Render graph | MISSING | **ENGINE-COMPLETE + LIVE CONSUMER** — `RenderGraph`: pass/resource declarations, single-writer validation, dependency+ordering edges, deterministic topological order. `native_scene3d_gpu` declares its per-frame resources (HDR scene target, color, depth) and passes (scene3d, tonemap — disabled without float-target support), compiles the DAG and executes passes in graph order; compile failure aborts the frame. | `engine/…/render_graph.hpp`, `native_scene3d_gpu.cpp` | `render_pipeline`, `native_scene3d_gpu` |
+| 5 | GPU-driven rendering | MISSING | **PARTIAL + LIVE CONSUMER** — `DrawBatcher`: stable opaque (layer,material,mesh) batching, back-to-front transparent sort, culling hooks. `native_scene3d_gpu` interns each draw's full GPU binding key (mesh + all eight bound textures + sampler/pipeline flags) into `material_id`/`mesh_id`, submits `DrawItem`s, and executes the emitted `DrawBatch` runs as instanced `SDL_DrawGPUIndexedPrimitives` calls with `first_instance` indexing SSBO uniform arrays — identical objects merge into one draw call. `SDL_DrawGPUIndexedPrimitivesIndirect` exists in the vendored SDL3, but it only merges batches sharing bound state — per-batch sampler binds mean the real enabler would be a texture-array/bindless surface set, so CPU-submitted draws stay the bound. | `engine/…/draw_batcher.hpp`, `native_scene3d_gpu.cpp` | `batcher_ui`, `native_scene3d_gpu` (instanced-draw + pixel assertions) |
+| 6 | Texture streaming | PARTIAL — bounded LRU caches, sync decode | **ENGINE-COMPLETE + LIVE CONSUMER** — `TextureStreamer`: mip residency, priorities, VRAM budget, pin/evict, per-frame load queue. `native_scene3d_gpu` registers each bound texture with real per-mip bytes (cooked/BC1/RGBA paths), declares the frame's demand with camera-distance priority during `prepare()`, applies the streamer's residency changes by granularity (demotions/promotions re-upload the new resident tail; denials evict), and uploads lazily on re-admission; `Window::set_scene3d_texture_budget` retunes the budget at runtime — the request persists through the lazily created renderer, and the video STARFIELD QUALITY tier drives it (Low 48 / Medium 96 / High+ 192 MiB). **Per-mip partial residency + screen-footprint LOD are live**: requests carry a desired mip derived from the projected bounding-sphere footprint (perspective/ortho focal × mesh radius — the sampler never reaches finer levels, so tails upload only what this frame needs; `anisotropic_texture` materials keep full chains since the flag declares high-frequency content), a denied request degrades to the coarsest mip tail that fits (`streamed_partial_binds` counts tail binds; RGBA tails CPU-box-downsample the base, cooked/BC1 tails upload level ranges), and only a fully denied bind serves the pinned white fallback (`streamed_fallbacks`). Environment/optics/shadow maps inherit the surface footprint estimate — a heuristic, not a per-UV density analysis. | `engine/…/texture_streaming.hpp`, `native_scene3d_gpu.cpp`, `native_map_platform.*` | `render_pipeline`, `native_scene3d_gpu` (budget-pressure eviction + degraded-tail + fallback pixel assertions) |
 | 7 | Shader library + cache | MISSING — SDL built-ins only | **ENGINE-COMPLETE (management layer)** — `ShaderLibrary`: families, canonical variant keys, artifact hashes, version invalidation, diagnostics. Consumption pending SDL_GPU pipeline. | `engine/…/shader_library.hpp` | `render_pipeline` |
 | 8 | Particle/VFX framework | MISSING — procedural flares | **ENGINE-COMPLETE** — `VfxSystem`: data-driven emitters, deterministic per-instance RNG pools, gravity/integration, LOD rate scaling, curve-driven scale/opacity/tint. RuntimeHost steps it in sim time and renders particles as camera-transformed tinted rects; host.spawn_emitter supports entity attachment with auto-stop on death (generated starter trails embers from its spark). Flare migration pending. | `engine/…/vfx.hpp`, `vfx.cpp` | `render_pipeline` |
-| 9 | Physics layer | MISSING — combat-only grid | **ENGINE-COMPLETE** — `PhysicsWorld`: circle/AABB/segment primitives, broadphase over SpatialGrid, overlap/raycast/sweep, trigger enter/stay/exit events. | `engine/…/physics.hpp`, `physics.cpp` | `spatial_physics` |
+| 9 | Physics layer | MISSING — combat-only grid | **ENGINE-COMPLETE** — `PhysicsWorld`: circle/AABB/segment primitives, broadphase over SpatialGrid, overlap/raycast/sweep, trigger enter/stay/exit events; versioned `capture_state`/`restore_state` round-trips bodies, id counter and the live overlap set (no phantom ENTER on restore) with `framework_state_json` codecs. Consumed by the shell PHYSICS inspector; game-path adoption pending. | `engine/…/physics.hpp`, `physics.cpp` | `spatial_physics`, `framework_persistence`, `framework_state_codec` |
 | 10 | Spatial query framework | PARTIAL — private combat index | **ENGINE-COMPLETE + LIVE CONSUMER** — `SpatialGrid`: deterministic cell order, insert/remove/update, radius/AABB/ray queries, broadphase candidates. Galaxy-map `system_hit` uses a lazily rebuilt world-space `SpatialGrid<int>` (invalidated on session cache generation) for pointer hit-testing — O(cells touched) instead of scanning every system per event. Parity review concluded the massive-combat `SpatialIndex` stays private: it is a 3D Chebyshev cell-box scan returning *all* occupants (callers distance-filter), while `SpatialGrid` is 2D and `SpatialIndex3D` is k-nearest k-d — neither reproduces the exact candidate set/order combat determinism requires. | `engine/…/spatial_index.hpp`, `spatial_index3d.hpp` | `spatial_physics` |
 | 11 | Route engine | PRESENT-PARTIAL | **EXTENDED** — `RoutePolicy` (blocked sets, per-system traversal cost = hostile-territory penalties) + `find_fuel_feasible_route` waypoint insertion with refuel callbacks. | `core/lane_network.*` | `route_policy` |
 | 12 | Knowledge/FoW | PRESENT-PARTIAL | **UNCHANGED** — `CivilizationKnowledgeState` covers observer filtering; per-callsite discipline retained. | `core/knowledge.*` | `settlement_knowledge_parity` |
@@ -2696,18 +4921,18 @@ meet the requirement), **PRESENT** (meets the requirement), **EXTERNAL**
 | 16 | Advanced saves | MOSTLY PRESENT | **EXTENDED** — fnv1a64 integrity sidecars (atomic, incl. `.bak`), rolling history `.bak.2`..`.bak.4` with loader fallback, `read_player_campaign_preview` metadata reader (player + developer envelopes). Existing: v17 schema, migrations, autosave scheduler, async writer. | `engine/…/save_integrity.hpp`, `save_history.hpp`, `core/save_preview.*`, `core/player_campaign_*.cpp` | `save_integrity`, `save_history` |
 | 17 | Deterministic replay | MISSING | **ENGINE-COMPLETE** — `ReplayRecorder`/`ReplayPlayer`: ordered command stream, FNV checkpoints, JSON round-trip. Session-journal integration pending. | `engine/…/replay.hpp` | `economy_animation` |
 | 18 | Crash reporter | PARTIAL — support bundle only | **INTEGRATED VIA CODEX PATH** — `RuntimeDiagnostics` owns the real capture: unhandled-exception filter, terminate/abort handlers, session log, minidump and rolling context at client startup. The expansion `CrashReporter` is a parallel implementation kept library-only — installing it would displace the richer codex filter (it does not chain). Its context/event-bundle API remains available if a second consumer needs a non-fatal bundle writer. | `engine/…/runtime_diagnostics.*`, `engine/…/crash_reporter.hpp` | `runtime_diagnostics`, `crash_reporter` |
-| 19 | Profiler | MISSING | **ENGINE-COMPLETE + CLIENT-CONSUMED** — `Profiler`: scoped spans, per-frame counters, thread-buffer drain, JSON export. Client frames bracketed in `scene()` (drains the preceding `update` spans), `update`/`simulation`/`scene` spans recorded, gated by developer session; aggregates render as `client/*` rows in the diagnostics LIVE PERFORMANCE table. GPU timeline and scenario comparison pending. | `engine/…/profiler.hpp`, `app/native_client/native_developer_diagnostics.hpp` | `engine_diagnostics`, `native_developer_diagnostics` |
+| 19 | Profiler | MISSING | **ENGINE-COMPLETE + CLIENT-CONSUMED** — `Profiler`: scoped spans, per-frame counters, thread-buffer drain, JSON export. Client frames bracketed in `scene()` (drains the preceding `update` spans), `update`/`simulation`/`scene` spans recorded, gated by developer session; aggregates render as `client/*` rows in the diagnostics LIVE PERFORMANCE table. **Frame capture + scenario comparison landed**: `ProfileCapture::parse`/`to_json` round-trips `export_json`, `compare_captures` diffs two captures into per-span mean deltas, and the engine shell's Profiler tool captures/saves/loads A+B slots (`<exe>/profiler_captures/`) and renders the largest deltas. **Lower-perturbation recording landed**: spans and call aggregates accumulate in per-thread buffers under each buffer's own lock — the global mutex is no longer taken on the recording path; per-thread aggregates merge at frame boundaries and thread exit, and `aggregates()`/`export_json` merge un-drained buffers on read so the real-time contract holds (multi-threaded recording covered in `profiler`). GPU timeline pending. | `engine/…/profiler.hpp`, `app/engine_main.cpp`, `app/native_client/native_developer_diagnostics.hpp` | `profiler`, `engine_diagnostics`, `native_developer_diagnostics` |
 | 20 | Memory tracking | MISSING | **ENGINE-COMPLETE + CLIENT-CONSUMED** — `MemoryTracker`: subsystem registry, high-water marks, `TrackedAllocator` adapter, JSON export. Client reports planet-material cache residency (`used`/`reserved` against its 96 MiB budget) each update; developer diagnostic bundles include `memory.json`. Broader tagged-allocation and VRAM attribution pending. | `engine/…/memory_tracker.hpp`, `app/developer_diagnostic_report.hpp` | `engine_diagnostics`, `developer_diagnostic_report` |
-| 21 | Input actions | PARTIAL — raw events | **ADOPTED** — `InputMapper` drives the client's galaxy keyboard shortcuts: `NativeCampaign` loads a data-driven `GALAXY` JSON context (pause, speeds 1–5 incl. Developer-only Demo, research/construction candidates, new campaign, F6 save, F8 support bundle) and dispatches `KeyPressed` events through `feed`/`just_pressed`. Stacked contexts, axes, chords and runtime rebinding ship in the engine for future UI. | `engine/…/input_actions.hpp`, `app/native_client/main.cpp` | `input_actions`, galaxy smoke key check |
-| 22 | Audio engine | PARTIAL — CPU mixer | **EXTENDED** — the event-driven gameplay voice pipeline is now the live client path: `NativeGameplayVoiceBridge` observes `CampaignFrameResult`s after each authoritative advance (fleet/hull/diplomacy/economy/logistics + event routes, observer-safe), `NativeVoiceRouter` resolves cues from `Data/voice_profiles/events.json`, and `NativeVoicePlayback` (8-deep priority queue, dedupe, subtitle fallback) plays through `NativeAudioDirector::play_dialogue_pcm` on the engine `AudioOutput` voice channel — no parallel audio stack. `prerecordedPath`/`subtitleText` cue fields are now honored: the three approved scientist WAVs play recorded; all other events synthesize via SAPI with subtitle fallback. Legacy `VoiceCue` remains as the fallback when voice data is absent. Minted `localization_key`s now resolve through the live `LocalizationTable` at subtitle presentation — a catalogued `voice.<dialogue>.<variant>` entry overrides authored cue text; shipped catalogs carry no voice keys yet, so authored English remains the baseline. | `native_audio*`, `native_voice*` | `native_audio`, `native_voice` |
+| 21 | Input actions | PARTIAL — raw events | **ADOPTED** — `InputMapper` drives the client's galaxy keyboard shortcuts: `NativeCampaign` loads a data-driven `GALAXY` JSON context (pause, speeds 1–5 incl. Developer-only Demo, research/construction candidates, new campaign, F6 save, F8 support bundle) and dispatches `KeyPressed` events through `feed`/`last_press_action` — per-event resolution, because `pressed_this_frame` accumulates across every event fed in a frame and scanning `just_pressed` after a second press would re-report the first event's action (surfaced by `--replay` batch-dispatching all due commands in one update: every post-first command masked to `toggle_pause`, so the recorded F6 quicksave never fired and save checkpoints could never verify). Stacked contexts, axes, chords and runtime rebinding ship in the engine for future UI. | `engine/…/input_actions.hpp`, `app/native_client/main.cpp` | `input_actions`, galaxy smoke key check |
+| 22 | Audio engine | PARTIAL — CPU mixer | **EXTENDED** — the event-driven gameplay voice pipeline is now the live client path: `NativeGameplayVoiceBridge` observes `CampaignFrameResult`s after each authoritative advance (fleet/hull/diplomacy/economy/logistics + event routes, observer-safe), `NativeVoiceRouter` resolves cues from `Data/voice_profiles/events.json`, and `NativeVoicePlayback` (8-deep priority queue, dedupe, subtitle fallback) plays through `NativeAudioDirector::play_dialogue_pcm` on the engine `AudioOutput` voice channel — no parallel audio stack. `prerecordedPath`/`subtitleText` cue fields are now honored: the three approved scientist WAVs play recorded; all other events synthesize via SAPI with subtitle fallback. Legacy `VoiceCue` remains as the fallback when voice data is absent. Minted `localization_key`s now resolve through the live `LocalizationTable` at subtitle presentation — a catalogued `voice.<dialogue>.<variant>` entry overrides authored cue text; shipped catalogs carry no voice keys yet, so authored English remains the baseline. Music is incrementally streamed: `AudioStreamDecoder`/`open_audio_stream` pull-decodes 48 kHz stereo F32 on demand (lazy MF reader, `rewind()` loop, `AudioStreamError` permanent-failure classification, no 16 MiB/96 MiB caps), `AudioOutput::play_music` feeds it through the same bounded SDL queue, and the director streams its music track (`stats().music_streaming`) — effects and voice stay on whole-file clips. | `native_audio*`, `native_voice*` | `native_audio`, `native_voice` |
 | 23 | Animation | MISSING | **ENGINE-COMPLETE** — `FloatCurve` (5 easings), `Timeline` tracks + loop modes (Once/Loop/PingPong) + crossed events. Skeletal blending out of scope. | `engine/…/animation.hpp` | `economy_animation` |
-| 24 | Advanced UI | PARTIAL — theme helpers | **PARTIAL** — `VirtualizedList`, `TableModel` (sort/filter), `TreeModel` (expand/flatten), `UndoHistory` (bounded snapshot undo/redo) in engine; `VirtualizedList` is the colony roster's and the editor systems list's scroll model (stride row_height, `scroll_to`/`max_scroll` clamps, wheel input); `UndoHistory` backs the editor's annotation layer (Ctrl+Z/Y). Table/Tree screen adoption pending. | `engine/…/ui_viewmodels.hpp`, `engine/…/undo_history.hpp`, `app/native_client/native_colony_roster.cpp`, `app/editor_main.cpp` | `batcher_ui`, `native_colony_roster`, `undo_history` |
+| 24 | Advanced UI | PARTIAL — theme helpers | **PARTIAL** — `VirtualizedList`, `TableModel` (sort/filter), `TreeModel` (expand/flatten), `UndoHistory` (bounded snapshot undo/redo) in engine; `VirtualizedList` is the colony roster's and the editor systems list's scroll model (stride row_height, `scroll_to`/`max_scroll` clamps, wheel input) **and the diagnostics panel's shared scroll model** — its four views configure the same instance per frame (33/57/61·s strides), wheel deltas scroll whole rows, `ensure_visible` drives the entities keyboard-follow, and `scroll_to` re-clamps every render so collapsing a tree or refreshing a list can never leave a stale offset past the tail, **and the remaining developer panels share it too** — the celestial index, planet-type index, empire monitor (both the empire and active-research lists), and the phenomena debug dump all scroll through the model (the phenomena dump's previous unbounded offset could even scroll past the end into blank space); the shared configure/clamp/snap step those consumers repeated is now the engine API itself — `VirtualizedList::sync_rows(row_count, row_height, viewport_height)` applies the new geometry, re-bounds a stale offset, snaps to a whole-row edge, and returns the first visible row, so every row-snapped consumer calls it per frame instead of duplicating the arithmetic — an offset pinned at `max_scroll` stays unsnapped so a fractional viewport remainder cannot strand the final row's tail out of reach (previously `floor`-snapping could hide up to one row-height of the last entry on every row-snapped list whose content height did not divide evenly); fractional-scroll consumers (colony roster, editor system/detail/picker lists, engine-shell asset/key/project/entity/scene lists, construction project/order lists) use the non-snapping `configure(...)`/`set_row_count(...)` pair, and the startup save-slot list is a `sync_rows` consumer, which closes the latent stale-offset gap their direct field assignments had — a filtered or shrunk row set could previously leave `scroll_offset` past `max_scroll` and render blank space; **`ScrollView` is the pixel-offset model for variable-height content** — `sync(content, viewport)` re-clamps on reflow, `scroll_by`/`scroll_to` bound wheel and drag deltas (non-finite input resets to the head), and `thumb(track, min_size)` reports proportional scrollbar geometry — consumed by every variable-height scrollable surface — chronicle browser, notification feed, body-inspection panel, economy workspace, research inspector/guided-card grid/active-program strip (the strip is a horizontal scroll, same contract), fleet outliner, colony freight review, new-game species and detail panes, diplomacy contact and detail panes, system-inspection card, supply-network workspace, controlled-assets navigator, planetary screen (facts/slots/details/queue panes) and shipyard designs/orders/details — replacing per-surface copies of the same clamp/thumb arithmetic; surfaces that used the inverted negative-offset convention (fleet, colony, construction, planetary, shipyard designs/orders) now hold positive offsets and subtract them from row geometry; `UndoHistory` backs the editor's annotation layer (Ctrl+Z/Y); **`TableModel` is the colony roster's sort and filter model** — column headers cycle ascending/descending over name/world/population (numeric population sort, direction marker), and a pointer-focused search field drives `TableModel::refilter` (case-insensitive contains over all cells; localized placeholder + caret, UTF-8-safe backspace, Escape blurs instead of closing); sort and filter both survive live refresh through `set_rows`, and the display-position→source-row mapping keeps filtered opens on the right colony; **`TableModel` is also the diagnostics performance table's sort model** — the Phase/Samples/Mean ms/Maximum ms headers cycle ascending→descending on click (roster `^`/`v` marker convention, scroll resets), and the per-frame `set_rows` rebuild keeps the sort live as samples refresh; **`TreeModel` is the editor's system list** — filtered systems are roots with bodies as children (›/▾ toggles, search auto-expands, body rows jump to system context); **`TreeModel` is also the diagnostics ENTITIES inspector** — the native client's first tree consumer: the read-only projected campaign hierarchy renders depth-indented rows with ·/›/▾ glyphs (roots open by default, deeper levels closed), a matched press+release on a row toggles its subtree, and toggles persist across `sync_campaign_world` rebuilds by node id (root collapses and child expansions remembered separately); **`TreeModel` owns an id-stable selection** (`select`/`selected`/`move_selection` over the flattened view — clears when the id is absent or hidden by a collapse) which the inspector drives from the keyboard — arrows/Home/End move a highlighted selection with the scroll window following, Left collapses an expanded parent or jumps to the parent row, Right expands or descends to the first child, Return/Space toggles, clicking a row selects it, and the selection survives sync rebuilds like the expansion sets; the selected row also drives a read-only detail pane beside the rows (entity index/generation, namespaced legacy ref, parent name, child count, and the full projected tag fields for each campaign domain); **`TreeModel` is also the Controlled Assets navigator** — the first player-surface consumer: the five category headers (Planets/Outposts/Fleets/Stations/Shipyards) are parent nodes over their asset rows, `flattened()` produces the visible entry list, and the persisted `Preferences::collapsed` plus search/temporary-reveal policy drive each header's expanded flag; the ENTITIES inspector also gained a pointer-focused search field (navigator contract — typed text filters the rebuild to matching entities plus their expanded ancestor chain, the census reports the kept count, Tab/Return commit out, Escape blurs instead of closing, and `wants_text_input` joins the client's text-input gate), and the RECENT EVENTS view shares the same field contract over its 512-record retained ring (a render-time index filter keeps hit-testing, scroll bounds and rendered cards on the same visible set). Remaining: `UndoHistory` adoption beyond the editor. | `engine/…/ui_viewmodels.hpp`, `engine/…/undo_history.hpp`, `app/native_client/native_colony_roster.cpp`, `app/native_client/native_controlled_assets.cpp`, `app/native_client/native_developer_diagnostics.hpp`, `app/editor_main.cpp` | `batcher_ui`, `native_colony_roster`, `native_controlled_assets`, `native_developer_diagnostics`, `undo_history` |
 | 25 | Localization | MISSING | **ADOPTED (menus, settings, setup wizard + voice cues)** — `LocalizationTable`/`LocalizationService` (JSON locales, fallback chain, positional+named formatting, plurals, runtime reload). The startup screens, pause menu, settings hub, all four settings panels (General, Audio, Video, Voice & Subtitles), and the new-game setup wizard (mode/species cards, galaxy-type and population pages, seed/size/dev controls, environment tolerance details) resolve their labels through `data/locale/en.json` (packaged to `Data/locale/en.json` via `resource_stream`; missing keys fall back to literals). The diplomacy workspace resolves its chrome the same way — title, filter/tab labels, relationship meters, action buttons, modal text, empty states, and secrecy-preserving placeholders (`THE UNDISCOVERED`, `UNRESOLVED INFORMATION`) — while controller-produced values (political status, agreement/history entries) stay authoritative data. `NativeVoicePlayback` resolves minted `voice.<dialogue>.<variant>` cue keys the same way, so a locale pack can override subtitle text. Earlier claims of a developer-tools embedded catalog were wrong — no such consumer existed. Gameplay HUD strings are still literal; only English ships. | `engine/…/localization.hpp`, `data/locale/en.json`, `app/native_client/native_general_settings.*`, `app/native_client/native_audio_settings.*`, `app/native_client/native_video_settings.*`, `app/native_client/native_voice_settings.*` | `localization`, `native_general_settings`, `native_audio_settings`, `native_video_settings`, `native_voice_settings` |
-| 26 | Accessibility | PARTIAL — subtitle size | **ENGINE-COMPLETE (settings layer), PARTIALLY CONSUMED** — `AccessibilitySettings`: ui/text scale, high contrast, color-blind modes, reduced motion/flashing, subtitles; sanitize + JSON round-trip. Client adoption began: General Settings now persists a `reduceMotion` preference that gates decorative motion (system tumble/planet spin, eruption animation) without touching simulation. ui/text scale, contrast, color-blind and reduced-flashing presentation adoption pending. | `engine/…/accessibility.hpp`, `app/native_client/native_general_settings.*` | `economy_animation`, `native_general_settings` |
+| 26 | Accessibility | PARTIAL — subtitle size | **ENGINE-COMPLETE (settings layer), PARTIALLY CONSUMED** — `AccessibilitySettings`: ui/text scale, high contrast, color-blind modes, reduced motion/flashing, subtitles; sanitize + JSON round-trip. Client adoption: General Settings persists `reduceMotion` (gates decorative motion — system tumble/planet spin, eruption animation — without touching simulation) and `interfaceScale` (Compact/Standard/Large/Huge → 0.85/1.0/1.2/1.45 multiplier inside the engine clamp, applied as `NativeUiLayout::user_scale` so every `for_viewport` consumer plus stellar-observation scaling follows; draft/cancel semantics, persisted), and `reduceFlashing` (gates the stellar artwork polar-pulse to steady mean luminance via `Artwork::set_reduce_flashing`), and `highContrast` (`native_ui::apply_high_contrast` runs a global DrawList pass in `scene()` — low-luminance text snaps to primary ink across every surface without per-screen palette plumbing), and `colorBlind` (Off/Protanopia/Deuteranopia/Tritanopia → `native_ui::apply_color_blind` runs a global DrawList daltonization in `scene()`: Machado severity-1 simulation measures lost contrast, error redistribution pushes it into the channels the mode still perceives — covers text, primitives, image tints and mesh tints; GPU-rendered 3D scene content is out of scope until a post-process pass exists). The client's `GeneralPreferences` embeds the engine `AccessibilitySettings` struct as the canonical substrate (`accessibility` member carrying reduce-motion/flashing, high-contrast and the typed `ColorBlindMode`; the persisted JSON shape is unchanged and `effective()` folds the interface-scale preset into `ui_scale` with `sanitize()` for consumers). Keyboard focus contract (settings layer complete): the settings hub and General/Audio/Video/Voice panels ring their controls on Tab/arrows (Home/End jump to first/last) with Return/Space activation routed through the same dispatch as pointer clicks; focused sliders take Left/Right/Home/End as value adjustments; activation keeps focus (repeated Space toggles) while pointer presses, close paths and modal transitions reset it; modal states narrow the ring (Controls help view, pending folder browser, display-rollback confirm); open dropdowns own their keys. Focus changes play the hover cue via `HoverFeedback::cue()` (non-mutating — pointer state stays authoritative). The startup flow also adopts the contract end to end: `NativeStartupWorkspace` rings per-screen focusables across Entry/ModeSelection/LoadSlots/Busy/Failure/Development with transitions resetting via `reset_pointer()`, and the delegated `NativeNewGameWorkspace` covers all three setup pages — galaxy cards + Back/Next, population-state picker (open dropdown owns its keys), and the Configuration form (species rows, size presets, rival/ancient pickers, seed field, footer actions) in (y,x)-sorted order; the seed field enters edit mode on Return/Space, captures typing/arrows, and commits on Tab/Return. In-game workspaces adopt the same contract: settlement (choice rows), logistics (refresh/close), colony freight-review modal, economy (refresh/close/industry priorities), shipyard (search edit mode, sort/filter dropdowns, dynamic design + order cards, quantity/favorite/build controls, cancel-confirmation narrowing), construction (project + status rows, two-stage cancel), research (domain tabs, render-registered interface hits, guided/tree cards, inspector action), fleet (outliner rows, release-gated order/locate controls activated through a matched press+release pair, recovery rail, engage, preview confirm), battle (chrome + order grid; field selection stays pointer-spatial by design), and the chronicle browser (header controls and intro-row cyclers including the conditional page/focus buttons, located cards, DIP actions and tag chips — each clipped to the list viewport, activated through the same replayed press/release dispatch; the search field owns its keys while editing, Tab/Return commit out), and the notification feed (RECENT EVENTS rings the CHRONICLE/close header buttons and each card's explicit action buttons — card bodies stay inert and only viewport-contained actions focus, the same gate pointer activation applies — with keyboard activation replaying the press/release dispatch so Contact emits OpenDiplomaticContact and located cards emit OpenSystem unchanged), and the diplomacy workspace (RELATIONS rings the close control, the nine-button filter grid, contact rows clipped to their viewport, the conditional transmission/negotiate/war action stack, the five-tab strip and the detail region's proposal/intelligence actions; an open modal narrows the ring to its terms or confirm/cancel pair; activation replays the click dispatch so SelectContact, Action, ProposalAction and FocusSystem commands emit unchanged), and the colony roster (search field, refresh/close, the sort-column headers and every clipped-visible row ring in order — the search field enters edit mode on activation and owns its keys until Tab/Return commit out — with row activation replaying the matched press/release pair so generation-guarded open-colony commands emit unchanged), and the controlled-assets navigator (hide/search/clear plus every clipped-visible tree entry — category headers and rows — ring in order with scroll-follow keeping the focused entry fully visible; activation replays the press/release pair so headers toggle persisted collapse and rows select/manage unchanged; hidden mode narrows the ring to the restore control; the search field owns its keys while editing), and the system workspace's small-body survey panel (the always-on launcher/motion chrome plus the panel's close/field/body/focus controls and developer debug/spawn buttons ring in (y,x) order; activation replays the press dispatch so toggle_motion, field/body cycling, focus_small_body and spawn commands emit unchanged), and the planetary colony screen (the render-registered hit registry rings every enabled button, layer/view-mode control, tab strip, action row and clipped-visible slot cell in (y,x) order — keyboard activation replays the exact same hit dispatch a matched pointer press+release takes, the confirmation modal narrows the ring automatically by clearing the registry before registering Cancel/Confirm, Escape releases the ring before the modal-cancel/deselect/Back chain, and globe region picking stays pointer-spatial by design; `NativeColonyWorkspace` delegates `focus()`/`focused_label`/`focused_bounds`/`focused_control` to the planetary screen outside the freight modal so announcements cover both), and the developer celestial index (search field as Edit, category filter, close, every rendered row with scroll-follow via `VirtualizedList::ensure_visible`, the conditional central-state dropdown and center-map action — activation replays the shared hit dispatch so dropdown opens, row selection and focus requests emit unchanged; search editing owns its keys until Tab/Return commit out and Escape releases edit, then the ring, then the panel), and the developer planet-type index (header actions, class filter, rendered rows and the conditional rules/go/generate footer — activation replays the press/release dispatch so `force_developer_planet_type` and the focus request emit unchanged), plus the phenomena debug overlay (close, density dropdown, region navigation and six option toggles — toggles classify CheckBox), the system-background debug overlay (its eight option/region buttons — activation replays the shared button dispatch so layer toggles, opacity cycles, region navigation and reset emit unchanged), and the giant/ring test panel (its twenty-button control grid through a shared `activate_button` dispatch — spectrum/distance/tilt apply through `apply_developer_giant_test` unchanged, shadow toggles classify CheckBox, the 3D preview stays pointer-spatial), and the stellar activity panel (its twenty-four command buttons through a shared `activate_button` dispatch — force/cycle/scrub/move commands run `apply_developer_stellar_activity` unchanged), and the developer empire monitor (close, refresh, show-home and the rendered empire rows ring in (y,x) order through a shared `activate_hit` dispatch — row selection and the home-system focus request replay the press/release path unchanged, scroll-follow via `VirtualizedList::ensure_visible` keeps focused rows visible; the read-only Core snapshots and research list stay inspection-only), and the developer simulation panel (all sixteen rendered buttons ring in (y,x) order through a shared `activate` dispatch — speed presets run `set_developer_speed`, pause/resume runs the tactical/strategic clock toggle, AI control runs `set_developer_ai_control`, and the index/diagnostics/empire/stellar requests emit unchanged; disabled controls — ADVANCE ONE TICK without a pending step, EXPORT while busy — skip the ring exactly like pointer input), and the developer diagnostics panel (the chrome, record-detail dropdown, sortable phase headers, the entities/events search fields classified Edit, and the rendered entity rows ring in (y,x) order through shared `activate_button`/`activate_phase_header`/`activate_entity_row` helpers — keyboard row activation replays the select+toggle dispatch, the entity tree's arrow/Home/End selection model keeps its keys while the ring is inactive, and an open record-detail dropdown or focused search owns its keys before the ring). Scroll-follow completes the contract for list-backed surfaces: `ScrollView::scroll_interval_into_view` (the pixel-scroll counterpart of `VirtualizedList::ensure_visible`) snaps a focused, partially-clipped row fully into view, and rings include edge-clipped rows so each focus move exposes the next entry — applied to the notification feed, chronicle cards, diplomacy contacts/proposals, construction project and order rows, fleet outliner rows, colony-roster rows (via `ensure_visible` on the list's display index), new-campaign species rows (clipped inclusion replacing the center-containment gate), research guided cards (scroll snap) and tree graph (camera-pan snap), shipyard design cards and order rows, startup save slots (`ensure_visible` by decoded slot index), and the planetary screen's hit registry (slot-grid and detail-action lanes). Fixed-slot `VirtualizedList` surfaces with no partially-rendered rows — the developer celestial index, planet-type index and empire monitor — instead edge-scroll: Up on the first rendered row scrolls one row up and Down on the last scrolls one row down, keeping focus on the slot so it re-resolves to the newly revealed row; other nav keys leave the list normally. The missions/settlement panel adds true list scrolling (it previously truncated rows at the panel edge for pointer and keyboard alike): `NativeMissionView` owns a `ScrollView` over the active tab's list — `mission_layout_for` takes a `scroll_offset`, exposes a `list_viewport`, and translates mission cards / colony rows by -offset with every draw clipped to the viewport; the wheel scrolls inside the panel, row-button dispatch is gated on `list_viewport.contains`, the ring keeps clipped button bands with unclipped bounds for snapping, and Home/End jump to the true list ends while Up/Down edge-scroll when a row's visible band exposes no button. `VirtualizedList` gained a 1e-3 row-boundary snap tolerance: without it, a max scroll landing a fraction under a row multiple floored the first rendered row one short, so a fixed-slot list's final row was unreachable by wheel or keyboard; `batcher_ui` pins the boundary case and `scroll_interval_into_view` geometry, and a 16-civilization developer fixture pins the empire monitor's edge-scroll end to end. Focus-ring suppression: `wants_keyboard_focus()` joins the galaxy input-mapper guard alongside `wants_text_input()` — while any post-mapper surface (workspaces, roster, system panel) holds a focused control, bound galaxy actions like Space→toggle_pause no longer preempt Return/Space activation. The pause menu itself adopts the contract: `menu_focus_` rings the seven stacked actions (Continue/Save/Load/Settings/Support/New Game/Exit) with hover-cue playback, Return/Space dispatch through the same `activate_menu_action` path pointer clicks take, and pointer presses, `toggle_menu`, and new-game pending/cancel transitions resetting it (the pending menu narrows to Continue; Return/Space there cancel like Escape/click). The map inspection card rings its close control (single-target ring; Return/Space replay the press dispatch that clears it, Escape now dismisses the card before falling through to the menu). Always-on map chrome is chained through a dispatcher focus-group policy: `map_focus_group_` orders the assets navigator, fleet outliner and HUD chrome, nav keys that would wrap a group's boundary release the ring (uncaptured) so the same key lands in the next group, pointer presses/cancels and `map_hud_visible()` transitions reset it, Escape releases a live ring before reaching the pause-menu toggle, and `NativeUiLayout::hud_actions()` exposes the 17 HUD actions (top strip, nav bar, rail; EVENTS only while the feed is available) for the ring, and `hud_ring_items` appends the command plate's view-switch button while it is actionable (a system is open or one is selected — it renders dimmed and is pointer-inert otherwise); keyboard activation replays the shared `activate_hud_switch` dispatch — activation replays the pointer dispatch paths (pause/resume, speed cycle, feed toggle, menu, `route_navigation`). This also fixed the fleet outliner's keyboard block being unreachable (the navigator claimed every nav key first). Screen-reader substrate lands its first slice: `AccessibilityAnnouncer` is a bounded live-region queue (polite/assertive priorities — assertive preempts queued polite, consecutive duplicates collapse, capacity evicts oldest polite first, monotonically increasing sequence numbers) that a platform AT bridge will eventually drain; the client already consumes it two ways — `publish_notification` announces every feed item, and the pause menu announces each focused action's localized label on navigation — with pending announcements rendered through the existing voice-caption channel (`render_voice_caption` accepts a UI-announcement fallback, shown only while subtitles are enabled). Focused controls carry announcement labels: the assets navigator and fleet outliner expose `focused_label()` (control names, category headers, fleet/asset names), the HUD ring and pause menu announce localized action labels on every focus move, and the notification feed announces arrivals — all routed through the announcer. Every focus-bearing surface now exposes `focused_label()` and the dispatcher announces it on focus moves (chronicle, roster, freight modal, notifications, diplomacy, battle, economy, construction, shipyard, research, settlement, supply, inspection, startup/settings). Speech playback of announcements lands opt-in: the Voice & Subtitles panel gains a persisted "Speak interface announcements" toggle (`interfaceAnnouncements` in `voice-settings.json`; the strict schema accepts the optional key so legacy 10-key files load with it defaulting off). While enabled, each drained announcement submits a `NativeSpeechRequest` to `NativeVoicePlayback::speak` — Important priority (so chatter gating cannot swallow it), `interface` category with `ReplaceCategory` queueing (rapid navigation collapses queued speech), a per-announcement dedupe key (identical labels re-focused within the dedupe window still speak), 10-second expiry, and `interruptible` honoring `no_interruptions`; captions continue independently under the subtitles preference. Platform AT bridging lands its first slice on Windows: `NativeAccessibilityBridge` subclasses the game HWND's window procedure (the SDL message hook can only observe messages, and WM_GETOBJECT needs a return value), answers `UiaRootObjectId` requests with a minimal server-side `IRawElementProviderSimple` (pane control type, application name, absent from the control tree), and `announce()` raises `UiaRaiseNotificationEvent` (ImportantMostRecent processing) per drained announcement whenever `UiaClientsAreListening()` — the startup and campaign announcer drains both feed it; `Window::native_window_handle()` exposes the HWND read-only. Announcements carry a `Kind` (`Status`/`Focus`) — every `focused_label` site routes through `announce_focus`, and `Focus` items raise a real `UIA_AutomationFocusChangedEventId` on a synthetic `IRawElementProviderFragment` child (custom control, HasKeyboardFocus, name = focused label, Parent/FragmentRoot navigation back to the window provider, reported through `GetFocus`) instead of a live-region notification. Every focus-bearing surface also exposes focused_bounds() — the focus announcement carries the control client-pixel rect and the fragment reports it as its BoundingRectangle (client to screen projected), so magnifier/tracking AT sees real geometry. Slider focus announcements also carry a normalized AnnouncementRange — the fragment exposes an IRangeValueProvider (GetPatternProvider on the raw provider) so AT reports the sliders position in range. Focus announcements also carry an AnnouncementControl kind — the fragment maps it to a real UIA ControlType (Button/CheckBox/Edit/Slider/Group; a valid range implies Slider) so AT names the widget class, not just "custom". Audio/voice settings, the pause-menu ring and HUD chrome classify their controls; the text-field surfaces (colony-roster, chronicle, controlled-assets, research and shipyard searches plus the new-campaign seed field via the startup-workspace delegation) announce Edit, and the startup settings route forwards range/control as well as label+bounds. The previously reserved text/subtitle fields now carry live controls and consumers: General Settings gains a third accessibility row — SUBTITLES (master caption gate), SUBTITLE SIZE (0.75..2.0 preset cycle), TEXT SIZE (same presets) — persisted as `subtitlesEnabled`/`subtitleScale`/`textScale`; `render_voice_caption` takes the effective `AccessibilitySettings`, gates all caption output on `subtitles_enabled`, and multiplies the voice-preferred pixel size by `subtitle_scale` for both the in-game and startup call sites; `NativeUiLayout::set_text_scale` scales only the shared font metrics (`control/metric/heading_font_pixels`) inside `for_viewport`, enlarging text without growing chrome geometry — and the same multiplier reaches per-surface fonts through the canonical `native_ui::type` ramp: every rung and the `type::scaled` bespoke-size helper carry `text_scale`, so workspace chrome text (battle title, missions, video settings, research body/small, colony/economy via the ramp) honors the setting; in-world labels keep their fit-to-field naming-contract sizes by design (`native_ui_layout` pins the ramp multiplier). The first writable UIA pattern also landed: the focus fragment answers `IInvokeProvider` for activatable controls (Button/CheckBox/Edit/Custom — sliders stay read-only range, groups stay containers), and `Invoke()` — which UIA calls on its own worker thread — only bumps an atomic counter the owner drains once per frame (`drain_activations`) into a Return press+release injected through normal input dispatch in both the campaign update loop and the startup entry loop, so assistive activation rides the exact keyboard path including release-gated controls. `IToggleProvider` also landed: `AccessibilityAnnouncement` carries an optional `checked` state, the four CheckBox surfaces report it via `focused_toggle()` (audio mute, the five voice-settings toggles, phenomena-debug option toggles, giant-panel ring/shadow toggles), and the fragment reports On/Off/Indeterminate while `Toggle()` queues the same activation (Return toggles a focused checkbox). `IRangeValueProvider` is now writable too: `SetValue` on a slider fragment queues the requested value (latest wins), the owner drains once per frame and routes it through `set_focused_range` to whichever visible settings panel owns the focused slider (audio master/music/effects; voice volume/subtitle-background/comms-filter — all clamp to their 0..1 range and preview), and a fresh focus announcement carries the applied position back to AT. Focus announcements now re-fire on same-focus state changes too: the announce sites compare focused toggle/range state before and after each handled event (campaign loop plus the startup settings route, which also forwards checked state to the announcement), so toggling a checkbox or nudging a slider speaks the new value instead of staying silent until focus moves; the announcer dedupe compares range/checked/value fields so only real changes queue. `IValueProvider` covers the Edit controls the same way: `AccessibilityAnnouncement` carries an optional `AnnouncementValue{text, writable}`, the eight edit surfaces report their field text via `focused_value()` (chronicle/roster/assets/celestial-index/diagnostics entity+event/research/shipyard searches are writable — `set_focused_text` applies the typed-path byte cap on a code-point boundary and refilters; the setup seed field reports read-only since seeds flow through the SeedEdited intent), `SetValue` on a writable edit queues the replacement for owner routing, and read-only edits report IsReadOnly and reject writes. `IExpandCollapseProvider` covers tree rows the same way: announcements carry an optional `expanded` state, the controlled-assets category headers (effective, reveal-aware) and diagnostics entity nodes report it via `focused_expanded`, and Expand()/Collapse() queue a direction that drains through `set_focused_expanded` — the ring re-resolves onto the toggled node so focus survives the flatten rebuild. Remaining open: AT-SPI/non-Windows backends and a full fragment tree (today only the focused control is exposed). Startup-flow announcements stay caption-only for speech (the voice pipeline starts with the campaign session; the UIA bridge covers them). | `engine/…/accessibility.hpp`, `app/native_client/native_general_settings.*`, `app/native_client/native_audio_settings.*`, `app/native_client/native_video_settings.*`, `app/native_client/native_voice_settings.*`, `app/native_client/native_settings_hub.hpp`, `app/native_client/native_menu_hover.hpp`, `app/native_client/native_voice_caption.hpp`, `app/native_client/native_startup_workspace.*`, `app/native_client/native_new_game_workspace.*`, `app/native_client/native_accessibility_bridge.*` | `economy_animation`, `native_general_settings`, `native_audio_settings`, `native_video_settings`, `native_voice_settings`, `native_startup_workspace`, `native_new_game_workspace`, `native_settlement_workspace`, `native_logistics_workspace`, `native_colony_workspace`, `native_economy_workspace`, `native_shipyard_workspace`, `native_construction_workspace`, `native_research_workspace`, `native_fleet_workspace`, `native_battle_workspace`, `native_chronicle`, `native_notifications`, `native_diplomacy_workspace`, `native_colony_roster`, `native_controlled_assets`, `native_system_workspace`, `native_inspection`, `native_accessibility_bridge`, `native_developer_index` |
 | 27 | Platform layer | PARTIAL — Win32+SDL+GDI | **UNCHANGED-PARTIAL** — existing paths/atomic-write/image layer retained; `PlatformServices` (Req 28) adds the services seam. Full OS abstraction documented as follow-on. | `engine/*` | — |
 | 28 | Steam layer | MISSING | **ENGINE-COMPLETE — EXTERNAL** — `PlatformServices` facade + `NullPlatformBackend`; feature gating, user identity, achievement/presence/cloud calls. Live Steamworks SDK backend pending credentials. | `engine/…/platform_services.hpp` | `package_platform` |
 | 29 | Mod architecture | MISSING | **ENGINE-COMPLETE** — `PackageManifest` (semver, deps, provides), `PackageRegistry` (protected namespaces, deterministic topo load order, conflict reporting), `scan_packages` directory discovery. | `engine/…/package.hpp` | `package_platform` |
-| 30 | Stellar Tools | PARTIAL — dev submenu + panel | **EXTENDED** — tabbed tools host: Commands / Diagnostics (live Profiler + MemoryTracker overlays, session stats) / Saves (rolling-chain slots with integrity + preview fields). Profiler `begin/end_frame` actually wired: one frame per `scene()` call, `update`/`simulation`/`scene` spans, aggregates shown in LIVE PERFORMANCE. Entity/asset/event-log inspectors remain follow-on. | `native_developer_tools.*`, `main.cpp` | `native_developer_tools` |
+| 30 | Stellar Tools | PARTIAL — dev submenu + panel | **EXTENDED** — tabbed tools host: Commands / Diagnostics (live Profiler + MemoryTracker overlays, session stats) / Saves (rolling-chain slots with integrity + preview fields). Profiler `begin/end_frame` actually wired: one frame per `scene()` call, `update`/`simulation`/`scene` spans, aggregates shown in LIVE PERFORMANCE. The diagnostics panel gained an ENTITIES inspector — a read-only `project_campaign_world` view over the authoritative campaign (rebuilt on open/refresh, not per-frame) listing every projected entity as `domain id · tag fields ← parent` (system position, body/colony/fleet and civ-scoped refs), plus entity/parented counts and the World's `estimated_memory_bytes` container footprint. The inspector keeps one projected world and reconciles it through `sync_campaign_world` on refresh — the incremental path's first live consumer, with created/updated/destroyed/reparented drift counts in the header. | `native_developer_tools.*`, `native_developer_diagnostics.hpp`, `main.cpp` | `native_developer_tools`, `native_developer_diagnostics` |
 
 ## Foundation expansion integration into the codex native line (2026-09-20)
 

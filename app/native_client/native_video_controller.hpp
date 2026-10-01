@@ -22,7 +22,7 @@ public:
   void set_hover_callback(std::function<void()> callback){view_.set_hover_callback(std::move(callback));}
   void open();
   void set_adapter(std::string value,std::function<void()> open_panel) {view_.set_adapter(std::move(value),std::move(open_panel));}
-  void set_localization(const stellar::engine::LocalizationTable* table) noexcept{view_.set_localization(table);}
+  void set_localization(const stellar::engine::LocalizationTable* table) noexcept{locale_=table;view_.set_localization(table);}
   void close();
   void service(bool focused=true,bool renderable=true);
   bool handle(const stellar::native_map::InputEvent&,int width,int height);
@@ -30,6 +30,10 @@ public:
   void set_display_choices(std::vector<VideoDisplayChoice> choices,std::string label);
   void set_windowed_display_choices(std::vector<VideoDisplayChoice> choices);
   [[nodiscard]] bool visible()const noexcept{return view_.visible();}
+  [[nodiscard]] int focused()const noexcept{return view_.focused();}
+  [[nodiscard]] std::string focused_label(int width,int height)const{return view_.focused_label(width,height);}
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect> focused_bounds(int width,int height)const{return view_.focused_bounds(width,height);}
   [[nodiscard]] bool previewing()const noexcept{return previous_.has_value();}
   [[nodiscard]] bool backend_state_known() const noexcept{return !faulted_;}
   [[nodiscard]] const NativeVideoSettings& active()const noexcept{return active_;}
@@ -47,6 +51,7 @@ private:
   Clock::time_point deadline_;
   Clock::time_point transition_settles_;
   std::string notice_;
+  const stellar::engine::LocalizationTable* locale_{};
   bool faulted_{};
 };
 }

@@ -19,13 +19,28 @@ int main(int argc,char**argv){
     require(assets.resource()&&assets.resource()->width()==1254&&assets.resource()->height()==1254,
         "Original tactical sprite resolution was lost.");
     require(assets.transparent_pixels()>1'000'000,"Tactical sprite has lost its alpha channel.");
-    require(draw.overlay.size()==5,"Moving corvette must draw two nozzles with core and plume then hull.");
+    require(draw.overlay.size()==1,"Moving corvette emits a single lit scene.");
     const auto& image=std::get<Scene3DView>(draw.overlay.back());
-    require(image.scene->instances().size()==2&&image.destination.height==540,
-        "Ship orientation or field clipping was discarded.");
-    const auto& plume=std::get<TriangleMesh>(draw.overlay.front());
-    require(plume.vertices[1].y<sprite.center.y-60.f&&plume.clip,
-        "Rotated engine plume did not follow the stern.");
+    require(image.scene->instances().size()==4&&image.destination.height==540,
+        "Ship orientation, flames or field clipping was discarded.");
+    const auto& hull=image.scene->instances()[0];
+    require(hull.material.pbr&&hull.material.pbr->metallic>.5f&&hull.material.linear_light,
+        "Hull lost its lit PBR metal.");
+    require(hull.material.pbr->environment_strength>0.f,"Hull metal does not opt in to the environment probe.");
+    require(!image.scene->environment(),"Unbound battle scene must not fabricate an environment.");
+    const auto probe=RgbaImage::create(4,2,std::vector<std::uint8_t>(4*2*4,128));
+    assets.set_environment(probe);
+    DrawList lit;assets.append(lit,std::span{&sprite,1});
+    require(std::get<Scene3DView>(lit.overlay.back()).scene->environment()==probe,
+        "Encounter environment probe was not bound to the battle scene.");
+    assets.set_environment(nullptr);
+    const auto& plume=image.scene->instances()[2];
+    const auto& core=image.scene->instances()[3];
+    require(plume.material.transparent&&core.material.transparent&&core.material.pbr&&core.material.pbr->emissive&&core.material.pbr->emissive_strength>1.f,
+        "Engine flames lost their HDR emissive.");
+    require(plume.rotation.x==hull.rotation.x&&plume.rotation.y==hull.rotation.y&&plume.rotation.z==hull.rotation.z&&plume.rotation.w==hull.rotation.w,"Engine plume no longer follows the hull heading.");
+    for(const auto& vertex:plume.mesh->vertices())
+      require(vertex.position.x<-.4f,"Engine plume did not follow the stern.");
     sprite.moving=false;DrawList parked;assets.append(parked,std::span{&sprite,1});
     require(parked.overlay.size()==1,"Stationary corvette must not emit propulsion flames.");
     require(std::get<Scene3DView>(parked.overlay.front()).scene->instances().front().mesh==image.scene->instances().front().mesh,"Ship instances decoded duplicate resources.");

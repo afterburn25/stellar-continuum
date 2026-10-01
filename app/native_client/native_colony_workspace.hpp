@@ -6,6 +6,7 @@
 
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 
 #include <optional>
 #include <functional>
@@ -50,6 +51,26 @@ public:
   [[nodiscard]] const auto& freight_preview() const noexcept { return freight_preview_; }
 
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  // Effective focus index: the freight modal's own ring while it is open,
+  // the planetary screen's hit-registry ring otherwise.
+  [[nodiscard]] int focus() const noexcept {
+    return freight_preview_ ? focus_ : planetary_.focus();
+  }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused. Outside the freight modal the
+  // planetary screen's focused control reports.
+  [[nodiscard]] std::string focused_label() const;
+  // Client-pixel rect of the ringed control — the freight modal's rect
+  // while it is open, the planetary hit rect otherwise. Null when nothing
+  // is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
+  // UIA control kind of the ringed control — all planetary/freight
+  // controls are buttons.
+  [[nodiscard]] stellar::engine::AnnouncementControl focused_control() const {
+    return focus() >= 0 ? stellar::engine::AnnouncementControl::Button
+                        : stellar::engine::AnnouncementControl::Custom;
+  }
   [[nodiscard]] const std::optional<stellar::native_colony::NativeColonyView> &
   view() const noexcept {
     return view_;
@@ -71,8 +92,9 @@ private:
   std::optional<stellar::native_colony::NativeOutpostFreightPreview> freight_preview_;
   std::string freight_text_;
   std::function<stellar::native_map::TextExtent(const stellar::native_map::Text&)> measure_;
-  mutable float freight_scroll_{};
+  mutable stellar::engine::ScrollView freight_scroll_{};
   ColonyWorkspaceCommandKind freight_pressed_{ColonyWorkspaceCommandKind::None};
+  int focus_{-1};
   [[nodiscard]] float freight_content_height(const ColonyWorkspaceLayout&) const;
 };
 

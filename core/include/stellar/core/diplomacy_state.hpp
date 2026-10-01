@@ -285,6 +285,13 @@ public:
   [[nodiscard]] std::vector<TerritorialClaimSnapshot>
   territorial_claims(std::optional<int> observer = std::nullopt) const;
   [[nodiscard]] DiplomacyStateSnapshot snapshot() const;
+  // Bounded journal tail for chronicle consumers: the newest recorded
+  // event id (0 when the journal is empty) and the events recorded
+  // after `event_id`, in ascending id order. Lets consumers watermark
+  // per advance without copying the whole diplomatic state.
+  [[nodiscard]] std::int64_t history_latest_event_id() const noexcept;
+  [[nodiscard]] std::vector<DiplomaticHistoryEventSnapshot>
+  history_events_since(std::int64_t event_id) const;
 
   // Low-level historical conversion matching DiplomacyState.Restore. This is
   // intentionally permissive and is separate from the later strict player-save

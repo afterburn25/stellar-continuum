@@ -18,8 +18,8 @@ namespace stellar::native_planets {
 using namespace stellar::native_map;
 using stellar::core::PlanetAppearance;
 struct MaterialSet {
-  std::string identity;std::shared_ptr<const RgbaImage> albedo,normal,properties,emission,night,rings,portrait;
-  std::size_t bytes()const{std::size_t n=0;for(const auto& p:{albedo,normal,properties,emission,night,rings,portrait})if(p)n+=p->byte_size();return n;}
+  std::string identity;std::shared_ptr<const RgbaImage> albedo,normal,properties,emission,night,rings,portrait,cloud,metallic_roughness;
+  std::size_t bytes()const{std::size_t n=0;for(const auto& p:{albedo,normal,properties,emission,night,rings,portrait,cloud,metallic_roughness})if(p)n+=p->byte_size();return n;}
 };
 inline std::string material_cache_identity(const PlanetAppearance&);
 using MaterialProvider=std::function<std::shared_ptr<const MaterialSet>(const PlanetAppearance&,int)>;
@@ -106,7 +106,35 @@ inline MaterialSet procedural(const PlanetAppearance& a,int width){
     emission[at]=255;emission[at+1]=103;emission[at+2]=14;emission[at+3]=static_cast<std::uint8_t>(lava*255);
   }
   MaterialSet m;m.albedo=RgbaImage::create(width,height,std::move(color));m.properties=RgbaImage::create(width,height,std::move(props));m.normal=RgbaImage::create(1,1,{128,128,255,255});
-  if(a.emission_strength>0)m.emission=RgbaImage::create(width,height,std::move(emission));return m;
+  if(a.emission_strength>0)m.emission=RgbaImage::create(width,height,std::move(emission));
+  // Cloud deck for atmosphere-bearing procedurals: alpha is cover fraction,
+  // RGB a neutral sunlit deck — the renderer reads the same contract as the
+  // authored clouds.png maps. Driven by the authoritative cloud_opacity.
+  if(!gas&&a.atmosphere.cloud_opacity>0){
+    std::vector<std::uint8_t> clouds(static_cast<std::size_t>(width)*height*4);
+    for(int y=0;y<height;++y)for(int x=0;x<width;++x){
+      const float lat=(.5f-(y+.5f)/height)*pi,lon=((x+.5f)/width-.5f)*2*pi,nx=std::cos(lat)*std::sin(lon),ny=std::sin(lat),nz=std::cos(lat)*std::cos(lon);
+      const float n=surface_noise(nx*1.7f,ny*1.7f,nz*1.7f,seed+9.f)+.45f*surface_noise(nx*4.3f,ny*4.3f,nz*4.3f,seed+23.f);
+      const float cover=std::clamp((n-.38f)*2.4f,0.f,1.f);const auto at=(static_cast<std::size_t>(y)*width+x)*4;
+      clouds[at]=clouds[at+1]=clouds[at+2]=236;clouds[at+3]=static_cast<std::uint8_t>(cover*255);
+    }
+    m.cloud=RgbaImage::create(width,height,std::move(clouds));
+  }
+  return m;
+}
+// Repack the authored properties map's roughness channel into the glTF
+// metallic-roughness layout (G=roughness, B=metallic): worlds are
+// dielectric, so B stays 0 while per-pixel roughness survives the PBR path.
+inline std::shared_ptr<const RgbaImage> pbr_metallic_roughness(
+    const std::shared_ptr<const RgbaImage>& properties){
+  if(!properties)return {};
+  const int w=properties->width(),h=properties->height();
+  std::vector<std::uint8_t> pixels(static_cast<std::size_t>(w)*h*4);
+  const auto& src=properties->pixels();
+  for(std::size_t i=0;i<static_cast<std::size_t>(w)*h;++i){
+    pixels[i*4]=0;pixels[i*4+1]=src[i*4];pixels[i*4+2]=0;pixels[i*4+3]=255;
+  }
+  return RgbaImage::create(w,h,std::move(pixels));
 }
 inline MaterialSet load_material(const std::filesystem::path& root,const PlanetAppearance& a,int width){
   stellar::core::validate_planet_appearance(a);MaterialSet m;
@@ -118,20 +146,22 @@ inline MaterialSet load_material(const std::filesystem::path& root,const PlanetA
     m.albedo=resize_map(decode_rgba_image(dir/"albedo.png",width),width);m.normal=resize_map(decode_rgba_image(dir/"normal.png",width),width);m.properties=resize_map(decode_rgba_image(dir/"properties.png",width),width);
   }else if(a.source_asset_id.starts_with("sol:")){
     const auto key=a.source_asset_id.substr(4);
-    for(int layer=0;layer<2;++layer){const auto index=stellar::native_system_ui::planet_surface_asset_index(key,layer);if(!index)continue;
+    for(int layer=0;layer<3;++layer){const auto index=stellar::native_system_ui::planet_surface_asset_index(key,layer);if(!index)continue;
       auto image=resize_map(decode_rgba_image(root/"sol"/stellar::native_system_ui::planet_surface_assets[*index].filename,width),width);
-      if(layer){auto pixels=image->pixels();for(std::size_t i=0;i<pixels.size();i+=4){const float v=std::max({pixels[i],pixels[i+1],pixels[i+2]})/255.f;pixels[i+3]=static_cast<std::uint8_t>(std::clamp((v-.1f)*1.08f,0.f,1.f)*255);}image=RgbaImage::create(image->width(),image->height(),std::move(pixels));}
-      (layer==0?m.albedo:m.night)=std::move(image);
+      if(layer){auto pixels=image->pixels();for(std::size_t i=0;i<pixels.size();i+=4){const float v=std::max({pixels[i],pixels[i+1],pixels[i+2]})/255.f;pixels[i+3]=static_cast<std::uint8_t>(std::clamp((v-.1f)*1.08f,0.f,1.f)*255);}if(layer==2)for(std::size_t i=0;i<pixels.size();i+=4)pixels[i]=pixels[i+1]=pixels[i+2]=240;image=RgbaImage::create(image->width(),image->height(),std::move(pixels));}
+      (layer==0?m.albedo:layer==1?m.night:m.cloud)=std::move(image);
     }
     if(!m.albedo)m=procedural(a,width);
   }else if(a.source_asset_id.empty())m=procedural(a,width);
   else{const auto dir=root/"planets"/a.material_id;
     const auto read=[&](const char* name){return resize_map(decode_rgba_image(dir/(std::string(name)+".png"),width),width);};
     m.albedo=read("albedo");m.normal=read("normal");m.properties=read("properties");
-    // Supplied surface identity is retained. No extracted or generated cloud
-    // overlay is loaded, including for old saves with nonzero cloud opacity.
+    // Canonical cloud decks ship with every authored material; the alpha
+    // channel carries cover and the RGB the lit deck the renderer shows.
+    m.cloud=read("clouds");
     if(a.emission_strength>0)m.emission=read("emission");
   }
+  m.metallic_roughness=pbr_metallic_roughness(m.properties);
   if(a.rings.enabled&&a.rings.version==1){
     const auto source=resize_map(decode_rgba_image(root/"rings"/a.rings.asset_id/"radial.png",std::max(256,width)),std::max(256,width));auto pixels=source->pixels();
     const double reflectance=.35+.65*std::sqrt(a.rings.reflectivity);
@@ -204,19 +234,85 @@ inline void append_instances(std::vector<MeshInstance3D>& out,const PlanetAppear
   }
   const auto lit=[&](Material3D& m){m.linear_light=true;m.light_direction=rotate_light(view,light.direction);m.light_color=light.color;m.light_intensity=light.intensity;m.additional_lights=light.additional;for(auto& l:m.additional_lights)l.direction=rotate_light(view,l.direction);};
   auto external_shadow=light.eclipse;if(external_shadow){auto& s=*external_shadow;const auto offset=rotate_light(view,{static_cast<float>(s.position.x),static_cast<float>(s.position.y),static_cast<float>(s.position.z)});s.position={p.x+offset.x*radius,p.y+offset.y*radius,p.z+offset.z*radius};s.scale*=radius;s.rotation=compose_rotation(view,s.rotation);}
+  using enum stellar::core::PlanetClass;
+  const bool giant=a.primary_class==GasGiant||a.primary_class==IceGiant||a.primary_class==MiniNeptune||a.primary_class==HotJupiter;
   Material3D material;material.texture=maps.albedo;material.ambient=night?.008f:.045f;material.diffuse=night?.12f:.95f;lit(material);material.shadow=external_shadow?external_shadow:ring_shadow;
-  if(lod>128&&maps.normal&&maps.properties){SurfaceResponse3D s;s.normal=maps.normal;s.properties=maps.properties;s.normal_strength=.35f;s.relief=static_cast<float>(a.terrain_height);s.cloud_opacity=0;material.surface_response=s;}
+  // Giant band textures stretch along longitude — anisotropic sampling keeps
+  // the authored stripes resolved at the grazing limb instead of blurring
+  // into mush (engine drops the sampler at Low quality anyway).
+  material.anisotropic_texture=giant;
+  // Globe-zoom LODs magnify authored albedo texels — Catmull-Rom
+  // reconstruction keeps close-up surfaces smooth without touching
+  // the canonical source art (minification path untouched).
+  material.cubic_magnification=lod>=512;
+  // Wrap-diffuse terminator: deep atmospheres soften the day/night edge,
+  // airless bodies keep the hard Lambert falloff.
+  material.terminator_wrap=giant?.42f:std::clamp(static_cast<float>(a.atmosphere.density)*.45f,0.f,.38f);
+  // Dynamic cloud decks are intentionally not rendered here: authored
+  // albedo already carries the canonical cloud cover and the material
+  // tests require append_instances to emit no extra cloud geometry/shadow
+  // in any display LOD (see native_planet_materials "no extra clouds").
+  if(lod>128&&maps.normal&&maps.properties){SurfaceResponse3D s;s.normal=maps.normal;s.properties=maps.properties;s.normal_strength=.35f;s.relief=std::clamp(static_cast<float>(a.terrain_height),0.f,.02f);s.cloud_opacity=0;material.surface_response=s;}
+  {
+    PbrSurface3D pbr;pbr.metallic_roughness=maps.metallic_roughness;
+    // Scalar factor multiplies the packed map's authored roughness;
+    // metallic stays 0 — every world shades as a dielectric.
+    pbr.roughness=giant?.8f:.95f;
+    // Opt in to the scene environment slot: when the host binds a local
+    // nebula composite, surrounding clouds wash the diffuse/specular IBL
+    // response. Restrained so the star key light stays dominant.
+    pbr.environment_strength=.32f;
+    if(maps.night&&inhabited){pbr.emissive=maps.night;pbr.emissive_strength=1.35f;pbr.night_emissive=1.f;}
+    material.pbr=pbr;
+  }
+  if(a.atmosphere.density>.01&&lod>128){
+    const auto& c=a.atmosphere.color;
+    Atmosphere3D atmo;
+    atmo.tint={static_cast<float>(c[0]),static_cast<float>(c[1]),static_cast<float>(c[2])};
+    atmo.strength=std::clamp(static_cast<float>(a.atmosphere.density)*1.5f,.15f,2.6f);
+    atmo.power=3.2f;atmo.night_floor=.045f;
+    // Terminator-transmitted dusk tint follows the key light's own color.
+    atmo.sunset={.92f*light.color.x+.08f,.45f*light.color.y+.05f,.14f*light.color.z+.02f};
+    atmo.sunset_strength=.5f;
+    material.atmosphere=atmo;
+  }
+  if(giant){
+    // Per-class zonal-band animation; the authoritative storm activity
+    // scales wave and turbulence terms on top of the class baseline.
+    const float storm=std::clamp(.5f+static_cast<float>(a.giant.storm_activity),0.f,1.3f);
+    switch(a.primary_class){
+    case HotJupiter:material.band_shear=-.3f;material.band_waves=.55f;material.band_drift=.11f;material.band_diff=2.6f;material.band_turbulence=1.5f;break;
+    case IceGiant:material.band_shear=-.09f;material.band_waves=.3f;material.band_drift=.02f;material.band_diff=.7f;material.band_turbulence=.35f;break;
+    case MiniNeptune:material.band_shear=-.14f;material.band_waves=.45f;material.band_drift=.035f;material.band_diff=1.1f;material.band_turbulence=.55f;break;
+    default:material.band_shear=-.24f;material.band_waves=.8f;material.band_drift=.055f;material.band_diff=1.8f;material.band_turbulence=.8f;break;
+    }
+    material.band_waves=std::clamp(material.band_waves*storm,0.f,1.f);material.band_turbulence=std::clamp(material.band_turbulence*storm,0.f,8.f);
+  }
   out.push_back({mesh,p,rotation,radius,material});
   if(maps.emission){Material3D m;m.texture=maps.emission;m.ambient=1;m.diffuse=0;m.transparent=true;m.opacity=static_cast<float>(a.emission_strength);out.push_back({mesh,p,rotation,radius*1.0001f,m});}
-  if(maps.night&&inhabited){Material3D m;m.texture=maps.night;m.ambient=1;m.diffuse=0;m.transparent=true;m.dark_side_strength=night?0:1.5f;lit(m);out.push_back({mesh,p,rotation,radius*1.0002f,m});}
-  if(a.atmosphere.density>.01&&lod>128){Material3D m;const auto& c=a.atmosphere.color;m.tint={static_cast<std::uint8_t>(255*c[0]),static_cast<std::uint8_t>(255*c[1]),static_cast<std::uint8_t>(255*c[2]),255};m.transparent=true;m.opacity=static_cast<float>(a.atmosphere.density*.42);m.rim_power=3.4f;m.ambient=.08f;m.diffuse=.92f;lit(m);m.shadow=external_shadow?external_shadow:ring_shadow;out.push_back({mesh,p,rotation,radius*(1.012f+static_cast<float>(a.atmosphere.haze)*.035f),m});}
   if(ring_shadow){
     static std::map<std::array<int,4>,std::shared_ptr<const Mesh3D>> rings;
     const int segments=lod<=128?64:lod<=256?128:512,depth=std::max(1,static_cast<int>(std::lround(a.rings.thickness*1000000)));const std::array cache_key{ring_key.first,ring_key.second,segments,depth};
     if(!rings.contains(cache_key)){if(rings.size()>=64)rings.erase(rings.begin());rings[cache_key]=annulus_mesh(ring_key.first*.01f,ring_key.second*.01f,segments,depth*.000001f);}
     AnalyticShadow3D s;s.position=p;s.rotation=rotation;s.scale=radius;
     s.radii={1,planet_polar_radius(a.oblateness),1};
-    Material3D m;m.texture=maps.rings;m.ambient=.17f;m.diffuse=.8f;m.transparent=true;m.double_sided=false;m.two_sided_diffuse=true;m.anisotropic_texture=true;lit(m);m.shadow=s;
+    Material3D m;m.texture=maps.rings;m.ambient=.17f;m.diffuse=.8f;m.transparent=true;m.double_sided=false;m.two_sided_diffuse=true;m.anisotropic_texture=true;m.cubic_magnification=lod>=512;
+    // Dusty sheets brighten when backlit — the HG forward lobe scaled by the
+    // ring's authoritative reflectivity (icy stays near neutral, dusty
+    // diffuse rings pick up the Saturn E-ring look).
+    m.forward_scatter=.2f+.45f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
+    // Real dust phase functions carry a second, broader lobe — icy sheets
+    // pick up a mild opposition component away from the forward peak.
+    m.forward_scatter_back=-.3f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
+    m.forward_scatter_back_mix=.4f;
+    // Rayleigh weight: small ice grains scatter blue — bright icy sheets
+    // pick up the (450/lambda)^4 tilt while dark rocky rings stay near
+    // achromatic. Luminance is preserved; only the hue redistributes.
+    m.forward_scatter_hue=.15f+.5f*std::clamp(static_cast<float>(a.rings.reflectivity),0.f,1.f);
+    // Ring grains orbit the planet: a restrained doppler asymmetry plus its
+    // paired tint gives the approaching lane a subtle bright/blue edge.
+    m.orbital_beaming=.08f;m.orbital_beaming_tint=.4f;
+    lit(m);m.shadow=s;
     out.push_back({rings[cache_key],p,ring_rotation,radius,m});
   }
 }

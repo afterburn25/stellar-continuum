@@ -1,6 +1,8 @@
 #include <stellar/engine/native_ui_skin.hpp>
 #include "native_campaign_calendar.hpp"
+#include "native_settlement_messages.hpp"
 #include "native_settlement_workspace.hpp"
+#include "native_ui_theme.hpp"
 
 #include <stellar/core/colonization_runtime.hpp>
 
@@ -69,8 +71,21 @@ std::string NativeSettlementWorkspace::trf(
 }
 
 void NativeSettlementWorkspace::reset_gesture() noexcept { pointer_owned_=false; pressed_=PressTarget::None; press_width_=press_height_=0; }
-void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();preview_=std::move(value);}
-void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};reset_gesture();}
+void NativeSettlementWorkspace::set_preview(NativeSettlementTargetPreview value){reset_gesture();focus_=-1;preview_=std::move(value);}
+void NativeSettlementWorkspace::clear()noexcept{preview_.reset();pointer_={};focus_=-1;reset_gesture();}
+std::string NativeSettlementWorkspace::focused_label() const {
+  if (focus_ < 0) return {};
+  return focus_ == 0 ? tr("SETTLE_CANCEL", "Cancel")
+                     : tr("SETTLE_CONFIRM", "Confirm mission");
+}
+
+std::optional<UiRect>
+NativeSettlementWorkspace::focused_bounds(int width, int height) const {
+  if (focus_ < 0) return std::nullopt;
+  const auto layout = SettlementWorkspaceLayout::for_viewport(width, height);
+  return focus_ == 0 ? std::optional<UiRect>{layout.cancel}
+                     : std::optional<UiRect>{layout.confirm};
+}
 
 SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&event,int width,int height){
   if(!preview_)return {};
@@ -79,8 +94,30 @@ SettlementWorkspaceCommand NativeSettlementWorkspace::handle(const InputEvent&ev
   const auto layout=SettlementWorkspaceLayout::for_viewport(width,height);
   if(event.type==InputEventType::PointerCancelled){reset_gesture();return {SettlementWorkspaceCommandKind::None,true};}
   if(pointer_owned_&&(width!=press_width_||height!=press_height_)){reset_gesture();}
+  if(event.type==InputEventType::KeyPressed&&event.key){
+    // SDL_Keycode: Tab/arrows move the ring, Return/Space replay the click
+    // gesture. Confirm is unreachable while the preview rejects the target.
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u;
+    constexpr std::uint32_t kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u;
+    constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
+    const int count=preview_->accepted?2:1;
+    const bool fwd=(event.key==kTab&&!event.shift)||event.key==kRight||event.key==kDown;
+    const bool bwd=(event.key==kTab&&event.shift)||event.key==kLeft||event.key==kUp;
+    if(event.key==kHome||event.key==kEnd)focus_=event.key==kHome?0:count-1;
+    else if(fwd||bwd)focus_=focus_<0?(bwd?count-1:0):(focus_+(bwd?-1:1)+count)%count;
+    else if((event.key==kReturn||event.key==kSpace)&&focus_>=0){
+      const auto&rect=focus_==0?layout.cancel:layout.confirm;
+      InputEvent press{InputEventType::LeftPressed},release{InputEventType::LeftReleased};
+      press.position=release.position={rect.x+rect.width*.5f,rect.y+rect.height*.5f};
+      const int keep=focus_;static_cast<void>(handle(press,width,height));
+      auto command=handle(release,width,height);
+      if(preview_)focus_=keep;return command;
+    }
+    return {SettlementWorkspaceCommandKind::None,true};
+  }
   if(event.type==InputEventType::LeftPressed){
     if(!layout.panel.contains(event.position))return {SettlementWorkspaceCommandKind::None,true};
+    focus_=-1;
     pointer_owned_=true;press_width_=width;press_height_=height;
     pressed_=layout.cancel.contains(event.position)?PressTarget::Cancel:
              (layout.confirm.contains(event.position)&&preview_->accepted?PressTarget::Confirm:PressTarget::None);
@@ -119,10 +156,10 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
     add(p.candidate->body_name+"  /  "+p.candidate->system_name,text_color,layout.title_font,36.f*layout.scale);
     add(trf(p.requires_new_authorization?"SETTLE_AUTH_NEW":"SETTLE_AUTH_RETAINED",{p.formatted_authorization},p.requires_new_authorization?"New authorization  {0}":"Retarget authorization retained  ·  New charge  {0}"));
     add(trf("SETTLE_TREASURY",{p.formatted_treasury},"Current treasury  {0}"));
-    add(trf("SETTLE_ROUTE",{stellar::core::format_interstellar_metric_primary(p.candidate->reach.route_distance_light_years)},"Route distance  {0}"));
+    add(trf("SETTLE_ROUTE",{stellar::native_settlement::localized_metric(locale_,stellar::core::format_interstellar_metric_primary(p.candidate->reach.route_distance_light_years))},"Route distance  {0}"));
     if(p.candidate->reach.route_system_ids)add(trf("SETTLE_LANES",{std::to_string(p.candidate->reach.route_system_ids->size()>0?p.candidate->reach.route_system_ids->size()-1:0)},"Confirmed lane route  {0} hop(s)"));
     add(tr("SETTLE_ETA_UNKNOWN","Travel duration estimate unavailable"),muted,layout.small_font);
-    add(trf("SETTLE_ESTABLISH",{stellar::native_campaign::format_campaign_duration(establishment_days(p.kind))},"Establishment after arrival  {0}"));
+    add(trf("SETTLE_ESTABLISH",{stellar::native_campaign::format_campaign_duration_localized(locale_,establishment_days(p.kind))},"Establishment after arrival  {0}"));
     if(p.kind==NativeSettlementMissionKind::Colony){
       add(trf("SETTLE_HABITABILITY",{number(p.candidate->natural_habitability*100.,1),number(p.candidate->unprotected_operational_capacity*100.,1)},"Natural habitability  {0}%  |  Operational capacity  {1}%"));
     }else{
@@ -133,5 +170,6 @@ void NativeSettlementWorkspace::render(DrawList&out,int width,int height)const{
   label(out,{x,y,content_w,55.f*layout.scale},p.message,p.accepted?good:bad,layout.small_font);
   stellar::engine::ui_skin::control(out,layout.cancel,layout.cancel.contains(pointer_),false,true,layout.scale);label(out,layout.cancel,tr("SETTLE_CANCEL","CANCEL"),text_color,layout.body_font,TextAlign::Center);
   const auto can_confirm=p.accepted;stellar::engine::ui_skin::control(out,layout.confirm,layout.confirm.contains(pointer_),true,can_confirm,layout.scale);label(out,layout.confirm,tr("SETTLE_CONFIRM","CONFIRM MISSION"),can_confirm?text_color:muted,layout.body_font,TextAlign::Center);
+  if(focus_>=0)stellar::native_ui::focus_ring(out,focus_==0?layout.cancel:layout.confirm);
 }
 } // namespace stellar::native_colony_ui

@@ -1,15 +1,20 @@
 #include "native_video_controller.hpp"
+#include <stellar/engine/localization.hpp>
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
 
 namespace stellar::native_video_settings {
 namespace {
-std::string panel_notice(const std::string& detail,bool failed){
-  if(failed)return "Display recovery failed. Restart the game. Preferences were not saved.";
-  if(detail.find("were not saved")!=std::string::npos)return "Could not save this change. Previous display settings restored.";
-  if(detail.find("Safe display")!=std::string::npos)return "Display change failed. Safe settings restored; preferences unchanged.";
-  if(detail.find("rejected")!=std::string::npos)return "Display change rejected. Previous settings restored.";
+std::string notice_text(const stellar::engine::LocalizationTable* locale,std::string_view key,std::string_view fallback){
+  if(locale&&locale->contains(key))return std::string(locale->translate(key));
+  return std::string(fallback);
+}
+std::string panel_notice(const stellar::engine::LocalizationTable* locale,const std::string& detail,bool failed){
+  if(failed)return notice_text(locale,"SETTINGS_VIDEO_NOTICE_RECOVERY","Display recovery failed. Restart the game. Preferences were not saved.");
+  if(detail.find("were not saved")!=std::string::npos)return notice_text(locale,"SETTINGS_VIDEO_NOTICE_SAVE","Could not save this change. Previous display settings restored.");
+  if(detail.find("Safe display")!=std::string::npos)return notice_text(locale,"SETTINGS_VIDEO_NOTICE_SAFE","Display change failed. Safe settings restored; preferences unchanged.");
+  if(detail.find("rejected")!=std::string::npos)return notice_text(locale,"SETTINGS_VIDEO_NOTICE_REJECTED","Display change rejected. Previous settings restored.");
   return detail;
 }
 }
@@ -25,7 +30,7 @@ NativeVideoController::~NativeVideoController(){
   if(previous_)try{restore("Display preview closed.");}catch(...){/* backend lifetime remains host-owned */}
 }
 void NativeVideoController::show_error(std::string reason){
-  notice_=std::move(reason);view_.open(active_);view_.set_error(panel_notice(notice_,faulted_));
+  notice_=std::move(reason);view_.open(active_);view_.set_error(panel_notice(locale_,notice_,faulted_));
   std::cerr<<"Video settings: "<<notice_<<'\n';
 }
 void NativeVideoController::recover(std::string reason){
@@ -36,7 +41,7 @@ void NativeVideoController::recover(std::string reason){
   catch(const std::exception& error){faulted_=true;reason+=" Display state is unknown. Restart the game. Recovery failed: ";reason+=error.what();}
   previous_.reset();show_error(std::move(reason));
 }
-void NativeVideoController::open(){view_.open(active_);view_.set_error(panel_notice(notice_,faulted_));}
+void NativeVideoController::open(){view_.open(active_);view_.set_error(panel_notice(locale_,notice_,faulted_));}
 void NativeVideoController::close(){if(previous_)restore("Display preview cancelled.");view_.close();}
 void NativeVideoController::restore(std::string reason){
   if(!previous_)return;

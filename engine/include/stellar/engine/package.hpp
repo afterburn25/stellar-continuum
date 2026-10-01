@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -87,5 +88,33 @@ private:
 std::size_t scan_packages(PackageRegistry &registry,
                           const std::string &directory,
                           std::vector<std::string> *errors = nullptr);
+
+// Result of verifying a world save's recorded package manifest against the
+// currently resolved load plan. `extra_packages` is informational — content
+// added since the save is not a compatibility failure. Saves predating the
+// manifest format verify as manifest_present=false (unknown, not broken).
+struct SavePackageReport {
+  bool manifest_present{};
+  std::vector<std::string> missing_packages;   // recorded, not loaded now
+  std::vector<std::string> extra_packages;     // loaded now, not recorded
+  // "id: recorded X.Y.Z != current A.B.C"
+  std::vector<std::string> version_mismatches;
+  bool compatible() const {
+    return missing_packages.empty() && version_mismatches.empty();
+  }
+};
+
+// Writes "<save>.packages.json" recording the resolved load plan — the
+// content set a world save was produced under. A torn write degrades to a
+// manifest that fails to parse, i.e. unknown rather than incompatible.
+void write_save_package_manifest(const std::filesystem::path &save_path,
+                                 const PackageLoadPlan &plan);
+
+// Reads the recorded manifest (absent or corrupt -> manifest_present=false)
+// and diffs it against the current plan. Report-only: callers decide whether
+// an incompatible save may still load.
+SavePackageReport
+verify_save_package_manifest(const std::filesystem::path &save_path,
+                             const PackageLoadPlan &plan);
 
 } // namespace stellar::engine

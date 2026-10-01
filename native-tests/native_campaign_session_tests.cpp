@@ -542,6 +542,8 @@ void background_manual_save(const fs::path &research_root,
   require(calls.load() == 2 && session->notice().kind == SessionNoticeKind::Saved &&
               session->notice().message == "Saved campaign" && read(path) == expected_latest,
           "Coalesced/retried manual save did not persist the exact latest capture.");
+  require(session->notice().message_key == "SESSION_NOTICE_SAVED",
+          "Saved notice did not carry its localization key.");
 }
 
 void failed_frame_clears_save_readiness(const fs::path &research_root,
@@ -572,7 +574,8 @@ void failed_frame_clears_save_readiness(const fs::path &research_root,
   require(writer_calls.load() == 0 && !session->exit_ready() &&
               session->notice().kind == SessionNoticeKind::Failure &&
               session->notice().message.find("until a campaign frame completes") !=
-                  std::string::npos,
+                  std::string::npos &&
+              session->notice().message_key == "SESSION_NOTICE_SAVE_UNAVAILABLE",
           "Failed frame retained stale manual save readiness.");
 }
 

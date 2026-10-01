@@ -1,7 +1,9 @@
 #include "native_notification_events.hpp"
 #include "native_campaign_calendar.hpp"
+#include "native_chronicle.hpp"
 #include <algorithm>
 #include <array>
+#include <limits>
 #include <stdexcept>
 
 namespace stellar::native_notifications {
@@ -20,6 +22,20 @@ const char* diplomatic_message(core::DiplomaticEventKind kind){
   default:return nullptr;
   }
 }
+const char* diplomatic_message_key(core::DiplomaticEventKind kind){
+  using enum core::DiplomaticEventKind;
+  switch(kind){
+  case contact_established:return "NOTIFY_DIP_CONTACT";
+  case communication_available:return "NOTIFY_DIP_CHANNEL";
+  case proposal_sent:return "NOTIFY_DIP_PROPOSAL_SENT";
+  case proposal_accepted:return "NOTIFY_DIP_PROPOSAL_ACCEPTED";
+  case proposal_rejected:return "NOTIFY_DIP_PROPOSAL_REJECTED";
+  case agreement_activated:return "NOTIFY_DIP_AGREEMENT_ACTIVE";
+  case agreement_terminated:return "NOTIFY_DIP_AGREEMENT_ENDED";
+  case war_declared:return "NOTIFY_DIP_WAR";
+  default:return nullptr;
+  }
+}
 }
 void publish_campaign_notifications(NativeNotificationFeed& feed,
     const native_campaign_feedback::CampaignFeedbackSummary& summary,double day){
@@ -28,14 +44,68 @@ void publish_campaign_notifications(NativeNotificationFeed& feed,
   constexpr std::array<const char*,7> messages{
       "Research report available","Construction complete","Ship complete",
       "Survey complete","Contact detected","Settlement established","Combat alert"};
+  constexpr std::array<const char*,7> keys{
+      "NOTIFY_MSG_RESEARCH","NOTIFY_MSG_CONSTRUCTION","NOTIFY_MSG_SHIP",
+      "NOTIFY_MSG_SURVEY","NOTIFY_MSG_CONTACT","NOTIFY_MSG_SETTLEMENT",
+      "NOTIFY_MSG_COMBAT"};
+  constexpr std::array<NotificationSeverity,7> severities{
+      NotificationSeverity::Info,NotificationSeverity::Positive,
+      NotificationSeverity::Positive,NotificationSeverity::Positive,
+      NotificationSeverity::Caution,NotificationSeverity::Positive,
+      NotificationSeverity::Alert};
   static_assert(categories.size()==native_campaign_feedback::feedback_kind_count);
   const auto date=native_campaign::format_campaign_date(day);
   for(std::size_t index=0;index<categories.size();++index){
     const auto count=summary.counts[index];
     if(!count)continue;
-    auto message=std::string(messages[index]);
-    if(count>1)message+=" ("+std::to_string(count)+")";
-    feed.publish(categories[index],date,std::move(message));
+    std::string suffix;
+    if(count>1)suffix=" ("+std::to_string(count)+")";
+    auto message=std::string(messages[index])+suffix;
+    feed.publish(categories[index],date,std::move(message),
+                 std::nullopt,std::nullopt,keys[index],std::move(suffix),
+                 severities[index]);
+  }
+}
+
+void seed_chronicle_notifications(NativeNotificationFeed& feed,
+    const engine::EventHistory& history,int observer_civilization_id,
+    std::size_t max_entries){
+  // Report floor: the category vocabulary assigns high-volume trivia
+  // (war.damage_applied 0.1, signature/system detections <=0.3,
+  // survey_started 0.2) below it — the feed is for reports, not noise.
+  const auto events=history.feed(
+      static_cast<std::uint64_t>(observer_civilization_id),
+      -std::numeric_limits<double>::infinity(),chronicle_seed_min_significance);
+  const auto begin=events.size()>max_entries?events.end()-max_entries
+                                           :events.begin();
+  const auto observer=static_cast<std::uint64_t>(observer_civilization_id);
+  for(auto it=begin;it!=events.end();++it){
+    const auto* event=*it;
+    // Keep the raw engine category on the entry so the display path can
+    // recompose localized history summaries (the public `category` carries
+    // the publisher label the chips and topic cycle expect).
+    const char* label=native_chronicle::category_label(event->category);
+    // Located reports get a VIEW SYSTEM action — the feed() projection
+    // already confined them to the observer's authorized visibility.
+    std::optional<int> system;
+    if(event->location)system=static_cast<int>(event->location);
+    // Exactly one foreign actor → the report can offer OPEN RELATIONS,
+    // same rule the chronicle browser uses for its DIP action. The
+    // diplomacy workspace's own identification check still gates what
+    // the contact actually shows.
+    std::uint64_t foreign=0;
+    for(const auto id:event->actors)
+      if(id!=observer){
+        if(foreign!=0&&foreign!=id){foreign=0;break;}
+        foreign=id;
+      }
+    const std::optional<int> counterpart=
+        foreign?std::optional<int>(static_cast<int>(foreign)):std::nullopt;
+    feed.publish(label?std::string(label):event->category,
+        native_campaign::format_campaign_date(event->at_day),
+        event->summary,counterpart,system,{},{},
+        event->category.starts_with("war.")?NotificationSeverity::Alert
+            :NotificationSeverity::Info,std::string(event->category));
   }
 }
 
@@ -70,10 +140,20 @@ void NativeDiplomaticNotifications::harvest(NativeNotificationFeed& feed,
       if(event.primary_civilization_id==observer_)counterpart=event.secondary_civilization_id;
       else if(event.secondary_civilization_id==observer_)counterpart=event.primary_civilization_id;
     }
+    using enum core::DiplomaticEventKind;
+    const auto severity=
+        event.kind==war_declared?NotificationSeverity::Alert
+        :event.kind==proposal_rejected||event.kind==agreement_terminated
+            ?NotificationSeverity::Caution
+        :event.kind==proposal_accepted||event.kind==agreement_activated||
+             event.kind==contact_established?NotificationSeverity::Positive
+        :NotificationSeverity::Info;
     feed.publish("Diplomacy",native_campaign::format_campaign_date(
         static_cast<double>(event.tick)/1000.),
         names_visible?message:"A diplomatic signal was received from an unidentified contact.",
-        counterpart);
+        counterpart,std::nullopt,
+        names_visible?std::string(diplomatic_message_key(event.kind))
+                     :std::string("NOTIFY_DIP_SIGNAL"),{},severity);
   }
   // At most Core's 256 retained events; old IDs cannot accumulate indefinitely.
   seen_=std::move(retained);

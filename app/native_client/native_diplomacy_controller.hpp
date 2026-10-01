@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/campaign_frame.hpp>
+#include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/diplomacy_state.hpp>
 
 #include <cstdint>
@@ -9,6 +10,8 @@
 #include <string_view>
 #include <thread>
 #include <vector>
+
+namespace stellar::engine { class LocalizationTable; }
 
 namespace stellar::native_diplomacy {
 
@@ -20,6 +23,8 @@ struct NativeDiplomacyContact {
   std::string display_name;
   std::string status;
   std::string communication;
+  // Raw relationship state for filtering; `status` is localized display text.
+  std::optional<stellar::core::DiplomaticPoliticalState> political_state;
   double confidence{};
   bool identified{};
   bool communication_available{};
@@ -45,6 +50,8 @@ struct NativeDiplomacyAgreementRow {
   std::int64_t agreement_id{};
   std::string type;
   std::string status;
+  // Raw agreement state for filtering; `status` is localized display text.
+  stellar::core::DiplomaticAgreementStatus agreement_status{};
   std::string started;
   std::string ended;
 };
@@ -80,6 +87,17 @@ struct NativeDiplomacySelected {
   bool can_offer_ceasefire{};
   bool can_set_access{};
   bool can_declare_war{};
+  // Per-action blocker reasons from the availability projection (plus the
+  // workspace's finer per-term gating); `none` falls back to the status
+  // summaries for contacts without an availability row.
+  stellar::core::DiplomacyActionBlocker communication_blocker{};
+  stellar::core::DiplomacyActionBlocker negotiate_blocker{};
+  stellar::core::DiplomacyActionBlocker offer_non_aggression_blocker{};
+  stellar::core::DiplomacyActionBlocker request_access_blocker{};
+  stellar::core::DiplomacyActionBlocker offer_peace_blocker{};
+  stellar::core::DiplomacyActionBlocker offer_ceasefire_blocker{};
+  stellar::core::DiplomacyActionBlocker set_access_blocker{};
+  stellar::core::DiplomacyActionBlocker declare_war_blocker{};
 };
 
 struct NativeDiplomacyView {
@@ -142,9 +160,16 @@ public:
           std::uint64_t revision, DiplomacyWorkspaceAction action,
           std::optional<int> target_civilization_id,
           std::optional<std::int64_t> proposal_id);
+  void set_localization(
+      const stellar::engine::LocalizationTable *table) noexcept {
+    locale_ = table;
+  }
 
 private:
   void require_owner() const;
+  [[nodiscard]] std::string tr(std::string_view key,
+                               std::string_view fallback) const;
+  const stellar::engine::LocalizationTable *locale_{};
   std::thread::id owner_{std::this_thread::get_id()};
   std::optional<std::uint64_t> generation_;
   std::uint64_t revision_{};

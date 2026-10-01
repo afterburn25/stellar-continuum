@@ -4,11 +4,15 @@
 #include <stellar/core/exploration_advance.hpp>
 #include "native_phenomena.hpp"
 #include "native_phenomena_debug.hpp"
+#include <stellar/engine/native_scene3d.hpp>
+#include <algorithm>
 #include <chrono>
 #include <iostream>
 #include <nlohmann/json.hpp>
 #include <set>
 #include <stdexcept>
+#include <string>
+#include <vector>
 using namespace stellar::core;
 using namespace stellar::native_phenomena;
 using namespace stellar::native_map;
@@ -109,17 +113,71 @@ int main(int argc,char** argv)try{
   VisualOptions debug;debug.labels=true;debug.bounds=true;debug.filenames=true;DrawList inspected;native.append_map(inspected,{{0,0},10},1280,720,debug,{});
   check(std::holds_alternative<TriangleMesh>(inspected.world.front())&&std::holds_alternative<Text>(inspected.world.back()),"Developer overlays hidden beneath artwork");
   const auto& label=std::get<Text>(inspected.world.back());check(label.value.find("Reflection Nebula")!=std::string::npos&&label.value.find(".png")!=std::string::npos,"Developer type/filename toggle concealed unknown artwork");
+  const auto texts=[&](const DrawList&d){std::vector<std::string> v;for(const auto&c:d.world)if(const auto*t=std::get_if<Text>(&c))v.push_back(t->value);return v;};
+  check(texts(map).empty(),"Unsurveyed phenomenon disclosed a map label");
+  auto named_fixture=fixture;named_fixture.regions[0].designation="RC-1";NativePhenomena charted;charted.bind(&named_fixture);
+  DrawList charted_map;charted.append_map(charted_map,{{0,0},10},1280,720,{},{named_fixture.regions[0].id});
+  const auto player_labels=texts(charted_map);
+  check(player_labels.size()==1&&player_labels[0].find("RC-1")!=std::string::npos&&player_labels[0].find("Reflection Nebula")!=std::string::npos,"Surveyed phenomenon lost its designation label");
+  DrawList charted_overview;charted.append_map(charted_overview,{{0,0},.15},1280,720,{},{named_fixture.regions[0].id});
+  check(texts(charted_overview).empty(),"Phenomenon label cluttered the overview zoom");
   for(const auto size:{std::pair{1280,720},std::pair{1920,1080}}){PhenomenaDebug panel;const float s=size.first/1280.f,px=(size.first-940*s)*.5f,py=(size.second-650*s)*.5f;
     const auto click=[&](float x,float y){InputEvent event{};event.type=InputEventType::LeftPressed;event.position={px+x*s,py+y*s};check(panel.handle(event,size.first,size.second),"Developer control did not capture input");};
     panel.toggle();click(490,128);check(panel.options.membership,"System overlap toggle failed");click(800,128);check(panel.options.filenames,"Artwork filename toggle failed");
     click(460,72);check(!panel.visible&&panel.take_navigation(3)==2,"Previous phenomenon did not wrap");check(!panel.take_navigation(3),"Navigation repeated without input");
     panel.toggle();click(620,72);check(panel.take_navigation(3)==0,"Next phenomenon did not wrap");panel.toggle();click(780,72);check(panel.take_navigation(3)==0,"Go To changed selected phenomenon");
+    // Keyboard ring: close, density dropdown, region navigation and the six
+    // option toggles walk in (y,x) order; toggles announce as CheckBox and
+    // activation replays the same dispatch as a pointer press.
+    {
+      panel.toggle();
+      const auto press=[&](std::uint32_t key,bool shift=false){InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=key;ev.shift=shift;return panel.handle(ev,size.first,size.second);};
+      check(panel.focus()<0,"Phenomena debug retained keyboard focus.");
+      check(press(9)&&panel.focus()>=0,"Tab did not enter the phenomena ring.");
+      check(panel.focused_label(size.first,size.second)=="Close phenomena debug","First phenomena target is not the close control.");
+      check(panel.focused_bounds(size.first,size.second).has_value(),"Focused phenomena control lacks bounds.");
+      int ring_guard=0;
+      while(panel.focused_control(size.first,size.second)!=stellar::engine::AnnouncementControl::CheckBox&&ring_guard++<32)
+        check(press(9),"Phenomena ring navigation leaked.");
+      check(panel.focused_control(size.first,size.second)==stellar::engine::AnnouncementControl::CheckBox,"Option toggle was not classified as a CheckBox.");
+      const bool bounds_before=panel.options.bounds;
+      check(press(13),"Phenomena toggle activation leaked.");
+      check(panel.options.bounds!=bounds_before,"Keyboard activation did not flip the toggle.");
+      check(press(9)&&panel.focus()>=0,"Phenomena ring did not stay live after activation.");
+      InputEvent pointer_press{};pointer_press.type=InputEventType::LeftPressed;pointer_press.position={4,4};
+      check(panel.handle(pointer_press,size.first,size.second),"Phenomena debug dropped pointer input.");
+      check(panel.focus()<0,"Pointer press did not clear the phenomena ring.");
+      check(press(9)&&panel.focus()>=0,"Phenomena ring did not re-enter.");
+      check(panel.handle({InputEventType::EscapePressed},size.first,size.second)&&panel.focus()<0&&panel.visible,"Escape closed the panel instead of releasing its ring.");
+      check(panel.handle({InputEventType::EscapePressed},size.first,size.second)&&!panel.visible,"Second Escape did not close the phenomena panel.");
+    }
+    // Scroll contract: the engine VirtualizedList clamps the dump window —
+    // the old unbounded int offset could scroll past the end into blank space.
+    {
+      PhenomenaDebug dump_panel;dump_panel.visible=true;
+      std::string dump;for(int i=0;i<40;++i)dump+="phenomena line "+std::to_string(i)+"\n";
+      dump_panel.data(std::move(dump));
+      const auto overlay_texts=[](const DrawList &d){std::vector<std::string> v;for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);std::ranges::sort(v);return v;};
+      const auto render=[&]{DrawList d;dump_panel.render(d,size.first,size.second);return d;};
+      const auto top=overlay_texts(render());
+      InputEvent wheel{InputEventType::Wheel,{},{},-3.f};
+      check(dump_panel.handle(wheel,size.first,size.second),"Phenomena debug dropped wheel input.");
+      check(overlay_texts(render())!=top,"Phenomena debug wheel did not scroll the dump.");
+      InputEvent up{InputEventType::Wheel,{},{},3.f};
+      (void)dump_panel.handle(up,size.first,size.second);
+      check(overlay_texts(render())==top,"Phenomena debug scroll did not return to the head.");
+      InputEvent far{InputEventType::Wheel,{},{},-10000.f};
+      (void)dump_panel.handle(far,size.first,size.second);
+      const auto tail=texts(render());
+      (void)dump_panel.handle(far,size.first,size.second);
+      check(texts(render())==tail,"Phenomena debug scroll did not clamp at the tail.");
+    }
   }
   DrawList system;native.append_system(system,7,0,0,1280,720,.2,{});check(system.overlay.empty(),"Phenomena drew over UI");system.world.emplace_back(Circle{{640,360},16,{255,255,255,255}});check(std::holds_alternative<Circle>(system.world.back()),"Objects cannot render above clouds");
   DrawList close_system;native.append_system(close_system,7,0,0,1280,720,10,{});
-  const auto& close_cloud=std::get<Image>(close_system.world.back());
-  const auto& far_cloud=std::get<Image>(system.world[system.world.size()-2]);
-  check(close_cloud.resource==far_cloud.resource&&close_cloud.destination.x==far_cloud.destination.x&&close_cloud.destination.y==far_cloud.destination.y&&close_cloud.destination.width==far_cloud.destination.width&&close_cloud.destination.height==far_cloud.destination.height,"System zoom enlarges gas layers");
+  const auto& close_cloud=std::get<Scene3DView>(close_system.world.back());
+  const auto& far_cloud=std::get<Scene3DView>(system.world[system.world.size()-2]);
+  check(close_cloud.scene->instances().front().material.texture==far_cloud.scene->instances().front().material.texture&&close_cloud.destination.x==far_cloud.destination.x&&close_cloud.destination.y==far_cloud.destination.y&&close_cloud.destination.width==far_cloud.destination.width&&close_cloud.destination.height==far_cloud.destination.height,"System zoom enlarges gas layers");
   auto before=phenomenon_context(&fixture,0,0,7);for(int setting=0;setting<3;++setting){VisualOptions visual;visual.density=setting;DrawList view;native.append_system(view,7,0,0,1280,720,.2,visual);check(before.effects==phenomenon_context(&fixture,0,0,7).effects,"Visual preferences changed gameplay");}
   check(visual_multiplier({0})<visual_multiplier({1})&&visual_multiplier({1})<visual_multiplier({2}),"Density levels are identical");
   check(local_visual_multiplier({},.2,true)<local_visual_multiplier({},.2,false)&&local_visual_multiplier({},10)<local_visual_multiplier({},.2),"Combat/close-camera clutter attenuation is missing");

@@ -425,6 +425,36 @@ Other concurrent branches may read and consume research interfaces/capabilities 
 
 Research milestone PRs merge this persistent branch to `main` after research validators plus normal .NET/Godot gates pass; continued research remains on the same owned workstream.
 
+## 2026-09-24 — Engine-framework adoption runs through projections first
+
+**Decision:** For the engine simulation frameworks (economy catalog, colony,
+flow/infrastructure, logistics, population, strategic AI, warfare),
+authoritative Core state is consumed through **read-only projection
+adapters** (`campaign_*_projection`, `planetary_adapter`,
+`project_colony_settlement`, `project_galaxy_map`). The projection maps
+authoritative Core records into the engine model; Core's bespoke systems
+remain the simulation authority and the projection never mutates state.
+
+**Why not direct adoption yet:** running both Core's bespoke system and the
+engine framework as live simulators creates dual simulation authority —
+they will diverge on edge cases and the save format would carry two
+versions of truth. A projection has exactly one direction of truth and
+still gives the engine framework real consumers (diagnostics, shell tools,
+cross-game reuse) today.
+
+**Criteria for graduating a framework from projection to authority:**
+1. the engine model's semantics are a strict superset or provably
+   equivalent for every observable Core rule it would replace;
+2. a save-format migration path exists (new fields, defaults, round-trip);
+3. a parity oracle demonstrates identical outcomes over a seeded campaign
+   corpus before the bespoke path is retired;
+4. determinism and observer-privacy contracts are preserved.
+
+**Consequence:** "adoption pending" rows in the capability table are not a
+backlog defect; permanent projection is an acceptable end state for domains
+where Core rules are intentionally game-specific. Engine frameworks still
+serve diagnostics, tooling, and future games built on the standalone engine.
+
 ## How to change a locked decision
 
 If the user explicitly changes a decision:

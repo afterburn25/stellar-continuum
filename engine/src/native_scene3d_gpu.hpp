@@ -11,7 +11,11 @@ class Scene3DRenderer final {
   ~Scene3DRenderer();
   void prepare(const DrawList&);
   void composite(const Scene3DView&);
+  // Retunes the TextureStreamer byte budget; takes effect next prepare().
+  void set_texture_budget(std::uint64_t bytes);
   [[nodiscard]] Scene3DStatistics statistics()const noexcept;
+  // Bytes per render-target pixel on this device — 16 HDR, 8 UNORM.
+  [[nodiscard]] std::size_t bytes_per_pixel()const noexcept;
  private:
   struct Storage;std::unique_ptr<Storage> storage_;
 };

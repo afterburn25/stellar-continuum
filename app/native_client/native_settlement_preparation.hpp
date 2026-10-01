@@ -2,6 +2,7 @@
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/colony_biology.hpp>
 #include <stellar/core/sovereign_currency.hpp>
+#include <stellar/engine/localization.hpp>
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -30,6 +31,7 @@ struct View {
 };
 
 [[nodiscard]] std::optional<View> build_settlement_preparation(
-    stellar::core::CampaignFrame &, std::uint64_t, int, int);
+    stellar::core::CampaignFrame &, std::uint64_t, int, int,
+    const stellar::engine::LocalizationTable * = nullptr);
 
 }  // namespace stellar::native_settlement_preparation

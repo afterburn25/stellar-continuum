@@ -1,9 +1,11 @@
 #include <stellar/engine/native_audio.hpp>
 
 #include <cmath>
+#include <algorithm>
 #include <atomic>
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <exception>
 #include <filesystem>
@@ -123,6 +125,58 @@ int main(int argc, char** argv) {
           "non-finite generated clip was accepted");
     check(rejects([] { (void)AudioClip::create({1.1f, 0.f}); }), "out-of-range generated clip was accepted");
 
+    // Streaming decode parity: pull-decoding the same files in small
+    // chunks produces byte-identical canonical PCM, reports
+    // end-of-stream, and rewinds cleanly for looping.
+    for (const auto& [source, whole] : {std::pair{wav, decoded_wav}, std::pair{mp3, decoded_mp3}}) {
+      const auto stream = open_audio_stream(source);
+      std::vector<float> streamed;
+      std::array<float, 4094> chunk{};
+      for (;;) {
+        const auto got = stream->read(chunk);
+        streamed.insert(streamed.end(), chunk.begin(), chunk.begin() + static_cast<std::ptrdiff_t>(got));
+        if (got < chunk.size()) break;
+      }
+      check(stream->finished(), "audio stream did not report end-of-stream");
+      check(streamed.size() == whole->samples().size(), "streamed PCM length differs from whole-file decode");
+      bool identical = streamed.size() == whole->samples().size();
+      for (std::size_t i = 0; identical && i < streamed.size(); ++i)
+        identical = streamed[i] == whole->samples()[i];
+      check(identical, "streamed PCM differs from whole-file decode");
+      stream->rewind();
+      const auto replayed = stream->read(chunk);
+      check(replayed > 0 && chunk[0] == whole->samples()[0],
+            "rewound stream did not replay from the first frame");
+    }
+    check(rejects([&] { (void)open_audio_stream(mp3.parent_path() / L"missing-测试.mp3"); }),
+          "missing stream source was accepted");
+    // The 16 MiB whole-decode source cap does not apply to streaming:
+    // an oversized WAV still decodes on demand with bounded memory.
+    const auto long_track = fixtures.path() / L"long-测试.wav";
+    {
+      std::ofstream output(long_track, std::ios::binary);
+      const std::uint32_t bytes = static_cast<std::uint32_t>(maximum_source_audio_bytes) + 1024u;
+      output.write("RIFF", 4); write_u32(output, 36u + bytes); output.write("WAVEfmt ", 8); write_u32(output, 16);
+      write_u16(output, 1); write_u16(output, 2); write_u32(output, 48000); write_u32(output, 192000);
+      write_u16(output, 4); write_u16(output, 16); output.write("data", 4); write_u32(output, bytes);
+      const std::array<char, 8192> silence{};
+      for (std::uint32_t left = bytes; left > 0;) {
+        const auto amount =
+            std::min(left, static_cast<std::uint32_t>(silence.size()));
+        output.write(silence.data(), amount);
+        left -= amount;
+      }
+      check(static_cast<bool>(output), "could not write the oversized stream fixture");
+    }
+    {
+      const auto stream = open_audio_stream(long_track);
+      std::array<float, 8192> chunk{};
+      const auto got = stream->read(chunk);
+      check(got == chunk.size(), "oversized source did not stream on demand");
+    }
+    std::error_code remove_error;
+    std::filesystem::remove(long_track, remove_error);
+
     const auto short_loop = AudioClip::create({0.f, 0.f, 0.25f, -0.25f});
     AudioOutput output;
     const auto idle = output.diagnostics();
@@ -230,6 +284,26 @@ int main(int argc, char** argv) {
     const auto preserved = output.diagnostics();
     check(preserved.active_effects == replaced.active_effects && preserved.effect_play_count == replaced.effect_play_count,
           "oversized effect cleared an existing voice before rejection");
+    // Positional effects: pan is validated, a panned play occupies a
+    // voice exactly like a centered one, and the equal-power curve
+    // preserves total energy at the extremes.
+    check(rejects([&] { output.play_effect(short_loop, -1.5f); }), "out-of-range negative pan was accepted");
+    check(rejects([&] { output.play_effect(short_loop, 2.f); }), "out-of-range positive pan was accepted");
+    check(rejects([&] { output.play_effect(short_loop, std::numeric_limits<float>::quiet_NaN()); }), "NaN pan was accepted");
+    check(rejects([&] { output.play_effect(nullptr, 0.5f); }), "null panned effect was accepted");
+    const auto before_pan = output.diagnostics().effect_play_count;
+    output.play_effect(short_loop, -1.f);
+    output.play_effect(short_loop, 1.f);
+    check(output.diagnostics().effect_play_count == before_pan + 2, "panned effects did not occupy voices");
+    // Distance attenuation: gain is validated on the same contract and a
+    // gained play occupies a voice exactly like a full-volume one.
+    check(rejects([&] { output.play_effect(short_loop, 0.f, -0.5f); }), "negative gain was accepted");
+    check(rejects([&] { output.play_effect(short_loop, 0.f, 1.5f); }), "over-unity gain was accepted");
+    check(rejects([&] { output.play_effect(short_loop, 0.f, std::numeric_limits<float>::quiet_NaN()); }), "NaN gain was accepted");
+    const auto before_gain = output.diagnostics().effect_play_count;
+    output.play_effect(short_loop, 0.5f, 0.4f);
+    output.play_effect(short_loop, 0.f, 0.f);
+    check(output.diagnostics().effect_play_count == before_gain + 2, "gained effects did not occupy voices");
     std::atomic_bool wrong_thread_rejected{};
     std::thread wrong_thread([&] {
       try { (void)output.diagnostics(); } catch (const std::logic_error&) { wrong_thread_rejected = true; }
@@ -242,6 +316,17 @@ int main(int argc, char** argv) {
     });
     check(effects_retired,
           "finite flushed effects did not drain queued input and converted output before retiring");
+    // Streamed music feeds the same bounded queue through the pull
+    // decoder instead of a fully-decoded clip.
+    output.play_music(open_audio_stream(wav));
+    for (int i = 0; i < 4; ++i) output.service();
+    const auto streaming = output.diagnostics();
+    check(streaming.music_started && streaming.music_streaming &&
+              streaming.queued_music_bytes > 0,
+          "streamed music did not feed the bounded SDL queue");
+    output.stop_music();
+    check(!output.diagnostics().music_streaming && !output.diagnostics().music_started,
+          "stopped music stream still reports playback");
     output.stop_all();
     const auto stopped = output.diagnostics();
     check(!stopped.music_started && stopped.queued_music_bytes == 0 && stopped.active_effects == 0 &&

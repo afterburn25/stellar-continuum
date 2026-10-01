@@ -14,6 +14,8 @@
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/native_map_platform.hpp>
 
+#include <array>
+#include <cstdint>
 #include <filesystem>
 #include <functional>
 #include <string>
@@ -97,13 +99,21 @@ public:
                            std::string actual_display_label);
   void set_windowed_choices(std::vector<VideoDisplayChoice> choices);
   [[nodiscard]] bool visible() const noexcept { return visible_; }
+  [[nodiscard]] int focused() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Choice rows announce "LABEL: value" like they render.
+  // Empty when nothing is focused.
+  [[nodiscard]] std::string focused_label(int width, int height) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(int width, int height) const;
   [[nodiscard]] const NativeVideoSettings &values() const noexcept {
     return values_;
   }
   // Whether the CONFIRM DISPLAY overlay is up; the host raises it after
   // applying an Apply payload and lowers it on Keep/Revert.
   [[nodiscard]] bool confirming() const noexcept { return confirming_; }
-  void set_confirming(bool confirming) noexcept { confirming_ = confirming; dropdown_.close(); }
+  void set_confirming(bool confirming) noexcept { confirming_ = confirming; dropdown_.close(); focus_ = -1; }
   void set_error(std::string message);
   void set_localization(const stellar::engine::LocalizationTable *table) noexcept {
     locale_ = table;
@@ -115,6 +125,16 @@ public:
               double rollback_remaining_seconds = 0.) const;
 
 private:
+  // Keyboard focus contract: Tab/arrow ring over the live controls,
+  // Return/Space activate; the ring narrows to Keep/Revert while the
+  // rollback confirm overlay is up.
+  struct Focusable {
+    stellar::native_map::UiRect rect;
+    int target{}; // >=0 choice index; -1 nvidia, -2 apply, -3 cancel, -4 keep, -5 revert
+    std::uint64_t cue{};
+  };
+  [[nodiscard]] int collect_focusables(const VideoSettingsLayout &,
+                                       std::array<Focusable, 11> &) const;
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
   void open_choice(int index);
   void select_choice(int index, int option) noexcept;
@@ -123,6 +143,17 @@ private:
                                std::string_view fallback) const;
   [[nodiscard]] std::string trf(std::string_view key, std::string_view arg,
                                 std::string_view fallback) const;
+  // Localized option labels — the enum→string maps above stay English for the
+  // settings file; these only paint the dropdown rows and announcements.
+  [[nodiscard]] std::string display_label(VideoDisplayMode) const;
+  [[nodiscard]] std::string vsync_label(VideoVsync) const;
+  [[nodiscard]] std::string frame_cap_label(VideoFrameCap) const;
+  [[nodiscard]] std::string quality_label(int) const;
+  [[nodiscard]] std::string density_label(int) const;
+  [[nodiscard]] std::string samples_label(int) const;
+  [[nodiscard]] std::string scene_res_label(int) const;
+  [[nodiscard]] std::string resolution_label(const NativeVideoSettings &) const;
+  [[nodiscard]] std::string choice_value(std::size_t) const;
 
   bool visible_{};
   const stellar::engine::LocalizationTable *locale_{};
@@ -136,6 +167,7 @@ private:
   std::string error_;
   std::string adapter_label_;
   std::function<void()> open_panel_;
+  int focus_{-1};
 };
 
 } // namespace stellar::native_video_settings

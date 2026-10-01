@@ -312,4 +312,46 @@ std::vector<PhysicsTriggerEvent> PhysicsWorld::advance(float dt) {
     return events;
 }
 
+PhysicsWorld::State PhysicsWorld::capture_state() const {
+    State state;
+    state.broadphase_cell_size = cell_size_;
+    state.next_id = next_id_;
+    state.bodies.reserve(bodies_.size());
+    for (const auto& [id, body] : bodies_) state.bodies.push_back(body);
+    std::sort(state.bodies.begin(), state.bodies.end(),
+              [](const PhysicsBody& a, const PhysicsBody& b) {
+                  return a.id < b.id;
+              });
+    state.overlapping.assign(overlapping_.begin(), overlapping_.end());
+    return state;
+}
+
+void PhysicsWorld::restore_state(const State& state) {
+    if (!std::isfinite(state.broadphase_cell_size) ||
+        state.broadphase_cell_size <= 0.0f)
+        throw std::invalid_argument(
+            "PhysicsWorld restore requires a positive finite cell size");
+    std::unordered_map<PhysicsBodyId, PhysicsBody> bodies;
+    bodies.reserve(state.bodies.size());
+    for (const auto& body : state.bodies) {
+        if (!bodies.emplace(body.id, body).second)
+            throw std::invalid_argument(
+                "PhysicsWorld restore found duplicate body ids");
+    }
+    std::set<std::pair<PhysicsBodyId, PhysicsBodyId>> overlapping;
+    for (const auto& pair : state.overlapping) {
+        if (!bodies.count(pair.first) || !bodies.count(pair.second))
+            throw std::invalid_argument(
+                "PhysicsWorld restore found an overlap referencing a "
+                "missing body");
+        overlapping.insert(pair);
+    }
+    bodies_ = std::move(bodies);
+    overlapping_ = std::move(overlapping);
+    next_id_ = state.next_id;
+    cell_size_ = state.broadphase_cell_size;
+    grid_ = SpatialGrid<PhysicsBodyId>{cell_size_};
+    for (const auto& [id, body] : bodies_) grid_.insert(id, body.x, body.y);
+}
+
 } // namespace stellar::engine

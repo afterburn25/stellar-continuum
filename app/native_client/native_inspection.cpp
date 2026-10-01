@@ -1,4 +1,6 @@
 #include "native_inspection.hpp"
+#include "native_data_names.hpp"
+#include "native_ui_theme.hpp"
 #include <stellar/core/campaign_observation.hpp>
 
 #include <stellar/core/fleet_reach.hpp>
@@ -6,6 +8,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <iomanip>
 #include <ranges>
 #include <sstream>
@@ -17,6 +20,17 @@ namespace {
 using namespace stellar::core;
 using namespace stellar::native_map;
 std::string number(double value, int digits = 1) { std::ostringstream out; out << std::fixed << std::setprecision(digits) << value; return out.str(); }
+// Compact kilometres: below a million print the integer; beyond it use the
+// body-inspection scientific convention so a wide value never orphans its
+// "km" unit onto a second wrapped line in the inspector's fact column.
+std::string compact_km(double kilometres) {
+  if (kilometres < 1'000'000.) return number(kilometres, 0);
+  const auto exponent = static_cast<int>(std::floor(std::log10(kilometres)));
+  constexpr std::string_view sup[] = {"⁰","¹","²","³","⁴","⁵","⁶","⁷","⁸","⁹"};
+  std::string superscript;
+  for (const char digit : std::to_string(exponent)) superscript += sup[digit - '0'];
+  return number(kilometres / std::pow(10., exponent), 3) + " × 10" + superscript;
+}
 void text(DrawList& out, UiRect box, std::string value, Color color, int font) {
   out.overlay.emplace_back(Text{{box.x, box.y}, std::move(value), color, font, box.width, box});
 }
@@ -92,8 +106,8 @@ ContentLayout content_layout(const SystemInspection& value, UiRect bounds,
   ContentLayout layout;
   layout.scale = scale_for(bounds);
   layout.clip = SystemInspectionCard::body_bounds(bounds);
-  layout.body_font = std::max(11, static_cast<int>(14 * layout.scale));
-  layout.small_font = std::max(9, static_cast<int>(11 * layout.scale));
+  layout.body_font = std::max(11, stellar::native_ui::type::compact_body(layout.scale));
+  layout.small_font = std::max(9, stellar::native_ui::type::compact_small(layout.scale));
   const float s = layout.scale;
   float y = 8.f * s;
   const auto add_block = [&](std::string text_value, float x, float width,
@@ -159,17 +173,11 @@ std::optional<UiRect> intersection(UiRect first,UiRect second){
   return UiRect{left,top,right-left,bottom-top};
 }
 
-float maximum_scroll(const SystemInspection& value, UiRect bounds,
-    const std::function<TextExtent(const Text&)>& measurer,
+void sync_scroll(stellar::engine::ScrollView& scroll, const SystemInspection& value,
+    UiRect bounds, const std::function<TextExtent(const Text&)>& measurer,
     const stellar::engine::LocalizationTable *locale = nullptr) {
   const auto layout = content_layout(value, bounds,measurer,locale);
-  return std::max(0.f, layout.height - layout.clip.height);
-}
-
-void clamp_scroll(float& scroll, const SystemInspection& value, UiRect bounds,
-    const std::function<TextExtent(const Text&)>& measurer,
-    const stellar::engine::LocalizationTable *locale = nullptr) {
-  scroll = std::clamp(scroll,0.f,maximum_scroll(value,bounds,measurer,locale));
+  scroll.sync(layout.height, layout.clip.height);
 }
 }
 
@@ -204,13 +212,14 @@ SystemInspection build_system_inspection(const FreshCampaignState& state, int se
   }
   result.name = system->name;
   result.guidance = tr(developer ? "INSPECTION_DEVELOPER_GUIDANCE" : "INSPECTION_SURVEYED_GUIDANCE", developer ? "Developer inspection · live stellar and settlement statistics." : "Survey complete. Review stellar findings and owned settlements below.");
+  result.foreign_settlement_intelligence = tr("INSPECTION_FOREIGN_INTEL","Foreign settlement intelligence unavailable");
   if (developer) result.foreign_settlement_intelligence = tr("INSPECTION_DEVELOPER_SETTLEMENTS","Developer access: all settlements shown with actual population and development.");
-  result.facts.push_back({tr("INSPECTION_PRIMARY_STAR","PRIMARY STAR"), system->stellar_object?stellar_object_definition(system->stellar_object->type).name:tr(star_key(system->primary),star_label(system->primary)), true});
+  result.facts.push_back({tr("INSPECTION_PRIMARY_STAR","PRIMARY STAR"), system->stellar_object?stellar::native_data::stellar_object_name(locale,stellar_object_definition(system->stellar_object->type)):tr(star_key(system->primary),star_label(system->primary)), true});
   if(system->stellar_object){
     const auto& p=*system->stellar_object;
-    result.facts.push_back({tr("INSPECTION_RADIUS","STELLAR RADIUS"),number(p.radius_solar*695700.,0)+" km",true});
+    result.facts.push_back({tr("INSPECTION_RADIUS","STELLAR RADIUS"),compact_km(p.radius_solar*695700.)+" km",true});
     result.facts.push_back({tr("INSPECTION_LUMINOSITY","LUMINOSITY"),number(p.luminosity_solar,4)+" x Sol",true});
-    result.facts.push_back({tr("INSPECTION_SAFE_APPROACH","SAFE APPROACH"),number(p.safe_approach_au*astronomical_unit_km,0)+" km",false});
+    result.facts.push_back({tr("INSPECTION_SAFE_APPROACH","SAFE APPROACH"),compact_km(p.safe_approach_au*astronomical_unit_km)+" km",false});
     if(p.hooks.is_rare_discovery)result.facts.push_back({tr("INSPECTION_DISCOVERY","DISCOVERY"),p.hooks.rarity_tier,true});
     if(p.jet_half_angle_radians>0)result.facts.push_back({tr("INSPECTION_HAZARD","STELLAR HAZARD"),tr("INSPECTION_HAZARD_JETS","Directional high-energy jets"),false});
   }
@@ -247,24 +256,43 @@ void SystemInspectionCard::set_text_measurer(
     std::function<TextExtent(const Text&)> value){
   text_measurer_=std::move(value);
   if(inspection_&&last_bounds_)
-    clamp_scroll(scroll_,*inspection_,*last_bounds_,text_measurer_,locale_);
+    sync_scroll(scroll_,*inspection_,*last_bounds_,text_measurer_,locale_);
 }
 void SystemInspectionCard::set_inspection(SystemInspection value) {
   if (!inspection_ || inspection_->selected_system_id != value.selected_system_id || inspection_->observer_id != value.observer_id) {
-    scroll_ = 0.f;
+    scroll_ = {};
     pointer_owned_ = false;
   }
   inspection_ = std::move(value);
-  if (last_bounds_) clamp_scroll(scroll_, *inspection_, *last_bounds_,text_measurer_,locale_);
+  if (last_bounds_) sync_scroll(scroll_, *inspection_, *last_bounds_,text_measurer_,locale_);
 }
-void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = 0.f; last_bounds_.reset(); pointer_owned_ = false; }
+void SystemInspectionCard::clear() noexcept { inspection_.reset(); scroll_ = {}; last_bounds_.reset(); pointer_owned_ = false; focus_ = -1; }
+std::string SystemInspectionCard::focused_label() const {
+  return focus_ >= 0 ? tr_at(locale_, "INSPECTION_CLOSE", "Close inspection")
+                     : std::string{};
+}
+std::optional<stellar::native_map::UiRect>
+SystemInspectionCard::focused_bounds(stellar::native_map::UiRect bounds) const {
+  return focus_ >= 0 ? std::optional<stellar::native_map::UiRect>{
+                           close_bounds(bounds)}
+                     : std::nullopt;
+}
+
 UiRect SystemInspectionCard::close_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+bounds.width-30.f*s,bounds.y+7.f*s,24.f*s,24.f*s}; }
 UiRect SystemInspectionCard::body_bounds(UiRect bounds) noexcept { const auto s=scale_for(bounds); return {bounds.x+10.f*s,bounds.y+62.f*s,std::max(0.f,bounds.width-20.f*s),std::max(0.f,bounds.height-70.f*s)}; }
 InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiRect bounds) {
-  if (!inspection_) return {};
+  if (!inspection_) { focus_ = -1; return {}; }
   last_bounds_ = bounds;
-  clamp_scroll(scroll_, *inspection_, bounds,text_measurer_,locale_);
+  sync_scroll(scroll_, *inspection_, bounds,text_measurer_,locale_);
   const auto close=close_bounds(bounds);
+  if (event.type == InputEventType::LeftPressed || event.type == InputEventType::PointerCancelled) focus_ = -1;
+  if (event.type == InputEventType::KeyPressed && event.key) {
+    constexpr std::uint32_t kTab=9u,kReturn=13u,kSpace=32u,kRight=0x4000004fu,kLeft=0x40000050u,kDown=0x40000051u,kUp=0x40000052u,kHome=0x4000004au,kEnd=0x4000004du;
+    if (event.key==kTab||event.key==kRight||event.key==kLeft||event.key==kDown||event.key==kUp||event.key==kHome||event.key==kEnd) { focus_=0; return {true,false}; }
+    if ((event.key==kReturn||event.key==kSpace)&&focus_>=0)
+      return handle({InputEventType::LeftPressed,{close.x+close.width*.5f,close.y+close.height*.5f}},bounds);
+    return {};
+  }
   if (event.type == InputEventType::LeftPressed && close.contains(event.position)) { clear(); return {true, true}; }
   if (event.type == InputEventType::PointerCancelled) { const bool captured=pointer_owned_; pointer_owned_=false; return {captured,false}; }
   if (pointer_owned_) {
@@ -281,7 +309,7 @@ InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiR
   }
   if (!bounds.contains(event.position)) return {};
   if (event.type == InputEventType::LeftPressed || event.type == InputEventType::RightPressed) { pointer_owned_=true; return {true,false}; }
-  if (event.type == InputEventType::Wheel) { scroll_ = std::clamp(scroll_ - event.wheel_y * 32.f*scale_for(bounds),0.f,maximum_scroll(*inspection_,bounds,text_measurer_,locale_)); return {true, false}; }
+  if (event.type == InputEventType::Wheel) { sync_scroll(scroll_,*inspection_,bounds,text_measurer_,locale_); scroll_.scroll_by(-event.wheel_y * 32.f*scale_for(bounds)); return {true, false}; }
   const bool pointer_event = event.type == InputEventType::PointerMove ||
       event.type == InputEventType::LeftReleased ||
       event.type == InputEventType::RightReleased;
@@ -290,7 +318,7 @@ InspectionHandleResult SystemInspectionCard::handle(const InputEvent& event, UiR
 void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
   if (!inspection_) return;
   const auto& value = *inspection_; const auto layout=content_layout(value,bounds,text_measurer_,locale_); const float scale=layout.scale; const int body=layout.body_font; const int small=layout.small_font;
-  last_bounds_=bounds; clamp_scroll(scroll_,value,bounds,text_measurer_,locale_);
+  last_bounds_=bounds; sync_scroll(scroll_,value,bounds,text_measurer_,locale_);
   out.overlay.emplace_back(FilledRectangle{bounds, {7, 20, 35, 246}}); out.overlay.emplace_back(StrokedRectangle{bounds, {78, 168, 209, 255}});
   const UiRect header{bounds.x+10.f*scale,bounds.y+7.f*scale,std::max(0.f,bounds.width-20.f*scale),48.f*scale};
   text(out,{header.x,header.y,std::max(0.f,header.width-34.f*scale),21.f*scale},value.name,{235,244,255,255},body+4);
@@ -300,26 +328,21 @@ void SystemInspectionCard::render(DrawList& out, UiRect bounds) const {
   out.overlay.emplace_back(FilledRectangle{{header.x,header.y+40.f*scale,header.width*static_cast<float>(std::clamp(value.survey_progress,0.,1.)),5.f*scale},{94,210,183,255}});
   for(const auto& item:layout.items){
     const UiRect row{layout.clip.x+item.x,
-                     layout.clip.y+item.y-scroll_,item.width,item.height};
+                     layout.clip.y+item.y-scroll_.scroll_offset,item.width,item.height};
     const auto clipped=intersection(row,layout.clip);
     if(!clipped)continue;
     out.overlay.emplace_back(Text{{row.x,row.y},item.value,item.color,item.font,
                                   row.width,*clipped});
   }
-  if(layout.height>layout.clip.height&&layout.clip.height>0.f){
-    const float maximum=layout.height-layout.clip.height;
-    const float thumb_height=std::min(layout.clip.height,std::max(18.f*scale,
-        layout.clip.height*layout.clip.height/layout.height));
-    const float travel=layout.clip.height-thumb_height;
-    const float thumb_y=layout.clip.y+(maximum>0.f?travel*scroll_/maximum:0.f);
+  {
     const float indicator_width=3.f*scale;
     const float indicator_x=layout.clip.x+layout.clip.width-indicator_width;
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,layout.clip.y,
-        indicator_width,layout.clip.height},{25,49,64,210}});
-    out.overlay.emplace_back(FilledRectangle{{indicator_x,thumb_y,
-        indicator_width,thumb_height},{105,213,244,230}});
+    stellar::native_ui::scrollbar(
+        out, {indicator_x, layout.clip.y, indicator_width, layout.clip.height},
+        scroll_, 18.f*scale);
   }
   const auto close=close_bounds(bounds);
   text(out,close,"X",{235,244,255,255},small);
+  if(focus_>=0)stellar::native_ui::focus_ring(out,close);
 }
 } // namespace stellar::native_inspection

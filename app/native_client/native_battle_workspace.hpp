@@ -56,6 +56,8 @@ struct BattleOrderButton {
   MassiveCombatOrderType type;
   bool needs_target{};
   std::string_view label_key{};
+  std::string_view tip_key{};
+  std::string_view tip{};
 };
 [[nodiscard]] const std::vector<BattleOrderButton> &battle_order_buttons();
 
@@ -103,6 +105,9 @@ public:
       const stellar::engine::LocalizationTable *table) noexcept {
     locale_ = table;
   }
+  using TextMeasurer = std::function<stellar::native_map::TextExtent(
+      const stellar::native_map::Text &)>;
+  void set_text_measurer(TextMeasurer value) { measure_ = std::move(value); }
   // Replaces the prior frame's artwork hits. Targets remain valid only while
   // the viewport and camera exactly match the draw that supplied them.
   void set_ship_targets(std::vector<BattleShipTarget> targets, int width,
@@ -132,6 +137,14 @@ public:
   [[nodiscard]] const std::set<std::int64_t> &selection() const noexcept {
     return selection_;
   }
+  [[nodiscard]] int focus() const noexcept { return focus_; }
+  // Localized label of the ringed control for screen-reader/live-region
+  // consumers. Empty when nothing is focused.
+  [[nodiscard]] std::string
+  focused_label(const BattleWorkspaceLayout &) const;
+  // Client-pixel rect of the ringed control — null when nothing is focused.
+  [[nodiscard]] std::optional<stellar::native_map::UiRect>
+  focused_bounds(const BattleWorkspaceLayout &) const;
 
 private:
   [[nodiscard]] stellar::native_map::Point
@@ -149,12 +162,22 @@ private:
                      BattleWorkspaceCommand &command) const;
   void adopt_viewport(int width, int height) noexcept;
   void invalidate_ship_targets() noexcept;
+  struct FocusRect {
+    stellar::native_map::UiRect bounds;
+    std::string label;
+  };
+  [[nodiscard]] std::vector<FocusRect>
+  focusables(const BattleWorkspaceLayout &) const;
   [[nodiscard]] bool ship_targets_current(int width, int height) const noexcept;
   [[nodiscard]] std::string tr(std::string_view key,
                                std::string_view fallback) const;
   [[nodiscard]] std::string
   trf(std::string_view key, std::initializer_list<std::string> args,
       std::string_view fallback) const;
+  // Recomposes core-authored English combat event/acknowledgement skeletons
+  // through the locale table; unrecognized text passes through unchanged.
+  [[nodiscard]] std::string
+  localized_battle_message(std::string_view message) const;
 
   const stellar::engine::LocalizationTable *locale_{};
   std::optional<MassiveCombatSnapshot> snapshot_;
@@ -170,6 +193,7 @@ private:
   std::vector<BattleShipTarget> ship_targets_;
   int ship_targets_width_{};
   int ship_targets_height_{};
+  TextMeasurer measure_;
   std::uint64_t ship_targets_camera_revision_{};
   enum class Gesture { None, LeftField, RightField, Chrome };
   Gesture gesture_{Gesture::None};
@@ -195,6 +219,7 @@ private:
   };
   std::vector<VisualEvent> visual_events_;
   mutable int last_rendered_tokens_{};
+  int focus_{-1};
 };
 
 } // namespace stellar::native_battle_ui
