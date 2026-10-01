@@ -24,8 +24,12 @@ active workstream branch is `game/ui-visual-overhaul` (PR #338). CI status
 asset/research/Godot-fixture battery) and `windows-export`
 (`windows-benchmark` export + full `windows-native-preview` build + complete
 328-test CTest; GPU-init tests skip by `SKIP_REGULAR_EXPRESSION` on the
-Vulkan-less runner — GPU coverage remains local/packaged). PR #338 open,
-mergeable, clean.]
+Vulkan-less runner — GPU coverage remains local/packaged). PR #338
+**MERGED 2026-10-01** via merge commit `b9aed3e4` onto
+`engine/space-strategy-simulation-specialization` — 225 commits, tip
+`050e3c3d` fully contained; post-merge native-foundation run
+`36892128321` green on the merge commit. The branch remains the active
+workstream lane for the next integration cycle.]
 
 > **`work/foundation-1-30-codex-integration`** merges the
 > `engine/foundation-expansion-1-30` engine work (save history, replay,
