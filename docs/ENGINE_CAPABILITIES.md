@@ -2060,7 +2060,15 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   and `treasury_arrears`/`treasury_depleted` from
   the authoritative `assess_treasury` — all previously surfaced only
   in workspace view-models or a player-scoped voice event, never in
-  developer diagnostics. Corrupt classifier inputs (non-finite/negative
+  developer diagnostics. `campaign_diagnostics` now stages every
+  finding class end-to-end — `degraded_structures`, `power_shortfall`,
+  `foreign_armed_presence`, `treasury_arrears`, `treasury_depleted`,
+  `freight_corridor_gap` and `logistics_critical` are each triggered
+  through staged authoritative state (a worn commissioned lab, an
+  under-powered staffed colony, a hostile fleet in held space, carried
+  arrears, a net-negative zero-balance treasury, an under-provisioned
+  external colony), not fabricated records — closing the coverage gap
+  ADR 0002 item 2 flagged. Corrupt classifier inputs (non-finite/negative
   credits or arrears) are skipped rather than thrown; `inspect_campaign_invariants`
   now also covers colony `stability`/`stored_extracted_materials`,
   building `condition`/`stored_power_days`, and economy

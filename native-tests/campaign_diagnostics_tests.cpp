@@ -3,6 +3,8 @@
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <nlohmann/json.hpp>
+#include <algorithm>
+#include <cmath>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -112,6 +114,106 @@ int main(int argc,char **argv)try{
     check(spotlight!=ops.end()&&spotlight->subsystem=="advisor"&&
         std::get<std::string>(spotlight->values.at("sourceEventType"))=="logistics_critical",
         "Advisor spotlighted the wrong finding class.");
+  }
+  {
+    // Coverage sweep for the projection-backed finding classes the
+    // scenarios above never trigger. Every input below is authoritative
+    // state the finding consumes: settlement structure condition,
+    // surface power supply/demand, the warfare theater projection, the
+    // credit-flow/treasury assessment, and corridor coverage.
+    auto exposed=world;
+    const int civ_id=world.player_civilization_id;
+    const auto civ_it=std::find_if(exposed.civilizations.begin(),exposed.civilizations.end(),
+        [&](const Civilization &c){return c.id==civ_id;});
+    check(civ_it!=exposed.civilizations.end(),"Player civ missing.");
+    const int home_id=civ_it->home_system_id;
+    int next_colony_id=1;for(const auto &c:exposed.colonies)next_colony_id=std::max(next_colony_id,c.id+1);
+    // A home-system colony carrying one worn-out but commissioned lab
+    // (degraded) and three healthy labs with no generator (power
+    // demand 6 against the base supply of 2).
+    Colony worn_site;worn_site.id=next_colony_id++;
+    worn_site.civilization_id=civ_id;worn_site.system_id=home_id;
+    worn_site.name="Worn site";worn_site.kind=SettlementKind::Colony;
+    worn_site.population_millions=5.0;worn_site.infrastructure=.5;worn_site.stability=.8;
+    worn_site.surface_hub_level=1;
+    SurfaceBuilding worn;worn.id=9001;worn.type_id="science_lab";
+    worn.is_complete=true;worn.is_enabled=true;worn.condition=.10;
+    worn_site.surface_buildings.push_back(worn);
+    for(int i=0;i<3;++i){
+      SurfaceBuilding lab;lab.id=9002+i;lab.type_id="science_lab";
+      lab.is_complete=true;lab.is_enabled=true;lab.condition=1.0;
+      worn_site.surface_buildings.push_back(lab);
+    }
+    exposed.colonies.push_back(worn_site);
+    // An under-provisioned colony in another owned system: import
+    // requirement > 0 makes it logistics_critical and leaves the civ
+    // with an unrepresented corridor gap.
+    const auto external_system=std::find_if(exposed.systems.begin(),exposed.systems.end(),
+        [&](const StellarSystem &s){return s.id!=home_id;});
+    check(external_system!=exposed.systems.end(),"No external system to stage the corridor gap.");
+    Colony frontier;frontier.id=next_colony_id++;
+    frontier.civilization_id=civ_id;frontier.system_id=external_system->id;
+    frontier.name="Frontier";frontier.kind=SettlementKind::Colony;
+    frontier.population_millions=10.0;frontier.infrastructure=.1;frontier.stability=.8;
+    exposed.colonies.push_back(frontier);
+    // An armed foreign fleet parked in the home system.
+    FleetState hostile;hostile.id=930;hostile.civilization_id=civ_id+4242;
+    hostile.role=FleetRole::Military;hostile.is_active=true;
+    hostile.current_system_id=home_id;
+    exposed.fleets.push_back(hostile);
+    // The theater projection refuses fleets it cannot represent — make
+    // sure every staged fleet carries a positive strategic speed.
+    for(auto &f:exposed.fleets)if(!(f.strategic_speed>0.0)||!std::isfinite(f.strategic_speed))f.strategic_speed=22;
+    // Treasury arrears on the player civ.
+    auto &econ=*std::find_if(exposed.economies.begin(),exposed.economies.end(),
+        [&](const CivilizationEconomy &e){return e.civilization_id==civ_id;});
+    econ.operating_arrears=25.0;
+    const auto ops=inspect_campaign_operations(exposed,9,4.5);
+    const auto degraded=std::find_if(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="degraded_structures"&&r.entity_id==worn_site.id;});
+    check(degraded!=ops.end()&&std::get<double>(degraded->values.at("degradedCount"))==1.0&&
+        std::abs(std::get<double>(degraded->values.at("worstCondition"))-.10)<1e-9,
+        "Worn commissioned structure was not reported as degraded.");
+    check(std::any_of(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="power_shortfall"&&r.entity_id==worn_site.id;}),
+        "Under-powered staffed colony produced no power shortfall.");
+    const auto hostile_record=std::find_if(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="foreign_armed_presence"&&r.entity_id==930;});
+    check(hostile_record!=ops.end()&&hostile_record->system_id==home_id&&
+        std::get<double>(hostile_record->values.at("projectedAttackPerDay"))>0.0,
+        "Armed foreign fleet in held space was not reported.");
+    check(std::any_of(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="treasury_arrears"&&r.civilization_id==civ_id;}),
+        "Carried operating arrears produced no treasury finding.");
+    check(std::any_of(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="freight_corridor_gap"&&r.civilization_id==civ_id;}),
+        "External import requirement produced no corridor-gap finding.");
+    check(std::any_of(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="logistics_critical"&&r.entity_id==frontier.id;}),
+        "Under-provisioned external colony was not classified critical.");
+  }
+  {
+    // Treasury depleted: zero balance with a net-negative credit flow.
+    // A giant low-stability colony makes services cost dominate any
+    // plausible seeded revenue, so the classification is deterministic.
+    auto bankrupt=world;
+    const int civ_id=world.player_civilization_id;
+    const auto civ_it=std::find_if(bankrupt.civilizations.begin(),bankrupt.civilizations.end(),
+        [&](const Civilization &c){return c.id==civ_id;});
+    const int home_id=civ_it->home_system_id;
+    Colony *home_colony=nullptr;
+    for(auto &c:bankrupt.colonies)
+      if(c.civilization_id==civ_id&&c.system_id==home_id){home_colony=&c;break;}
+    check(home_colony,"No home colony to bankrupt.");
+    home_colony->population_millions=100000.0;
+    home_colony->infrastructure=5.0;home_colony->stability=.1;
+    auto &econ=*std::find_if(bankrupt.economies.begin(),bankrupt.economies.end(),
+        [&](const CivilizationEconomy &e){return e.civilization_id==civ_id;});
+    econ.credits=0.0;econ.operating_arrears=0.0;
+    const auto ops=inspect_campaign_operations(bankrupt,9,4.5);
+    check(std::any_of(ops.begin(),ops.end(),
+        [&](const auto &r){return r.event_type=="treasury_depleted"&&r.civilization_id==civ_id;}),
+        "Zero balance with a deficit produced no depleted-treasury finding.");
   }
   auto corrupt=world;corrupt.systems.push_back(corrupt.systems.front());
   corrupt.colonies.front().civilization_id=99999;

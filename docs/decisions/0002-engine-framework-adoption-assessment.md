@@ -110,8 +110,15 @@ The adoption frontier is not authority migration — it is:
    tasks (b) stay deferred.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
-   (`degraded_structures`). Similar cheap wins may exist on the logistics
-   and warfare projections.
+   (`degraded_structures`). **Status (landed):** `campaign_diagnostics`
+   now exercises every previously untriggered finding class —
+   `degraded_structures` (settlement projection condition),
+   `power_shortfall` (sustenance analysis bottleneck),
+   `foreign_armed_presence` (warfare theater projection),
+   `treasury_arrears` and `treasury_depleted` (credit flow +
+   `assess_treasury`), `freight_corridor_gap` and `logistics_critical`
+   (logistics coverage projection) — each staged through authoritative
+   state, not fabricated records.
 3. **Greenfield, not graduation, for genuinely new capability:**
    `Terraforming` is the one framework where first-authority adoption is
    realistic — Core has no competing simulation, so criterion 1 is vacuously

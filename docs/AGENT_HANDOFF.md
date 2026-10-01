@@ -154,7 +154,12 @@ clamps exactly mid-loop. `freight_parity` (87 C# cases + 2 native
 boundaries) and the campaign/parity oracles are unchanged and green;
 `freight_cadence` covers the mid-loop clamp and cache-reuse paths.
 Executor-level entity tasks (option b) stay deferred — see the ADR's
-status note.
+status note. ADR item 2 also landed (2026-10-01): `campaign_diagnostics`
+now stages every previously untriggered operations finding end-to-end —
+`degraded_structures`, `power_shortfall`, `foreign_armed_presence`,
+`treasury_arrears`/`treasury_depleted`, `freight_corridor_gap`,
+`logistics_critical` — through authoritative state, not fabricated
+records.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:
