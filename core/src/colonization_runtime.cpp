@@ -225,37 +225,71 @@ ColonizationSimulation::advance(ColonizationWorldView world,
   if (simulation_days == 0)
     return {};
   std::vector<ColonizationEvent> events;
-  // ADR 0002 option (a): per-advance indexes replace the per-fleet
-  // linear scans this loop used to run — civilization_operating_funding
-  // and require_civilization scanned economies/civilizations per
-  // candidate, body_in_system scanned world.bodies per lookup, and the
-  // occupied test rescanned every colony. emplace keeps the earliest
-  // element, matching find_if first-match semantics; colonies founded
-  // mid-loop join occupied_systems at each push_back.
+  // ADR 0002 option (a): lazily-built per-advance indexes replace the
+  // per-fleet linear scans this loop used to run —
+  // civilization_operating_funding and require_civilization scanned
+  // economies/civilizations per candidate, body_in_system scanned
+  // world.bodies per lookup, and the occupied test rescanned every
+  // colony. Each index builds on first use only: most ticks have no
+  // colony-fleet candidates, and unconditional builds over
+  // ~systems-sized spans would cost more than the scans they replace
+  // (measured: colonization total ballooned when these were eager).
+  // emplace keeps the earliest element, matching find_if first-match
+  // semantics; colonies founded mid-loop join occupied_systems at each
+  // push_back.
   std::unordered_map<int, CivilizationEconomy *> economy_index;
-  for (auto &e : world.economies)
-    economy_index.emplace(e.civilization_id, &e);
+  bool economy_index_built = false;
+  const auto economy_row = [&](int id) -> CivilizationEconomy * {
+    if (!economy_index_built) {
+      for (auto &e : world.economies)
+        economy_index.emplace(e.civilization_id, &e);
+      economy_index_built = true;
+    }
+    const auto it = economy_index.find(id);
+    return it == economy_index.end() ? nullptr : it->second;
+  };
   std::unordered_map<int, const Civilization *> civilization_index;
-  for (const auto &c : world.civilizations)
-    civilization_index.emplace(c.id, &c);
+  bool civilization_index_built = false;
+  const auto civilization_row = [&](int id) -> const Civilization & {
+    if (!civilization_index_built) {
+      for (const auto &c : world.civilizations)
+        civilization_index.emplace(c.id, &c);
+      civilization_index_built = true;
+    }
+    const auto it = civilization_index.find(id);
+    if (it == civilization_index.end())
+      throw std::runtime_error("Sequence contains no matching element");
+    return *it->second;
+  };
   const auto body_key = [](int body_id, int system_id) {
     return (static_cast<std::int64_t>(system_id) << 32) ^
            static_cast<std::uint32_t>(body_id);
   };
   std::unordered_map<std::int64_t, const PlanetaryBody *> body_index;
-  for (const auto &b : world.bodies)
-    body_index.emplace(body_key(b.id, b.system_id), &b);
-  std::unordered_set<int> occupied_systems;
-  for (const auto &c : world.colonies)
-    occupied_systems.insert(c.system_id);
-  const auto economy_row = [&](int id) -> CivilizationEconomy * {
-    const auto it = economy_index.find(id);
-    return it == economy_index.end() ? nullptr : it->second;
-  };
+  bool body_index_built = false;
   const auto body_row = [&](int body_id, int system_id)
       -> const PlanetaryBody * {
+    if (!body_index_built) {
+      for (const auto &b : world.bodies)
+        body_index.emplace(body_key(b.id, b.system_id), &b);
+      body_index_built = true;
+    }
     const auto it = body_index.find(body_key(body_id, system_id));
     return it == body_index.end() ? nullptr : it->second;
+  };
+  std::unordered_set<int> occupied_systems;
+  bool occupied_built = false;
+  const auto is_occupied = [&](int system_id) {
+    if (!occupied_built) {
+      for (const auto &c : world.colonies)
+        occupied_systems.insert(c.system_id);
+      occupied_built = true;
+    }
+    return occupied_systems.contains(system_id);
+  };
+  const auto occupy = [&](int system_id) {
+    if (occupied_built)
+      occupied_systems.insert(system_id);
   };
   // Built lazily on the first fleet that enters the AI opportunity
   // branch — construction throws on duplicate ids, and that throw must
@@ -270,10 +304,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
             1e-7 ||
         fleet.prevent_automatic_settlement)
       continue;
-    const auto civ_it = civilization_index.find(fleet.civilization_id);
-    if (civ_it == civilization_index.end())
-      throw std::runtime_error("Sequence contains no matching element");
-    const auto &civilization = *civ_it->second;
+    const auto &civilization = civilization_row(fleet.civilization_id);
     if (ResourceOutpostOpportunityPlanner::is_outpost_fleet(fleet)) {
       if (fleet.transit_phase == FleetTransitPhase::None &&
           !fleet.destination_system_id && fleet.current_system_id &&
@@ -318,7 +349,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
           colony.infrastructure = .15;
           colony.stability = .85;
           world.colonies.push_back(colony);
-          occupied_systems.insert(colony.system_id);
+          occupy(colony.system_id);
           consume_settlement_vessel(fleet);
           events.push_back({fleet.civilization_id, fleet.id, colony.system_id,
                             colony.id,
@@ -347,8 +378,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
         if (id)
           body = body_row(*id, *fleet.current_system_id);
       }
-      const bool occupied =
-          occupied_systems.contains(*fleet.current_system_id);
+      const bool occupied = is_occupied(*fleet.current_system_id);
       if (body && !(body->stellar_exposure && body->stellar_exposure->baked) &&
           world.knowledge.system_survey_level(fleet.civilization_id,
                                               body->system_id) ==
@@ -383,7 +413,7 @@ ColonizationSimulation::advance(ColonizationWorldView world,
         colony.infrastructure = natural ? .35 : .42;
         colony.stability = natural ? .92 : .88;
         world.colonies.push_back(colony);
-        occupied_systems.insert(colony.system_id);
+        occupy(colony.system_id);
         consume_settlement_vessel(fleet);
         const auto &profile = species_environment_profile(species);
         events.push_back(
