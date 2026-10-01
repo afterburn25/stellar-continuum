@@ -159,7 +159,22 @@ now stages every previously untriggered operations finding end-to-end —
 `degraded_structures`, `power_shortfall`, `foreign_armed_presence`,
 `treasury_arrears`/`treasury_depleted`, `freight_corridor_gap`,
 `logistics_critical` — through authoritative state, not fabricated
-records.
+records. Third option-(a) deployment (landed 2026-10-01): the wider
+coordinator-phase audit found O(economies × colonies) rescans in the
+economy/storage phases — `advance_colony_economies` now builds a
+civilization→colony pointer index once per call (world order preserved
+inside each bucket, so accumulation/mutation order is bit-identical) and
+feeds each economy only its own colonies through `credit_flow`,
+`industry_storage_capacity` and the mutable loop;
+`run_industry_allocation` hoists the `ConstructionWorld`/
+`ShipbuildingWorld` span views out of the civilization loop. The lazy
+`economy_for` lookup in `economy_credit_flow` is preserved —
+`include_research=false` callers with a missing economy row must not
+throw. Oracles unchanged and green: `campaign_economy_parity`,
+`campaign_coordinator_parity`, `campaign_frame_parity`,
+`industry_allocation_parity`, `galaxy_economy_persistence_parity`,
+`economy_scale_5000_colonies`. Win is asymptotic (E×C → E+C), not a
+small-scale constant win.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

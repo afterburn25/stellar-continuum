@@ -6,6 +6,8 @@
 #include <array>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_map>
+#include <vector>
 
 namespace stellar::core {
 namespace {
@@ -37,6 +39,21 @@ const Civilization* civilization_for(std::span<const Civilization> civilizations
     const auto found = std::find_if(civilizations.begin(), civilizations.end(), [=](const auto& value) { return value.id == id; });
     return found == civilizations.end() ? nullptr : &*found;
 }
+// Pointee adaptor so one accumulation serves the raw colony span and the
+// pre-grouped per-civilization pointer buckets below.
+const Colony& colony_ref(const Colony& colony) noexcept { return colony; }
+const Colony& colony_ref(const Colony* colony) noexcept { return *colony; }
+// Per-step colony index (ADR 0002 option a): the per-economy evaluations
+// below each re-scanned the full colony span filtering by civilization
+// id — O(economies x colonies) per step. Grouping once preserves each
+// civilization's colonies in world order, so accumulation and mutation
+// order stay identical.
+template <class C>
+std::unordered_map<int, std::vector<C*>> colonies_by_civilization(std::span<C> colonies) {
+    std::unordered_map<int, std::vector<C*>> index;
+    for (auto& colony : colonies) index[colony.civilization_id].push_back(&colony);
+    return index;
+}
 }
 
 std::span<const ConstructionEconomicProfile> construction_economic_profiles() {
@@ -63,14 +80,18 @@ double fleet_operating_cost(EconomyFleetRole role) {
     switch (role) { case EconomyFleetRole::Scout: return .08; case EconomyFleetRole::Science: return .12; case EconomyFleetRole::Colony: return .16; case EconomyFleetRole::Military: return .35; case EconomyFleetRole::Logistics: return .14; } return .12;
 }
 namespace {
-CreditFlowSnapshot credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
+// `owned` carries only the civilization's colonies in world order — a
+// pre-grouped bucket or a filtered span — so the accumulations match a
+// full-span filtered scan exactly.
+template <class ColonyRange>
+CreditFlowSnapshot credit_flow(EconomyWorldView world, const ColonyRange& owned,
     std::span<const CivilizationEconomy> economies, int civilization_id, bool include_research, double power_days,
     const SettlementBodyIndex& body_index) {
     const auto& construction = construction_for(world.construction, civilization_id);
     CreditFlowSnapshot result;
     const bool automation = completed(construction, "industrial_automation");
-    for (const auto& colony : colonies) {
-        if (colony.civilization_id != civilization_id) continue;
+    for (const auto& entry : owned) {
+        const auto& colony = colony_ref(entry);
         const auto population_factor = std::max(.01, colony.population_millions / 1000.0);
         const auto infrastructure = std::clamp(colony.infrastructure, .1, 5.0);
         const auto stability = std::clamp(colony.stability, .1, 1.2);
@@ -97,13 +118,19 @@ CreditFlowSnapshot credit_flow(EconomyWorldView world, std::span<const Colony> c
 CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
     std::span<const CivilizationEconomy> economies, int civilization_id, bool include_research, double power_days) {
     const SettlementBodyIndex body_index(colonies, world.bodies);
-    return credit_flow(world, colonies, economies, civilization_id, include_research, power_days, body_index);
+    std::vector<const Colony*> owned;
+    for (const auto& colony : colonies)
+        if (colony.civilization_id == civilization_id) owned.push_back(&colony);
+    return credit_flow(world, owned, economies, civilization_id, include_research, power_days, body_index);
 }
-double industry_storage_capacity(EconomyWorldView world, std::span<const Colony> colonies, int id) {
+namespace {
+// `owned` carries only the civilization's colonies in world order —
+// same accumulation as a filtered full-span scan.
+double industry_storage_capacity(EconomyWorldView world, std::span<const Colony* const> owned, int id) {
     const auto* civilization = civilization_for(world.civilizations, id); if (!civilization) throw std::out_of_range("Civilization is unavailable.");
     if (civilization->is_seeded_ancient) return 50000.0;
     double result = base_industry_storage;
-    for (const auto& colony : colonies) if (colony.civilization_id == id) result += industry_storage_per_infrastructure * std::clamp(colony.infrastructure, .1, 5.0);
+    for (const auto* colony : owned) result += industry_storage_per_infrastructure * std::clamp(colony->infrastructure, .1, 5.0);
     const auto& construction = construction_for(world.construction, id);
     if (completed(construction,"industrial_automation")) result += 500;
     if (completed(construction,"orbital_launch_complex")) result += 250;
@@ -111,9 +138,21 @@ double industry_storage_capacity(EconomyWorldView world, std::span<const Colony>
     if (completed(construction,"asteroid_resource_network")) result += 1000;
     return result;
 }
+}
+double industry_storage_capacity(EconomyWorldView world, std::span<const Colony> colonies, int id) {
+    std::vector<const Colony*> owned;
+    owned.reserve(colonies.size());
+    for (const auto& colony : colonies)
+        if (colony.civilization_id == id) owned.push_back(&colony);
+    return industry_storage_capacity(world, std::span<const Colony* const>(owned), id);
+}
 void apply_industry_storage_caps(EconomyWorldView world, std::span<const Colony> colonies, std::span<CivilizationEconomy> economies, std::span<const IndustryReserve> reserves) {
+    const auto colony_index = colonies_by_civilization(colonies);
+    static const std::vector<const Colony*> empty_owned;
     for (auto& economy : economies) {
-        double cap = industry_storage_capacity(world, colonies, economy.civilization_id);
+        const auto bucket = colony_index.find(economy.civilization_id);
+        const auto& owned = bucket == colony_index.end() ? empty_owned : bucket->second;
+        double cap = industry_storage_capacity(world, std::span<const Colony* const>(owned), economy.civilization_id);
         bool seen = false;
         for (const auto& reserve : reserves) if (reserve.civilization_id == economy.civilization_id) {
             if (seen) throw std::invalid_argument("Industry reserves must have unique civilization IDs.");
@@ -125,8 +164,15 @@ void apply_industry_storage_caps(EconomyWorldView world, std::span<const Colony>
 void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies, std::span<CivilizationEconomy> economies, double days, bool accrue_science) {
     if (days <= 0) return;
     const SettlementBodyIndex body_index(colonies, world.bodies);
+    // Group once per step: credit_flow and the mutation loop below used
+    // to re-scan every colony per economy. Bucket order is world order,
+    // so each civilization sees the same colonies in the same sequence.
+    const auto colony_index = colonies_by_civilization(colonies);
+    static const std::vector<Colony*> empty_owned;
     for (auto& economy : economies) {
-        const auto flow = credit_flow(world, colonies, economies, economy.civilization_id, false, days, body_index);
+        const auto bucket = colony_index.find(economy.civilization_id);
+        const auto& owned = bucket == colony_index.end() ? empty_owned : bucket->second;
+        const auto flow = credit_flow(world, owned, economies, economy.civilization_id, false, days, body_index);
         const double opening_arrears = std::max(0.0, economy.operating_arrears);
         const double available_funds = std::max(0.0, economy.credits) + flow.gross_income_per_day * days;
         const double current_operating_obligations = flow.operating_costs_per_day * days;
@@ -143,8 +189,8 @@ void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies
 
         double industry_per_day = 0.0;
         double science_per_day = 0.0;
-        for (auto& colony : colonies) {
-            if (colony.civilization_id != economy.civilization_id) continue;
+        for (auto* colony_ptr : owned) {
+            auto& colony = *colony_ptr;
 
             const double population_factor = std::max(.01, colony.population_millions / 1000.0);
             const double infrastructure = std::clamp(colony.infrastructure, .1, 5.0);

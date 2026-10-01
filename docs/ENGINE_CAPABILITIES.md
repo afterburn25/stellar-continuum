@@ -162,6 +162,50 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   pattern — hoist the invariant, keep the mutated live — applies to any
   phase loop whose helper projections are provably stable within a tick.
 
+## Economy per-civilization colony index + industry-allocation view hoist — ADR 0002 option (a) (2026-10-01)
+
+- **Purpose:** the wider coordinator-phase audit found the same repeated
+  work pattern in the economy and storage-cap phases:
+  `advance_colony_economies` ran `credit_flow` per economy, and both the
+  credit-flow read and the mutable advancement loop re-scanned the full
+  colony span filtering by civilization id — O(economies × colonies)
+  visits per step; `apply_industry_storage_caps` →
+  `industry_storage_capacity` repeated the scan again. The industry
+  allocation phase additionally rebuilt the `ConstructionWorld`/
+  `ShipbuildingWorld` span views inside its civilization loop.
+- **Modules:** `core/src/campaign_economy.cpp` (`colonies_by_civilization`
+  helper, owned-bucket `industry_storage_capacity` overload);
+  `core/src/campaign_coordinator.cpp` (`run_industry_allocation` view
+  hoist).
+- **Public interface:** unchanged — `economy_credit_flow`,
+  `industry_storage_capacity(std::span<const Colony>)`,
+  `apply_industry_storage_caps` and `advance_colony_economies` keep their
+  signatures; the pointer-span overload is translation-unit-local.
+- **Consumers:** the economy phase and the economy_storage phase consume
+  the bucketed paths; diagnostics and adaptive-research callers still use
+  the public span signatures.
+- **Tests:** seeded oracles unchanged on the shipped binary —
+  `campaign_economy_parity`, `campaign_coordinator_parity`,
+  `campaign_frame_parity`, `industry_allocation_parity`,
+  `galaxy_economy_persistence_parity`, `economy_scale_5000_colonies`,
+  `colony_economy_parity`, `surface_economy_parity` plus the
+  `native_economy*`/`engine_shell_tool_economy` consumers.
+- **Save/performance impact:** the index is rebuilt once per call —
+  nothing persists, nothing serialized. Removes E×C rescans per step;
+  skipped iterations were cheap civ-id branches, so the win is asymptotic
+  (matters at large civilization × colony counts), not a small-scale
+  constant win. The lazy `economy_for` lookup in `economy_credit_flow`
+  is deliberately preserved: `include_research=false` callers with a
+  missing economy row must not throw — an eager hoist would have changed
+  error behavior.
+- **Limitations:** bucket grouping pays a pointer-vector allocation per
+  call; industry-allocation views were already cheap span builders, so
+  that half of the change removes closure rebuilds only; no cross-call
+  index reuse (economies/colonies spans change between phases).
+- **Future reuse:** the ordered-pointer-bucket pattern applies wherever a
+  loop filters one shared span by an owner key and must preserve world
+  order — build the index once, iterate the bucket.
+
 ## Starfield-quality live propagation + streamer budget (2026-09-29)
 
 - **Purpose:** the STARFIELD QUALITY video setting was wired to the

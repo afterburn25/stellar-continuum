@@ -108,6 +108,28 @@ The adoption frontier is not authority migration — it is:
    `freight_cadence` (mid-loop clamp on the second freighter, port-capacity
    reuse, outpost loading, idle/ineligible skips). Executor-level entity
    tasks (b) stay deferred.
+
+   **Third deployment (landed):** the wider coordinator-phase audit found
+   the same repeated-scan pattern in the economy/storage-cap phases.
+   `advance_colony_economies` called `credit_flow` per economy, and both
+   `credit_flow` and the mutable advancement loop re-scanned the full
+   colony span filtering by civilization id — O(economies × colonies)
+   visits per step; `apply_industry_storage_caps` →
+   `industry_storage_capacity` did the same. The reduction is a per-step
+   civilization→colony pointer index built once (`colonies_by_civilization`,
+   preserving world order inside each bucket), so each economy sees exactly
+   its own colonies — accumulation and mutation order are bit-identical.
+   `economy_credit_flow`'s lazy `economy_for` lookup is deliberately
+   preserved: `include_research=false` callers with a missing economy row
+   must not throw. In `CampaignCoordinator::run_industry_allocation` the
+   `ConstructionWorld`/`ShipbuildingWorld` span views were also hoisted out
+   of the civilization loop — pure view builders, same spans and closures.
+   The win is asymptotic (skipped iterations were cheap civ-id branches);
+   it removes E×C rescans and per-civ view rebuilds per step.
+   Seeded-oracle gate: `campaign_economy_parity`,
+   `campaign_coordinator_parity`, `campaign_frame_parity`,
+   `industry_allocation_parity`, `galaxy_economy_persistence_parity`,
+   `economy_scale_5000_colonies` — all unchanged.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`

@@ -577,6 +577,15 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          auto &campaign = step_.state->campaign();
          const double phase_days =
              step_.simulation_days * static_cast<double>(ctx.elapsed_ticks);
+         // Loop-invariant per ADR 0002 option (a): the world views wrap
+         // spans over campaign containers the loop never mutates — build
+         // them once instead of rebuilding the closure-carrying structs
+         // per civilization.
+         const auto construction =
+             construction_world(campaign, construction_capability_);
+         const auto shipbuilding = shipbuilding_world(
+             campaign, shipbuilding_capability_, strategic_,
+             use_strategic_shipbuilding_preferences_);
          for (const auto &civilization : campaign.civilizations) {
            if (civilization.is_seeded_ancient)
              continue;
@@ -587,11 +596,6 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
                });
            if (economy == campaign.economies.end())
              throw std::runtime_error("Sequence contains no matching element");
-           const auto construction =
-               construction_world(campaign, construction_capability_);
-           const auto shipbuilding = shipbuilding_world(
-               campaign, shipbuilding_capability_, strategic_,
-               use_strategic_shipbuilding_preferences_);
            const IndustryAllocationContext context{
                civilization.id,
                std::max(economy->industry, 0.0),
