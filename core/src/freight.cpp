@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 namespace stellar::core {
@@ -188,6 +190,42 @@ void FreightSimulation::advance(FreightWorldView world,
   if (simulation_days <= 0.0)
     return;
 
+  // Per-advance invariant caches (ADR 0002 option a): the transfer-rate
+  // port capacity, storage-capacity projections and fleet/construction
+  // projections depend only on inputs that cannot change inside this loop
+  // (colony buildings/infrastructure, construction completion sets, fleet
+  // roles/activity). Rebuilding them per freighter is O(fleets x world);
+  // hoisting keeps identical arithmetic while paying it once.
+  std::unordered_map<int, double> port_capacity_cache;
+  const auto transfer_rate = [&](const FleetState &vessel,
+                                 const Colony &colony) {
+    const auto [entry, inserted] =
+        port_capacity_cache.try_emplace(colony.id, 0.0);
+    if (inserted)
+      entry->second = port_transfer_capacity_per_day(colony);
+    return source_min(cargo_transfer_rate_per_day(vessel), entry->second);
+  };
+  std::optional<std::vector<EconomyConstructionState>> construction_cache;
+  std::optional<std::vector<EconomyFleetState>> fleets_cache;
+  std::unordered_map<int, double> storage_capacity_cache;
+  const auto free_storage_for = [&](int civilization_id,
+                                    const CivilizationEconomy &economy) {
+    const auto [entry, inserted] =
+        storage_capacity_cache.try_emplace(civilization_id, 0.0);
+    if (inserted) {
+      if (!construction_cache)
+        construction_cache = construction_projection(world.construction);
+      if (!fleets_cache)
+        fleets_cache = economic_fleet_projection(world.fleets);
+      entry->second = industry_storage_capacity(
+          economy_view(world, *construction_cache, *fleets_cache),
+          world.colonies, civilization_id);
+    }
+    // `economy.industry` is mutated by unload transfers below — keep the
+    // subtraction live rather than caching the free amount.
+    return source_max(0.0, entry->second - economy.industry);
+  };
+
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active || fleet.role != FleetRole::Logistics ||
         fleet.transit_phase != FleetTransitPhase::None ||
@@ -219,7 +257,7 @@ void FreightSimulation::advance(FreightWorldView world,
         continue;
 
       const auto loaded = source_min(
-          effective_transfer_rate_per_day(fleet, *outpost) * simulation_days,
+          transfer_rate(fleet, *outpost) * simulation_days,
           source_min(outpost->stored_extracted_materials,
                      fleet.cargo_material_capacity - fleet.cargo_materials));
       outpost->stored_extracted_materials -= loaded;
@@ -260,15 +298,10 @@ void FreightSimulation::advance(FreightWorldView world,
                      }) == world.construction.end())
       throw std::runtime_error("Sequence contains no matching element");
 
-    const auto construction = construction_projection(world.construction);
-    const auto fleets = economic_fleet_projection(world.fleets);
-    const auto free_storage = source_max(
-        0.0,
-        industry_storage_capacity(economy_view(world, construction, fleets),
-                                  world.colonies, fleet.civilization_id) -
-            economy->industry);
+    const auto free_storage =
+        free_storage_for(fleet.civilization_id, *economy);
     const auto unloaded = source_min(
-        effective_transfer_rate_per_day(fleet, *home) * simulation_days,
+        transfer_rate(fleet, *home) * simulation_days,
         source_min(fleet.cargo_materials, free_storage));
     economy->industry += unloaded;
     fleet.cargo_materials -= unloaded;

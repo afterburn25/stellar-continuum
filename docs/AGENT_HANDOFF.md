@@ -142,8 +142,19 @@ the fleet's reach fields. Diagnostics via `idle_verdict_stats()`; custom
 reach providers bypass the memo. Measured ~44x on the idle-evaluation
 path (`exploration_idle_cadence_400`: 80k evaluations in ~2.7 ms vs
 ~121 ms fresh-sweep estimate). `campaign_coordinator_parity` and the
-knowledge/lane/exploration oracles are unchanged and green. Next
-candidate: `freight` — see the ADR's status note.
+knowledge/lane/exploration oracles are unchanged and green. Second
+option-(a) deployment (landed 2026-10-01): `FreightSimulation::advance`
+— the audit showed freighters do real work every tick, so the
+equivalent work reduction is a per-advance hoist of loop-invariant
+projections (port transfer capacity per colony id, industry storage
+capacity per civilization over lazy `construction_projection`/
+`economic_fleet_projection` snapshots) while `economy.industry` stays
+live in the free-storage subtraction — the second freighter still
+clamps exactly mid-loop. `freight_parity` (87 C# cases + 2 native
+boundaries) and the campaign/parity oracles are unchanged and green;
+`freight_cadence` covers the mid-loop clamp and cache-reuse paths.
+Executor-level entity tasks (option b) stay deferred — see the ADR's
+status note.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

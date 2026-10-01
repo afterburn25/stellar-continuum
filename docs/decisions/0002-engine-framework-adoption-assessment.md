@@ -88,8 +88,26 @@ The adoption frontier is not authority migration — it is:
    `exploration_idle_cadence_400` (scale run; measured ~44x on the idle
    evaluation path — 80k retained evaluations in ~2.7 ms against a fresh
    `select_mission` baseline). Seeded-oracle gate:
-   `campaign_coordinator_parity` unchanged. `freight` remains the next
-   option-(a) candidate; executor-level entity tasks (b) stay deferred.
+   `campaign_coordinator_parity` unchanged.
+
+   **Second deployment (landed):** `FreightSimulation::advance` was the
+   other named candidate, but its audit showed the waste is not idle
+   re-planning — active freighters perform real transfer work every tick,
+   and a time cadence would alter clamp-boundary arithmetic. The repeated
+   cost is rebuilding loop-invariant projections per freighter inside one
+   `advance`: `construction_projection`, `economic_fleet_projection`,
+   `industry_storage_capacity` (colony infrastructure, construction
+   completion, civ flags — none mutated by freight), and
+   `port_transfer_capacity_per_day`. The adopted equivalent work reduction
+   is an exact per-advance hoist: port capacity is memoized per colony id
+   and industry storage capacity per civilization, while
+   `economy.industry` — which unloads mutate mid-loop — stays live in the
+   subtraction, preserving the second-freighter clamp. No scheduling or
+   ordering semantics changed; seeded-oracle gate: `freight_parity`
+   (87 C# cases + 2 native boundaries) unchanged, covered by
+   `freight_cadence` (mid-loop clamp on the second freighter, port-capacity
+   reuse, outpost loading, idle/ineligible skips). Executor-level entity
+   tasks (b) stay deferred.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). Similar cheap wins may exist on the logistics

@@ -114,11 +114,53 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   is retained — fleets that find work always plan fresh; in-place
   mutation of `StellarSystem` geometry fields is outside the key
   (same contract as the upstream astronomy-static assumption);
-  `freight` is the next option-(a) candidate and is not yet cadenced.
+  `freight` received its option-(a) increment as a loop-invariant hoist
+  (see the entry below) rather than a cadence.
 - **Future reuse:** the revision+nonce keying pattern transfers directly
-  to the freight entity loop and to any future pure-verdict entity class;
-  a time-based next-due accumulator remains available for classes whose
-  verdicts can degrade with elapsed time rather than discrete inputs.
+  to any future pure-verdict entity class; a time-based next-due
+  accumulator remains available for classes whose verdicts can degrade
+  with elapsed time rather than discrete inputs.
+
+## Freight loop-invariant projection hoist — ADR 0002 option (a) (2026-10-01)
+
+- **Purpose:** the second option-(a) deployment, on the other named
+  candidate. Auditing `FreightSimulation::advance` showed the waste is
+  not idle re-planning — every eligible freighter performs real transfer
+  work per tick, so a time cadence would alter clamp-boundary arithmetic.
+  The repeated cost is rebuilding loop-invariant projections per
+  freighter inside a single `advance`; the equivalent work reduction is
+  an exact hoist with zero scheduling-semantics change.
+- **Modules:** `core/src/freight.cpp` (per-advance caches inside
+  `FreightSimulation::advance`).
+- **Public interface:** unchanged — the caches are function-local, so no
+  API surface moved. `FreightSimulation::advance(FreightWorldView,
+  double)` is bit-identical in observable behavior.
+- **Consumers:** the fleet loop itself. `port_transfer_capacity_per_day`
+  is memoized per colony id (colony buildings/infrastructure are
+  loop-invariant), while `cargo_transfer_rate_per_day(vessel)` stays
+  live per fleet. `industry_storage_capacity` is memoized per
+  civilization over lazily-built `construction_projection`/
+  `economic_fleet_projection` snapshots — all read only colony
+  infrastructure, construction completion sets and civilization flags,
+  none of which freight mutates — while `economy.industry`, which
+  unloads do mutate mid-loop, stays live in the free-storage subtraction
+  so the second freighter still clamps exactly.
+- **Tests:** `freight_cadence` — mid-loop storage clamp binding on the
+  second freighter of a shared civilization, port-capacity reuse across
+  outpost and home transfers, outpost loading with reach-assessed route
+  assignment, and idle/ineligible fleet skips. Seeded oracle unchanged:
+  `freight_parity` (87 C# cases + 2 native boundaries) passes bit-for-bit.
+- **Save/performance impact:** caches live only for the duration of one
+  `advance` call — nothing persists, nothing serialized. Removes
+  O(fleets × world) rebuilds when many freighters unload in one tick.
+- **Limitations:** per-advance scope only — no cross-tick reuse (the
+  knowledge/lane revision machinery does not cover colony/construction
+  inputs, so a wider memo is not yet safe); freight mission-state fields
+  remain live by design; executor-level entity tasks remain deferred
+  per the ADR.
+- **Future reuse:** the "which fields does each projection read" audit
+  pattern — hoist the invariant, keep the mutated live — applies to any
+  phase loop whose helper projections are provably stable within a tick.
 
 ## Starfield-quality live propagation + streamer budget (2026-09-29)
 
