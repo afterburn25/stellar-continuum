@@ -191,6 +191,22 @@ int main(int argc,char **argv)try{
     check(std::any_of(ops.begin(),ops.end(),
         [&](const auto &r){return r.event_type=="logistics_critical"&&r.entity_id==frontier.id;}),
         "Under-provisioned external colony was not classified critical.");
+    // A marginally under-covered colony lands Strained (coverage in
+    // [.70,.95)), not Critical — exercises the other supply band.
+    Colony thin;thin.id=next_colony_id++;
+    thin.civilization_id=civ_id;thin.system_id=home_id;
+    thin.name="Thin margin";thin.kind=SettlementKind::Colony;
+    thin.population_millions=10.0;thin.infrastructure=1.5;thin.stability=1.0;
+    exposed.colonies.push_back(thin);
+    const auto strained_ops=inspect_campaign_operations(exposed,9,4.5);
+    check(std::any_of(strained_ops.begin(),strained_ops.end(),
+        [&](const auto &r){return r.event_type=="logistics_strained"&&r.entity_id==thin.id;}),
+        "Marginally under-covered colony was not classified strained.");
+    // A bound below the finding count emits the truncation marker
+    // rather than silently dropping records.
+    const auto capped_ops=inspect_campaign_operations(exposed,9,4.5,1);
+    check(capped_ops.size()==2&&capped_ops.back().event_type=="findings_truncated",
+        "Operational finding bound ignored or truncation marker missing.");
   }
   {
     // Treasury depleted: zero balance with a net-negative credit flow.
