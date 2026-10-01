@@ -5,6 +5,7 @@
 #include <stellar/core/fleet_transit.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cctype>
 #include <cmath>
 #include <limits>
@@ -357,13 +358,26 @@ const ShipDesignDefinition *select_ai_design(ShipbuildingReadView world,
   if (available.empty())
     return nullptr;
   const auto pref = preference_for(world, civilization.id);
+  // One pass over world.fleets — the any_of scans per (role, populated)
+  // query it replaces were also pure reads, so precomputed flags are
+  // identical. Out-of-range role values still report absent, matching
+  // the equality-compare misses of the original.
+  std::array<bool, 5> role_seen{}, role_populated{};
+  for (const auto &f : world.fleets) {
+    if (!f.is_active || f.civilization_id != civilization.id)
+      continue;
+    const auto idx = static_cast<std::size_t>(f.role);
+    if (idx >= role_seen.size())
+      continue;
+    role_seen[idx] = true;
+    if (f.embarked_population_millions > 0)
+      role_populated[idx] = true;
+  }
   auto active = [&](FleetRole role, bool populated = false) {
-    return std::any_of(
-        world.fleets.begin(), world.fleets.end(), [&](const FleetState &f) {
-          return f.is_active && f.civilization_id == civilization.id &&
-                 f.role == role &&
-                 (!populated || f.embarked_population_millions > 0);
-        });
+    const auto idx = static_cast<std::size_t>(role);
+    if (idx >= role_seen.size())
+      return false;
+    return populated ? role_populated[idx] : role_seen[idx];
   };
   bool need = false;
   if (pref.preferred_new_fleet_role)
@@ -839,7 +853,7 @@ ShipbuildingCancellationResult cancel_ship_build(ShipbuildingWorld world,
           assessment.refund_credits};
 }
 
-double shipbuilding_industry_demand(ShipbuildingReadView world,
+double shipbuilding_industry_demand(ShipbuildingReadView,
                                     const ShipyardState *state,
                                     double days) {
   if (!state)

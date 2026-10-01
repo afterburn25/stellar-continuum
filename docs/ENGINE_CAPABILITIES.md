@@ -224,9 +224,16 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `surface_construction_industry_demand`/`advance_surface_construction`
   overloads, `site_demand` extraction),
   `core/src/construction_projects.cpp` + `core/src/shipbuilding.cpp`
-  (resolved-input `*_industry_demand` overloads),
+  (resolved-input `*_industry_demand` overloads, single-pass
+  `(role, populated)` flags in `select_ai_design`),
   `core/src/campaign_coordinator.cpp` (economy, construction-state,
-  shipyard and colony-bucket indexes in the industry-allocation phase).
+  shipyard and colony-bucket indexes in the industry-allocation phase),
+  `core/src/colonization_runtime.cpp` (per-advance economy/civilization/
+  body indexes, `occupied_systems` set maintained across mid-loop colony
+  founding, lazily-built AI opportunity maps preserving duplicate-key
+  throw timing),
+  `core/src/legacy_research.cpp` (civ-keyed technology/construction/
+  economy indexes in `advance_core`).
 - **Public interface:** additive overloads only —
   `campaign_industry_weights(const CivilizationEconomy*)`,
   `civilization_operating_funding(const CivilizationEconomy*)`,
@@ -258,9 +265,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   persists. Removes O(civs) linear lookups per civ per step
   (~5–8 scans/civ in `advance_construction` alone); each skipped
   iteration was a cheap id compare, so the win is asymptotic.
-- **Limitations:** `select_ai_design`'s fleet `any_of` scans and
-  `lock`/`promote`'s bounded promotion-time lookups are left as-is;
-  indexes are rebuilt per call with no cross-phase reuse.
+- **Limitations:** `lock`/`promote`'s bounded promotion-time lookups
+  and per-founding `count_if` naming scans in colonization are left
+  as-is (bounded, rare); indexes are rebuilt per call with no
+  cross-phase reuse.
 - **Future reuse:** `civ_index_of` is the generic shape — any batch loop
   that resolves civ-keyed rows repeatedly can index once; the
   resolved-pointer extraction pattern lets public per-civ entry points

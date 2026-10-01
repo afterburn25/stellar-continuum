@@ -179,6 +179,29 @@ The adoption frontier is not authority migration — it is:
    full-span scans they replace. The public civ-id overloads remain;
    the shipbuilding one delegates to the resolved body. Seeded-oracle
    gate: same set as the fourth deployment, unchanged.
+
+   **Sixth deployment (landed):** the remaining audit items.
+   `select_ai_design` replaced its up-to-four `any_of` fleet scans per
+   AI order decision with one pass filling `(role, populated)` flag
+   arrays — out-of-range role ordinals still report absent, matching the
+   original equality-compare misses. `ColonizationSimulation::advance`
+   previously rescanned economies (`civilization_operating_funding` in
+   the skip guard and inside `advance_establishment`), civilizations
+   (`require_civilization`), bodies (`body_in_system`) and all colonies
+   (`occupied` test) per candidate fleet, and rebuilt the AI
+   opportunity branch's system/body maps per idle colony fleet. One
+   per-advance pass now builds civ-keyed economy/civilization indexes,
+   a `(body_id, system_id)`-keyed body index and an
+   `occupied_systems` set (colonies founded mid-loop join the set at
+   `push_back`, preserving the original visibility); the planner maps
+   are built lazily once so their duplicate-key throws still fire only
+   when a fleet reaches the branch. `advance_establishment` now takes
+   the resolved `const CivilizationEconomy*`.
+   `LegacyResearchSimulation::advance_core` gains the same three-index
+   pattern for technologies/construction/economies with identical
+   missing-row throw order. Seeded-oracle gate: colonization,
+   settlement, shipbuilding, industry-allocation, construction,
+   legacy/adaptive research and coordinator/frame parity — unchanged.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`

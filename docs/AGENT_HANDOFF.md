@@ -206,9 +206,19 @@ ConstructionState*, span<const Colony* const>, double)`,
 ShipyardState*, double)`, and a const-element
 `surface_construction_industry_demand` span). Null resolved rows throw
 the same `out_of_range` the lookups produced; public civ-id overloads
-remain (shipbuilding delegates). Deferred: `select_ai_design`
-fleet scans, `promote`/`lock` promotion-time lookups, and
-strategic-AI/colonization/combat internals.
+remain (shipbuilding delegates). Sixth option-(a) deployment (landed
+2026-10-01): remaining audit items — `select_ai_design` now fills
+`(role, populated)` flags in one fleet pass; `ColonizationSimulation::
+advance` indexes economies/civilizations/bodies once per call plus an
+`occupied_systems` set updated at each mid-loop colony founding, with
+the AI opportunity maps lazily built once so duplicate-key throws keep
+their original timing; `LegacyResearchSimulation::advance_core` indexes
+technologies/construction/economies per call with identical throw
+order. Audit conclusion on the rest: `promote`/`lock` are bounded
+promotion-time lookups, strategic AI is already cadence-gated
+(`next_review_tick_`), and combat already indexes fleets per advance
+(`index_fleets`/`build_targets`) — no remaining per-entity rescans in
+the coordinator's 12-phase loop.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

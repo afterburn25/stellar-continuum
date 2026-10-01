@@ -639,14 +639,14 @@ double site_demand(const Colony &c, double days) {
   return sum;
 }
 } // namespace
-double surface_construction_industry_demand(ConstructionReadView w,
+double surface_construction_industry_demand(ConstructionReadView,
     std::span<Colony *const> owned, double days) {
   double sum = 0;
   for (const auto *c : owned)
     sum += site_demand(*c, days);
   return sum;
 }
-double surface_construction_industry_demand(ConstructionReadView w,
+double surface_construction_industry_demand(ConstructionReadView,
     std::span<const Colony *const> owned, double days) {
   double sum = 0;
   for (const auto *c : owned)
@@ -662,7 +662,7 @@ double surface_construction_industry_demand(ConstructionReadView w, int civ,
   return sum;
 }
 void advance_surface_construction(ConstructionWorld w,
-                                  std::span<Colony *const> owned, int civ,
+                                  std::span<Colony *const> owned, int,
                                   CivilizationEconomy *e, double budget,
                                   double days) {
   if (!std::isfinite(budget) || budget < 0 || !std::isfinite(days) || days < 0)

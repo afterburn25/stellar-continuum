@@ -4,6 +4,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 namespace stellar::core {
@@ -106,6 +107,23 @@ std::vector<LegacyResearchEvent> LegacyResearchSimulation::advance_core(
   std::vector<LegacyResearchEvent> events;
   const std::vector<Civilization> snapshot(world.civilizations.begin(),
                                            world.civilizations.end());
+  // ADR 0002 option (a): the loop used to linear-scan three civ-keyed
+  // spans per civilization. Index once per call; emplace keeps the
+  // earliest element, matching find_if first-match semantics, and each
+  // resolved row is the same object the span exposes (science spend and
+  // progress writes land identically).
+  std::unordered_map<int, TechnologyState *> technology_index;
+  for (auto &v : world.technologies)
+    technology_index.emplace(v.civilization_id, &v);
+  std::unordered_map<int, const ConstructionState *> construction_index;
+  for (const auto &v : world.construction)
+    construction_index.emplace(v.civilization_id, &v);
+  std::unordered_map<int, CivilizationEconomy *> economy_index;
+  for (auto &v : world.economies)
+    economy_index.emplace(v.civilization_id, &v);
+  const auto missing = []() -> void {
+    throw std::runtime_error("Sequence contains no matching element");
+  };
   for (const auto &civilization : snapshot) {
     if (only_civilization_id && civilization.id != *only_civilization_id)
       continue;
@@ -113,15 +131,18 @@ std::vector<LegacyResearchEvent> LegacyResearchSimulation::advance_core(
         CivilizationDevelopmentStage::AncientSpacefaring)
       continue;
 
-    auto &state = first<TechnologyState>(
-        world.technologies,
-        [&](const auto &value) { return value.civilization_id == civilization.id; });
-    const auto &construction = first<ConstructionState>(
-        world.construction,
-        [&](const auto &value) { return value.civilization_id == civilization.id; });
-    auto &economy = first<CivilizationEconomy>(
-        world.economies,
-        [&](const auto &value) { return value.civilization_id == civilization.id; });
+    const auto tech_it = technology_index.find(civilization.id);
+    if (tech_it == technology_index.end())
+      missing();
+    auto &state = *tech_it->second;
+    const auto con_it = construction_index.find(civilization.id);
+    if (con_it == construction_index.end())
+      missing();
+    const auto &construction = *con_it->second;
+    const auto eco_it = economy_index.find(civilization.id);
+    if (eco_it == economy_index.end())
+      missing();
+    auto &economy = *eco_it->second;
 
     if (!state.active_research_id && civilization_uses_ai(civilization,world.control)) {
       const auto *selection =
