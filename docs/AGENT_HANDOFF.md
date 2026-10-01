@@ -209,10 +209,12 @@ the same `out_of_range` the lookups produced; public civ-id overloads
 remain (shipbuilding delegates). Sixth option-(a) deployment (landed
 2026-10-01): remaining audit items — `select_ai_design` now fills
 `(role, populated)` flags in one fleet pass; `ColonizationSimulation::
-advance` indexes economies/civilizations/bodies once per call plus an
-`occupied_systems` set updated at each mid-loop colony founding, with
-the AI opportunity maps lazily built once so duplicate-key throws keep
-their original timing; `LegacyResearchSimulation::advance_core` indexes
+advance` indexes economies/civilizations/bodies lazily on first
+candidate (eager per-tick builds measured WORSE — colonization hit
+6,978 ms total on the canonical benchmark vs 328 ms lazy, identical
+finalStateHash) plus an `occupied_systems` set updated at each mid-loop
+colony founding, with the AI opportunity maps lazily built once so
+duplicate-key throws keep their original timing; `LegacyResearchSimulation::advance_core` indexes
 technologies/construction/economies per call with identical throw
 order. Audit conclusion on the rest: `promote`/`lock` are bounded
 promotion-time lookups, strategic AI is already cadence-gated

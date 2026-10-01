@@ -189,14 +189,19 @@ The adoption frontier is not authority migration — it is:
    the skip guard and inside `advance_establishment`), civilizations
    (`require_civilization`), bodies (`body_in_system`) and all colonies
    (`occupied` test) per candidate fleet, and rebuilt the AI
-   opportunity branch's system/body maps per idle colony fleet. One
-   per-advance pass now builds civ-keyed economy/civilization indexes,
-   a `(body_id, system_id)`-keyed body index and an
-   `occupied_systems` set (colonies founded mid-loop join the set at
-   `push_back`, preserving the original visibility); the planner maps
-   are built lazily once so their duplicate-key throws still fire only
-   when a fleet reaches the branch. `advance_establishment` now takes
-   the resolved `const CivilizationEconomy*`.
+   opportunity branch's system/body maps per idle colony fleet. Each
+   index builds **lazily on first use**: civ-keyed
+   economy/civilization indexes, a `(body_id, system_id)`-keyed body
+   index and an `occupied_systems` set (colonies founded mid-loop join
+   the set through `occupy`, preserving the original visibility), and
+   the planner maps — so duplicate-key throws still fire only when a
+   fleet reaches the branch. `advance_establishment` now takes the
+   resolved `const CivilizationEconomy*`. Lazy construction was forced
+   by measurement, not taste: an eager per-advance build cost more than
+   the scans on the dominant "no candidates" path — the canonical
+   benchmark (2500 systems, 1000 stress fleets, 4000 ticks) showed
+   colonization ballooning to 6,978 ms total (step mean 5.6 ms);
+   lazily built it is 328 ms, with an identical `finalStateHash`.
    `LegacyResearchSimulation::advance_core` gains the same three-index
    pattern for technologies/construction/economies with identical
    missing-row throw order. Seeded-oracle gate: colonization,

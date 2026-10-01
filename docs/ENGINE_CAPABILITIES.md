@@ -228,10 +228,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `(role, populated)` flags in `select_ai_design`),
   `core/src/campaign_coordinator.cpp` (economy, construction-state,
   shipyard and colony-bucket indexes in the industry-allocation phase),
-  `core/src/colonization_runtime.cpp` (per-advance economy/civilization/
-  body indexes, `occupied_systems` set maintained across mid-loop colony
-  founding, lazily-built AI opportunity maps preserving duplicate-key
-  throw timing),
+  `core/src/colonization_runtime.cpp` (lazily-built per-advance
+  economy/civilization/body indexes — most ticks have no colony-fleet
+  candidates, and an eager build measurably cost more than the scans;
+  `occupied_systems` set maintained across mid-loop colony founding,
+  lazily-built AI opportunity maps preserving duplicate-key throw
+  timing),
   `core/src/legacy_research.cpp` (civ-keyed technology/construction/
   economy indexes in `advance_core`).
 - **Public interface:** additive overloads only —
