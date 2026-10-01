@@ -1,4 +1,7 @@
 #pragma once
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -35,6 +38,13 @@ struct TriangleMesh {
 inline constexpr int maximum_rgba_image_dimension=8192;
 inline constexpr std::size_t maximum_rgba_image_bytes=64u*1024u*1024u;
 inline constexpr std::size_t maximum_image_cache_entries=128;
+// UTF-8 encoded path strings (argv, JSON manifests) must construct through the
+// char8_t overload — a plain char source decodes in the native encoding.
+[[nodiscard]] inline std::filesystem::path path_from_utf8(
+    const std::string &encoded){
+  return std::filesystem::path(std::u8string(
+      reinterpret_cast<const char8_t *>(encoded.data()),encoded.size()));
+}
 // Includes the immutable CPU pixels retained by the cache and the estimated
 // RGBA texture allocation. Images also retained by callers are outside it.
 inline constexpr std::size_t maximum_image_cache_resident_bytes=192u*1024u*1024u;
@@ -121,6 +131,13 @@ struct RenderOptions3D {
   float saturation{1.f}; // 0..2
   float sharpen{0.f};    // 0..1 unsharp amount
   float vignette{0.f};   // 0..1 post-tonemap corner darkening
+  // Post-tonemap 3x3 channel remap (column-major, c' = M·c) applied to
+  // the resolved display-space color — e.g. a Machado color-blind
+  // simulation matrix. Identity (default) is bit-identical to the old
+  // path; a non-finite element disables the remap entirely. Composes
+  // after contrast/saturation/sharpen and before vignette (a scalar, so
+  // ordering against it is free).
+  std::array<float,9> color_matrix{1.f,0.f,0.f, 0.f,1.f,0.f, 0.f,0.f,1.f};
   DebugView3D debug_view{DebugView3D::Lit};
   // Scene seconds for animated material terms (band_drift, volume
   // flow_rate); the driving host accumulates it per frame. 0 keeps
@@ -135,7 +152,25 @@ struct Scene3DView { std::shared_ptr<const Scene3D> scene;UiRect destination;Ren
   // loads, the editor preview) pass a stable serial so one logical scene
   // bakes once — bump it when the probe content should refresh. Zero keys
   // the bake to this scene instance (ad-hoc views).
-  std::uint64_t probe_epoch{}; };
+  std::uint64_t probe_epoch{};
+  // Fraction of the destination size the offscreen render target is
+  // allocated at ([0.25,1]; composite upscales linearly). A frame over
+  // the render-target budget can shrink backdrop views and keep their
+  // volumetric/warped shading instead of dropping whole layers to 2D.
+  float render_scale{1.f}; };
+// Effective offscreen-target pixel extent for a view — prepare()
+// allocates ceil(destination*render_scale) per axis (one pixel minimum).
+// prepare() rejects scales outside [0.25,1]; the estimator treats an
+// invalid scale as unscaled so a malformed view is never under-budgeted.
+[[nodiscard]] inline std::array<std::size_t,2> scene3d_view_target_extent(const Scene3DView& view){
+  const float scale=std::isfinite(view.render_scale)&&view.render_scale>=.25f&&view.render_scale<=1.f?view.render_scale:1.f;
+  const auto extent=[scale](float e){return static_cast<std::size_t>(std::max(1,static_cast<int>(std::ceil(e*scale))));};
+  return {extent(view.destination.width),extent(view.destination.height)};}
+// The prepare()-time render-target charge for a view — bytes_per_pixel is
+// 16 on the HDR path, 8 on the UNORM fallback
+// (Window::scene3d_statistics().hdr reports the live device path).
+[[nodiscard]] inline std::size_t scene3d_view_target_bytes(const Scene3DView& view,std::size_t bytes_per_pixel=16){
+  const auto e=scene3d_view_target_extent(view);return e[0]*e[1]*bytes_per_pixel;}
 using WorldCommand=std::variant<Line,Circle,Text,Image,TriangleMesh,Scene3DView>;
 using UiOverlayCommand=std::variant<FilledRectangle,StrokedRectangle,Line,Text,Image,TriangleMesh,Scene3DView>;
 // A completed scene is immutable at this boundary. Coordinates are drawable
@@ -251,7 +286,15 @@ class Window final {
   [[nodiscard]] std::size_t image_cache_resident_bytes() const noexcept;
   [[nodiscard]] std::uint64_t image_upload_count() const noexcept;
   [[nodiscard]] Scene3DStatistics scene3d_statistics() const noexcept;
+  // Predicts the prepare()-time render-target accounting for a draw list
+  // — scene3d_view_target_bytes per Scene3DView in world + overlay at the
+  // device's real bytes-per-pixel (HDR aware; 16 B/px conservatively
+  // before a renderer exists). Lets hosts gate or rescale views against
+  // maximum_scene3d_target_bytes before submission.
+  [[nodiscard]] std::size_t scene3d_target_bytes(const DrawList& draw) const noexcept;
   // Retunes the 3D texture-streaming byte budget; takes effect next frame.
+  // The request persists — a renderer lazily created on the first 3D frame
+  // inherits the last requested budget.
   void set_scene3d_texture_budget(std::uint64_t bytes);
  private:
   struct Storage; Storage *storage_{};

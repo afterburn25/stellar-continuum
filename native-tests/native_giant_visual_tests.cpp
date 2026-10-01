@@ -15,7 +15,7 @@ int main(int argc,char** argv)try{
   const int lod=area.width<640?256:1024;
   const auto maps=load_material(root/"assets/visual",a,lod);std::vector<MeshInstance3D> objects;append_instances(objects,a,maps,{},1,lod,0,illumination,view);
   Camera3D camera;camera.position={0,0,8};camera.projection=Projection3D::Perspective;camera.near_plane=.1f;camera.far_plane=20;
-  camera.vertical_fov_radians=2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.16/8);
+  camera.vertical_fov_radians=static_cast<float>(2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.16/8));
   draw.overlay.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects)),area});
   stellar::native_menu_style::text(draw,{area.x+3,area.y+area.height-31,area.width-6,28},caption,16,stellar::native_menu_style::ink,TextAlign::Center);
  };
@@ -70,6 +70,8 @@ int main(int argc,char** argv)try{
  auto panel_draw=render();window.draw(panel_draw,folder/"giant-test-panel.png");
  const auto press=[&](std::string_view label){auto draw=render();for(const auto& cmd:draw.overlay)if(const auto* t=std::get_if<Text>(&cmd);t&&t->value==label&&t->clip){Point p{t->clip->x+t->clip->width/2,t->clip->y+t->clip->height/2};panel.handle({InputEventType::LeftPressed,p},1280,720,frame);panel.handle({InputEventType::LeftReleased,p},1280,720,frame);return;}throw std::runtime_error("Missing panel control "+std::string(label));};
  for(auto action:{"ICE GIANTS","NEXT SUBCLASS","NEXT PLANET IMAGE","NEXT RING IMAGE","TILT +15°","CAMERA LEFT","CAMERA HIGHER","STAR DIRECTION +45°","STAR SPECTRUM","MOVE FARTHER","RING SHADOW: ON","PLANET SHADOW: ON"})press(action);
+ {const auto draw=render();const auto* view=[&]{for(const auto& c:draw.overlay)if(const auto* v=std::get_if<Scene3DView>(&c))return v;return static_cast<const Scene3DView*>(nullptr);}();
+  check(view&&view->options.time>0,"Preview ignored the shader clock; band drift renders frozen");}
  window.draw(render(),folder/"giant-test-panel-adjusted.png");
  const auto& live=frame.runtime().world().campaign();const auto lab=build_developer_giant_test(live);const auto& planet=lab.body;
  check(live.systems.size()==250,"QA changed generated system count");

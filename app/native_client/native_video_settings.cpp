@@ -223,9 +223,9 @@ VideoSettingsLayout::for_viewport(const int width, const int height) {
                                             (w - 24.f) / 760.f, (h - 24.f) / 730.f}));
   VideoSettingsLayout layout;
   layout.scale = scale;
-  layout.title_font_pixels = static_cast<int>(std::lround(28.f * scale));
-  layout.body_font_pixels = static_cast<int>(std::lround(18.f * scale));
-  layout.small_font_pixels = static_cast<int>(std::lround(15.f * scale));
+  layout.title_font_pixels = stellar::native_ui::type::scaled(28.f, scale);
+  layout.body_font_pixels = stellar::native_ui::type::scaled(18.f, scale);
+  layout.small_font_pixels = stellar::native_ui::type::scaled(15.f, scale);
   const auto panel_width = std::min(760.f * scale, w - 24.f * scale);
   const auto panel_height = std::min(730.f * scale, h - 24.f * scale);
   layout.panel = {(w - panel_width) * .5f, (h - panel_height) * .5f,

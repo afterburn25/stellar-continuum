@@ -110,6 +110,12 @@ public:
   bool pressed(std::string_view action) const;   // held or pressed this frame
   bool just_pressed(std::string_view action) const;
   bool just_released(std::string_view action) const;
+  // The first action whose press edge the most recent feed() created —
+  // empty when that event was a release, axis, motion, unbound, or a held
+  // repeat. Per-event resolution: pressed_this_frame accumulates across
+  // every event fed in a frame, so scanning just_pressed() after a second
+  // press would return an earlier event's action instead of this one.
+  std::string_view last_press_action() const noexcept;
   float axis(std::string_view action) const;
   float axis_y(std::string_view action) const;
 
@@ -133,6 +139,7 @@ private:
   std::unordered_map<std::string, InputContext> contexts_;
   std::vector<std::string> stack_;
   std::unordered_map<std::string, ActionState> states_;
+  std::string last_press_action_;
   std::unordered_map<int, bool> held_keys_; // for chord evaluation
   // Latest value per gamepad axis — persists across frames since devices
   // only emit axis events on change; begin_frame must not clear them.

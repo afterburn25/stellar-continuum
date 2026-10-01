@@ -8,6 +8,9 @@
 #include "native_video_controller.hpp"
 #include "native_video_settings_smoke.hpp"
 #include "native_audio_settings_smoke.hpp"
+#include "native_voice_settings_smoke.hpp"
+#include "native_general_settings_smoke.hpp"
+#include "native_settings_hub_smoke.hpp"
 
 #include <algorithm>
 #include <chrono>
@@ -293,6 +296,58 @@ StartupEntryResult run_native_startup_entry(Window &window,
             workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
             config.video_settings->render(draw,width,height);
             window.draw(draw,confirming?automation->video_confirm_screenshot:automation->video_settings_screenshot);
+          });
+    }
+    if (!automation->voice_settings_screenshot.empty()) {
+      if (!config.voice_settings) throw std::runtime_error("Voice settings validation requires the real overlay.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_audio::check_voice_settings(*config.voice_settings,
+          automation->voice_settings_path,width,height,"startup",
+          [&]{if(config.settings_hub)config.settings_hub->close();
+              route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[3])});},route,
+          [&]{DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.voice_settings->render(draw,width,height);
+            window.draw(draw,automation->voice_settings_screenshot);
+          });
+    }
+    if (!automation->controls_settings_screenshot.empty()) {
+      if (!config.settings_hub) throw std::runtime_error("Controls settings validation requires the settings hub.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_settings::check_controls_help_card(*config.settings_hub,
+          width,height,"startup",
+          [&]{config.settings_hub->close();
+              route({InputEventType::LeftPressed,center(entry_layout.settings)});
+              route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[4])});},route,
+          [&]{DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.settings_hub->render(draw,width,height);
+            window.draw(draw,automation->controls_settings_screenshot);
+          });
+    }
+    if (!automation->general_settings_screenshot.empty()) {
+      if (!config.settings_hub || !config.general_settings)
+        throw std::runtime_error("General settings validation requires the settings hub and overlay.");
+      const auto route=[&](const InputEvent& event){
+        if(!route_settings(event,width,height))dispatch(workspace.handle(event,width,height,measure));
+      };
+      stellar::native_general::check_general_settings(
+          *config.general_settings,config.general_settings->path(),width,height,"startup",
+          [&]{
+            config.settings_hub->close();
+            route({InputEventType::LeftPressed,center(entry_layout.settings)});
+            route({InputEventType::LeftPressed,center(stellar::native_settings::HubLayout::for_viewport(width,height).categories[0])});
+          },route,
+          [&]{
+            DrawList draw;
+            workspace.render(draw,width,height,measure,&portrait_provider,&artwork_provider);
+            config.general_settings->render(draw,width,height);
+            window.draw(draw,automation->general_settings_screenshot);
           });
     }
     if(config.settings_hub)config.settings_hub->close();

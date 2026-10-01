@@ -76,7 +76,12 @@ public:
   void set_stellar_art(StellarArtProvider value){stellar_art_=std::move(value);}
   void set_stellar_activity(StellarActivityProvider value){stellar_activity_=std::move(value);}
   void set_planet_materials(stellar::native_planets::MaterialProvider value){planet_materials_=std::move(value);}
+  void set_scene3d_quality(stellar::native_map::RenderQuality3D value)noexcept{scene3d_quality_=value;}
+  // Optional world-fixed radiance map for the planet scene's IBL slot —
+  // the phenomena pipeline feeds its composited local nebula field here.
+  void set_scene_environment(std::shared_ptr<const stellar::native_map::RgbaImage> value){scene_environment_=std::move(value);}
   void set_small_body_images(SmallBodyImageProvider value){small_bodies_.set_images(std::move(value));}
+  void set_small_body_scene3d_quality(stellar::native_map::RenderQuality3D quality)noexcept{small_bodies_.set_scene3d_quality(quality);}
   void set_simulation_days(double days);
   [[nodiscard]] std::optional<int> tracked_body_id()const noexcept{return tracked_body_id_;}
   void set_motion_running(bool running)noexcept{motion_running_=running;}
@@ -202,6 +207,8 @@ private:
   std::shared_ptr<const stellar::native_map::RgbaImage> shipyard_image_;
   bool dragging_{},pending_initial_travel_fit_{};
   bool artwork_ready_{true};
+  stellar::native_map::RenderQuality3D scene3d_quality_{stellar::native_map::RenderQuality3D::High};
+  std::shared_ptr<const stellar::native_map::RgbaImage> scene_environment_;
   int width_{},height_{};
 };
 } // namespace stellar::native_system_ui

@@ -2547,7 +2547,9 @@ int RuntimeHost::run() {
             ad->kelvin >= 100.f && ad->kelvin <= 100000.f &&
             std::abs(ad->beaming) <= 1.f)
           inst.material = accretion_disc_material3d(
-              ad->inner, ad->outer, ad->kelvin, ad->beaming);
+              ad->inner, ad->outer, ad->kelvin, ad->beaming, ad->spiral,
+              static_cast<int>(ad->spiral_arms), ad->spiral_turns,
+              ad->shear_rate);
         if (tint)
           inst.material.tint = Color{tint->r, tint->g, tint->b, 255};
         inst.material.opacity = op ? op->value : 1.f;
@@ -2596,10 +2598,12 @@ int RuntimeHost::run() {
           inst.material.band_turbulence = sf->band_turbulence;
           inst.material.band_diff = sf->band_diff;
           inst.material.orbital_beaming = sf->orbital_beaming;
+          inst.material.orbital_beaming_tint = sf->orbital_beaming_tint;
           inst.material.forward_scatter = sf->forward_scatter;
           inst.material.forward_scatter_back = sf->forward_scatter_back;
           inst.material.forward_scatter_back_mix =
               sf->forward_scatter_back_mix;
+          inst.material.forward_scatter_hue = sf->forward_scatter_hue;
         }
         if (const auto *at = world.get<AtmosphereShell>(e))
           inst.material.atmosphere =

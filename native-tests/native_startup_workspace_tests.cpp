@@ -359,7 +359,61 @@ void menu_hover_feedback(){
     InputEvent scroll{};scroll.type=InputEventType::Wheel;scroll.wheel_y=1.f;
     require(hub.handle(scroll,w,h)&&mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::MouseWheel,
             "wheel scroll did not capture on an axis row");
+    // Pointer loss disarms an armed capture — the cancel-pending
+    // convention every other surface already follows.
+    require(key(kReturn)&&hub.capturing(),"axis recapture did not arm for the pointer-loss check");
+    require(hub.handle({InputEventType::PointerCancelled},w,h),"pointer loss was not consumed");
+    require(!hub.capturing(),"pointer loss left the rebind capture armed");
+    require(mapper.bindings("map_zoom")[0].kind==stellar::engine::RawInputEvent::Kind::MouseWheel,
+            "pointer loss disturbed the bound map");
     DrawList draw;hub.render(draw,w,h);
+  }
+  // Clipped controls page: more actions than fit must render only the
+  // visible page — the row loop once indexed past the clipped rect vector
+  // (UB; the live smoke caught a garbage non-finite rect tripping the
+  // platform's text-bounds guard).
+  {
+    const int w=1280,h=720;
+    stellar::engine::InputMapper mapper;
+    stellar::engine::InputContext context;
+    context.name="GALAXY";
+    for(int i=0;i<20;++i){
+      stellar::engine::InputAction action;
+      action.name="action_"+std::to_string(i);
+      action.type=stellar::engine::InputAction::Type::Button;
+      action.bindings={stellar::engine::InputBinding{
+          stellar::engine::RawInputEvent::Kind::KeyPress,65+i}};
+      context.actions.push_back(std::move(action));
+    }
+    mapper.add_context(std::move(context));
+    mapper.push_context("GALAXY");
+    stellar::native_settings::NativeSettingsHub hub;
+    hub.set_input_mapper(&mapper);
+    hub.open();
+    const auto l=stellar::native_settings::HubLayout::for_viewport(w,h);
+    (void)hub.handle({InputEventType::LeftPressed,center(l.categories[4])},w,h);
+    int visible=0;
+    while(hub.control_row_bounds(visible,w,h).has_value())++visible;
+    require(visible>0&&visible<20,"controls page did not clip the row list");
+    require(!hub.control_row_bounds(19,w,h).has_value(),"tail row had a hitbox before scrolling");
+    // Wheel pages the list — the tail row gains a hitbox, the head loses it.
+    InputEvent wheel{};wheel.type=InputEventType::Wheel;wheel.wheel_y=-1.f;
+    for(int i=0;i<8&&!hub.control_row_bounds(19,w,h).has_value();++i)
+      require(hub.handle(wheel,w,h),"controls view did not consume the wheel");
+    require(hub.control_row_bounds(19,w,h).has_value(),"wheel did not reach the tail row");
+    require(!hub.control_row_bounds(0,w,h).has_value(),"row 0 stayed on-page after scrolling");
+    // Focus-follow: keyboard focus on an off-page row scrolls it into view.
+    auto key=[&](std::uint32_t k){
+      InputEvent ev{};ev.type=InputEventType::KeyPressed;ev.key=k;return hub.handle(ev,w,h);};
+    constexpr std::uint32_t kHome=0x4000004au;
+    require(key(kHome)&&hub.control_row_bounds(0,w,h).has_value(),"Home did not scroll back to the first row");
+    DrawList draw;hub.render(draw,w,h);
+    for(const auto& command:draw.overlay)
+      if(const auto* label=std::get_if<Text>(&command))
+        require(std::isfinite(label->at.x)&&std::isfinite(label->at.y)&&
+                (!label->clip||(std::isfinite(label->clip->x)&&std::isfinite(label->clip->y)&&
+                                std::isfinite(label->clip->width)&&std::isfinite(label->clip->height))),
+                "controls page render emitted a text with non-finite bounds");
   }
 }
 }

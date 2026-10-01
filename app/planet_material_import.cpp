@@ -9,7 +9,7 @@ using nlohmann::json;
 int main(int argc,char** argv){
  try{
   if(argc<3)throw std::invalid_argument("Usage: stellar_planet_material_import audit.json output-directory [width] [id]");
-  json audit;std::ifstream(argv[1])>>audit;const auto output=std::filesystem::u8path(argv[2]);std::filesystem::create_directories(output);
+  json audit;std::ifstream(argv[1])>>audit;const auto output=stellar::native_map::path_from_utf8(argv[2]);std::filesystem::create_directories(output);
   std::atomic<std::size_t> cursor{};std::mutex mutex;json results=json::array();std::vector<std::thread> workers;
   for(int worker=0;worker<4;++worker)workers.emplace_back([&]{for(;;){const auto i=cursor.fetch_add(1);if(i>=audit["images"].size())break;const auto& item=audit["images"][i];
    const auto id=item["id"].get<std::string>();if(item["status"]!="candidate"||(argc>4&&id!=argv[4]))continue;
@@ -20,7 +20,7 @@ int main(int argc,char** argv){
     options.preserve_zonal_detail=flags.value("preserveZonalDetail",false);options.source_roll_degrees=flags.value("sourceRollDegrees",0.);
     options.maximum_light_gradient=flags.value("maximumLightGradient",.7);
     options.maximum_dark_fraction=flags.value("maximumDarkFraction",.08);
-    const auto source=stellar::native_map::decode_rgba_image(std::filesystem::u8path(item["source"].get<std::string>()));const auto maps=stellar::native_map::prepare_spherical_material(*source,options);
+    const auto source=stellar::native_map::decode_rgba_image(stellar::native_map::path_from_utf8(item["source"].get<std::string>()));const auto maps=stellar::native_map::prepare_spherical_material(*source,options);
     record.update({{"usable",maps.usable},{"reason",maps.rejection_reason},{"disc",maps.disc},{"removedLightGradient",maps.removed_light_gradient},{"observedSurfaceFraction",maps.observed_surface_fraction},{"blackFraction",maps.black_fraction},{"clippedFraction",maps.clipped_fraction},{"seamError",maps.seam_error}});
     if(maps.usable){const auto dir=output/id;std::filesystem::create_directories(dir);
      for(const auto& [name,image]:std::initializer_list<std::pair<const char*,std::shared_ptr<const stellar::native_map::RgbaImage>>>{{"albedo",maps.albedo},{"properties",maps.properties},{"clouds",maps.clouds},{"emission",maps.emission},{"normal",maps.normal},{"thumbnail",maps.thumbnail}})stellar::native_map::encode_rgba_png(*image,dir/(std::string(name)+".png"));

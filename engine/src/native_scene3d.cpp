@@ -86,9 +86,12 @@ void validate_instance(const MeshInstance3D& i){
      !bounded(m.terminator_wrap,1)||m.terminator_wrap<0||!bounded(m.limb_darkening,1)||m.limb_darkening<0||!bounded(m.limb_darkening_q,1)||m.limb_darkening_q<0||!bounded(m.limb_darkening_mid,1)||m.limb_darkening_mid<0||
      !bounded(m.band_shear,.5f)||!bounded(m.band_waves,1.f)||m.band_waves<0||
      !bounded(m.band_drift,.25f)||!bounded(m.band_turbulence,8.f)||!bounded(m.band_diff,8.f)||
-     !bounded(m.orbital_beaming,1.f)||!bounded(m.forward_scatter,1.f)||
+     !bounded(m.shear_rate,8.f)||!bounded(m.shear_ratio,1024.f)||m.shear_ratio<1.f||
+     !bounded(m.orbital_beaming,1.f)||!bounded(m.orbital_beaming_tint,1.f)||m.orbital_beaming_tint<0||
+     !bounded(m.forward_scatter,1.f)||
      !bounded(m.forward_scatter_back,1.f)||
-     !bounded(m.forward_scatter_back_mix,1.f)||m.forward_scatter_back_mix<0)
+     !bounded(m.forward_scatter_back_mix,1.f)||m.forward_scatter_back_mix<0||
+     !bounded(m.forward_scatter_hue,1.f)||m.forward_scatter_hue<0)
     throw std::invalid_argument("3D material lighting and opacity must be finite and bounded.");
   if(i.lod_meshes.size()>8||!bounded(i.lod_pixels,4096)||i.lod_pixels<1.f||
      !bounded(i.lod_fade,.5f)||i.lod_fade<0.f)
@@ -105,7 +108,7 @@ void validate_instance(const MeshInstance3D& i){
      m.light_color.x>4||m.light_color.y>4||m.light_color.z>4||!bounded(m.light_intensity,16)||m.light_intensity<0||!bounded(m.rim_power,16)||m.rim_power<0)
     throw std::invalid_argument("3D light color, intensity and rim response must be bounded.");
   if(m.surface_effect){const auto& e=*m.surface_effect;
-    if(!e.next_texture||!bounded(e.blend,1)||e.blend<0||!bounded(e.flow_phase,1e6)||!bounded(e.flow_rate,64)||!bounded(e.distortion,.1)||e.distortion<0||!valid(e.view_sphere_center)||!bounded(e.sphere_radius,1e5)||e.sphere_radius<0||!bounded(e.occlude,1e5)||e.occlude<0)
+    if((!e.next_texture&&e.blend>0)||!bounded(e.blend,1)||e.blend<0||!bounded(e.flow_phase,1e6)||!bounded(e.flow_rate,64)||!bounded(e.distortion,.1)||e.distortion<0||!valid(e.view_sphere_center)||!bounded(e.sphere_radius,1e5)||e.sphere_radius<0||!bounded(e.occlude,1e5)||e.occlude<0)
       throw std::invalid_argument("Invalid surface effect sequence or occlusion sphere");
     if(!bounded(e.volume_depth,.75)||e.volume_depth<0||!bounded(e.volume_density,32)||e.volume_density<=0||
        !bounded(e.volume_seed,1e4)||e.volume_steps<8||e.volume_steps>64||

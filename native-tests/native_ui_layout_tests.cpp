@@ -1,4 +1,5 @@
 #include "native_ui_layout.hpp"
+#include "native_ui_theme.hpp"
 
 #include <array>
 #include <cmath>
@@ -207,6 +208,17 @@ void verify_text_scale() {
               scaled.heading_font_pixels ==
                   std::lround(22.f * baseline.scale * 1.5f),
           "Text scale did not enlarge the shared font metrics.");
+  // The canonical theme ramp and bespoke chrome sizes must carry the same
+  // accessibility multiplier — otherwise workspace text ignores text_scale
+  // while the shared metrics enlarge.
+  require(stellar::native_ui::type::title(1.f) == std::lround(24.f * 1.5f) &&
+              stellar::native_ui::type::body(1.f) ==
+                  std::lround(15.f * 1.5f) &&
+              stellar::native_ui::type::compact_small(1.f) ==
+                  std::lround(11.f * 1.5f) &&
+              stellar::native_ui::type::scaled(18.f, 2.f) ==
+                  std::lround(18.f * 2.f * 1.5f),
+          "Text scale did not reach the canonical workspace type ramp.");
   NativeUiLayout::set_text_scale(0.5f);
   require(NativeUiLayout::text_scale() == .75f,
           "Text scale did not clamp below the accessibility range.");

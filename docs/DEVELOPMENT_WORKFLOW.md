@@ -1,6 +1,8 @@
 # Development, GitHub and evidence policy
 
-The active native baseline is `cpp/codex-native-architecture-integration`.
+The active native baseline is `engine/space-strategy-simulation-specialization`
+(feature work lands via `game/**`/`engine/**` PRs; previously
+`cpp/codex-native-architecture-integration`).
 Audit date: 2026-09-20. `main` and other research/editor workstreams have distinct
 histories; their features are not automatically part of this branch.
 

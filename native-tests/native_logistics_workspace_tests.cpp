@@ -313,20 +313,28 @@ void external_coverage_renders_system_rows_and_gap() {
                            SupplyCondition::Strained, 2, 4., 6., 2., false});
   view.external.push_back({4, "Outpost", "Healthy",
                            SupplyCondition::Healthy, 1, 8., 5., 0., true});
+  view.external_links.push_back({3, "Sol", "Frontier", "Prospective", .10, 2.,
+                                 1.36, false, true, false});
   DrawList draw;
   workspace.render(draw, view, 1600, 900);
   const auto layout = SupplyLayout::for_viewport(1600, 900);
   bool header = false, system = false, colonies = false, gap = false;
+  bool links_header = false, link_route = false, link_status = false;
   for (const auto &item : draw.overlay)
     if (const auto *text = std::get_if<Text>(&item)) {
       header |= text->value == "INTERSTELLAR COVERAGE";
       system |= text->value == "Frontier";
       colonies |= text->value == "2 colonies";
       gap |= text->value.find("3.50 / DAY") != std::string::npos;
+      links_header |= text->value == "INTERSTELLAR LINKS";
+      link_route |= text->value == "Sol <-> Frontier";
+      link_status |= text->value == "Prospective";
     }
   require(header && system && colonies,
           "external coverage did not render its title, system or colony count");
   require(gap, "unrepresented interstellar demand was not surfaced");
+  require(links_header && link_route && link_status,
+          "interstellar link section did not render its title, route or status");
   for (const auto &item : draw.overlay)
     if (const auto *text = std::get_if<Text>(&item))
       require(!text->clip || contains(layout.body, *text->clip) ||
@@ -344,6 +352,8 @@ void hover_explainers_cover_tiles_and_rows() {
                         false});
   view.external.push_back({3, "Frontier", "Strained", SupplyCondition::Strained,
                            2, 4., 6., 2., false});
+  view.external_links.push_back({3, "Sol", "Frontier", "Prospective", .10, 2.,
+                                 1.36, false, true, false});
   const auto layout = SupplyLayout::for_viewport(1600, 900);
   const auto tipped = [](const DrawList &draw, std::string_view needle) {
     for (const auto &item : draw.overlay)
@@ -395,6 +405,17 @@ void hover_explainers_cover_tiles_and_rows() {
   workspace.render(hovered_external, view, 1600, 900);
   require(tipped(hovered_external, "colonies outside the home system"),
           "hovered external coverage row did not explain its columns");
+  // Interstellar link row explains its columns on hover.
+  const auto corridor_at = find(hovered_external, "Sol <-> Frontier");
+  require(corridor_at.x >= 0.f,
+          "interstellar link route missing for tooltip test");
+  (void)workspace.handle({InputEventType::PointerMove,
+                          {corridor_at.x + 6.f, corridor_at.y + 6.f}},
+                         view, 1600, 900);
+  DrawList hovered_corridor;
+  workspace.render(hovered_corridor, view, 1600, 900);
+  require(tipped(hovered_corridor, "prospective freight corridor"),
+          "hovered interstellar link row did not explain its columns");
   // The demand-gap callout explains itself on hover.
   const auto gap_at = find(hovered_external, "UNREPRESENTED INTERSTELLAR DEMAND  3.50 / DAY");
   require(gap_at.x >= 0.f, "demand gap callout missing for tooltip test");

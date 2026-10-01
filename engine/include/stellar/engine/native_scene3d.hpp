@@ -123,6 +123,8 @@ struct AnalyticShadow3D {
 // Reusable emissive image sequence on surface-attached geometry. A camera-space
 // sphere masks fragments behind an existing photosphere, including its limb.
 struct SurfaceEffect3D {
+  // Second frame of a two-image blend; may be null when `blend <= 0` for
+  // single-texture effects (the emission volume uses only the volume fields).
   std::shared_ptr<const RgbaImage> next_texture;
   float blend{},flow_phase{},distortion{};
   // Marched-filament churn rate: the volume's flow phase advances by
@@ -289,6 +291,17 @@ struct Material3D {
   // polar rate. Fraction of drift, [-8,8]; 0 scrolls all latitudes
   // uniformly. No effect without band_drift.
   float band_diff{};
+  // Differential (Keplerian) shear for annular flows: scrolls the
+  // azimuthal V coordinate by rate·t·rho^(-3/2) turns/second where
+  // rho = 1 + (shear_ratio-1)·u is the radius in inner-edge units, so
+  // the inner rim laps the outer edge instead of the baked pattern
+  // spinning rigidly. rad/s at the inner edge, [-8,8]; 0 freezes.
+  // shear_ratio carries the annulus's outer/inner radius, [1,1024]
+  // (1 = uniform scroll, equivalent to rigid rotation). Only
+  // meaningful on meshes with radial U / azimuthal V, e.g.
+  // annulus_mesh; the surface texture must be V-periodic.
+  float shear_rate{};
+  float shear_ratio{1.f};
   // Orbital beaming: material orbiting local +Y gains a first-order
   // doppler asymmetry — radiance scales by 1 + s·(v̂·V̂), so the
   // approaching lane brightens while the receding lane dims. Face-on
@@ -296,6 +309,13 @@ struct Material3D {
   // edge-on discs peak. Accretion discs, ring forward-scatter. [-1,1];
   // negative spins retrograde; 0 disables.
   float orbital_beaming{};
+  // Doppler color shift paired with the beaming asymmetry [0,1]:
+  // the approaching lane blueshifts (red depletes, blue gains) and the
+  // receding lane redshifts, scaled by the same v̂·V̂ alignment — a
+  // first-order spectral-shift approximation so accretion discs read
+  // hot-and-fast on the bright lane, cool on the dim one. 0 keeps the
+  // brightness-only asymmetry; no effect without orbital_beaming.
+  float orbital_beaming_tint{};
   // Henyey–Greenstein single-scatter phase: radiance scales by
   // (1−g²)/(1+g²+2g·(V̂·L̂))^(3/2), so g > 0 peaks the sheet when it is
   // backlit (dusty-ring forward scatter — Saturn E-ring look) with a
@@ -313,6 +333,12 @@ struct Material3D {
   // the single-lobe path unchanged.
   float forward_scatter_back{};
   float forward_scatter_back_mix{};
+  // Wavelength weight for the phase lobes [0,1]: Rayleigh-style
+  // λ⁻⁴ scattering redistributes the phase boost toward blue —
+  // crest-lit dusty sheets read icy blue instead of achromatic white.
+  // Mean-normalized so luminance is preserved; 0 keeps achromatic
+  // scatter, 1 is the full small-particle spectrum.
+  float forward_scatter_hue{};
   // Decode authored sRGB color before illumination; encode the final output.
   bool linear_light{};
   std::optional<SurfaceEffect3D> surface_effect;
@@ -352,9 +378,19 @@ struct Material3D {
 // bypasses light_color), and `orbital_beaming` applies the first-order
 // doppler asymmetry — the approaching lane reads brighter, which is the
 // signature look of a relativistic disc. beaming in [-1,1].
+// `spiral` [0,1] bakes grand-design density-wave arms into the texture
+// as compressional heating: `spiral_arms` (1..4) is the azimuthal m-mode
+// and `spiral_turns` [-4,4] the total inner→outer winding of the log
+// spiral (trailing positive). Arm crests read slightly hotter and
+// brighter, troughs cooler — the azimuth wrap stays seamless because
+// the arm count is integral. 0 keeps the uniform one-row texture.
+// `shear_rate` [-8,8] rad/s at the inner edge adds Keplerian
+// differential rotation — azimuth scrolls as (r/inner)^(-3/2) so the
+// hot rim laps the cool edge over scene time; 0 keeps the rigid bake.
 [[nodiscard]] Material3D accretion_disc_material3d(
     float inner_radius, float outer_radius, double kelvin,
-    float beaming = .85f);
+    float beaming = .85f, float spiral = 0.f, int spiral_arms = 2,
+    float spiral_turns = .75f, float shear_rate = 0.f);
 struct MeshInstance3D {
   std::shared_ptr<const Mesh3D> mesh;
   Position3 position;
@@ -518,6 +554,10 @@ struct PreparedShadow3D { Matrix4 from_model;Vec3 light; };
 // even when both blocker and receiver are at astronomical world coordinates.
 [[nodiscard]] PreparedShadow3D prepare_shadow3d(const Camera3D&,const MeshInstance3D&,Vec3 light);
 struct Scene3DStatistics {
+  // True when a live renderer produced these counters — a window that has
+  // not yet drawn 3D returns a default instance, so callers inferring
+  // device properties (e.g. hdr) must gate on this flag.
+  bool renderer_active{};
   std::uint64_t mesh_uploads{},texture_uploads{},draw_calls{},culled_instances{};
   // Instanced batches submitted this frame — diverges from draw_calls only
   // in counting (they are equal), kept for fleet-scale batching audits.
@@ -559,6 +599,10 @@ struct Scene3DStatistics {
   std::uint64_t streamed_partial_binds{};
   // Cumulative GPU bytes the TextureStreamer evicted from the texture cache.
   std::uint64_t streamed_evicted_bytes{};
+  // The TextureStreamer's live byte budget — set via
+  // Window::set_scene3d_texture_budget (quality tiers retune it). Zero on a
+  // default instance; diagnostics must not read it before renderer_active.
+  std::uint64_t texture_budget_bytes{};
   // Captured environment probes baked since renderer creation — each
   // counts six face renders for one scene's environmentCapture.
   std::uint64_t probe_bakes{};

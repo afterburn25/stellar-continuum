@@ -1,10 +1,13 @@
 #pragma once
 
+#include "native_ui_layout.hpp"
+
 #include <stellar/engine/native_map_platform.hpp>
 #include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <functional>
 #include <optional>
@@ -22,6 +25,7 @@ using native_map::Image;
 using native_map::FontFace;
 using native_map::Line;
 using native_map::Point;
+using native_map::Scene3DView;
 using native_map::StrokedRectangle;
 using native_map::Text;
 using native_map::TextAlign;
@@ -58,39 +62,58 @@ inline constexpr Color shadow{0, 4, 9, 168};
 // Canonical type ramp in unscaled pixels: one vocabulary for workspace
 // chrome so the heading/body/small hierarchy reads identically on every
 // surface. Dense tabular surfaces (fleet/battle/inspection) use the compact
-// body/small rungs instead of inventing their own.
+// body/small rungs instead of inventing their own. Every rung multiplies the
+// accessibility text scale like the shared NativeUiLayout font metrics, so
+// workspace text enlarges without growing chrome geometry.
 namespace type {
+// Bespoke chrome sizes outside the ramp route through this so they carry
+// viewport fit and the accessibility text scale exactly once.
+[[nodiscard]] inline int scaled(float base_pixels, float scale) noexcept {
+  return static_cast<int>(
+      std::lround(base_pixels * scale * native_map::NativeUiLayout::text_scale()));
+}
 [[nodiscard]] inline int title(float scale) noexcept {
-  return static_cast<int>(std::lround(24.f * scale));
+  return scaled(24.f, scale);
 }
 [[nodiscard]] inline int body(float scale) noexcept {
-  return static_cast<int>(std::lround(15.f * scale));
+  return scaled(15.f, scale);
 }
 [[nodiscard]] inline int small(float scale) noexcept {
-  return static_cast<int>(std::lround(12.f * scale));
+  return scaled(12.f, scale);
 }
 [[nodiscard]] inline int compact_body(float scale) noexcept {
-  return static_cast<int>(std::lround(14.f * scale));
+  return scaled(14.f, scale);
 }
 [[nodiscard]] inline int compact_small(float scale) noexcept {
-  return static_cast<int>(std::lround(11.f * scale));
+  return scaled(11.f, scale);
 }
 } // namespace type
 
 // Global high-contrast pass over a finished DrawList: snaps low-luminance
 // text to the primary ink so every surface gains readability without
 // per-screen palette plumbing. Colored accents above the threshold keep
-// their semantic hue; dim labels/disabled text become legible.
+// their semantic hue; dim labels/disabled text become legible. Rendered
+// 3D scenes get the same treatment through the post-tonemap contrast and
+// unsharp terms on their render options, so planets, ships and nebula
+// volumes sharpen together with the surrounding chrome.
 inline void apply_high_contrast(DrawList &draw) {
   const auto boost = [](Color &c) {
     const float luminance = .299f * c.r + .587f * c.g + .114f * c.b;
     if (luminance < 160.f) c = color::text_primary;
   };
+  const auto punch = [](Scene3DView &view) {
+    view.options.contrast = std::max(view.options.contrast, 1.35f);
+    view.options.sharpen = std::max(view.options.sharpen, .3f);
+  };
   for (auto &text : draw.text) boost(text.color);
-  for (auto &command : draw.overlay)
+  for (auto &command : draw.overlay) {
     if (auto *text = std::get_if<Text>(&command)) boost(text->color);
-  for (auto &command : draw.world)
+    if (auto *view = std::get_if<Scene3DView>(&command)) punch(*view);
+  }
+  for (auto &command : draw.world) {
     if (auto *text = std::get_if<Text>(&command)) boost(text->color);
+    if (auto *view = std::get_if<Scene3DView>(&command)) punch(*view);
+  }
 }
 
 // Every color-bearing field a draw-command variant can hold. Shared by the
@@ -108,8 +131,9 @@ inline void for_each_command_color(Command &command, const Fn &fn) {
 // then the standard error redistribution pushes it into the channels the
 // mode still perceives (blue + luminance) — semantic accent hues stay
 // distinguishable instead of merely being simulated away. Covers every
-// CPU-side surface (text, primitives, image tints, mesh tints); GPU-rendered
-// 3D scene content is out of scope until a post-process pass exists.
+// CPU-side surface (text, primitives, image tints, mesh tints) and every
+// GPU-rendered 3D view: Scene3DView options carry the same composed map as
+// RenderOptions3D::color_matrix, applied post-tonemap in display space.
 inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
   if (mode == engine::ColorBlindMode::None) return;
   const float *m;
@@ -135,6 +159,23 @@ inline void apply_color_blind(DrawList &draw, engine::ColorBlindMode mode) {
   for (auto &text : draw.text) daltonize(text.color);
   for (auto &command : draw.overlay) for_each_command_color(command,daltonize);
   for (auto &command : draw.world) for_each_command_color(command,daltonize);
+  // The CPU daltonizer is linear in float space, so the 3D remap composes
+  // the identical map: e_g = g − sim.row1·c, e_b = b − sim.row2·c, then
+  // c' = c + {.7,.7}·e_g + {.7,.7,1}·e_b per channel. Column-major for
+  // RenderOptions3D::color_matrix.
+  const float er[3]{-m[3],1.f-m[4],-m[5]},eb[3]{-m[6],-m[7],1.f-m[8]};
+  std::array<float,9> remap{};
+  for (int col = 0; col < 3; ++col) {
+    remap[col*3+0] = (col==0?1.f:0.f) + .7f*er[col] + .7f*eb[col];
+    remap[col*3+1] = (col==1?1.f:0.f) +      er[col] + .7f*eb[col];
+    remap[col*3+2] = (col==2?1.f:0.f) + .7f*er[col] +      eb[col];
+  }
+  for (auto &command : draw.overlay)
+    if (auto *view = std::get_if<Scene3DView>(&command))
+      view->options.color_matrix = remap;
+  for (auto &command : draw.world)
+    if (auto *view = std::get_if<Scene3DView>(&command))
+      view->options.color_matrix = remap;
 }
 
 enum class Tone { Neutral, Selected, Success, Caution, Danger, Science, Economy, Construction, Diplomacy, Military, Unknown };

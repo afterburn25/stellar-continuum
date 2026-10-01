@@ -3,6 +3,7 @@
 #include "native_menu_style.hpp"
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/input_actions.hpp>
+#include <stellar/engine/ui_viewmodels.hpp>
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -55,13 +56,16 @@ public:
   // action — the dispatcher announces it (focus stays on the row, so it
   // cannot surface through focused_label change detection).
   [[nodiscard]] std::string take_notice(){auto s=std::move(notice_);notice_.clear();return s;}
-  void open(){hover_feedback_.reset();visible_=true;controls_=false;pointer_={};focus_=-1;capture_=-1;notice_.clear();}
-  void close(){visible_=false;controls_=false;focus_=-1;capture_=-1;notice_.clear();}
+  void open(){hover_feedback_.reset();visible_=true;controls_=false;pointer_={};focus_=-1;capture_=-1;notice_.clear();controls_scroll_={};}
+  void close(){visible_=false;controls_=false;focus_=-1;capture_=-1;notice_.clear();controls_scroll_={};}
   bool visible()const{return visible_;}
   bool showing_categories()const{return visible_&&(!child_visible_||!child_visible_());}
   // True while a controls row waits for a trigger — pad presses must reach
   // handle() untranslated so they can be captured as bindings.
   bool capturing()const noexcept{return capture_>=0;}
+  // True while the Controls view is up — at startup (no mapper) it is the
+  // static help card, in-campaign it is the live rebind list.
+  bool controls_view()const noexcept{return visible_&&controls_;}
   int focused()const noexcept{return focus_;}
   // Localized label of the ringed control for screen-reader/live-region
   // consumers. Empty when nothing is focused.
@@ -92,21 +96,37 @@ public:
     const auto rows=control_actions();
     if(capture_>=0&&capture_<static_cast<int>(rows.size())){
       const auto rects=control_row_rects(l);
-      return capture_<static_cast<int>(rects.size())?std::optional<UiRect>{rects[static_cast<std::size_t>(capture_)]}:std::nullopt;
+      const auto& rect=rects[static_cast<std::size_t>(capture_)];
+      return rect.height>0.f?std::optional<UiRect>{rect}:std::nullopt;
     }
     if(focus_<0)return std::nullopt;
     if(controls_){
       if(focus_==static_cast<int>(rows.size()))return l.back;
       const auto rects=control_row_rects(l);
-      return focus_<static_cast<int>(rects.size())?std::optional<UiRect>{rects[static_cast<std::size_t>(focus_)]}:std::nullopt;
+      if(focus_>=static_cast<int>(rects.size()))return std::nullopt;
+      const auto& rect=rects[static_cast<std::size_t>(focus_)];
+      return rect.height>0.f?std::optional<UiRect>{rect}:std::nullopt;
     }
     if(focus_==5)return l.back;
     return focus_<5?std::optional<UiRect>{l.categories[static_cast<std::size_t>(focus_)]}:std::nullopt;
   }
+  // Client-pixel rect of rebind row `index` in the controls view —
+  // nullopt while the categories view or a child panel is up, the index
+  // is off the list, or the row is scrolled off the page. Smoke
+  // harnesses need the same hitboxes clicks use.
+  [[nodiscard]] std::optional<UiRect>
+  control_row_bounds(int index,int width,int height)const{
+    if(!visible_||!controls_)return std::nullopt;
+    const auto rows=control_row_rects(HubLayout::for_viewport(width,height));
+    if(index<0||index>=static_cast<int>(rows.size()))return std::nullopt;
+    const auto& rect=rows[static_cast<std::size_t>(index)];
+    if(rect.height<=0.f)return std::nullopt; // scrolled off the page
+    return rect;
+  }
   bool handle(const InputEvent&e,int width,int height){
     if(!showing_categories())return false;
     if(e.type==InputEventType::PointerMove)pointer_=e.position;
-    if(e.type==InputEventType::PointerCancelled){pointer_={};return true;}
+    if(e.type==InputEventType::PointerCancelled){pointer_={};capture_=-1;return true;}
     const auto l=HubLayout::for_viewport(width,height);
     auto target=stellar::native_menu_audio::hit(e.position,{l.back});
     if(!controls_)for(std::size_t i=0;i<l.categories.size();++i)if(l.categories[i].contains(e.position))target=10+i;
@@ -167,17 +187,26 @@ public:
       constexpr std::uint32_t kHome=0x4000004au,kEnd=0x4000004du;
       const int count=controls_?control_count():6;
       if(e.key==kHome||e.key==kEnd){
-        focus_=e.key==kHome?0:count-1;hover_feedback_.cue(focus_target());return true;
+        focus_=e.key==kHome?0:count-1;follow_controls_focus(l);hover_feedback_.cue(focus_target());return true;
       }
       const bool fwd=(e.key==kTab&&!e.shift)||e.key==kRight||e.key==kDown;
       const bool bwd=(e.key==kTab&&e.shift)||e.key==kLeft||e.key==kUp;
       if(fwd||bwd){
         if(focus_<0)focus_=bwd?count-1:0;else focus_=(focus_+(bwd?-1:1)+count)%count;
-        hover_feedback_.cue(focus_target());return true;
+        follow_controls_focus(l);hover_feedback_.cue(focus_target());return true;
       }
       if((e.key==kReturn||e.key==kSpace)&&focus_>=0){activate_focus();return true;}
       // D cycles the pad pin on the focused row's gamepad bindings.
       if(controls_&&e.key=='d'){if(cycle_device_pin())hover_feedback_.cue(focus_target());return true;}
+    }
+    // Wheel scrolls the rebind list (when a capture is armed the capture
+    // branch above already consumed it as an axis trigger).
+    if(controls_&&e.type==InputEventType::Wheel&&e.wheel_y!=0.f){
+      const float pitch=26.f*l.scale;
+      controls_scroll_.configure(static_cast<std::size_t>(std::max(0,control_count()-1)),
+                                 pitch,l.back.y-8.f*l.scale-l.categories[0].y);
+      controls_scroll_.scroll_to(controls_scroll_.scroll_offset-e.wheel_y*pitch*3.f);
+      return true;
     }
     // Right-click on a controls row does the same for pointer users — it
     // only becomes a capturable trigger while capture is active.
@@ -199,7 +228,7 @@ public:
         for(std::size_t i=0;i<rects.size();++i)if(rects[i].contains(e.position)){focus_=static_cast<int>(i);capture_=focus_;break;}
       }
       else for(int i=0;i<5;++i)if(l.categories[i].contains(e.position)){
-        if(i==4)controls_=true;else if(open_)open_(static_cast<Category>(i));break;
+        if(i==4){controls_=true;controls_scroll_={};}else if(open_)open_(static_cast<Category>(i));break;
       }
     }return true;
   }
@@ -218,7 +247,10 @@ public:
         for(int i=0;i<static_cast<int>(lines.size());++i)text(out,{l.categories[0].x,l.categories[0].y+i*39*s,l.categories[0].width,35*s},tr(keys[i],lines[i]),static_cast<int>(16*s));
       }else{
         const auto rects=control_row_rects(l);
-        for(std::size_t i=0;i<rows.size();++i){
+        std::size_t page_rows=0;
+        for(std::size_t i=0;i<rects.size();++i){
+          if(rects[i].height<=0.f)continue; // scrolled off the page
+          ++page_rows;
           const bool hot=rects[i].contains(pointer_)||focus_==static_cast<int>(i);
           const auto bindings=mapper_->bindings(rows[i]->name);
           const std::string value=capture_==static_cast<int>(i)
@@ -231,7 +263,7 @@ public:
         }
         // Stick-camera defaults, kept discoverable beside the rebind rows
         // (the pad axis rows themselves are listed above).
-        const float hint_y=l.categories[0].y+static_cast<float>(rects.size())*26.f*s;
+        const float hint_y=l.categories[0].y+static_cast<float>(page_rows)*26.f*s;
         if(hint_y+22.f*s<l.back.y-26.f*s)
           text(out,{l.categories[0].x,hint_y,l.categories[0].width,22.f*s},
                tr("SETTINGS_CONTROLS_PAD","Left stick — pan the map · right stick — zoom"),static_cast<int>(13*s),muted);
@@ -288,16 +320,40 @@ private:
     return rows;
   }
   [[nodiscard]] int control_count()const{return static_cast<int>(control_actions().size())+1;}
-  // Row rects inside the controls view — packed under the description and
-  // clipped so the last row never overlaps Back.
+  // Row rects inside the controls view, parallel to control_actions() —
+  // packed under the description, scrolled by controls_scroll_, and
+  // intersect-clipped to the list viewport (same convention as the
+  // startup load list): rows scrolled off carry a zero rect, a partially
+  // visible row at an edge carries just its visible sliver so the tail
+  // stays reachable. Scroll offsets are NOT row-snapped — snapping
+  // scroll_offset down to a whole row would strand the last row under a
+  // fractional viewport remainder.
   [[nodiscard]] std::vector<UiRect> control_row_rects(const HubLayout& l)const{
     const auto rows=control_actions();
     const float s=l.scale,row_h=26.f*s;
-    const int visible=std::min<int>(static_cast<int>(rows.size()),
-        std::max(0,static_cast<int>((l.back.y-8.f*s-l.categories[0].y)/row_h)));
-    std::vector<UiRect> rects(static_cast<std::size_t>(visible));
-    for(int i=0;i<visible;++i)rects[static_cast<std::size_t>(i)]={l.categories[0].x,l.categories[0].y+i*row_h,l.categories[0].width,row_h-3.f*s};
+    const UiRect view{l.categories[0].x,l.categories[0].y,l.categories[0].width,
+                      std::max(0.f,l.back.y-8.f*s-l.categories[0].y)};
+    controls_scroll_.configure(rows.size(),row_h,view.height);
+    std::vector<UiRect> rects(rows.size());
+    for(std::size_t i=0;i<rows.size();++i)
+      rects[i]=clip_rect({view.x,view.y+i*row_h-controls_scroll_.scroll_offset,
+                          view.width,row_h-3.f*s},view);
     return rects;
+  }
+  [[nodiscard]] static UiRect clip_rect(UiRect a,UiRect b)noexcept{
+    const float x=std::max(a.x,b.x),y=std::max(a.y,b.y);
+    return {x,y,std::max(0.f,std::min(a.x+a.width,b.x+b.width)-x),
+            std::max(0.f,std::min(a.y+a.height,b.y+b.height)-y)};
+  }
+  // Re-clamps the controls list scroll and pulls the focused row onto the
+  // page — called after every keyboard focus move so Tab/arrows can reach
+  // rows the wheel would have to scroll to otherwise.
+  void follow_controls_focus(const HubLayout& l){
+    const float row_h=26.f*l.scale;
+    controls_scroll_.configure(static_cast<std::size_t>(std::max(0,control_count()-1)),
+                               row_h,l.back.y-8.f*l.scale-l.categories[0].y);
+    if(controls_&&focus_>=0&&focus_<control_count()-1)
+      controls_scroll_.ensure_visible(static_cast<std::size_t>(focus_));
   }
   // "toggle_pause" → SETTINGS_ACTION_TOGGLE_PAUSE, fallback "Toggle pause".
   [[nodiscard]] std::string action_label(std::string_view name)const{
@@ -393,10 +449,13 @@ private:
       return;
     }
     if(focus_==5)close();
-    else if(focus_==4){controls_=true;focus_=-1;}
+    else if(focus_==4){controls_=true;focus_=-1;controls_scroll_={};}
     else if(open_)open_(static_cast<Category>(focus_));
   }
   stellar::native_menu_audio::HoverFeedback hover_feedback_;
+  // Scroll state for the controls view's rebind list — mutable because the
+  // same row-window sync runs from const render() and the event path.
+  mutable stellar::engine::VirtualizedList controls_scroll_{};
   bool visible_{},controls_{};Point pointer_{};int focus_{-1};Open open_;std::function<bool()> child_visible_;
   const stellar::engine::LocalizationTable* locale_{};
   stellar::engine::InputMapper* mapper_{};std::string context_name_{"GALAXY"},axis_context_name_;

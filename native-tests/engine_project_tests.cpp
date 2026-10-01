@@ -448,11 +448,13 @@ int main() {
     cube.band_drift = 0.08f;
     cube.band_turbulence = 1.25f;
     cube.orbital_beaming = 0.7f;
+    cube.orbital_beaming_tint = 0.4f;
     cube.star_kelvin = 3200.0;
-    cube.accretion = {0.4f, 1.f, 9000.f, 0.8f};
+    cube.accretion = {0.4f, 1.f, 9000.f, 0.8f, 0.5f, 2.f, 1.25f, 0.35f};
     cube.forward_scatter = 0.5f;
     cube.forward_scatter_back = -0.35f;
     cube.forward_scatter_back_mix = 0.3f;
+    cube.forward_scatter_hue = 0.6f;
     cube.volume_depth = 0.3f;
     cube.volume_density = 6.f;
     cube.volume_seed = 2.f;
@@ -611,11 +613,16 @@ int main() {
                 rc.band_shear == -0.25f && rc.band_waves == 0.6f &&
                 rc.band_drift == 0.08f && rc.band_turbulence == 1.25f &&
                 rc.orbital_beaming == 0.7f &&
+                rc.orbital_beaming_tint == 0.4f &&
                 rc.star_kelvin == 3200.0 && rc.accretion[0] == 0.4f &&
                 rc.accretion[1] == 1.f && rc.accretion[2] == 9000.f &&
-                rc.accretion[3] == 0.8f && rc.forward_scatter == 0.5f &&
+                rc.accretion[3] == 0.8f && rc.accretion[4] == 0.5f &&
+                rc.accretion[5] == 2.f && rc.accretion[6] == 1.25f &&
+                rc.accretion[7] == 0.35f &&
+                rc.forward_scatter == 0.5f &&
                 rc.forward_scatter_back == -0.35f &&
-                rc.forward_scatter_back_mix == 0.3f,
+                rc.forward_scatter_back_mix == 0.3f &&
+                rc.forward_scatter_hue == 0.6f,
             "scene3d surface-response fields round-trip");
       check(rc.lod_meshes.size() == 2 &&
                 rc.lod_meshes[0] == "models/crate_mid.obj" &&
@@ -682,9 +689,9 @@ int main() {
             "unset material fields keep neutral defaults");
       const auto path = root / "editor" / "scene3d.json";
       scene.save(path);
-      const auto loaded = engine::Scene3dDocument::load(path);
-      check(loaded.has_value() && loaded->entities.size() == 2 &&
-                loaded->entities[1].mesh == "models/ship.obj",
+      const auto scene_loaded = engine::Scene3dDocument::load(path);
+      check(scene_loaded.has_value() && scene_loaded->entities.size() == 2 &&
+                scene_loaded->entities[1].mesh == "models/ship.obj",
             "scene3d save/load round-trips");
     }
     check(!engine::Scene3dDocument::from_json("{not json").has_value(),
@@ -977,14 +984,46 @@ int main() {
               R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,1.5]}]})")
               .has_value(),
           "scene3d accretion beaming above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,1.2,2,1]}]})")
+              .has_value(),
+          "scene3d accretion spiral depth above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.5,2.5,1]}]})")
+              .has_value(),
+          "scene3d accretion non-integer arms rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.5,0,1]}]})")
+              .has_value(),
+          "scene3d accretion spiral with zero arms rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.5,2,5]}]})")
+              .has_value(),
+          "scene3d accretion spiral turns above 4 rejected");
     check(engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8]}]})")
               .has_value(),
           "scene3d accretion preset rejected a legal disc");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.6,2,1.25]}]})")
+              .has_value(),
+          "scene3d accretion preset rejected a legal spiral disc");
+    check(engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.6,2,1.25,0.4]}]})")
+              .has_value(),
+          "scene3d accretion preset rejected a legal sheared disc");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"accretion":[0.4,1,8000,0.8,0.6,2,1.25,9]}]})")
+              .has_value(),
+          "scene3d accretion shear above 8 rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"forwardScatter":1.4}]})")
               .has_value(),
           "scene3d forward scatter above 1 rejected");
+    check(!engine::Scene3dDocument::from_json(
+              R"({"entities":[{"name":"x","pos":[1,2,3],"forwardScatterHue":1.4}]})")
+              .has_value(),
+          "scene3d scatter hue above 1 rejected");
     check(!engine::Scene3dDocument::from_json(
               R"({"entities":[{"name":"x","pos":[1,2,3],"texture":"t.png","volume":{"depth":0.9}}]})")
               .has_value(),

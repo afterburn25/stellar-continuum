@@ -1,4 +1,5 @@
 #include "native_shipyard_controller.hpp"
+#include "native_data_names.hpp"
 
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
 #include <stellar/core/ship_designs.hpp>
@@ -126,8 +127,9 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
         assess_start_ship_build(read, player->id, design.id);
     view.available_designs.push_back(
         {.id = design.id,
-         .name = design.name,
-         .description = design.description,
+         .name = stellar::native_data::ship_design_name(locale, design),
+         .description =
+             stellar::native_data::ship_design_description(locale, design),
          .role = design.role,
          .industry_cost = design.industry_cost,
          .minimum_build_days_at_full_shipyard_rate =
@@ -170,7 +172,7 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
     view.orders.push_back(
         {.order_id = std::move(order_id),
          .design_id = std::move(design_id),
-         .design_name = design ? design->name : resolve(locale,"SHIPYARD_DESIGN_UNAVAILABLE","Unavailable design"),
+         .design_name = design ? stellar::native_data::ship_design_name(locale,*design) : resolve(locale,"SHIPYARD_DESIGN_UNAVAILABLE","Unavailable design"),
          .active = active,
          .progress_fraction = industry_cost <= 0.
                                   ? (active ? 1. : 0.)

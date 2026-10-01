@@ -156,15 +156,23 @@ same document headless-tested.
    gives self-luminous bodies the photosphere's edge falloff.
    `band_shear`+`band_waves` (two-harmonic longitude warp — differential rotation + alternating jets)
    and `orbital_beaming` (first-order doppler asymmetry about local +Y —
-   accretion discs get their approaching-lane brightening)
+   accretion discs get their approaching-lane brightening, with
+   `orbitalBeamTint` adding the paired blue/red spectral shift)
    landed on top. Ring/scattering physics followed:
    `accretion_disc_material3d` + `accretion`/`AccretionDisc` generate a
    Shakura–Sunyaev radial disc for `annulus` meshes (black holes compose
-   with a dark sphere), `forward_scatter`/`forwardScatter` adds a
+   with a dark sphere; the optional `[spiral,arms,turns]` tail bakes
+   grand-design density-wave arms — integral m-modes wind along the
+   log spiral with compressional heating, so crests read hotter/brighter
+   and troughs cooler while the azimuth wraps seamlessly),
+   `forward_scatter`/`forwardScatter` adds a
    Henyey–Greenstein phase function (backlit dusty rings brighten, icy
    opposition surges) — `forwardScatterBack`/`forwardScatterBackMix`
    blend in an optional second lobe so a narrow forward spike pairs
-   with a broad weak back lobe like real dust sheets — and
+   with a broad weak back lobe like real dust sheets, and
+   `forwardScatterHue` weights the lobes by the mean-normalized
+   Rayleigh (450/λ)⁴ spectrum so small-particle scatter reads icy blue
+   instead of achromatic — and
    `SurfaceEffect3D::volume_scatter` makes
    emission volumes read star-lit; volumes are document-authored via the
    `volume` block / `EmissionVolume` component (entity texture supplies
@@ -248,8 +256,10 @@ material (blackbody tint, emissive-dominant, temperature-graded limb
 coefficient). `accretion_disc_material3d(inner,outer,kelvin,beaming)`
 generates a Shakura–Sunyaev thin-disc radial column (`T ∝ r^(−3/4)`,
 flux ∝ T⁴, per-texel blackbody) for `annulus:i,o` meshes with the
-orbital-beaming lane asymmetry — black holes compose it with a dark
-sphere rather than needing an engine concept. Screen-space mesh LOD
+orbital-beaming lane asymmetry — the `spiral`/`arms`/`turns` tail adds
+baked density-wave arms (compressional heating modulates T, so flux and
+hue follow one perturbation and the wrap stays seamless) — black holes
+compose it with a dark sphere rather than needing an engine concept. Screen-space mesh LOD
 chains are landed: `lod_meshes`/`lod_pixels` swap to coarser meshes by
 projected bounding diameter (halving per level), with the streamer
 demand and draw submission sharing `select_lod3d_level` so only the

@@ -43,7 +43,9 @@ struct VirtualizedList {
   // Frame sync for row-snapped consumers: reconfigures the model,
   // re-clamps the offset against the new content (a shrinking row set
   // can never strand it past the tail), snaps down to a whole-row
-  // boundary, and returns the first visible row index.
+  // boundary, and returns the first visible row index. An offset
+  // pinned at max_scroll stays unsnapped so a fractional viewport
+  // remainder cannot strand the final row out of reach.
   std::size_t sync_rows(std::size_t rows, float row_height,
                       float viewport_height);
 };

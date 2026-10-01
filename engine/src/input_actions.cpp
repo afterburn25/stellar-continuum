@@ -183,6 +183,7 @@ bool InputMapper::chord_satisfied(const InputBinding &binding) const {
 }
 
 bool InputMapper::feed(const RawInputEvent &event) {
+  last_press_action_.clear();
   // Track raw key state for chord evaluation.
   if (event.kind == RawInputEvent::Kind::KeyPress)
     held_keys_[event.code] = true;
@@ -209,8 +210,11 @@ bool InputMapper::feed(const RawInputEvent &event) {
             event.kind == RawInputEvent::Kind::KeyRelease ||
             (button_event && !event.pressed);
         if (is_press) {
-          if (!state.held)
+          if (!state.held) {
             state.pressed_this_frame = true;
+            if (last_press_action_.empty())
+              last_press_action_ = action.name;
+          }
           state.held = true;
           consumed = true;
           continue;
@@ -277,6 +281,9 @@ bool InputMapper::just_pressed(std::string_view action) const {
 }
 bool InputMapper::just_released(std::string_view action) const {
   return state(action).released_this_frame;
+}
+std::string_view InputMapper::last_press_action() const noexcept {
+  return last_press_action_;
 }
 float InputMapper::axis(std::string_view action) const {
   float result = state(action).axis;

@@ -4,6 +4,7 @@
 #include <stellar/core/exploration_advance.hpp>
 #include "native_phenomena.hpp"
 #include "native_phenomena_debug.hpp"
+#include <stellar/engine/native_scene3d.hpp>
 #include <algorithm>
 #include <chrono>
 #include <iostream>
@@ -156,15 +157,15 @@ int main(int argc,char** argv)try{
       PhenomenaDebug dump_panel;dump_panel.visible=true;
       std::string dump;for(int i=0;i<40;++i)dump+="phenomena line "+std::to_string(i)+"\n";
       dump_panel.data(std::move(dump));
-      const auto texts=[](const DrawList &d){std::vector<std::string> v;for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);std::ranges::sort(v);return v;};
+      const auto overlay_texts=[](const DrawList &d){std::vector<std::string> v;for(const auto &c:d.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip)v.push_back(t->value);std::ranges::sort(v);return v;};
       const auto render=[&]{DrawList d;dump_panel.render(d,size.first,size.second);return d;};
-      const auto top=texts(render());
+      const auto top=overlay_texts(render());
       InputEvent wheel{InputEventType::Wheel,{},{},-3.f};
       check(dump_panel.handle(wheel,size.first,size.second),"Phenomena debug dropped wheel input.");
-      check(texts(render())!=top,"Phenomena debug wheel did not scroll the dump.");
+      check(overlay_texts(render())!=top,"Phenomena debug wheel did not scroll the dump.");
       InputEvent up{InputEventType::Wheel,{},{},3.f};
       (void)dump_panel.handle(up,size.first,size.second);
-      check(texts(render())==top,"Phenomena debug scroll did not return to the head.");
+      check(overlay_texts(render())==top,"Phenomena debug scroll did not return to the head.");
       InputEvent far{InputEventType::Wheel,{},{},-10000.f};
       (void)dump_panel.handle(far,size.first,size.second);
       const auto tail=texts(render());
@@ -174,9 +175,9 @@ int main(int argc,char** argv)try{
   }
   DrawList system;native.append_system(system,7,0,0,1280,720,.2,{});check(system.overlay.empty(),"Phenomena drew over UI");system.world.emplace_back(Circle{{640,360},16,{255,255,255,255}});check(std::holds_alternative<Circle>(system.world.back()),"Objects cannot render above clouds");
   DrawList close_system;native.append_system(close_system,7,0,0,1280,720,10,{});
-  const auto& close_cloud=std::get<Image>(close_system.world.back());
-  const auto& far_cloud=std::get<Image>(system.world[system.world.size()-2]);
-  check(close_cloud.resource==far_cloud.resource&&close_cloud.destination.x==far_cloud.destination.x&&close_cloud.destination.y==far_cloud.destination.y&&close_cloud.destination.width==far_cloud.destination.width&&close_cloud.destination.height==far_cloud.destination.height,"System zoom enlarges gas layers");
+  const auto& close_cloud=std::get<Scene3DView>(close_system.world.back());
+  const auto& far_cloud=std::get<Scene3DView>(system.world[system.world.size()-2]);
+  check(close_cloud.scene->instances().front().material.texture==far_cloud.scene->instances().front().material.texture&&close_cloud.destination.x==far_cloud.destination.x&&close_cloud.destination.y==far_cloud.destination.y&&close_cloud.destination.width==far_cloud.destination.width&&close_cloud.destination.height==far_cloud.destination.height,"System zoom enlarges gas layers");
   auto before=phenomenon_context(&fixture,0,0,7);for(int setting=0;setting<3;++setting){VisualOptions visual;visual.density=setting;DrawList view;native.append_system(view,7,0,0,1280,720,.2,visual);check(before.effects==phenomenon_context(&fixture,0,0,7).effects,"Visual preferences changed gameplay");}
   check(visual_multiplier({0})<visual_multiplier({1})&&visual_multiplier({1})<visual_multiplier({2}),"Density levels are identical");
   check(local_visual_multiplier({},.2,true)<local_visual_multiplier({},.2,false)&&local_visual_multiplier({},10)<local_visual_multiplier({},.2),"Combat/close-camera clutter attenuation is missing");

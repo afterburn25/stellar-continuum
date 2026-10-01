@@ -313,6 +313,45 @@ int main() {
           "describe_binding did not show the axis pin");
   }
 
+  // last_press_action resolves the action each feed triggered. Press edges
+  // accumulate across every event in a frame, so a caller dispatching two
+  // presses in one frame must not scan just_pressed() — it would re-report
+  // the first press's action for the second event.
+  {
+    InputMapper burst;
+    check(burst.load_contexts(R"({
+      "contexts": [{"name": "GAME", "actions": [
+        {"name": "alpha", "type": "Button",
+         "bindings": [{"kind": "KeyPress", "code": 65}]},
+        {"name": "beta", "type": "Button",
+         "bindings": [{"kind": "KeyPress", "code": 66}]}
+      ]}]
+    })",
+                              &error),
+          error.c_str());
+    burst.push_context("GAME");
+    burst.begin_frame();
+    (void)burst.feed(key(RawInputEvent::Kind::KeyPress, 65));
+    check(burst.last_press_action() == "alpha",
+          "first same-frame press did not resolve alpha");
+    (void)burst.feed(key(RawInputEvent::Kind::KeyPress, 66));
+    check(burst.last_press_action() == "beta",
+          "second same-frame press masked by the first edge");
+    check(burst.just_pressed("alpha") && burst.just_pressed("beta"),
+          "frame edges must still accumulate for frame-level queries");
+    (void)burst.feed(key(RawInputEvent::Kind::KeyRelease, 66));
+    check(burst.last_press_action().empty(),
+          "release must not report a press action");
+    // A held repeat press creates no new edge and no new resolution.
+    (void)burst.feed(key(RawInputEvent::Kind::KeyRelease, 65));
+    (void)burst.feed(key(RawInputEvent::Kind::KeyPress, 65));
+    check(burst.last_press_action() == "alpha",
+          "press after release did not resolve alpha");
+    (void)burst.feed(key(RawInputEvent::Kind::KeyPress, 65));
+    check(burst.last_press_action().empty(),
+          "held repeat press reported a phantom action");
+  }
+
   if (failures == 0)
     std::cout << "InputMapper tests passed\n";
   return failures == 0 ? 0 : 1;

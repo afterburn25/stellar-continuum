@@ -488,14 +488,32 @@ std::string Scene3dDocument::to_json() const {
       item["bandTurbulence"] = e.band_turbulence;
     if (e.band_diff != 0.f) item["bandDiff"] = e.band_diff;
     if (e.orbital_beaming != 0.f) item["orbitalBeam"] = e.orbital_beaming;
+    if (e.orbital_beaming_tint != 0.f)
+      item["orbitalBeamTint"] = e.orbital_beaming_tint;
     if (e.forward_scatter != 0.f)
       item["forwardScatter"] = e.forward_scatter;
     if (e.forward_scatter_back != 0.f)
       item["forwardScatterBack"] = e.forward_scatter_back;
     if (e.forward_scatter_back_mix != 0.f)
       item["forwardScatterBackMix"] = e.forward_scatter_back_mix;
+    if (e.forward_scatter_hue != 0.f)
+      item["forwardScatterHue"] = e.forward_scatter_hue;
     if (e.star_kelvin != 0.0) item["starKelvin"] = e.star_kelvin;
-    if (e.accretion[2] != 0.f) item["accretion"] = e.accretion;
+    if (e.accretion[2] != 0.f) {
+      // Emit the shortest payload the authored tail needs so older
+      // readers keep their four/seven-entry accession shapes.
+      if (e.accretion[7] != 0.f)
+        item["accretion"] = e.accretion;
+      else if (e.accretion[4] != 0.f || e.accretion[5] != 0.f ||
+               e.accretion[6] != 0.f)
+        item["accretion"] = {e.accretion[0], e.accretion[1],
+                             e.accretion[2], e.accretion[3],
+                             e.accretion[4], e.accretion[5],
+                             e.accretion[6]};
+      else
+        item["accretion"] = {e.accretion[0], e.accretion[1],
+                             e.accretion[2], e.accretion[3]};
+    }
     if (e.volume_depth != 0.f)
       item["volume"] = {{"depth", e.volume_depth},
                         {"density", e.volume_density},
@@ -774,6 +792,9 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       e.orbital_beaming = item.value("orbitalBeam", 0.0f);
       if (!(e.orbital_beaming >= -1.f && e.orbital_beaming <= 1.f))
         return fail("orbitalBeam must be in [-1,1]");
+      e.orbital_beaming_tint = item.value("orbitalBeamTint", 0.0f);
+      if (!(e.orbital_beaming_tint >= 0.f && e.orbital_beaming_tint <= 1.f))
+        return fail("orbitalBeamTint must be in [0,1]");
       e.forward_scatter = item.value("forwardScatter", 0.0f);
       if (!(e.forward_scatter >= -1.f && e.forward_scatter <= 1.f))
         return fail("forwardScatter must be in [-1,1]");
@@ -785,21 +806,40 @@ Scene3dDocument::from_json(std::string_view text, std::string *error) {
       if (!(e.forward_scatter_back_mix >= 0.f &&
             e.forward_scatter_back_mix <= 1.f))
         return fail("forwardScatterBackMix must be in [0,1]");
+      e.forward_scatter_hue = item.value("forwardScatterHue", 0.0f);
+      if (!(e.forward_scatter_hue >= 0.f && e.forward_scatter_hue <= 1.f))
+        return fail("forwardScatterHue must be in [0,1]");
       e.star_kelvin = item.value("starKelvin", 0.0);
       if (!(e.star_kelvin == 0.0 ||
             (e.star_kelvin >= 100.0 && e.star_kelvin <= 100000.0)))
         return fail("starKelvin must be in [100,100000]");
       if (item.contains("accretion")) {
         const auto &ac = item.at("accretion");
-        if (!ac.is_array() || ac.size() != 4)
-          return fail("accretion must be [inner,outer,kelvin,beaming]");
-        for (int i = 0; i < 4; ++i) e.accretion[i] = ac[i].get<float>();
+        if (!ac.is_array() ||
+            (ac.size() != 4 && ac.size() != 7 && ac.size() != 8))
+          return fail(
+              "accretion must be [inner,outer,kelvin,beaming] with an "
+              "optional [spiral,arms,turns[,shear]] tail");
+        for (std::size_t i = 0; i < ac.size(); ++i)
+          e.accretion[i] = ac[i].get<float>();
         if (!(e.accretion[0] > 0.f && e.accretion[1] > e.accretion[0]))
           return fail("accretion radii must satisfy 0<inner<outer");
         if (!(e.accretion[2] >= 100.f && e.accretion[2] <= 100000.f))
           return fail("accretion kelvin must be in [100,100000]");
         if (!(std::abs(e.accretion[3]) <= 1.f))
           return fail("accretion beaming must be in [-1,1]");
+        if (!(e.accretion[4] >= 0.f && e.accretion[4] <= 1.f))
+          return fail("accretion spiral depth must be in [0,1]");
+        if (!(e.accretion[5] >= 0.f && e.accretion[5] <= 4.f &&
+              std::floor(e.accretion[5]) == e.accretion[5]))
+          return fail("accretion spiral arms must be an integer in [0,4]");
+        if (e.accretion[4] > 0.f && e.accretion[5] < 1.f)
+          return fail("accretion spiral arms must be at least 1 when "
+                      "spiral is set");
+        if (!(std::abs(e.accretion[6]) <= 4.f))
+          return fail("accretion spiral turns must be in [-4,4]");
+        if (!(std::abs(e.accretion[7]) <= 8.f))
+          return fail("accretion shear must be in [-8,8]");
       }
       if (item.contains("volume")) {
         const auto &vol = item.at("volume");

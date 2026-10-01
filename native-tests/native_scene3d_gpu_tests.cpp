@@ -36,6 +36,17 @@ int main(int argc,char** argv)try{
     list.overlay.emplace_back(FilledRectangle{{20,20,30,30},{40,50,240,255}});
     auto path=folder/name;window.draw(list,path);return decode_rgba_image(path);
   };
+  { // A texture budget set before the first 3D frame persists through the
+    // lazily-created renderer instead of being silently dropped — a zero
+    // budget denies the first bind outright (pinned white fallback serves it).
+    window.set_scene3d_texture_budget(0);
+    auto early=a;early.material.tint={255,255,255,255};
+    early.material.texture=RgbaImage::create(2,2,{255,0,0,255,0,255,0,255,0,0,255,255,255,255,255,255});
+    (void)capture({early},"budget-pre-renderer.png");
+    check(window.scene3d_statistics().streamed_fallbacks>0,"Pre-renderer texture budget did not reach the lazily created renderer");
+    check(window.scene3d_statistics().texture_budget_bytes==0,"Statistics did not report the live streamer budget");
+    window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+  }
   const auto first=capture({a,b},"depth-forward.png"),second=capture({b,a},"depth-reverse.png");
   check(first->pixels()==second->pixels(),"3D occlusion depends on triangle submission order");
   const auto channel=[](const RgbaImage& p,int x,int y,int c){return p.pixels()[(static_cast<std::size_t>(y)*p.width()+x)*4+c];};
@@ -50,6 +61,25 @@ int main(int argc,char** argv)try{
     check(tex!=snapshot.subsystems.end()&&meshes!=snapshot.subsystems.end()&&targets!=snapshot.subsystems.end(),"3D renderer VRAM is not attributed to MemoryTracker subsystems");
     check(tex->current_bytes==residency.texture_cache_bytes&&meshes->current_bytes==residency.mesh_cache_bytes&&targets->current_bytes==residency.target_bytes,"Attributed VRAM bytes do not match renderer residency");
     check(find("ui-image-cache")!=snapshot.subsystems.end()&&find("ui-text-cache")!=snapshot.subsystems.end(),"2D image/text caches are not attributed to MemoryTracker subsystems");
+  }
+  { // render_scale shrinks the offscreen target; composite() upscales the
+    // same destination rect linearly, and target-byte accounting follows
+    // the scaled extent.
+    DrawList half;half.world.emplace_back(Scene3DView{Scene3D::create(camera,{a,b}),{0,0,320,320}});
+    std::get_if<Scene3DView>(&half.world.front())->render_scale=.5f;
+    window.draw(half,folder/"render-scale-half.png");
+    const auto scaled_stats=window.scene3d_statistics();
+    const auto bpp=scaled_stats.hdr?16u:8u;
+    check(scaled_stats.target_bytes==160u*160u*bpp,"render_scale did not shrink the render target");
+    check(window.scene3d_target_bytes(half)==scaled_stats.target_bytes,"Target-byte estimator diverged from prepare() accounting");
+    const auto scaled_cap=decode_rgba_image(folder/"render-scale-half.png");
+    check(channel(*scaled_cap,80,160,0)>200&&channel(*scaled_cap,240,160,1)>200,"Scaled 3D viewport did not upscale to fill its destination");
+    check(channel(*scaled_cap,400,160,0)==5,"Scaled 3D viewport escaped its destination rectangle");
+    for(float bad_scale:{.1f,1.5f,std::numeric_limits<float>::quiet_NaN(),std::numeric_limits<float>::infinity()}){
+      DrawList bad;bad.world.emplace_back(Scene3DView{Scene3D::create(camera,{a,b}),{0,0,320,320}});
+      std::get_if<Scene3DView>(&bad.world.front())->render_scale=bad_scale;
+      bool threw=false;try{window.draw(bad,folder/"render-scale-bad.png");}catch(const std::invalid_argument&){threw=true;}
+      check(threw,"render_scale outside [0.25,1] was not rejected");}
   }
   {
     std::vector<std::uint8_t> pixels(64*64*4);
@@ -193,6 +223,7 @@ int main(int argc,char** argv)try{
      check(channel(*tail,72,160,0)>200&&channel(*tail,72,160,1)>50&&channel(*tail,72,160,1)<200&&channel(*tail,72,160,2)<120,
          "Residency view did not mark the partial tail warm");}
     window.set_scene3d_texture_budget(maximum_scene3d_texture_cache_bytes);
+    check(window.scene3d_statistics().texture_budget_bytes==maximum_scene3d_texture_cache_bytes,"Statistics did not report the restored streamer budget");
     // The 2x2 texture is upsampled at this footprint, so its demanded
     // tail starts at mip 0 — the resident-bind green case.
     {const auto full=res_capture(textured,"residency-full.png");
@@ -1033,7 +1064,18 @@ int main(int argc,char** argv)try{
         "Vignette corner was already dark without the option");
     check(std::abs(int(channel(*vig_on,160,160,0))-int(channel(*vig_off,160,160,0)))<=4,
         "Vignette shifted the frame center");
-    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_vignette_passed\n";
+    // Channel matrix: swap red and green on the red-emissive surface; the
+    // post-tonemap remap must move the resolved display color.
+    RenderOptions3D swapped;swapped.color_matrix={0,1,0, 1,0,0, 0,0,1};
+    const auto swap_frame=options_view(colored,swapped,"post-color-matrix.png");
+    const auto swap_neutral=options_view(colored,{},"post-color-matrix-off.png");
+    check(channel(*swap_neutral,160,160,0)>channel(*swap_neutral,160,160,1)+20,
+        "Reference frame lost its red dominance");
+    check(channel(*swap_frame,160,160,1)>channel(*swap_frame,160,160,0)+20,
+        "Color matrix did not swap the resolved channels");
+    check(channel(*swap_frame,160,160,2)==channel(*swap_neutral,160,160,2),
+        "Identity column (blue) was touched by the swap");
+    std::cout<<"post_gpu=exposure_bloom_quality_tiers_msaa_vignette_color_matrix_passed\n";
   }
   {
     // Debug shading views isolate single channels for material review —
@@ -1601,6 +1643,16 @@ int main(int argc,char** argv)try{
     disc.material.orbital_beaming=0;disc.rotation=rotation_axis_angle({1,0,0},.55f);
     const auto disc_ref=capture({disc},"beam-off.png");
     check(channel(*disc_ref,30,160,0)==left_flat,"Beaming=0 did not restore the flat disc");
+    // Doppler tint: the brightened lane blueshifts (B−R rises) while
+    // the dimmed lane redshifts (B−R falls) vs the untinted beam.
+    disc.material.orbital_beaming=.9f;disc.material.orbital_beaming_tint=.5f;
+    const auto tinted_disc=capture({disc},"beam-tinted.png");
+    const int ul_r=channel(*beamed_disc,30,160,0),ul_b=channel(*beamed_disc,30,160,2);
+    const int ur_r=channel(*beamed_disc,290,160,0),ur_b=channel(*beamed_disc,290,160,2);
+    const int tl_r=channel(*tinted_disc,30,160,0),tl_b=channel(*tinted_disc,30,160,2);
+    const int tr_r=channel(*tinted_disc,290,160,0),tr_b=channel(*tinted_disc,290,160,2);
+    check(tl_b-tl_r>ul_b-ul_r+10,"Doppler tint did not blueshift the approaching lane");
+    check(tr_b-tr_r<ur_b-ur_r-10,"Doppler tint did not redshift the receding lane");
     std::cout<<"orbital_beam_gpu=tilt_asymmetry_faceon_symmetric_passed\n";
   }
   {
@@ -1628,7 +1680,65 @@ int main(int argc,char** argv)try{
     const int left=channel(*disc,70,160,0),right=channel(*disc,250,160,0);
     check(left>150&&right<left*3/4,
         "Accretion disc lost its beamed lane asymmetry");
-    std::cout<<"accretion_disc_gpu=radial_beaming_passed\n";
+    // Spiral density waves bake azimuthal structure into the generated
+    // texture: with beaming disabled the flat twin stays lane-uniform
+    // while the spiral disc splits into brighter crests and cooler
+    // troughs at the same radii — the diff must carry both signs.
+    MeshInstance3D flat{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f)};
+    flat.rotation=rotation_axis_angle({1,0,0},.55f);
+    MeshInstance3D arms{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f,.7f,2,.9f)};
+    arms.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto flat_cap=capture({flat},"accretion-flat.png");
+    const auto arms_cap=capture({arms},"accretion-arms.png");
+    int crest=0,trough=0;
+    for(int y=60;y<170;++y)for(int x=40;x<280;++x){
+        const int d=channel(*arms_cap,x,y,0)-channel(*flat_cap,x,y,0);
+        if(d>8)++crest;else if(d<-8)++trough;
+    }
+    check(crest>400&&trough>400,
+        "Spiral arms produced no azimuthal crest/trough modulation");
+    // Differential shear: scene time scrolls the azimuth at rho^-3/2 in
+    // inner-edge radii, so the inner rim laps the outer edge — the
+    // sheared frame must diverge over time, most strongly near the inner
+    // rim, while a zero-rate material stays frozen at any time.
+    MeshInstance3D shearing{annulus_mesh(.45f,1.f,192),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f,.7f,2,.9f,.8f)};
+    shearing.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto timed_disc=[&](const MeshInstance3D& i,float t,const char* name){
+        DrawList list;RenderOptions3D o;o.time=t;
+        list.world.emplace_back(Scene3DView{Scene3D::create(camera,{i}),{0,0,320,320},o});
+        list.overlay.emplace_back(FilledRectangle{{20,20,30,30},{40,50,240,255}});
+        window.draw(list,folder/name);return decode_rgba_image(folder/name);};
+    const auto shear_t0=timed_disc(shearing,0.f,"accretion-shear-t0.png");
+    const auto shear_t4=timed_disc(shearing,4.f,"accretion-shear-t4.png");
+    const auto still_t4=timed_disc(arms,4.f,"accretion-shear-off.png");
+    check(still_t4->pixels()==arms_cap->pixels(),
+        "Static disc moved under scene time without shear");
+    int inner_px=0,outer_px=0;
+    for(int x=40;x<280;++x){
+        for(int y=118;y<138;++y)  // inner rim band
+          if(std::abs(channel(*shear_t0,x,y,0)-channel(*shear_t4,x,y,0))>8)++inner_px;
+        for(int y=52;y<78;++y)    // outer rim band
+          if(std::abs(channel(*shear_t0,x,y,0)-channel(*shear_t4,x,y,0))>8)++outer_px;
+    }
+    check(inner_px>200,"Accretion shear did not advect the inner rim");
+    check(inner_px>outer_px,"Accretion shear was not differential by radius");
+    // Flared geometry: the rim sheet climbs off the midplane, so the far
+    // edge of a flared disc silhouettes higher on screen than the flat
+    // annulus carrying the identical material.
+    MeshInstance3D flared{flared_annulus_mesh(.45f,1.f,.3f,1.8f),{},{},.9f,
+        accretion_disc_material3d(.45f,1.f,8000,0.f,.7f,2,.9f)};
+    flared.rotation=rotation_axis_angle({1,0,0},.55f);
+    const auto flared_cap=capture({flared},"accretion-flared.png");
+    const auto topmost=[&](const RgbaImage& p){
+        for(int y=0;y<320;++y)for(int x=64;x<320;++x)
+          if(channel(p,x,y,0)+channel(p,x,y,1)+channel(p,x,y,2)>90)return y;
+        return 320;};
+    check(topmost(*flared_cap)+3<topmost(*arms_cap),
+        "Flared annulus did not lift the rim silhouette");
+    std::cout<<"accretion_disc_gpu=radial_beaming_spiral_shear_flare_passed\n";
   }
   {
     // Henyey-Greenstein phase: the same ring sheet brightens when
@@ -1660,6 +1770,20 @@ int main(int argc,char** argv)try{
     const int back_two=channel(*two_back,160,120,0),face_two=channel(*two_face,160,120,0);
     check(face_two>face_on*5/4,"Two-term back lobe did not lift the face-lit ring");
     check(back_two>back_off,"Two-term mix lost the forward-scatter boost");
+    // Rayleigh wavelength weight: the same phase lobe tilts blue —
+    // probing the unsaturated face-lit sheet, the hue capture's
+    // blue/red ratio multiplies by the (450/lambda)^4 spread and blue
+    // gains over the achromatic baseline while red depletes.
+    ring.material.forward_scatter_hue=1.f;
+    DrawList face4;face4.world.emplace_back(Scene3DView{Scene3D::create(camera,{ring},{0,0,1}),{0,0,320,320}});
+    window.draw(face4,folder/"ring-facelit-icy.png");const auto icy_face=decode_rgba_image(folder/"ring-facelit-icy.png");
+    const float achrom_br=static_cast<float>(channel(*two_face,160,120,2))/
+                          std::max(1.f,static_cast<float>(channel(*two_face,160,120,0)));
+    const float icy_br=static_cast<float>(channel(*icy_face,160,120,2))/
+                       std::max(1.f,static_cast<float>(channel(*icy_face,160,120,0)));
+    check(icy_br>achrom_br*2.5f,"Rayleigh hue did not blue-shift the scattered light");
+    check(channel(*icy_face,160,120,2)>channel(*two_face,160,120,2),
+        "Rayleigh hue did not lift the blue channel");
     std::cout<<"forward_scatter_gpu=backlit_boost_passed\n";
   }
   auto reversed=b;auto back_indices=b.mesh->indices();std::reverse(back_indices.begin(),back_indices.end());

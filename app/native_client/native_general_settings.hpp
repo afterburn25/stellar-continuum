@@ -74,6 +74,8 @@ class NativeGeneralSettings final {
   explicit NativeGeneralSettings(std::filesystem::path path);
   [[nodiscard]] const GeneralPreferences& saved() const noexcept { return saved_; }
   [[nodiscard]] const GeneralPreferences& draft() const noexcept { return draft_; }
+  // The file this view loads/saves — checks use it to verify persistence.
+  [[nodiscard]] const std::filesystem::path& path() const noexcept { return path_; }
   [[nodiscard]] std::string error() const { return error_; }
   // Persistence failure leaves the previous preference and destination intact.
   [[nodiscard]] bool save(GeneralPreferences);

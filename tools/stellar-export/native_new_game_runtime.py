@@ -92,7 +92,7 @@ def _video_diagnostic(stdout: str, location: str) -> dict:
         report = json.loads(rows[0], object_pairs_hook=unique_object)
     except (TypeError, ValueError, json.JSONDecodeError) as error:
         raise RuntimeError("Video settings diagnostic was not valid unique-key JSON") from error
-    flags = ("opened", "four_rows", "previewed", "normal_capture",
+    flags = ("opened", "choice_rows", "previewed", "normal_capture",
              "confirm_capture", "escape_reverted", "kept", "restored")
     expected_keys = {"location", *flags}
     if (not isinstance(report, dict) or set(report) != expected_keys or
@@ -100,6 +100,102 @@ def _video_diagnostic(stdout: str, location: str) -> dict:
         raise RuntimeError("Video settings diagnostic did not report the expected fields and location")
     if any(report[name] is not True for name in flags):
         raise RuntimeError("Video settings diagnostic did not complete the visible preview/keep/revert flow")
+    return report
+
+
+def _general_diagnostic(stdout: str, location: str) -> dict:
+    rows = re.findall(r"^general_settings_check=(.*)$", stdout, flags=re.MULTILINE)
+    if len(rows) != 1:
+        raise RuntimeError("Expected exactly one general settings diagnostic")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        report = json.loads(rows[0], object_pairs_hook=unique_object)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("General settings diagnostic was not valid unique-key JSON") from error
+    flags = ("opened", "capture", "text_scale", "cancel_restored",
+             "saved", "restored")
+    expected_keys = {"location", *flags}
+    if (not isinstance(report, dict) or set(report) != expected_keys or
+            report.get("location") != location):
+        raise RuntimeError("General settings diagnostic did not report the expected fields and location")
+    if any(report[name] is not True for name in flags):
+        raise RuntimeError("General settings diagnostic did not complete the text-scale exercise")
+    return report
+
+
+def _voice_settings_diagnostic(stdout: str, location: str) -> dict:
+    rows = re.findall(r"^voice_settings_check=(.*)$", stdout, flags=re.MULTILINE)
+    if len(rows) != 1:
+        raise RuntimeError("Expected exactly one voice settings diagnostic")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        report = json.loads(rows[0], object_pairs_hook=unique_object)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("Voice settings diagnostic was not valid unique-key JSON") from error
+    flags = ("opened", "previewed", "replay", "stop", "defaults",
+             "cancel_restored", "saved", "restored")
+    expected_keys = {"location", *flags}
+    if (not isinstance(report, dict) or set(report) != expected_keys or
+            report.get("location") != location):
+        raise RuntimeError("Voice settings diagnostic did not report the expected fields and location")
+    if any(report[name] is not True for name in flags):
+        raise RuntimeError("Voice settings diagnostic did not complete the full control matrix")
+    return report
+
+
+def _controls_diagnostic(stdout: str, location: str) -> dict:
+    rows = re.findall(r"^controls_settings_check=(.*)$", stdout, flags=re.MULTILINE)
+    if len(rows) != 1:
+        raise RuntimeError("Expected exactly one controls settings diagnostic")
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        report = json.loads(rows[0], object_pairs_hook=unique_object)
+    except (TypeError, ValueError, json.JSONDecodeError) as error:
+        raise RuntimeError("Controls settings diagnostic was not valid unique-key JSON") from error
+    if location == "startup":
+        # Pre-campaign the hub has no input mapper — the Controls category is
+        # a static help card whose proof is the open/render/back-out shape.
+        if (not isinstance(report, dict) or
+                set(report) != {"location", "help_card"} or
+                report.get("location") != location or
+                report.get("help_card") is not True):
+            raise RuntimeError("Controls startup diagnostic did not report the help-card proof")
+        return report
+    required = ("opened", "capture_cancel", "rebound", "restored")
+    conditional = ("scrolled", "axis_captured", "pinned", "noticed",
+                   "triggers", "stole", "file_preexisted")
+    expected_keys = {"location", *required, *conditional}
+    if (not isinstance(report, dict) or set(report) != expected_keys or
+            report.get("location") != location):
+        raise RuntimeError("Controls settings diagnostic did not report the expected fields and location")
+    if any(report[name] is not True for name in required):
+        raise RuntimeError("Controls settings diagnostic did not complete the rebind matrix")
+    if any(type(report[name]) is not bool for name in conditional):
+        raise RuntimeError("Controls settings diagnostic reported non-boolean evidence flags")
     return report
 
 
@@ -161,7 +257,9 @@ def _launch(args, cwd: Path, env: dict[str, str], label: str):
 
 def validate_native_new_game_export(folder: Path, env: dict[str, str],
                                     fixture_path: Path, *, audio_check=False,
-                                    audio_settings_check=False, video_settings_check=False):
+                                    audio_settings_check=False, video_settings_check=False,
+                                    general_settings_check=False, voice_settings_check=False,
+                                    controls_settings_check=False):
     if audio_settings_check and not audio_check:
         raise RuntimeError("Native audio settings check requires the audio check")
     anchor_payload = _source_payload(fixture_path)
@@ -193,6 +291,9 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if audio_settings_check:
             fresh_args.append("--audio-settings-check")
         if video_settings_check: fresh_args.append("--video-settings-check")
+        if general_settings_check: fresh_args.append("--general-settings-check")
+        if voice_settings_check: fresh_args.append("--voice-settings-check")
+        if controls_settings_check: fresh_args.append("--controls-settings-check")
         fresh = _launch(fresh_args, cwd, clean, "fresh input")
         fresh_audio = parse_native_audio_check(fresh.stdout, fresh=True) if audio_check else None
         fresh_audio_settings = (parse_native_audio_settings_check(fresh.stdout, fresh=True)
@@ -228,6 +329,13 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
             _bmp(fresh_settings_capture, 1280, 720, fresh.stdout)
             settings_bytes = verify_native_audio_settings_file(settings_path)
         video_bytes = (anchor.parent / "video-settings.json").read_bytes() if video_settings_check else None
+        general_path = anchor.parent / "general-settings.json"
+        general_bytes = general_path.read_bytes() if general_settings_check and general_path.is_file() else None
+        voice_path = anchor.parent / "voice-settings.json"
+        voice_reference = (json.loads(voice_path.read_text(encoding="utf-8"))
+                           if voice_settings_check and voice_path.is_file() else None)
+        controls_path = anchor.parent / "galaxy-controls.json"
+        controls_bytes = controls_path.read_bytes() if controls_settings_check and controls_path.is_file() else None
         generated_payload = json.loads(generated.read_text(encoding="utf-8"))
         _verify_campaign(generated_payload, state)
 
@@ -243,6 +351,9 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if audio_settings_check:
             reload_args.append("--audio-settings-check")
         if video_settings_check: reload_args.append("--video-settings-check")
+        if general_settings_check: reload_args.append("--general-settings-check")
+        if voice_settings_check: reload_args.append("--voice-settings-check")
+        if controls_settings_check: reload_args.append("--controls-settings-check")
         loaded = _launch(reload_args, cwd, clean, "paused reload")
         reload_audio = parse_native_audio_check(loaded.stdout, fresh=False) if audio_check else None
         reload_audio_settings = (parse_native_audio_settings_check(loaded.stdout, fresh=False)
@@ -268,6 +379,45 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
                 raise RuntimeError("Video preferences changed across cold campaign reload")
             for location, process in (("startup", fresh), ("pause", loaded)):
                 video_checks[location] = _video_diagnostic(process.stdout, location)
+        general_checks = {}
+        if general_settings_check:
+            # The check restores byte-exact when a file pre-existed; a file
+            # first written by the check itself is equivalently restored
+            # when its prefs match saved (proven by restored=true).
+            if general_bytes is not None and (
+                    not general_path.is_file() or
+                    general_path.read_bytes() != general_bytes):
+                raise RuntimeError("General preferences changed across the settings checks")
+            for location, process in (("startup", fresh), ("pause", loaded)):
+                general_checks[location] = _general_diagnostic(process.stdout, location)
+        voice_checks = {}
+        if voice_settings_check:
+            # Slider clicks persist the pointer's x-fraction, and the two legs
+            # run at different resolutions — floats compare within the check's
+            # own .01 tolerance while toggles/enums stay exact.
+            if voice_reference is not None:
+                if not voice_path.is_file():
+                    raise RuntimeError("Voice preferences were removed by the settings checks")
+                restored = json.loads(voice_path.read_text(encoding="utf-8"))
+                if set(restored) != set(voice_reference):
+                    raise RuntimeError("Voice preferences file changed shape across the settings checks")
+                for key, before in voice_reference.items():
+                    after = restored[key]
+                    if type(before) is float and type(after) is float:
+                        if not math.isfinite(after) or abs(after - before) > .01:
+                            raise RuntimeError(f"Voice preference {key} drifted across the settings checks")
+                    elif before != after:
+                        raise RuntimeError(f"Voice preference {key} changed across the settings checks")
+            for location, process in (("startup", fresh), ("pause", loaded)):
+                voice_checks[location] = _voice_settings_diagnostic(process.stdout, location)
+        controls_checks = {}
+        if controls_settings_check:
+            if controls_bytes is not None and (
+                    not controls_path.is_file() or
+                    controls_path.read_bytes() != controls_bytes):
+                raise RuntimeError("Controls bindings changed across the settings checks")
+            for location, process in (("startup", fresh), ("pause", loaded)):
+                controls_checks[location] = _controls_diagnostic(process.stdout, location)
         capture_paths = [menu_capture, modes_capture, setup_capture,
                          loading_capture, final_capture, reload_capture]
         if video_settings_check:
@@ -279,6 +429,24 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
                     capture_paths.append(path)
         if audio_settings_check:
             capture_paths.extend((fresh_settings_capture, reload_settings_capture))
+        if general_settings_check:
+            for base, dimensions, stdout in ((final_capture, (1280, 720), fresh.stdout),
+                                              (reload_capture, (1920, 1080), loaded.stdout)):
+                path = base.with_stem(base.stem + "-general-settings")
+                _bmp(path, *dimensions, stdout)
+                capture_paths.append(path)
+        if voice_settings_check:
+            for base, dimensions, stdout in ((final_capture, (1280, 720), fresh.stdout),
+                                              (reload_capture, (1920, 1080), loaded.stdout)):
+                path = base.with_stem(base.stem + "-voice-settings")
+                _bmp(path, *dimensions, stdout)
+                capture_paths.append(path)
+        if controls_settings_check:
+            for base, dimensions, stdout in ((final_capture, (1280, 720), fresh.stdout),
+                                              (reload_capture, (1920, 1080), loaded.stdout)):
+                path = base.with_stem(base.stem + "-controls-settings")
+                _bmp(path, *dimensions, stdout)
+                capture_paths.append(path)
         for path in capture_paths:
             evidence = folder.parent / (folder.name + "-" + path.name)
             shutil.copy2(path, evidence)
@@ -301,4 +469,13 @@ def validate_native_new_game_export(folder: Path, env: dict[str, str],
         if video_settings_check:
             result["nativeVideoSettingsCheck"] = True
             result["videoSettingsChecks"] = video_checks
+        if general_settings_check:
+            result["nativeGeneralSettingsCheck"] = True
+            result["generalSettingsChecks"] = general_checks
+        if voice_settings_check:
+            result["nativeVoiceSettingsCheck"] = True
+            result["voiceSettingsChecks"] = voice_checks
+        if controls_settings_check:
+            result["nativeControlsSettingsCheck"] = True
+            result["controlsSettingsChecks"] = controls_checks
         return result

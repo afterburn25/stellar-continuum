@@ -10,6 +10,7 @@
 #include <cstring>
 #include <limits>
 #include <map>
+#include <numbers>
 #include <set>
 #include <stdexcept>
 #include <thread>
@@ -88,8 +89,8 @@ template<class Map> void evict(Map& cache,std::size_t& bytes,std::size_t incomin
   }
 }
 struct VertexUniform {Matrix4 mvp,model_view,shadow_from_model;};
-struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;std::array<float,4> atmo_sunset;std::array<float,4> env_flags;std::array<float,4> drift_options;std::array<float,4> scatter_options;};
-struct PostUniform {std::array<float,4> a,b;};
+struct FragmentUniform {std::array<float,4> tint,light,parameters,optics,absorption,view_options,camera_orientation,illumination,surface_response,surface_options,shadow_light,shadow_radii,shadow_options,effect_options,effect_sphere,volume_options;Matrix4 effect_from_view;std::array<std::array<float,4>,2> additional_direction,additional_illumination,additional_shadow;std::array<float,4> texture_options,pbr_options,pbr_values,emissive_tint,uv_options,atmo_options,atmo_shape;std::array<float,4> response_options;std::array<std::array<float,4>,4> point_position,point_energy,point_cone;std::array<float,4> point_outer;std::array<float,4> anim_options;std::array<float,4> atmo_sunset;std::array<float,4> env_flags;std::array<float,4> drift_options;std::array<float,4> scatter_options;std::array<float,4> wave_options;};
+struct PostUniform {std::array<float,4> a,b,c,d,e;};
 // View-wide fragment uniform: debug selector, then the key light's
 // view→shadow-clip transform, {texel size (>0 enables), PCF radius in
 // texels, strength, bias}, and the world-units normal-offset lift for
@@ -100,7 +101,7 @@ struct PostUniform {std::array<float,4> a,b;};
 // box's centre/depth (one depth-array layer each, options .z carrying
 // each tier's own texel-scaled lift), the omni pair the cube-atlas rows.
 struct ViewUniform {std::array<float,4> debug_mode;Matrix4 shadow_from_view;std::array<float,4> shadow_options;std::array<float,4> shadow_advanced;std::array<Matrix4,4> spot_from_view;std::array<std::array<float,4>,4> spot_options;std::array<std::array<float,4>,4> spot_bounds;std::array<Matrix4,maximum_scene3d_shadow_cascades> cascade_from_view;std::array<std::array<float,4>,maximum_scene3d_shadow_cascades> cascade_options;std::array<std::array<float,4>,4> omni_options,omni_atlas;std::array<std::array<float,4>,4> spot_advanced,omni_advanced;};
-static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==832&&sizeof(PostUniform)==32&&sizeof(ViewUniform)==1072);
+static_assert(sizeof(Vertex3D)==32&&sizeof(VertexUniform)==192&&sizeof(FragmentUniform)==848&&sizeof(PostUniform)==80&&sizeof(ViewUniform)==1072);
 // IEEE-754 binary16 -> float for the RGBA16F probe downloads.
 float half_to_float(std::uint16_t h){
   const int e=(h>>10)&0x1f,m=h&0x3ff;
@@ -412,6 +413,10 @@ struct Scene3DRenderer::Storage {
     // Per-view policy is resolved once: quality gates expensive sampling
     // (aniso, cubic magnification, emission-volume steps) before uniform
     // fill, and the post/debug uniforms feed the pass below.
+    // Render resolution is the target's — render_scale shrinks it below
+    // the destination extent and composite() upscales linearly.
+    const auto res_w=static_cast<std::uint32_t>(target.width),res_h=static_cast<std::uint32_t>(target.height);
+    const float res_aspect=static_cast<float>(res_w)/static_cast<float>(res_h);
     const auto& opt=view.options;
     const bool low_tier=opt.quality==RenderQuality3D::Low;
     struct Draw {const MeshInstance3D* instance;PreparedInstance3D transform;std::shared_ptr<Geometry> mesh;std::shared_ptr<Texture> image,optical,environment,normal,properties,cloud,shadow,next,emissive,mr;
@@ -427,8 +432,8 @@ struct Scene3DRenderer::Storage {
     // Screen-space LOD uses the same px-per-world-unit convention as the
     // streamer footprint so both agree on which level is submitted.
     const auto& lod_camera=view.scene->camera();
-    const float lod_focal=lod_camera.projection==Projection3D::Orthographic?view.destination.height/std::max(lod_camera.orthographic_height,1e-6f)
-      :view.destination.height/std::max(2.f*std::tan(lod_camera.vertical_fov_radians*.5f),1e-6f);
+    const float lod_focal=lod_camera.projection==Projection3D::Orthographic?static_cast<float>(res_h)/std::max(lod_camera.orthographic_height,1e-6f)
+      :static_cast<float>(res_h)/std::max(2.f*std::tan(lod_camera.vertical_fov_radians*.5f),1e-6f);
     // Group proxy collapse: each named group accumulates the merged
     // view-space bounding sphere of its contributing members (frustum-
     // and range-culled members neither contribute nor collapse). When
@@ -443,7 +448,7 @@ struct Scene3DRenderer::Storage {
     for(const auto& instance:view.scene->instances()){
       if(instance.lod_group.empty()||!instance.lod_group_proxy||instance.lod_group_pixels<=0.f)continue;
       if(instance.material.surface_effect&&instance.material.surface_effect->volume_depth>0.f)continue;
-      const auto prepared=prepare_instance3d(lod_camera,instance,view.destination.width/view.destination.height);
+      const auto prepared=prepare_instance3d(lod_camera,instance,res_aspect);
       if(!prepared.visible)continue;
       const double gx=prepared.model_view.values[12],gy=prepared.model_view.values[13],gz=prepared.model_view.values[14];
       const double radius=static_cast<double>(instance.scale)*instance.mesh->bounding_radius();
@@ -482,7 +487,7 @@ struct Scene3DRenderer::Storage {
         if(const auto it=probe_cache.find(probe_key(view));it!=probe_cache.end())return texture(it->second);
       return view.scene->environment()?texture(view.scene->environment()):nullptr;}();
     for(const auto& instance:view.scene->instances()){
-      auto prepared=prepare_instance3d(view.scene->camera(),instance,view.destination.width/view.destination.height);
+      auto prepared=prepare_instance3d(view.scene->camera(),instance,res_aspect);
       if(!prepared.visible){++stats.culled_instances;continue;}
       // A card mesh is camera-facing: its view-space rotation collapses
       // to uniform scale (position and depth stay) so the impostor always
@@ -493,7 +498,7 @@ struct Scene3DRenderer::Storage {
         if(mesh->billboard()){
           for(int c=0;c<3;++c)for(int r=0;r<3;++r)
             out.model_view.values[c*4+r]=c==r?instance.scale:0.f;
-          out.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),out.model_view);
+          out.model_view_projection=multiply(projection3d_matrix(lod_camera,res_aspect),out.model_view);
         }
         return out;};
       std::shared_ptr<const Mesh3D> drawn_mesh=instance.mesh;
@@ -569,7 +574,7 @@ struct Scene3DRenderer::Storage {
           proxy_t.model_view.values[13]=static_cast<float>(g.y);
           proxy_t.model_view.values[14]=static_cast<float>(g.z);
           proxy_t.model_view.values[15]=1.f;
-          proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,view.destination.width/view.destination.height),proxy_t.model_view);
+          proxy_t.model_view_projection=multiply(projection3d_matrix(lod_camera,res_aspect),proxy_t.model_view);
           proxy_t.camera_depth=static_cast<float>(-g.z);proxy_t.visible=true;
           draws.push_back({&instance,proxy_t,geometry(proxy_mesh),surface,
             optical?texture(optical->surface):surface,
@@ -671,7 +676,11 @@ struct Scene3DRenderer::Storage {
       // flow rate advances the filament phase — both scaled by the
       // view's scene time on debug_mode.y.
       fragment.anim_options={material.band_drift,material.surface_effect?material.surface_effect->flow_rate:0.f,material.band_turbulence,material.limb_darkening_q};
-      fragment.drift_options[0]=material.band_diff;
+      fragment.drift_options={material.band_diff,
+        // Azimuthal shear as turns/s at the inner edge (rad/s ÷ 2π);
+        // the shader scales it by rho^-3/2 and folds it into V.
+        material.shear_rate*(.5f/std::numbers::pi_v<float>),
+        material.shear_ratio,0.f};
       if(material.shadow){const auto& s=*material.shadow;
         fragment.shadow_light={shadow.light.x,shadow.light.y,shadow.light.z,s.shape==AnalyticShadowShape3D::Ellipsoid?1.f:2.f};
         fragment.shadow_radii={s.radii.x,s.radii.y,s.radii.z,0};
@@ -701,10 +710,14 @@ struct Scene3DRenderer::Storage {
       fragment.atmo_shape[3]=material.forward_scatter;
       // Secondary terms ride one lane: x = HG secondary-lobe
       // asymmetry, y = secondary-lobe weight (0 keeps the single-lobe
-      // phase), z = three-term limb-darkening mid-curve coefficient.
+      // phase), z = three-term limb-darkening mid-curve coefficient,
+      // w = doppler beaming tint strength.
       fragment.scatter_options={material.forward_scatter_back,
                                 material.forward_scatter_back_mix,
-                                material.limb_darkening_mid,0.f};
+                                material.limb_darkening_mid,
+                                material.orbital_beaming_tint};
+      // x = Rayleigh wavelength weight applied to the HG phase lobes.
+      fragment.wave_options={material.forward_scatter_hue,0.f,0.f,0.f};
       if((material.surface_effect&&material.surface_effect->volume_depth>0.f)||material.orbital_beaming!=0.f){
         // Model transforms use uniform scale and an orthonormal rotation.
         // Invert their camera-relative matrix once per draw, not per
@@ -1214,7 +1227,6 @@ struct Scene3DRenderer::Storage {
     // dependencies are declared per frame, compile() validates the DAG and
     // emits the execution order, and the backend binds routines by tag.
     engine::RenderGraph graph;
-    const auto res_w=static_cast<std::uint32_t>(view.destination.width),res_h=static_cast<std::uint32_t>(view.destination.height);
     const auto hdr_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"hdr-scene",res_w,res_h,"rgba16f",true});
     const auto color_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"color",res_w,res_h,"rgba8",true});
     const auto depth_target=graph.add_resource({engine::RenderResourceDesc::Kind::Texture2D,"depth",res_w,res_h,"d32",true});
@@ -1333,9 +1345,20 @@ struct Scene3DRenderer::Storage {
       target.hdr&&opt.quality>=RenderQuality3D::Medium?std::clamp(opt.bloom_strength,0.f,8.f):0.f,
       std::clamp(std::isfinite(opt.bloom_threshold)?opt.bloom_threshold:1.f,0.f,8.f),
       std::clamp(std::isfinite(opt.contrast)?opt.contrast:1.f,0.f,2.f)};
+    // Post-tonemap channel remap: active only when every element is
+    // finite and the matrix differs from identity, so the default path
+    // stays bit-identical and never pays the multiply.
+    bool use_matrix=std::ranges::all_of(opt.color_matrix,[](float v){return std::isfinite(v);});
+    if(use_matrix){static constexpr float identity[]{1,0,0,0,1,0,0,0,1};
+      use_matrix=!std::equal(opt.color_matrix.begin(),opt.color_matrix.end(),std::begin(identity));}
+    if(use_matrix){
+      post.c={opt.color_matrix[0],opt.color_matrix[1],opt.color_matrix[2],0.f};
+      post.d={opt.color_matrix[3],opt.color_matrix[4],opt.color_matrix[5],0.f};
+      post.e={opt.color_matrix[6],opt.color_matrix[7],opt.color_matrix[8],0.f};}
     post.b={std::clamp(std::isfinite(opt.saturation)?opt.saturation:1.f,0.f,2.f),
       opt.quality>=RenderQuality3D::High?std::clamp(std::isfinite(opt.sharpen)?opt.sharpen:0.f,0.f,1.f):0.f,
-      std::clamp(std::isfinite(opt.vignette)?opt.vignette:0.f,0.f,1.f),0.f};
+      std::clamp(std::isfinite(opt.vignette)?opt.vignette:0.f,0.f,1.f),
+      use_matrix?1.f:0.f};
     // Disabled shadow passes never reach their resize branch — release a
     // stale map so target memory and bytes() stop charging it.
     if(shadow_res==0&&target.shadow){SDL_ReleaseGPUTexture(device,target.shadow);target.shadow=nullptr;target.shadow_size=0;}
@@ -1680,16 +1703,21 @@ void Scene3DRenderer::prepare(const DrawList& list){
   std::size_t geometry_bytes=0,texture_bytes=0;
   for(const auto* view:s.views){const auto r=view->destination;
     if(!view->scene||!std::isfinite(r.x)||!std::isfinite(r.y)||std::abs(r.x)>65536||std::abs(r.y)>65536||
-       !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192)
-      throw std::invalid_argument("3D viewport requires a scene and finite bounded dimensions.");
-    total+=static_cast<std::size_t>(std::ceil(r.width))*static_cast<std::size_t>(std::ceil(r.height))*(s.hdr?16u:8u);
+       !std::isfinite(r.width)||!std::isfinite(r.height)||r.width<1||r.height<1||r.width>8192||r.height>8192||
+       !std::isfinite(view->render_scale)||view->render_scale<.25f||view->render_scale>1.f)
+      throw std::invalid_argument("3D viewport requires a scene, finite bounded dimensions and render_scale in [0.25,1].");
+    const auto extent=scene3d_view_target_extent(*view);
+    total+=extent[0]*extent[1]*(s.hdr?16u:8u);
     const auto& cam=view->scene->camera();const auto& camera=cam.position;
     // Projected px per world unit: the sampler only reaches the mip whose
     // texel density matches the on-screen footprint, so the resident tail
     // can start there. Bounding-sphere diameter overestimates surface texel
     // density — the choice errs finer, never blurrier than the full chain.
-    const float focal=cam.projection==Projection3D::Orthographic?r.height/std::max(cam.orthographic_height,1e-6f)
-      :r.height/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
+    // render_scale shrinks the actual target: demand follows the rendered
+    // height, not the destination's.
+    const float res_h=static_cast<float>(extent[1]);
+    const float focal=cam.projection==Projection3D::Orthographic?res_h/std::max(cam.orthographic_height,1e-6f)
+      :res_h/std::max(2.f*std::tan(cam.vertical_fov_radians*.5f),1e-6f);
     for(const auto& instance:view->scene->instances()){
       // Distance-culled instances never submit — no residency demand either.
       const auto dx=instance.position.x-camera.x,dy=instance.position.y-camera.y,dz=instance.position.z-camera.z;
@@ -1756,14 +1784,17 @@ void Scene3DRenderer::prepare(const DrawList& list){
   }
   for(const auto& [id,demand]:stream_demand)s.streamer.request(id,demand.second,demand.first);
   s.apply_streaming();
-  if(total>maximum_scene3d_target_bytes)throw std::length_error("3D viewports exceed their 128 MiB target budget.");
+  if(total>maximum_scene3d_target_bytes){
+    std::string detail="3D viewports exceed their 128 MiB target budget ("+std::to_string(total)+" B across "+std::to_string(s.views.size())+" views:";
+    for(const auto* view:s.views){detail+=" "+std::to_string(static_cast<int>(view->destination.width))+"x"+std::to_string(static_cast<int>(view->destination.height))+"@"+std::to_string(view->render_scale);}
+    throw std::length_error(detail+")");}
   if(meshes.size()>maximum_scene3d_resource_entries||textures.size()>maximum_scene3d_resource_entries||geometry_bytes>maximum_mesh3d_cache_bytes||texture_bytes>maximum_scene3d_texture_cache_bytes)
     throw std::length_error("Combined 3D views exceed their resident resource budget.");
   // SDL's GPU renderer keeps its command buffer until present. Flush alone
   // does not submit it: render all independent 3D targets before any 2D work.
   // One target per view prevents an earlier viewport sampling a later view.
   s.targets.resize(s.views.size());
-  for(std::size_t i=0;i<s.views.size();++i){const auto r=s.views[i]->destination;const int w=static_cast<int>(std::ceil(r.width)),h=static_cast<int>(std::ceil(r.height));
+  for(std::size_t i=0;i<s.views.size();++i){const auto e=scene3d_view_target_extent(*s.views[i]);const int w=static_cast<int>(e[0]),h=static_cast<int>(e[1]);
     if(!s.targets[i]||s.targets[i]->width!=w||s.targets[i]->height!=h)s.targets[i]=s.target(w,h);
     s.render(*s.views[i],*s.targets[i]);
   }
@@ -1775,6 +1806,7 @@ void Scene3DRenderer::composite(const Scene3DView& view){
   checked(SDL_RenderTexture(s.renderer,s.targets[s.next_view++]->composite,nullptr,&destination),"3D viewport composition failed");
 }
 void Scene3DRenderer::set_texture_budget(std::uint64_t bytes){auto& s=*storage_;s.require_owner();s.streamer.set_budget(bytes);}
-Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;return result;}
+Scene3DStatistics Scene3DRenderer::statistics()const noexcept{auto result=storage_->stats;result.renderer_active=true;result.mesh_cache_entries=storage_->meshes.size();result.texture_cache_entries=storage_->textures.size();result.hdr=storage_->hdr;result.texture_budget_bytes=storage_->streamer.budget();return result;}
+std::size_t Scene3DRenderer::bytes_per_pixel()const noexcept{return storage_->hdr?16u:8u;}
 } // namespace stellar::native_map
 

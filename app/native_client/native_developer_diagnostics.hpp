@@ -25,12 +25,16 @@ const char *campaign_domain_name(std::int64_t domain){
   }
   return "domain";
 }
+constexpr std::array<std::string_view,11> kShadingNames{"Lit","Unlit","Albedo","Normals","Roughness","Metallic","Emissive","Lighting only","LOD","Residency","Shadows"};
 } // namespace
 class NativeDeveloperDiagnostics {
 public:
   void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;ring_=-1;refresh(monitor);}
   void close(){visible_=false;pressed_=-1;ring_=-1;dropdown_.close();entity_search_focused_=event_search_focused_=false;}
   bool visible()const{return visible_;}
+  // One-line renderer workload summary for the LIVE PERFORMANCE view —
+  // the window's per-frame Scene3DStatistics, formatted by the host.
+  void set_renderer_stats(std::string value){renderer_stats_=std::move(value);}
   bool wants_text_input()const{return visible_&&(entity_search_focused_||event_search_focused_);}
   // Keyboard-focus contract: Tab enters a ring over the chrome, the
   // view's search field (entities/events, classified Edit), the sortable
@@ -107,7 +111,11 @@ public:
   bool handle(const InputEvent &e,int w,int h,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(!visible_)return false;const auto l=layout(w,h);pointer_=e.position;
     if(dropdown_.visible()){
-      if(const auto choice=dropdown_.handle(e,l.detail,w,h))monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
+      const int drop=dropdown_.id();
+      if(const auto choice=dropdown_.handle(e,drop==1?l.shading:l.detail,w,h)){
+        if(drop==1)shading_=static_cast<DebugView3D>(*choice);
+        else monitor.history().set_detail(static_cast<stellar::engine::DiagnosticDetail>(*choice));
+      }
       return true;
     }
     if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_){entity_search_focused_=event_search_focused_=false;return true;}if(ring_>=0){ring_=-1;return true;}close();return true;}
@@ -122,6 +130,7 @@ public:
     if(e.type==InputEventType::LeftPressed){
       ring_=-1;
       if(l.detail.contains(e.position)){open_detail_dropdown(monitor);return true;}
+      if(l.shading.contains(e.position)){open_shading_dropdown();return true;}
       pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
       entity_search_focused_=entities_&&header_search_rect(l).contains(e.position);
       event_search_focused_=events_&&header_search_rect(l).contains(e.position);
@@ -225,20 +234,33 @@ public:
       const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor)const{
     if(!visible_)return;const auto l=layout(w,h);const auto s=l.scale;const int font=std::max(12,static_cast<int>(16*s));
     native_menu_style::panel(out,l.panel,s);
-    const auto label=[&](UiRect r,std::string value,Color color=native_menu_style::ink){native_menu_style::text(out,r,std::move(value),font,color);};
+    const auto label=[&](UiRect r,std::string value,Color color=native_menu_style::ink,std::optional<UiRect> clip={}){
+      const auto c=clip?intersection(r,*clip):r;if(c.height<=0||c.width<=0)return;
+      out.overlay.emplace_back(Text{{r.x,r.y},std::move(value),color,font,r.width,c,TextAlign::Left,FontFace::Interface});};
     const auto button=[&](UiRect r,std::string name){native_menu_style::button(out,r,std::move(name),font,r.contains(pointer_),true,s);};
     label({l.panel.x+20*s,l.panel.y+16*s,850*s,28*s},"DEVELOPER · PERFORMANCE & DIAGNOSTICS",native_menu_style::cyan);
     button(l.close,"CLOSE");button(l.performance,"LIVE PERFORMANCE");button(l.events,"RECENT EVENTS");button(l.refresh,"REFRESH EVENTS");button(l.generation,"GALAXY DETAILS");button(l.assets,"COOKED ASSETS");button(l.entities,"ENTITIES");
     const std::array<std::string,4> levels{"Errors only","Normal","Detailed","Trace"};
     button(l.detail,"Record: "+levels.at(static_cast<std::size_t>(monitor.history().detail()))+" ▾");
+    button(l.shading,"Shading: "+std::string(kShadingNames[static_cast<std::size_t>(shading_)])+" ▾");
+    // Diagnostic shading applies to every scene already submitted this
+    // frame — planets, ships, eruptions and the nebula volume — while
+    // chrome and text stay lit.
+    if(shading_!=DebugView3D::Lit){
+      for(auto& command:out.world)
+        if(auto*view=std::get_if<Scene3DView>(&command))view->options.debug_view=shading_;
+      for(auto& command:out.overlay)
+        if(auto*view=std::get_if<Scene3DView>(&command))view->options.debug_view=shading_;
+    }
     if(assets_){
       if(auto registry=stellar::engine::mounted_asset_registry()){
         const auto d=registry->diagnostics();const auto& records=registry->records();
         label({l.list.x,l.list.y-31*s,l.list.width,27*s},std::to_string(d.assets)+" assets / "+std::to_string(d.packages)+" packages · Reads "+std::to_string(d.reads)+" · Errors "+std::to_string(d.failures)+" · Read "+number(d.bytes_read/1048576.)+" MiB",native_menu_style::muted);
         const auto range=scroll_window(l,61.f,records.size(),7);
         for(auto i=range.first;i<range.last;++i){const auto&r=records[i];std::uint64_t size=0;for(const auto&c:r.chunks)size+=c.stored_bytes;const auto y=l.list.y+static_cast<float>(i)*61*s-list_view_.scroll_offset;
-          label({l.list.x,y,l.list.width,25*s},r.id);
-          label({l.list.x,y+27*s,l.list.width,25*s},r.format+" · "+std::to_string(r.width)+" × "+std::to_string(r.height)+" · "+std::to_string(r.chunks.size())+" chunks · "+number(size/1048576.)+" MiB · "+r.chunks.front().package,native_menu_style::muted);
+          const auto clip=intersection({l.list.x,y,l.list.width,61*s},l.list);if(clip.height<=0)continue;
+          label({l.list.x,y,l.list.width,25*s},r.id,native_menu_style::ink,l.list);
+          label({l.list.x,y+27*s,l.list.width,25*s},r.format+" · "+std::to_string(r.width)+" × "+std::to_string(r.height)+" · "+std::to_string(r.chunks.size())+" chunks · "+number(size/1048576.)+" MiB · "+r.chunks.front().package,native_menu_style::muted,l.list);
         }
       }else label(l.list,"Development source mode. Cook and launch a packaged build to inspect runtime compression and package reads.");
     }else if(generation_){
@@ -354,12 +376,13 @@ public:
       for(auto i=range.first;i<range.last;++i){
         const auto &[node,depth]=entity_flat_[i];
         const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
+        const auto clip=intersection({rows_rect.x,y,rows_rect.width,31*s},l.list);if(clip.height<=0)continue;
         const bool selected=node->id==entity_selected_;
-        if(selected)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{24,64,88,230}});
-        else if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{rows_rect.x,y,rows_rect.width,31*s},{12,32,45,210}});
+        if(selected)out.overlay.emplace_back(FilledRectangle{clip,{24,64,88,230}});
+        else if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
         const float indent=8*s+static_cast<float>(depth)*20*s;
         const std::string glyph=node->children.empty()?"· ":(node->expanded?"▾ ":"› ");
-        label({rows_rect.x+indent,y+4*s,rows_rect.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink);
+        label({rows_rect.x+indent,y+4*s,rows_rect.width-indent-8*s,25*s},glyph+node->label_key,selected?native_menu_style::cyan:native_menu_style::ink,l.list);
       }
       if(entity_flat_.empty())label(rows_rect,"The campaign projected no entities.");
       if(const auto sel=entity_for_node(entity_selected_);sel&&projected.alive(*sel)){
@@ -382,6 +405,8 @@ public:
         else if(const auto*shipyard_tag=projected.get<CampaignShipyardTag>(e)){line("tag campaign.shipyard",native_menu_style::cyan);line("civ "+std::to_string(shipyard_tag->civilization_id));}
       }else label(detail,"Select a row — the projected entity's index, refs and tag fields list here.",native_menu_style::muted);
     }else if(!events_){
+      if(!renderer_stats_.empty())
+        label({l.panel.x+20*s,l.panel.y+152*s,l.panel.width-40*s,24*s},renderer_stats_,native_menu_style::muted);
       const auto sort_mark=[&](std::string_view id){const auto &st=phase_table_.sort_state();return st&&st->first==id?(st->second?" ^":" v"):"";};
       label(phase_header_rect(l,0),std::string("Phase")+sort_mark("phase"),native_menu_style::muted);
       label(phase_header_rect(l,1),std::string("Samples")+sort_mark("samples"),native_menu_style::muted);
@@ -406,11 +431,12 @@ public:
       const auto range=scroll_window(l,33.f,rows.size(),14);
       for(auto i=range.first;i<range.last;++i){
         const auto &cells=rows[i]->second;const auto y=l.list.y+static_cast<float>(i)*33*s-list_view_.scroll_offset;
-        if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,31*s},{12,32,45,210}});
-        label({l.list.x+8*s,y+4*s,400*s,25*s},cells[0].text);
-        label({l.list.x+430*s,y+4*s,140*s,25*s},cells[1].text);
-        label({l.list.x+600*s,y+4*s,170*s,25*s},cells[2].text);
-        label({l.list.x+810*s,y+4*s,190*s,25*s},cells[3].text);
+        const auto clip=intersection({l.list.x,y,l.list.width,31*s},l.list);if(clip.height<=0)continue;
+        if((i-range.first)%2==0)out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
+        label({l.list.x+8*s,y+4*s,400*s,25*s},cells[0].text,native_menu_style::ink,l.list);
+        label({l.list.x+430*s,y+4*s,140*s,25*s},cells[1].text,native_menu_style::ink,l.list);
+        label({l.list.x+600*s,y+4*s,170*s,25*s},cells[2].text,native_menu_style::ink,l.list);
+        label({l.list.x+810*s,y+4*s,190*s,25*s},cells[3].text,native_menu_style::ink,l.list);
       }
     }else{
       // The filter maps onto a stable index list so hit-testing, scroll
@@ -428,11 +454,12 @@ public:
       const auto range=scroll_window(l,57.f,event_view_.size(),8);
       for(auto i=range.first;i<range.last;++i){
         const auto &r=snapshot_[event_view_[i]];const auto y=l.list.y+static_cast<float>(i)*57*s-list_view_.scroll_offset;
-        out.overlay.emplace_back(FilledRectangle{{l.list.x,y,l.list.width,54*s},{12,32,45,210}});
+        const auto clip=intersection({l.list.x,y,l.list.width,54*s},l.list);if(clip.height<=0)continue;
+        out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
         const auto color=r.severity>=stellar::engine::DiagnosticSeverity::Error?Color{255,135,112,255}:
             r.severity==stellar::engine::DiagnosticSeverity::Warning?Color{245,199,113,255}:native_menu_style::cyan;
-        label({l.list.x+8*s,y+3*s,l.list.width-16*s,23*s},r.game_date+" · tick "+std::to_string(r.tick)+(r.civilization_id?" · empire "+std::to_string(*r.civilization_id):"")+" · "+r.subsystem+" / "+r.event_type,color);
-        label({l.list.x+8*s,y+28*s,l.list.width-16*s,23*s},r.message);
+        label({l.list.x+8*s,y+3*s,l.list.width-16*s,23*s},r.game_date+" · tick "+std::to_string(r.tick)+(r.civilization_id?" · empire "+std::to_string(*r.civilization_id):"")+" · "+r.subsystem+" / "+r.event_type,color,l.list);
+        label({l.list.x+8*s,y+28*s,l.list.width-16*s,23*s},r.message,native_menu_style::ink,l.list);
       }
       if(snapshot_.empty())label(l.list,"No retained events at the chosen recording level. This does not certify a clean simulation.",native_menu_style::muted);
       else if(event_view_.empty())label(l.list,"No retained events match the search.",native_menu_style::muted);
@@ -452,20 +479,24 @@ public:
         out.overlay.emplace_back(StrokedRectangle{r,native_menu_style::cyan});
       }
     }
-    if(dropdown_.visible())dropdown_.render(out,l.detail,w,h,font);
+    if(dropdown_.visible())dropdown_.render(out,dropdown_.id()==1?l.shading:l.detail,w,h,font);
   }
 private:
-  struct Layout {float scale;UiRect panel,close,performance,events,refresh,detail,list,generation,assets,entities;};
+  struct Layout {float scale;UiRect panel,close,performance,events,refresh,detail,shading,list,generation,assets,entities;};
   static Layout layout(int w,int h){
     const float s=std::clamp(std::min(w/1920.f,h/1080.f),.67f,2.f);const UiRect p{w*.5f-550*s,h*.5f-370*s,1100*s,740*s};
     return {s,p,{p.x+984*s,p.y+12*s,96*s,32*s},{p.x+20*s,p.y+64*s,242*s,38*s},
       {p.x+276*s,p.y+64*s,242*s,38*s},{p.x+532*s,p.y+64*s,242*s,38*s},{p.x+788*s,p.y+64*s,292*s,38*s},
+      {p.x+788*s,p.y+110*s,292*s,34*s},
       {p.x+20*s,p.y+186*s,1060*s,445*s},{p.x+20*s,p.y+110*s,242*s,34*s},{p.x+276*s,p.y+110*s,242*s,34*s},
       {p.x+532*s,p.y+110*s,242*s,34*s}};
   }
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
   static UiRect entity_rows_rect(const Layout &l){return {l.list.x,l.list.y,l.list.width*.62f,l.list.height};}
+  // A tail-pinned scroll offset stays fractional, so the first/last
+  // visible row can straddle the list edge — clip row geometry to it.
+  static UiRect intersection(UiRect a,UiRect b){const float x=std::max(a.x,b.x),y=std::max(a.y,b.y);return {x,y,std::max(0.f,std::min(a.x+a.width,b.x+b.width)-x),std::max(0.f,std::min(a.y+a.height,b.y+b.height)-y)};}
   struct FocusTarget{UiRect rect;int hit{-1};stellar::engine::AnnouncementControl control{stellar::engine::AnnouncementControl::Button};std::string label;};
   std::vector<FocusTarget> focusables(const Layout &l)const{
     std::vector<FocusTarget> out;
@@ -473,7 +504,7 @@ private:
       if(r.width>0&&r.height>0)out.push_back({r,hit,c,std::move(label)});};
     push(l.close,0,"Close diagnostics");
     push(l.performance,1,"Live performance");push(l.events,2,"Recent events");push(l.refresh,3,"Refresh events");
-    push(l.detail,7,"Record detail level");
+    push(l.detail,7,"Record detail level");push(l.shading,8,"Shading debug view");
     push(l.generation,4,"Galaxy details");push(l.assets,5,"Cooked assets");push(l.entities,6,"Entities");
     if(entities_){
       push(header_search_rect(l),50,"Search entities",stellar::engine::AnnouncementControl::Edit);
@@ -482,7 +513,7 @@ private:
         auto range=list_view_.visible_range();range.last=std::min(range.last,range.first+14);
         const auto rows=entity_rows_rect(l);
         for(auto i=range.first;i<range.last&&i<entity_flat_.size();++i)
-          push({rows.x,l.list.y+static_cast<float>(i)*33.f*l.scale-list_view_.scroll_offset,rows.width,31.f*l.scale},100+static_cast<int>(i),entity_flat_[i].first->label_key);
+          push(intersection({rows.x,l.list.y+static_cast<float>(i)*33.f*l.scale-list_view_.scroll_offset,rows.width,31.f*l.scale},l.list),100+static_cast<int>(i),entity_flat_[i].first->label_key);
       }
     }else if(events_)push(header_search_rect(l),51,"Search events",stellar::engine::AnnouncementControl::Edit);
     if(!events_&&!generation_&&!assets_&&!entities_){
@@ -503,6 +534,11 @@ private:
   }
   void open_detail_dropdown(stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));
+  }
+  void open_shading_dropdown(){
+    std::vector<std::string> names;names.reserve(kShadingNames.size());
+    for(const auto name:kShadingNames)names.emplace_back(name);
+    dropdown_.open(1,std::move(names),static_cast<int>(shading_));
   }
   void activate_phase_header(int col){
     static constexpr std::string_view ids[]{"phase","samples","mean","maximum"};
@@ -530,6 +566,7 @@ private:
     if(t.hit==50){entity_search_focused_=true;ring_=-1;}
     else if(t.hit==51){event_search_focused_=true;ring_=-1;}
     else if(t.hit==7)open_detail_dropdown(monitor);
+    else if(t.hit==8)open_shading_dropdown();
     else if(t.hit>=200)activate_phase_header(t.hit-200);
     else if(t.hit>=100)activate_entity_row(t.hit-100);
     else activate_button(t.hit,monitor);
@@ -606,11 +643,13 @@ private:
   }
   static std::string number(double value){std::ostringstream out;out<<std::fixed<<std::setprecision(3)<<value;return out.str();}
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
+  DebugView3D shading_{DebugView3D::Lit};
   bool visible_{},events_{};int pressed_{-1},ring_{-1};Point pointer_{};
   std::string entity_search_,event_search_;bool entity_search_focused_{},event_search_focused_{};
   mutable std::size_t entity_shown_{};
   mutable std::vector<std::size_t> event_view_;
   mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
+  std::string renderer_stats_;
   mutable stellar::engine::TableModel phase_table_;
 };
 }

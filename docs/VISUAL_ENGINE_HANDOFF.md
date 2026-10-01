@@ -63,6 +63,9 @@ m.band_turbulence = 1.2f;                   // [-8,8] rad/s evolving
 m.orbital_beaming = 0.8f;                   // [-1,1] orbital doppler
                                             // asymmetry (accretion discs,
                                             // ring forward-scatter)
+m.orbital_beaming_tint = 0.5f;              // [0,1] paired doppler color
+                                            // shift: bright lane blueshifts,
+                                            // dim lane redshifts
 m.forward_scatter = 0.6f;                   // [-1,1] HG phase asymmetry:
                                             // +backlit boost (dusty
                                             // rings), -opposition surge
@@ -70,6 +73,10 @@ m.forward_scatter_back = -0.35f;            // [-1,1] optional second HG
                                             // lobe (broad weak back lobe)
 m.forward_scatter_back_mix = 0.25f;         // [0,1] share of the second
                                             // lobe; 0 = single-lobe phase
+m.forward_scatter_hue = 0.5f;               // [0,1] Rayleigh wavelength
+                                            // weight: scattered light
+                                            // blue-shifts, luminance
+                                            // preserved
 ```
 
 `star_photosphere3d(kelvin)` builds a spectral-class star material in
@@ -127,6 +134,13 @@ cools and dims), emissive-dominant response, double-sided, anisotropic
 filtering, and `orbital_beaming` for the approaching-lane asymmetry. The
 texture is 256×1 — authored for an `annulus:i,o` mesh at matching radii
 (annulus U is radial, so the column maps straight onto the disc). The
+`spiral`/`spiral_arms`/`spiral_turns` parameters grow it to 256×64 and
+bake grand-design density-wave arms into the angular V axis: the phase
+`arms·φ + turns·ln(r/in)/ln(out/in)` winds `turns` times inner→outer
+(integral m-mode keeps the V wrap seamless), and compressional heating
+perturbs the local temperature so crests read hotter and brighter while
+troughs cool — one perturbation drives both the T⁴ flux and the
+blackbody hue. The
 implementation lives in `spherical_material_preparation.cpp` because
 `RgbaImage::create` lives in `stellar_native_image`, which already links
 `stellar_engine` — keep generated-texture factories on that side of the
@@ -477,7 +491,8 @@ Entity fields: `metallic`, `roughness`, `metallic_roughness`,
 `bandDrift` ([-0.25,0.25] uv/s scroll) and `bandTurbulence`
 ([-8,8] rad/s evolving warp) and `bandDiff` ([-8,8]
 latitude-differential drift term),
-`orbitalBeam`/`forwardScatter` ([-1,1]), `starKelvin`
+`orbitalBeam`/`orbitalBeamTint`, `forwardScatter`/`forwardScatterBack`/
+`forwardScatterBackMix`/`forwardScatterHue` ([-1,1]/[0,1]), `starKelvin`
 ([100,100000]), `accretion` ([inner,outer,kelvin,beaming]), `volume`
 (`{depth,density,seed,steps,scatter,flow,distort,blend,image2,occlude,flowRate}`
 — requires a `texture`), `lods` (array of
@@ -524,7 +539,8 @@ UV tiling, atmosphere tint/strength/power/night floor, visible range,
 surface maps (normal/properties/cloud), surface scalars (normal
 strength/relief), cloud deck (opacity/albedo/offset), terminator wrap,
 limb darkening, band shear, orbital beaming, starKelvin photosphere
-preset, accretion disc preset (inner,outer,kelvin,beaming csv),
+preset, accretion disc preset (inner,outer,kelvin,beaming csv with
+optional spiral,arms,turns tail),
 forward-scatter phase, mesh LOD chain (csv specs), LOD switch size and
 LOD fade width.
 Scene rows: exposure, bloom + threshold, contrast/saturation/sharpen,
@@ -596,20 +612,24 @@ The preview runs the real `Scene3D` + GPU path, so edits are WYSIWYG.
 - Limb darkening is the three-term linear+quadratic+mid-curve law
   (`limb_darkening`/`limb_darkening_q`/`limb_darkening_mid`) — no
   four-term Claret coefficients or wavelength-dependent profiles.
-- `orbital_beaming` is a first-order brightness asymmetry — no doppler
-  color shift, gravitational redshift, or lensing.
-- `accretion_disc_material3d` is an azimuthally uniform thin-disc
-  profile — no spiral fluctuations, no relativistic ray-bending; the
-  annulus radii must be re-stated in the `annulus:i,o` mesh spec.
+- `orbital_beaming` is a first-order asymmetry — `orbital_beaming_tint`
+  adds a bounded linear doppler color shift (bright lane blueshifts,
+  dim lane redshifts); no gravitational redshift or lensing.
+- `accretion_disc_material3d` is a thin-disc profile with optional
+  baked spiral density-wave arms (`spiral`/`arms`/`turns` — compressional
+  heating modulates the generated texture; static arms, no live shear or
+  turbulence evolution) — no relativistic ray-bending; the annulus radii
+  must be re-stated in the `annulus:i,o` mesh spec.
 - `volume_scatter` attenuates its limb boost by a coarse 4-tap
   light-path extinction march through the same density field (plus
   occluder-sphere blocking) — no multi-scatter or shadow-map-grade
   resolution.
 - `forward_scatter` is a bounded two-term Henyey-Greenstein phase
   (`forward_scatter_back`/`_back_mix` blend a second lobe in, g2=0
-  degenerating to the isotropic filler) — no wavelength-dependent
-  scattering or >2-term phase functions; it scales radiance only, not
-  alpha.
+  degenerating to the isotropic filler) with one shared Rayleigh
+  wavelength weight (`forward_scatter_hue` — mean-normalized (450/λ)⁴
+  tilts the scattered light blue; no per-lobe spectra or Mie size split)
+  — no >2-term phase functions; it scales radiance only, not alpha.
 - One shared equirect env map per material, or the scene-level
   `environment` probe for opt-in PBR materials with no authored map;
   `environmentCapture` bakes six face views at an anchor into the slot

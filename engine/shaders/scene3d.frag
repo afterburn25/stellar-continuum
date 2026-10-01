@@ -58,8 +58,9 @@ struct Material {
     vec4 anim_options; // band drift (uv/s), volume flow rate, band turbulence, quadratic limb darkening
     vec4 atmo_sunset; // terminator-transmitted tint rgb, blend strength
     vec4 env_flags; // x: bound environment map is RGBM-encoded HDR
-    vec4 drift_options; // x: latitude-differential drift fraction
-    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient
+    vec4 drift_options; // x: latitude-differential drift fraction, y: azimuthal shear turns/s at inner edge, z: outer/inner radius
+    vec4 scatter_options; // x: HG secondary-lobe asymmetry, y: secondary-lobe weight, z: three-term limb coefficient, w: doppler beaming tint
+    vec4 wave_options; // x: Rayleigh wavelength weight for the HG phase lobes
 };
 layout(set=2,binding=14,std430) readonly buffer Materials {
     Material materials[];
@@ -402,6 +403,16 @@ void main() {
     if(material.anim_options.x!=0.0){
         float lat_term=cos(PI*(texture_uv.y-0.5));
         uv.x+=view_params.debug_mode.y*material.anim_options.x*(1.0+material.drift_options.x*lat_term*lat_term);
+    }
+    // Keplerian shear for annular flows (annulus_mesh: radial U,
+    // azimuthal V): the azimuth scroll falls off as rho^-3/2 in
+    // inner-edge radii, so the hot inner rim laps the cool outer edge
+    // instead of the baked spiral spinning rigidly. The disc bake is
+    // V-periodic (integral arm count), so fract keeps the wrap seamless
+    // under the clamped surface sampler.
+    if(material.drift_options.y!=0.0){
+        float rho=1.0+(material.drift_options.z-1.0)*texture_uv.x;
+        uv.y=fract(uv.y+view_params.debug_mode.y*material.drift_options.y*pow(rho,-1.5));
     }
     // Evaluate derivatives before per-pixel alpha rejection; annulus horizon
     // rejection above is arithmetic so neighbouring fragments remain coherent.
@@ -814,8 +825,13 @@ void main() {
     // Orbital beaming: a first-order doppler asymmetry for material
     // orbiting local +Y — radiance scales by 1 + s*(v.V) where v is the
     // tangential velocity. Face-on discs stay symmetric (v ⟂ view);
-    // edge-on discs peak. The atmosphere rim below stays exempt — it is
-    // a scattering shell, not orbiting surface material.
+    // edge-on discs peak. scatter_options.w adds the paired spectral
+    // shift: the approaching lane blueshifts (red depletes, blue
+    // gains) and the receding lane redshifts by the same signed
+    // alignment — a linear wavelength-shift approximation, clamped so
+    // a strong shift can deplete a channel but never invert it. The
+    // atmosphere rim below stays exempt — it is a scattering shell,
+    // not orbiting surface material.
     if(material.uv_options.z!=0.0){
         vec3 local=(material.effect_from_view*vec4(view_position,1.0)).xyz;
         float orbit_r2=local.x*local.x+local.z*local.z;
@@ -824,7 +840,10 @@ void main() {
             // stores the inverse model_view linear part, so its transpose
             // carries object-space directions back into view space.
             vec3 beam_v=transpose(mat3(material.effect_from_view))*vec3(local.z,0.0,-local.x);
-            result*=max(1.0+material.uv_options.z*dot(normalize(beam_v),V),0.0);
+            float lane=dot(normalize(beam_v),V);
+            result*=max(1.0+material.uv_options.z*lane,0.0);
+            float shift=material.uv_options.z*lane*material.scatter_options.w;
+            result*=max(vec3(1.0-shift,1.0,1.0+shift),0.0);
         }
     }
     // Henyey–Greenstein single-scatter phase (atmo_shape.w = primary
@@ -848,8 +867,15 @@ void main() {
         const float cosv=dot(V,material.light_direction.xyz);
         const float den=max(1.0+hg*hg+2.0*hg*cosv,1e-4);
         const float den2=max(1.0+gb*gb+2.0*gb*cosv,1e-4);
-        result*=(1.0-w2)*(1.0-hg*hg)*pow(den,-1.5)
-               +w2*(1.0-gb*gb)*pow(den2,-1.5);
+        const float phase=(1.0-w2)*(1.0-hg*hg)*pow(den,-1.5)
+                          +w2*(1.0-gb*gb)*pow(den2,-1.5);
+        // wave_options.x weights the phase by the Rayleigh spectrum
+        // (450/lambda)^4 for 650/532/450nm, mean-normalized so the
+        // sheet's luminance is preserved while hue redistributes it
+        // blueward — small-particle scatter reads icy rather than
+        // achromatic. 0 keeps the achromatic phase.
+        const float rh=clamp(material.wave_options.x,0.0,1.0);
+        result*=phase*mix(vec3(1.0),vec3(0.395,0.881,1.724),rh);
     }
     // Single-scatter limb: wavelength-tinted rim, day-side weighted with a
     // nightside floor, tied to the star's actual color.

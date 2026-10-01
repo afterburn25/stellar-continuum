@@ -20,6 +20,11 @@ namespace stellar::native_fleet_ui {
 struct FleetScreenMarker {
   int fleet_id{};
   stellar::native_map::Point position{};
+  // Screen-space hull bearing (degrees, 0 = +x) and observed motion for the
+  // Scene3D ship glyph. Derived from the fleet's published destination;
+  // idle fleets keep a neutral -90-degree (up) heading.
+  float heading_degrees{-90.f};
+  bool in_transit{};
 };
 
 enum class FleetWorkspacePresentation { Outliner, SelectedCommands };
@@ -91,6 +96,10 @@ public:
     locale_ = table;
   }
   void set_view(stellar::native_fleet::NativeFleetMapView view);
+  void
+  set_scene3d_quality(stellar::native_map::RenderQuality3D value) noexcept {
+    scene3d_quality_ = value;
+  }
   void discard_campaign();
   void set_preview(stellar::native_fleet::NativeFleetRoutePreview preview,
                    std::string target_display_name);
@@ -197,6 +206,8 @@ private:
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> pressed_military_quote_;
   std::optional<stellar::native_fleet::NativeFleetLocateQuote> pressed_locate_quote_;
   mutable int last_ship_art_rows_{};
+  stellar::native_map::RenderQuality3D scene3d_quality_{
+      stellar::native_map::RenderQuality3D::High};
   int focus_{-1};
 };
 

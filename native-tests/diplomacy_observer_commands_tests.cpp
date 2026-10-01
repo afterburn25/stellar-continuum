@@ -875,6 +875,143 @@ int main(int argc, char **argv) {
     require(count == 46, "Native replay row accounting differed.");
     require(read(fixture_path) == fixture_bytes,
             "Native replay changed retained fixture bytes.");
+
+    // The retained fixture predates the blocker projection, so a dedicated
+    // scenario pins each projection-assigned DiplomacyActionBlocker value and
+    // the can_* == (blocker == none) invariant.
+    {
+      DiplomacyStateSnapshot snap;
+      snap.next_claim_id = 1;
+      snap.next_agreement_id = 10;
+      snap.next_proposal_id = 100;
+      snap.next_event_id = 1;
+      const auto add_contact =
+          [&](std::string id, int target, ContactAwareness awareness,
+              ContactCondition condition, bool channel) {
+            DiplomaticContactSnapshot c;
+            c.observer_civilization_id = 0;
+            c.contact_id = std::move(id);
+            c.target_civilization_id = target;
+            c.last_observed_tick = 100;
+            c.awareness = awareness;
+            c.condition = condition;
+            c.communication_available = channel;
+            c.confidence = .9;
+            snap.contacts.push_back(std::move(c));
+          };
+      // civ1: open channel, peaceful — attempt blocked by channel_open.
+      add_contact("c1", 1, ContactAwareness::communication_available,
+                  ContactCondition::active, true);
+      // civ2: stale/lost contact — every action blocked.
+      add_contact("c2", 2, ContactAwareness::identified,
+                  ContactCondition::stale_or_lost, false);
+      // civ3: identified, no channel — attempt open, the rest no_channel.
+      add_contact("c3", 3, ContactAwareness::identified,
+                  ContactCondition::active, false);
+      // civ4: channel + at war + pending proposals in both directions.
+      add_contact("c4", 4, ContactAwareness::communication_available,
+                  ContactCondition::active, true);
+      DiplomaticRelationshipSnapshot war;
+      war.civilization_a_id = 0;
+      war.civilization_b_id = 4;
+      war.political_state = DiplomaticPoliticalState::at_war;
+      war.trust = .1;
+      war.hostility = .9;
+      snap.relationships.push_back(std::move(war));
+      DiplomaticProposalSnapshot incoming;
+      incoming.proposal_id = 11;
+      incoming.proposer_civilization_id = 4;
+      incoming.recipient_civilization_id = 0;
+      incoming.kind = DiplomaticProposalKind::ceasefire_offer;
+      incoming.status = DiplomaticProposalStatus::pending;
+      incoming.summary = "Stand down.";
+      snap.proposals.push_back(std::move(incoming));
+      DiplomaticProposalSnapshot outgoing;
+      outgoing.proposal_id = 12;
+      outgoing.proposer_civilization_id = 0;
+      outgoing.recipient_civilization_id = 4;
+      outgoing.kind = DiplomaticProposalKind::demand;
+      outgoing.status = DiplomaticProposalStatus::pending;
+      outgoing.summary = "Withdraw.";
+      snap.proposals.push_back(std::move(outgoing));
+      // civ5: channel + active agreement — terminate is the open action.
+      add_contact("c5", 5, ContactAwareness::communication_available,
+                  ContactCondition::active, true);
+      DiplomaticAgreementSnapshot pact;
+      pact.agreement_id = 3;
+      pact.civilization_a_id = 0;
+      pact.civilization_b_id = 5;
+      pact.type = DiplomaticAgreementType::non_aggression;
+      pact.status = DiplomaticAgreementStatus::active;
+      snap.agreements.push_back(std::move(pact));
+
+      const auto state = DiplomacyState::restore(snap);
+      const auto rows = build_observer_diplomacy_action_availability(
+          state.build_view_for(0));
+      require(rows.size() == 5, "Blocker scenario row count diverged.");
+      const auto row_for = [&](int target)
+          -> const ObserverDiplomacyActionAvailability & {
+        const auto found = std::ranges::find(
+            rows, target,
+            &ObserverDiplomacyActionAvailability::
+                counterpart_civilization_id);
+        require(found != rows.end(), "Blocker scenario missing a contact row.");
+        return *found;
+      };
+      using enum DiplomacyActionBlocker;
+      for (const auto &row : rows) {
+        require(row.can_attempt_communication ==
+                        (row.attempt_communication_blocker == none) &&
+                    row.can_send_proposal ==
+                        (row.send_proposal_blocker == none) &&
+                    row.can_set_access_permission ==
+                        (row.set_access_permission_blocker == none) &&
+                    row.can_declare_war == (row.declare_war_blocker == none) &&
+                    row.can_respond_to_pending_proposal ==
+                        (row.respond_to_pending_proposal_blocker == none) &&
+                    row.can_withdraw_pending_proposal ==
+                        (row.withdraw_pending_proposal_blocker == none) &&
+                    row.can_terminate_active_agreement ==
+                        (row.terminate_active_agreement_blocker == none),
+                "Availability flag/blocker invariant broken.");
+      }
+      const auto &open = row_for(1);
+      require(open.attempt_communication_blocker == channel_open &&
+                  open.send_proposal_blocker == none &&
+                  open.respond_to_pending_proposal_blocker ==
+                      no_pending_proposal &&
+                  open.withdraw_pending_proposal_blocker ==
+                      no_pending_proposal &&
+                  open.terminate_active_agreement_blocker ==
+                      no_active_agreement,
+              "Open-channel blocker assignment diverged.");
+      const auto &lost = row_for(2);
+      require(lost.attempt_communication_blocker == contact_lost &&
+                  lost.send_proposal_blocker == no_channel &&
+                  lost.set_access_permission_blocker == no_channel &&
+                  lost.terminate_active_agreement_blocker == no_channel &&
+                  lost.declare_war_blocker == none,
+              "Lost-contact blocker assignment diverged.");
+      const auto &known = row_for(3);
+      require(known.attempt_communication_blocker == none &&
+                  known.send_proposal_blocker == no_channel &&
+                  known.set_access_permission_blocker == no_channel,
+              "No-channel blocker assignment diverged.");
+      const auto &war_row = row_for(4);
+      require(war_row.declare_war_blocker == already_at_war &&
+                  war_row.respond_to_pending_proposal_blocker == none &&
+                  war_row.withdraw_pending_proposal_blocker == none,
+              "At-war blocker assignment diverged.");
+      const auto &pact_row = row_for(5);
+      require(pact_row.terminate_active_agreement_blocker == none &&
+                  pact_row.can_terminate_active_agreement,
+              "Active-agreement blocker assignment diverged.");
+      require(diplomacy_action_blocker_name(contact_lost) == "contact_lost" &&
+                  diplomacy_action_blocker_name(no_channel) == "no_channel" &&
+                  diplomacy_action_blocker_name(none) == "none",
+              "Blocker name projection diverged.");
+    }
+
     static_assert(!std::is_constructible_v<ObserverDiplomacyCommandService,
                                            DiplomacyState &&>);
     static_assert(!std::is_constructible_v<

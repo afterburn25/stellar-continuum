@@ -38,6 +38,28 @@ struct CampaignTerritorialClaimCommandResult {
   std::optional<std::int64_t> claim_id;
 };
 
+// Observer-safe reason an availability flag is false. The projection assigns
+// the subset each action can raise; the wider vocabulary covers the
+// finer-grained proposal/access reasons consumers derive from the same sealed
+// view (for example per-kind offer gating in the diplomacy workspace).
+// Localize at presentation time; these are stable machine-facing reasons.
+enum class DiplomacyActionBlocker : std::uint8_t {
+  none,                 // action is available
+  channel_open,         // attempt: communication channel already active
+  contact_lost,         // contact stale or lost; rediscovery required
+  no_channel,           // requires an active communication channel
+  not_hostile,          // peace/ceasefire while relations are not in conflict
+  already_at_war,       // war already declared
+  agreement_active,     // an equivalent agreement is already in force
+  access_granted,       // transit access already granted
+  no_pending_proposal,  // nothing pending to respond to or withdraw
+  no_active_agreement,  // nothing active to terminate
+  no_terms,             // every negotiation term individually blocked
+};
+
+[[nodiscard]] std::string_view
+diplomacy_action_blocker_name(DiplomacyActionBlocker blocker) noexcept;
+
 struct ObserverDiplomacyActionAvailability {
   int counterpart_civilization_id{};
   ContactAwareness contact_awareness{};
@@ -56,6 +78,14 @@ struct ObserverDiplomacyActionAvailability {
   int pending_incoming_proposal_count{};
   int pending_outgoing_proposal_count{};
   int active_agreement_count{};
+  // Invariant: each can_* flag is equivalent to (blocker == none).
+  DiplomacyActionBlocker attempt_communication_blocker{};
+  DiplomacyActionBlocker send_proposal_blocker{};
+  DiplomacyActionBlocker set_access_permission_blocker{};
+  DiplomacyActionBlocker declare_war_blocker{};
+  DiplomacyActionBlocker respond_to_pending_proposal_blocker{};
+  DiplomacyActionBlocker withdraw_pending_proposal_blocker{};
+  DiplomacyActionBlocker terminate_active_agreement_blocker{};
 };
 
 [[nodiscard]] std::vector<ObserverDiplomacyActionAvailability>

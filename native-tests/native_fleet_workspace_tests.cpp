@@ -1,5 +1,8 @@
 #include "native_fleet_workspace.hpp"
 
+#include <stellar/engine/native_scene3d.hpp>
+
+#include <algorithm>
 #include <array>
 #include <iostream>
 #include <stdexcept>
@@ -132,6 +135,29 @@ int main() try {
         "Selected fleet command card lost canonical travel confirmation.");
   }
   {
+    NativeFleetWorkspace ships{FleetWorkspacePresentation::SelectedCommands};
+    ships.set_view(player_view(true));
+    DrawList draw;
+    const std::array markers{FleetScreenMarker{10,{600,380},35.f,true},
+                             FleetScreenMarker{12,{700,420}}};
+    ships.render(draw,1280,720,markers);
+    require(draw.circles.size()==markers.size()*2,
+        "Scene3D fleet glyphs displaced the faction marker circles.");
+    const auto scene=std::ranges::find_if(draw.world,[](const auto &command){
+        return std::holds_alternative<Scene3DView>(command);});
+    require(scene!=draw.world.end(),
+        "Fleet markers emitted no Scene3D ship layer.");
+    const auto &instances=std::get<Scene3DView>(*scene).scene->instances();
+    require(instances.size()==4,
+        "Transit and idle fleet glyphs did not emit the expected hull and flame instances.");
+    require(std::ranges::count_if(instances,[](const auto &instance){
+        return instance.material.pbr&&instance.material.pbr->metallic>0.f;})==2,
+        "Fleet ship hulls lost their lit PBR materials.");
+    require(std::ranges::count_if(instances,[](const auto &instance){
+        return instance.material.pbr&&instance.material.pbr->emissive;})==1,
+        "Engine emission did not stay exclusive to the transiting fleet.");
+  }
+  {
     auto view = player_view(true);
     auto& fleet = view.own_fleets.front();
     fleet.design_name = "Pathfinder-class";
@@ -140,6 +166,18 @@ int main() try {
     fleet.cargo_material_capacity = 40.;
     fleet.cargo_materials = 12.5;
     fleet.embarked_population_millions = 2.5;
+    NativeFleetMember member;
+    member.vessel_id = 10;
+    member.name = "ISS Wayfinder Prime";
+    member.design_name = "Pathfinder-class";
+    member.is_flagship = true;
+    member.has_vessel_state = true;
+    member.hull_fraction = .62f;
+    member.engine_fraction = .75f;
+    member.battles_fought = 3;
+    member.confirmed_kills = 1;
+    fleet.members = {member};
+    fleet.vessel_count = 1;
     NativeFleetWorkspace workspace{FleetWorkspacePresentation::SelectedCommands};
     workspace.set_view(std::move(view));
     DrawList draw;
@@ -149,6 +187,11 @@ int main() try {
             has_text(draw, "Cargo") && has_text(draw, "12.5 / 40.0") &&
             has_text(draw, "Embarked") && has_text(draw, "2.5M"),
         "Fleet composition rows did not surface design, condition or payload.");
+    // Member roster rides with the identity header, so it must render even
+    // on the cramped 720p card where telemetry extras clip.
+    require(has_text(draw, "Vessel") &&
+            has_text(draw, "ISS Wayfinder Prime (Flagship) · Hull 62%"),
+        "Member-vessel roster did not surface identity, flags or hull.");
   }
   for (const auto [width, height] :
        std::array{std::pair{640, 360}, std::pair{1280, 720},
@@ -428,6 +471,11 @@ int main() try {
             "Ineligible fleet exposed a tactical engagement action.");
   }
   engagement.set_view(armed);
+  (void)engagement.handle({InputEventType::PointerMove,center(layout.engage)},1280,720,markers,std::nullopt);
+  DrawList engage_tip_draw;
+  engagement.render(engage_tip_draw,1280,720,markers);
+  require(has_text(engage_tip_draw,"Order this fleet to attack the hostile forces in this system."),
+          "Engage control did not explain itself on hover.");
   engagement.set_preview(blocked, "Unknown system");
   require(engage_click() != FleetWorkspaceCommandKind::Engage,
           "Blocked travel preview accidentally started combat.");
@@ -483,6 +531,28 @@ int main() try {
     command=strategic.handle({InputEventType::LeftReleased,center(layout.military_locate)},1280,720,{},std::nullopt);
     require(command.kind==FleetWorkspaceCommandKind::Locate&&command.locate_quote==locate_quote,
             "Locate did not retain its displayed quote.");
+    (void)strategic.handle({InputEventType::PointerMove,center(layout.military_locate)},1280,720,{},std::nullopt);
+    DrawList locate_tip_draw;
+    strategic.render(locate_tip_draw,1280,720,{});
+    require(has_text(locate_tip_draw,"Center the map on this fleet."),
+            "Locate rail control did not explain itself on hover.");
+    // German catalog at the compact viewport: the same hover path must
+    // surface the shipped strings (the shared tooltip helper wraps and
+    // clamps inside the canvas, so the longer German text still fits).
+    {
+      stellar::engine::LocalizationTable german("de","en");
+      std::string german_error;
+      require(german.load_file(std::string(STELLAR_LOCALE_DIR)+"/de.json",&german_error),
+              ("de.json rejected: "+german_error).c_str());
+      strategic.set_localization(&german);
+      const auto compact=FleetWorkspaceLayout::for_viewport(640,360);
+      (void)strategic.handle({InputEventType::PointerMove,center(compact.military_locate)},640,360,{},std::nullopt);
+      DrawList german_tip;
+      strategic.render(german_tip,640,360,{});
+      require(has_text(german_tip,"Karte auf diese Flotte zentrieren."),
+              "German locate tip missing at 640x360");
+      strategic.set_localization(nullptr);
+    }
     (void)strategic.handle({InputEventType::LeftPressed,center(layout.order_hold)},1280,720,{},std::nullopt);
     (void)strategic.handle({InputEventType::PointerCancelled},1280,720,{},std::nullopt);
     command=strategic.handle({InputEventType::LeftReleased,center(layout.order_hold)},1280,720,{},std::nullopt);
@@ -520,6 +590,16 @@ int main() try {
     recovery.render(recovery_draw,1280,720,{});
     require(has_text(recovery_draw,"LOCATE")&&has_text(recovery_draw,"RETURN TO BASE"),
             "Civilian recovery did not retain both recovery controls and Locate.");
+    (void)recovery.handle({InputEventType::PointerMove,center(layout.recovery_left)},1280,720,{},std::nullopt);
+    DrawList hold_tip_draw;
+    recovery.render(hold_tip_draw,1280,720,{});
+    require(has_text(hold_tip_draw,"Pause the mission"),
+            "Recovery hold control did not explain itself on hover.");
+    (void)recovery.handle({InputEventType::PointerMove,center(layout.recovery_right)},1280,720,{},std::nullopt);
+    DrawList return_tip_draw;
+    recovery.render(return_tip_draw,1280,720,{});
+    require(has_text(return_tip_draw,"Send this fleet to an owned base"),
+            "Return-to-base control did not explain itself on hover.");
     (void)recovery.handle({InputEventType::LeftPressed,center(layout.civilian_locate)},1280,720,{},std::nullopt);
     const auto locate=recovery.handle({InputEventType::LeftReleased,center(layout.civilian_locate)},1280,720,{},std::nullopt);
     require(locate.kind==FleetWorkspaceCommandKind::Locate&&locate.locate_quote==locate_quote,

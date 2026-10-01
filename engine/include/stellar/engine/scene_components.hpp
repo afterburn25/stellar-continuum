@@ -192,6 +192,9 @@ struct MaterialSurface {
   // First-order orbital beaming about local +Y (accretion discs, ring
   // forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — bright lane
+  // blueshifts, dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
   // Henyey–Greenstein scattering phase: positive brightens the backlit
   // sheet (dusty rings), negative boosts opposition (icy). [-1,1];
   // 0 disables.
@@ -200,6 +203,9 @@ struct MaterialSurface {
   // `forward_scatter_back_mix` [0,1]; mix 0 keeps the single-lobe phase.
   float forward_scatter_back{0.f};
   float forward_scatter_back_mix{0.f};
+  // Rayleigh-style wavelength weight for the phase lobes [0,1] —
+  // blue-tilts the scattered light; 0 keeps achromatic scatter.
+  float forward_scatter_hue{0.f};
   // Zonal-wind harmonic strength [0,1] layered on `band_shear` for
   // alternating mid-latitude jets.
   float band_waves{0.f};
@@ -237,6 +243,14 @@ struct StarPhotosphere {
 // texture + orbital beaming on an `annulus` mesh at matching radii.
 struct AccretionDisc {
   float inner{0.f}, outer{0.f}, kelvin{0.f}, beaming{0.85f};
+  // Spiral density-wave tail (appended — older 16-byte payloads decode
+  // with the uniform-disc defaults): depth [0,1], integral m-mode
+  // 1..4, log-spiral winding [-4,4] trailing-positive.
+  float spiral{0.f}, spiral_arms{0.f}, spiral_turns{0.f};
+  // Keplerian shear tail (appended — older 28-byte payloads decode with
+  // a rigid disc): rad/s at the inner edge [-8,8], scrolling azimuthal V
+  // by rho^(-3/2) through accretion_disc_material3d's trailing arg.
+  float shear_rate{0.f};
 };
 // Image-shaped emission volume (nebula, plasma plume, accretion glow) —
 // the component counterpart of the entity document's `volume` block.

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ main, integration, "dev/**", "docs/**", "work/**" ]
   pull_request:
-    branches: [ main, integration ]
+    branches: [ main, integration, "engine/**" ]
 
 jobs:
   validate:

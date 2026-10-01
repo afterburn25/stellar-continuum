@@ -12,7 +12,7 @@ foreach(INDEX RANGE 0 ${STELLAR_MOON_LAST})
     message(FATAL_ERROR "Reviewed moon material digest mismatch: ${ASSET_PATH}")
   endif()
   get_filename_component(ASSET_DIRECTORY "${ASSET_PATH}" DIRECTORY)
-  add_custom_command(TARGET stellar_native_moon_assets
+  add_custom_command(TARGET stellar_native_moon_assets POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E make_directory "${CMAKE_BINARY_DIR}/${ASSET_DIRECTORY}"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/${ASSET_PATH}" "${CMAKE_BINARY_DIR}/${ASSET_PATH}")
 endforeach()

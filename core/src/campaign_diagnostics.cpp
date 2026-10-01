@@ -313,7 +313,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
           [&](const auto &c){return c.civilization_id==civ.id&&c.system_id!=civ.home_system_id;});
       if(records.size()>=maximum)truncated=true;else if(has_external){
         CivilizationLogisticsCoverage coverage;
-        try{coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,civ.id);}
+        try{coverage=civilization_logistics_coverage(econ,world.colonies,world.economies,world.systems,civ.id);}
         catch(const std::exception&){coverage={};}
         if(coverage.has_unrepresented_interstellar_support_gap){
           DiagnosticRecord r;r.tick=tick;r.game_date=format_campaign_date(day);r.subsystem="logistics";

@@ -2,6 +2,7 @@
 #include <stellar/engine/native_solid_mesh.hpp>
 #include <stellar/engine/native_geometry3d.hpp>
 #include <stellar/engine/surface_attachment.hpp>
+#include <algorithm>
 #include <cmath>
 #include <iostream>
 #include <limits>
@@ -18,6 +19,41 @@ int main()try{
     const Vec3 u{b.x-a.position.x,b.y-a.position.y,b.z-a.position.z},v{c.x-a.position.x,c.y-a.position.y,c.z-a.position.z};
     check((u.y*v.z-u.z*v.y)*a.normal.x+(u.z*v.x-u.x*v.z)*a.normal.y+(u.x*v.y-u.y*v.x)*a.normal.z>0,"Ring thickness has inward faces");}
   rejects([]{(void)annulus_mesh(1,2,64,-.1f);});
+  // Flared annulus: two mirrored trumpet sheets — rim rises symmetrically
+  // off the midplane, UVs keep the radial U / azimuthal V convention so
+  // the accretion material transfers verbatim.
+  const auto flared=flared_annulus_mesh(.4f,1.f,.2f,2.f,32,4);
+  check(flared->vertices().size()==2*5*33ull,"Flared annulus lost its mirrored sheet vertices");
+  {float top=-1.f,bottom=1.f,inner_top=-1.f;
+   for(const auto& v:flared->vertices()){
+     const float r=std::hypot(v.position.x,v.position.z);
+     if(r>.95f){top=std::max(top,v.position.y);bottom=std::min(bottom,v.position.y);}
+     if(r<.45f)inner_top=std::max(inner_top,std::abs(v.position.y));}
+   check(close(top,.2f)&&close(bottom,-.2f),"Flared annulus rim did not reach the flare height");
+   check(inner_top<.05f,"Flared annulus inner edge left the midplane too early");}
+  for(const auto& v:flared->vertices())check(close(v.uv.x,std::clamp(v.uv.x,0.f,1.f))&&v.uv.y>=0.f&&v.uv.y<=1.f,"Flared annulus UV escaped [0,1]");
+  for(std::size_t i=0;i<flared->indices().size();i+=3){const auto& a=flared->vertices()[flared->indices()[i]];const auto b=flared->vertices()[flared->indices()[i+1]].position,c=flared->vertices()[flared->indices()[i+2]].position;
+    const Vec3 u{b.x-a.position.x,b.y-a.position.y,b.z-a.position.z},v{c.x-a.position.x,c.y-a.position.y,c.z-a.position.z};
+    check((u.y*v.z-u.z*v.y)*a.normal.x+(u.z*v.x-u.x*v.z)*a.normal.y+(u.x*v.y-u.y*v.x)*a.normal.z>-1e-4f,"Flared annulus has inward faces");}
+  rejects([]{(void)flared_annulus_mesh(1,2,.0f);});
+  rejects([]{(void)flared_annulus_mesh(1,2,3.f);});
+  rejects([]{(void)flared_annulus_mesh(1,2,.2f,0.f);});
+  // render_scale target accounting: the extent follows the scaled
+  // destination (ceil, one-pixel floor) and invalid scales estimate
+  // conservatively at full resolution.
+  {Scene3DView view;view.destination={0,0,320,200};
+   check(view.render_scale==1.f,"render_scale default is not 1");
+   auto e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"Unscaled view extent is not the destination size");
+   view.render_scale=.5f;e=scene3d_view_target_extent(view);check(e[0]==160&&e[1]==100,"Half-scale extent did not halve the target");
+   view.destination={0,0,101,77};e=scene3d_view_target_extent(view);check(e[0]==51&&e[1]==39,"Scaled extent did not ceil odd destination sizes");
+   view.destination={0,0,320,200};
+   view.render_scale=.4f;e=scene3d_view_target_extent(view);check(e[0]==128&&e[1]==80,"Scaled extent did not ceil the destination product");
+   view.render_scale=.25f;e=scene3d_view_target_extent(view);check(e[0]==80&&e[1]==50,"Floor-scale extent wrong");
+   view.render_scale=.1f;e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"Under-floor scale did not estimate as unscaled");
+   view.render_scale=1.5f;e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"Supersampled scale did not estimate as unscaled");
+   view.render_scale=std::numeric_limits<float>::quiet_NaN();e=scene3d_view_target_extent(view);check(e[0]==320&&e[1]==200,"NaN scale did not estimate as unscaled");
+   view.render_scale=.5f;check(scene3d_view_target_bytes(view,16)==160ull*100ull*16ull,"Scaled view target bytes did not follow the extent");
+   check(scene3d_view_target_bytes(view,8)==160ull*100ull*8ull,"Scaled view target bytes ignored the bytes-per-pixel parameter");}
   const auto solid=directional_solid_mesh([](Vec3 p){return Vec3{p.x*2,p.y*.6f,p.z};},32,16);
   for(const auto& v:solid->vertices()){
     const Vec3 expected{v.position.x/4,v.position.y/.36f,v.position.z};const float norm=std::hypot(expected.x,expected.y,expected.z);
@@ -159,11 +195,24 @@ int main()try{
   rejects([&]{auto i=instance;i.material.band_diff=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.band_diff=2.f;const auto diffed=Scene3D::create(camera,{i});
    check(close(diffed->instances()[0].material.band_diff,2.f),"Band differential did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.shear_rate=9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_rate=-9.f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_rate=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_ratio=.9f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.shear_ratio=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.shear_rate=.8f;i.material.shear_ratio=3.f;const auto sheared=Scene3D::create(camera,{i});
+   check(close(sheared->instances()[0].material.shear_rate,.8f)&&close(sheared->instances()[0].material.shear_ratio,3.f),
+       "Accretion shear did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.orbital_beaming=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=-1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.orbital_beaming=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.orbital_beaming=.8f;const auto beamed=Scene3D::create(camera,{i});
    check(close(beamed->instances()[0].material.orbital_beaming,.8f),"Orbital beaming did not survive scene creation");}
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.orbital_beaming_tint=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.orbital_beaming_tint=.5f;const auto tinted=Scene3D::create(camera,{i});
+   check(close(tinted->instances()[0].material.orbital_beaming_tint,.5f),"Doppler beaming tint did not survive scene creation");}
   rejects([&]{auto i=instance;i.material.forward_scatter=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
   {auto i=instance;i.material.forward_scatter=-.6f;const auto phased=Scene3D::create(camera,{i});
@@ -172,6 +221,12 @@ int main()try{
   rejects([&]{auto i=instance;i.material.forward_scatter_back_mix=1.5f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter_back_mix=-.1f;(void)Scene3D::create(camera,{i});});
   rejects([&]{auto i=instance;i.material.forward_scatter_back=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_hue=1.5f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_hue=-.1f;(void)Scene3D::create(camera,{i});});
+  rejects([&]{auto i=instance;i.material.forward_scatter_hue=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
+  {auto i=instance;i.material.forward_scatter_hue=.7f;const auto tinted=Scene3D::create(camera,{i});
+   check(close(tinted->instances()[0].material.forward_scatter_hue,.7f),
+         "Scatter hue did not survive scene creation");}
   {auto i=instance;i.material.forward_scatter_back=-.4f;i.material.forward_scatter_back_mix=.3f;
    const auto phased=Scene3D::create(camera,{i});
    check(close(phased->instances()[0].material.forward_scatter_back,-.4f)&&
@@ -187,7 +242,10 @@ int main()try{
    rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=70.f;(void)Scene3D::create(camera,{i});});
    rejects([&]{auto i=plasma;i.material.surface_effect->flow_rate=std::numeric_limits<float>::quiet_NaN();(void)Scene3D::create(camera,{i});});
    plasma.material.surface_effect->flow_rate=.5f;
-   check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");}
+   check(Scene3D::create(camera,{plasma})!=nullptr,"Legal volume scatter rejected");
+   rejects([&]{auto i=plasma;i.material.surface_effect->next_texture.reset();i.material.surface_effect->blend=.5f;(void)Scene3D::create(camera,{i});});
+   {auto i=plasma;i.material.surface_effect->next_texture.reset();i.material.surface_effect->blend=0;
+    check(Scene3D::create(camera,{i})!=nullptr,"Single-texture volume effect rejected without next_texture");}}
   rejects([&]{(void)star_photosphere3d(50);});
   rejects([&]{(void)star_photosphere3d(2e5);});
   rejects([&]{(void)star_photosphere3d(std::numeric_limits<double>::quiet_NaN());});
@@ -203,6 +261,11 @@ int main()try{
   rejects([&]{(void)accretion_disc_material3d(2,1,8000);});
   rejects([&]{(void)accretion_disc_material3d(0.5f,1,50);});
   rejects([&]{(void)accretion_disc_material3d(0.5f,1,8000,2.f);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,-.1f);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,1.2f);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,.5f,0);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,.5f,5);});
+  rejects([&]{(void)accretion_disc_material3d(0.5f,1.f,8000,.8f,.5f,2,5.f);});
   {const auto disc=accretion_disc_material3d(0.5f,1.f,8000);
    check(disc.texture&&disc.texture->width()==256&&disc.texture->height()==1,
        "Accretion disc did not generate its radial texture");
@@ -217,6 +280,25 @@ int main()try{
        "Accretion outer rim did not cool redward of the inner edge");
    const auto repeat=accretion_disc_material3d(0.5f,1.f,8000);
    check(repeat.texture->pixels()==disc.texture->pixels(),"Accretion texture is not deterministic");}
+  {const auto arm=accretion_disc_material3d(0.5f,1.f,8000,.8f,.6f,2,.75f);
+   check(arm.texture&&arm.texture->width()==256&&arm.texture->height()==64,
+       "Spiral disc did not grow its azimuthal texture");
+   const auto &apx=arm.texture->pixels();
+   const auto alum=[&](int u,int v){
+    const auto at=(static_cast<std::size_t>(v)*256+u)*4;
+    return apx[at]*3+apx[at+1]*4+apx[at+2];};
+   int lo=1<<30,hi=0;
+   for(int v=0;v<64;++v){const int l=alum(128,v);lo=std::min(lo,l);hi=std::max(hi,l);}
+   check(hi>lo*5/4,"Spiral arms produced no azimuthal modulation");
+   check(std::abs(alum(128,63)-alum(128,0))<(hi-lo)/4,
+       "Spiral arms broke the integral azimuth wrap");
+   check(alum(8,10)>alum(248,10),"Spiral disc lost its radial falloff");
+   const auto arepeat=accretion_disc_material3d(0.5f,1.f,8000,.8f,.6f,2,.75f);
+   check(arepeat.texture->pixels()==arm.texture->pixels(),
+       "Spiral texture is not deterministic");
+   const auto flat=accretion_disc_material3d(0.5f,1.f,8000,.8f,0.f,0,0.f);
+   check(flat.texture->height()==1,
+       "Zero spiral tail did not keep the compact radial row");}
   {PointLight3D light;light.position={0,0,1};light.intensity=2;light.range=50;
    const auto lit=Scene3D::create(camera,{instance},{0,0,1},{light});
    check(lit->point_lights().size()==1,"Scene dropped its point light");}

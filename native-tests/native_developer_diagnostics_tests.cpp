@@ -5,6 +5,7 @@
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/developer_campaign.hpp>
 #include <stellar/engine/profiler.hpp>
+#include <stellar/engine/native_scene3d.hpp>
 #include <iostream>
 #include <limits>
 using namespace stellar::core;
@@ -259,6 +260,28 @@ int main(int argc,char **argv)try{
       }
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Entities inspector modified world state.");
+    // Shading dropdown switches every submitted 3D scene to the chosen
+    // diagnostic view while chrome stays lit; Lit applies nothing.
+    {
+      Camera3D camera;
+      DrawList lit_view;lit_view.overlay.emplace_back(Scene3DView{Scene3D::create(camera,{}),UiRect{0,0,64,64}});
+      window.render(lit_view,w,h,frame,monitor);
+      check(std::get<Scene3DView>(lit_view.overlay.front()).options.debug_view==DebugView3D::Lit,"Diagnostics touched shading while Lit was selected.");
+      const auto shade_point=control(draw(),"Shading: Lit ▾");
+      (void)window.handle({InputEventType::LeftPressed,shade_point},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,shade_point},w,h,monitor);
+      const auto normals_point=control(draw(),"Normals");
+      (void)window.handle({InputEventType::LeftPressed,normals_point},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,normals_point},w,h,monitor);
+      (void)control(draw(),"Shading: Normals ▾");
+      DrawList shaded;shaded.world.emplace_back(Scene3DView{Scene3D::create(camera,{}),UiRect{0,0,64,64}});
+      shaded.overlay.emplace_back(Scene3DView{Scene3D::create(camera,{}),UiRect{0,64,64,64}});
+      window.render(shaded,w,h,frame,monitor);
+      check(std::get<Scene3DView>(shaded.world.front()).options.debug_view==DebugView3D::Normals&&
+            std::get<Scene3DView>(shaded.overlay.front()).options.debug_view==DebugView3D::Normals,
+          "Shading selection did not reach submitted scene views.");
+      check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Shading inspection modified world state.");
+    }
     // Events search — the same pointer-focused field filters the
     // retained ring down to cards carrying the needle.
     click("RECENT EVENTS");

@@ -3,6 +3,7 @@
 #include <memory>
 
 namespace stellar::core {
+struct StellarSystem;
 enum class LogisticsNodeKind { Homeworld, OrbitalHub, LunarSettlement, PlanetarySettlement, ResourceSite, Depot, Shipyard };
 struct LogisticsNode { int id{}, civilization_id{}, system_id{}; std::string name; LogisticsNodeKind kind{}; };
 struct LogisticsLink {
@@ -80,14 +81,29 @@ struct ExternalSystemLogisticsStatus {
     SupplyCondition condition{};
     bool has_represented_interstellar_freight_corridor{};
 };
+// A prospective interstellar freight corridor between the civilization's home
+// system and one owned external system: endpoint systems, throughput, transit
+// and the demand the corridor would carry. Rows are a deterministic projection
+// of authoritative state — `represented`/`enabled` stay false until an
+// authoritative corridor exists (matching
+// `has_represented_interstellar_freight_corridor` on the coverage row).
+struct ExternalLogisticsLink {
+    int civilization_id{}, home_system_id{}, external_system_id{};
+    double capacity_per_day{}, transit_days{}, required_per_day{};
+    bool bidirectional{true}, enabled{}, represented{};
+};
 struct CivilizationLogisticsCoverage {
     int civilization_id{};
     HomeSystemLogisticsNetwork home_system;
     std::vector<ExternalSystemLogisticsStatus> external_systems;
+    // External corridor edges in the same system-id order as external_systems;
+    // rows whose endpoint system records cannot be resolved are dropped.
+    std::vector<ExternalLogisticsLink> external_links;
     int owned_system_count{}, external_system_count{};
     double external_import_requirement_per_day{}, external_local_surplus_per_day{}, unrepresented_interstellar_support_per_day{};
     bool has_unrepresented_interstellar_support_gap{};
 };
 CivilizationLogisticsCoverage civilization_logistics_coverage(EconomyWorldView world, std::span<const Colony> colonies,
-    std::span<const CivilizationEconomy> economies, int civilization_id);
+    std::span<const CivilizationEconomy> economies, std::span<const StellarSystem> system_records,
+    int civilization_id);
 } // namespace stellar::core

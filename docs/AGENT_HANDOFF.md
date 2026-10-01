@@ -16,7 +16,16 @@ Snapshot: 2026-09-20. Repository: `afterburn25/stellar-continuum`.
 Continue from **`cpp/codex-native-architecture-integration`**, not `main` or an
 old research/editor branch. The default branch does not represent this native
 working build. Engine `0.1.64`; game `0.1.14.2-dev`; source of truth:
-[`export/runtime-config.json`](../export/runtime-config.json).
+[`export/runtime-config.json`](../export/runtime-config.json). [Status update
+2026-09-30: the integration lane is now
+`engine/space-strategy-simulation-specialization` — clone/PR base — and the
+active workstream branch is `game/ui-visual-overhaul` (PR #338). CI status
+2026-09-30: both PR checks green at `c049755e` — `validate` (33-step
+asset/research/Godot-fixture battery) and `windows-export`
+(`windows-benchmark` export + full `windows-native-preview` build + complete
+328-test CTest; GPU-init tests skip by `SKIP_REGULAR_EXPRESSION` on the
+Vulkan-less runner — GPU coverage remains local/packaged). PR #338 open,
+mergeable, clean.]
 
 > **`work/foundation-1-30-codex-integration`** merges the
 > `engine/foundation-expansion-1-30` engine work (save history, replay,
@@ -46,7 +55,7 @@ not require a shader SDK; regeneration requires the pinned shader toolchain.
 In an **x64 Native Tools Command Prompt for VS 2022**:
 
 ```bat
-git clone --branch cpp/codex-native-architecture-integration https://github.com/afterburn25/stellar-continuum.git
+git clone --branch engine/space-strategy-simulation-specialization https://github.com/afterburn25/stellar-continuum.git
 cd stellar-continuum
 git lfs pull
 cmake --preset windows-native-preview
@@ -55,6 +64,11 @@ ctest --preset windows-native-preview --parallel 2 --output-on-failure
 set STELLAR_NATIVE_EXE=%CD%\build-native\preview\stellar-continuum.exe
 python -m unittest discover -s tools/stellar-export -p "test_*.py"
 ```
+
+Run the validator tests with the launcher (`py -3 -m unittest`, resolves
+3.14) — the WindowsApps `python3` stub is 3.10 and lacks
+`hashlib.file_digest`/PIL, silently turning ~145 suite cases into errors
+(`test_native_*_assets`, `test_galaxy_asset_import`).
 
 The normal graphical development preset is `windows-native-preview`
 (RelWithDebInfo, tests enabled). `windows-development` is Debug **without** the
@@ -90,6 +104,170 @@ ice optics, sharper rings, independent flare timing and scoped simulation
 lookup/image-memory optimizations. [Progress](DEVELOPMENT_PROGRESS.md) links the
 owners and evidence. Do not infer that a historical report describes the latest
 behavior when a newer correction supersedes it.
+
+**Graphics integration (branch `game/ui-visual-overhaul`, PR #338):** the
+`engine/space-graphics-overhaul` renderer is fully adopted in the runtime —
+system/planetary/battle/fleet Scene3D surfaces, phenomena emission volumes,
+small-body lighting/LOD fade, quality propagation to every view, accessibility
+gates (reduce-motion/reduce-flashing/high-contrast) on 3D scenes, and the
+DebugView3D diagnostics panel. Per-commit record and the adopted-vs-declined
+engine-API inventory live in [UI_UX_OVERHAUL_PLAN.md](UI_UX_OVERHAUL_PLAN.md);
+all five renderer requests are delivered, and the three core-lane
+projection requests filed in
+[GAME_VISUAL_ENGINE_REQUESTS.md](GAME_VISUAL_ENGINE_REQUESTS.md) are now
+delivered too — per-action diplomacy blocker reasons
+(`DiplomacyActionBlocker` on `ObserverDiplomacyActionAvailability`, sealed
+through `NativeDiplomacySelected` to localized disabled-slot/term hovers),
+the interstellar logistics route graph
+(`CivilizationLogisticsCoverage::external_links` — sealed corridor edges
+rendered as the supply workspace's INTERSTELLAR LINKS section and
+serialized as `coverage.externalLinks`), and per-vessel fleet composition
+(`core/fleet_composition` — `FleetCompositionMember` roster sealed onto
+`NativeOwnFleet::members`, rendered as identity rows on the detail card
+and consumed by the controlled-assets ship count). Suite: 328/328;
+live smokes green at every quality tier and both density extremes.
+
+Hardening contracts added late in the workstream that future changes must
+preserve:
+
+- `ImagePreparationQueue` consumers all follow the poll() convention — every
+  owner of a submitted ticket drains it per frame even while its view is
+  undrawn (`scene()` calls `galaxy_assets_`, `stellar_art_`, `planet_discs_`,
+  `small_body_assets_`, `system_background_`, `phenomena_` polls plus
+  `eruption_art_.begin_frame()`; `celestial_appearance_` cancels on workspace
+  close). A stranded completed ticket holds its byte reservation forever and
+  can starve a full-cap request (this was the `--developer-smoke` `sky=0`
+  failure). `artwork_status()` reports `queue=<jobs>/<bytes>` for diagnosis.
+- The frame-level 3D render-target budget
+  (`maximum_scene3d_target_bytes`, 128 MiB) is enforced by staged emission
+  plus `Scene3DView::render_scale` ([0.25,1]): `scene_content` renders
+  content views first, then `fit_backdrop_within_budget` shrinks the
+  staged backdrop's view targets (ceil(destination*scale) allocation,
+  linear upscale on composite) so the dome/nebula keep their
+  volumetric/warped shading down to quarter-scale; the authored 2D paths
+  run only when even .25 cannot fit. `scene()` then applies a final
+  multiplicative clamp over every view so developer panels appended after
+  the per-layer gates cannot push a frame over the cap — `prepare()`
+  throwing means a contract bug, not a load state. At 2560×1440 a
+  fullscreen HDR target is ~59 MiB, so scaling engages there. Keep the
+  game's accounting equal to the renderer's: `scene3d_view_target_bytes`
+  is the shared formula, `Window::scene3d_target_bytes` uses the live
+  device's bytes-per-pixel, and `Scene3DStatistics::renderer_active`
+  gates the bpp mirror so pre-first-3D-draw stats cannot under-count
+  (the 2560×1440 dev-smoke throw). Smoke assertions must accept the flat
+  fallback only when quarter-scale genuinely cannot fit.
+- Fixture hazards for smoke runs: stale `.bak`/`.integrity` sidecars beside
+  `--save-path` make the loader silently recover the previous save — delete
+  them when swapping fixtures (packaged validators that rewrite a save
+  mid-chain must clear `save.name.*` sidecars too; the system-travel
+  validator does this after authoring the recon edit on the fleet-smoke
+  save); saves authored before `GenerationMetadata`
+  carry the key as null (the replay observer guards `is_object()`).
+- Save-anchored smokes F6-save back over their own fixture, so they
+  self-mutate between runs: `--battle-smoke` must run on a freshly authored
+  `tools/author_battle_save.py <save>` copy (the advance+save drains the
+  fixture's vessels across runs; "bound no patrol_corvette art" is the tell),
+  and `--system-smoke` needs a save whose player civ knows Sol (a generated
+  new-game save usually won't — the smoke now fails fast with "observer does
+  not know Sol"). For fixture-authoring smokes prefer the packaged
+  `validate_native_*_export` validators (`tools/stellar-export`) — e.g.
+  `validate_native_diplomacy_export(folder, env,
+  native-tests/fixtures/player-campaign-json.json)` authors its proposal
+  fixture in a temp dir per run rather than consuming a checked-in save.
+  `--system-travel-smoke`/`--system-travel-reload-smoke` need a fleet in
+  LocalDeparture/Arrival transit — `work/travel.json` is that fixture
+  (copy it under `build-native/` before use; the run saves over it).
+  The `--smoke`-anchored checks have dedicated 500-system fixtures in
+  `work/` (`c-economy.json`, `c-logistics.json`, `c-inspection.json`,
+  `mil-fixture.json`) — copy before running for the same reason.
+  `--settlement-completion-smoke`/`--settlement-founded-smoke` add a
+  timing contract on top: they assert `simulation_days()` advances by
+  exactly `1/64` per step, which requires the source save's sim day to
+  keep that increment exactly representable in double precision. A save
+  whose sim day carries a full mantissa (arbitrary fractional residue)
+  trips the check once accumulated days pass ~255.5 (`before + 1/64`
+  rounds at the ULP boundary — the diagnostic now prints route/substeps/
+  day_delta/backlog). The packaged path is the maintained fixture:
+  `stellar_native_earned_settlement_tests.exe <research-v1> <catalog>
+  --earned <first-survey-save> --output-dir <dir>` stages the
+  eligible-site/populated-vessel/partial-establishment/founded
+  checkpoints (its source must have the scout+science pair idle in a
+  fully-surveyed non-colony system), then `--settlement-smoke` on the
+  populated-vessel save yields the active expedition the completion
+  smoke consumes — `validate_native_earned_settlement_export` in
+  `tools/stellar-export` runs that whole chain including both
+  completion modes and binds every checkpoint.
+- `--record`/`--replay`/`--replay-info`/`--replay-until`/`--replay-exit`
+  verified end-to-end including the divergence negative path (section-
+  localizing failure + leaf diff); the dated receipt lists every flag-legal
+  smoke/check/profile combination and the fixture each needs.
+  Recordable journal = every session save is reproducible on replay.
+  Input-driven saves (real F6/`key_press`, journaled pointer clicks that
+  dispatch a Save action) replay their own command; internal smoke saves
+  (boundary establishment, `request_smoke_save`, `smoke_save_pending_`
+  drains, campaign-profile saves, the battle-workspace F2 save) route
+  through `NativeCampaign::request_internal_save()`, which journals a
+  synthetic press of the active `quicksave` binding while a recorder is
+  attached — on replay that press dispatches the real save path and
+  reproduces the checkpoint. Strategic-day autosaves need no command: the
+  deterministic sim reaches the same boundary on replay. Replay at the
+  recorded drawable size (`--width/--height`) against the pre-run anchor —
+  restore the anchor and clear `save.*` sidecars first, exactly like the
+  travel validator's mid-chain rewrite. `InputMapper::last_press_action()`
+  gives per-event resolution for batched dispatch (scanning `just_pressed`
+  after a second same-frame press re-reports the first event's action —
+  the bug that masked replayed F6 as `toggle_pause`). The packaged
+  navigation and system-travel validators gate this contract:
+  `replay_check=True` records a journal on a live leg, restores the
+  anchor, replays it, and requires `replay_verified` counts matching the
+  recorded journal — travel's moving-fleet leg also covers the
+  synthetic-press path for internal saves.
+- Flag-coverage audit closed (`ecd2d310`/`834d110c`): every standalone
+  client smoke/check flag rides `stellar.py` — the once-orphaned
+  `verify_native_restart` (all four lifecycle modes incl.
+  `--new-game-restart-smoke`), `validate_native_quick_find_export`,
+  `validate_native_eruption_export` and `validate_native_developer_export`
+  are wired; the developer leg additionally carries the
+  `--smoke-galaxy-card`/`--smoke-system-count 500`/`--smoke-full-exploration`
+  modifiers (the only legal composite context). Remaining ungated flags
+  are dev tooling covered by CTest (`--dev-game`, `--devtools`) or
+  positional/modifier arguments. `--audio-check` is illegal under
+  `--new-game-restart-smoke`; `--smoke-full-exploration` requires
+  developer mode.
+- Authoritative `stellar.py export windows-native-preview` verified
+  end-to-end at `217918b7`
+  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-217918b7-20260930T053810915133Z`):
+  fresh configure+build, 328/328 CTest on the first pass (the
+  `atomic_file_write` `ERROR_UNABLE_TO_REMOVE_REPLACED` retry removed
+  the transient destination-lock flake class), every
+  `tools/stellar-export/test_*.py` module, dependency audit, packaging,
+  restricted-PATH relocated smoke, the full validator battery, ZIP +
+  SHA-256
+  `e8ad75b9598864d90775c67c5bf93cddb563f1bcb40c74aaa21a67e8c581f06f`.
+  Validation JSON: 106 top-level booleans, only `graphicalParity` false
+  (intentional). Prior authoritative exports at `79ed3047`
+  (SHA `e35af2cc…`) and `412e683d`
+  (`StellarContinuum-0.1.14.2-dev-windows-native-preview-412e683d-20260929T233838555462Z`):
+  fresh configure+build, 327/327 CTest, every
+  `tools/stellar-export/test_*.py` module (native_build now globs them —
+  the hardcoded list had orphaned 21 modules incl. the wired validators'
+  parser suites; `test_galaxy_asset_import` self-skips when
+  `assets/source/` provenance is absent), dependency audit, packaging
+  (5943 manifest files incl. `assets/visual/moons/**`, `Data/locale/`,
+  `Documentation/ReleaseNotes.md`), restricted-PATH relocated smoke, the
+  full validator battery, ZIP + SHA-256
+  `9557278177bd75edb5167eb9032bd5597360b3a046d64eeaa3596a50929f103a`.
+  Validation JSON: 106 booleans, only `graphicalParity` false
+  (intentional). native_build now retries failed CTest cases once via
+  `--rerun-failed` — `player_campaign_save` once flaked on a transient OS
+  file lock and passed immediately on retry; persistent defects still
+  fail the second pass. Separate clean-machine/VM certification remains
+  required; restricted-PATH is not that.
+- Draw-list test hazard: elements of `DrawList::overlay`/`world` are
+  vector-backed — a held `Text*`/`UiRect*` dangles after the next
+  `draw={}`/render. Copy `->at`/rects before re-rendering (the
+  `native_planetary_screen` chip-click flake + parallel SEGFAULT was a
+  test-side UAF of exactly this shape, `d910cd6b`).
 
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being
@@ -486,6 +664,11 @@ the world AABB, raycast is O(tris) per entity with no spatial partition,
 editor has no transform gizmos — see the registry record.
 
 **Recommended next workstream: the Core-adoption architecture decision.**
+The per-framework audit applying the 2026-09-24 graduation criteria is in
+[ADR 0002](decisions/0002-engine-framework-adoption-assessment.md) — it
+recommends keeping projections-first (no framework meets criterion 1),
+with executor granularity, projection-consumer depth, and greenfield
+terraforming as the productive frontier.
 The 2026-09-24 validation receipt records 294/294 native tests green on this
 branch — the failures in the 2026-09-20 receipt were resolved through the
 integration merge. A 2026-09-23 supplement
@@ -514,7 +697,10 @@ asserts one instanced call renders two objects correctly), `DrawBatcher`
 owns submission ordering/batching (full GPU binding key interned into
 material_id), `RenderGraph` schedules the scene→tonemap pass chain per
 frame, and `TextureStreamer` owns texture residency under a runtime-tunable
-byte budget (`Window::set_scene3d_texture_budget`) with pinned-fallback
+byte budget (`Window::set_scene3d_texture_budget` — the request persists
+through the lazily created renderer; the video STARFIELD QUALITY tier
+drives it at 48/96/192 MiB and live-pushes `RenderQuality3D` to all 3D
+consumers via `NativeCampaign::sync_scene3d_quality`) with pinned-fallback
 pop-in on denied binds (`Scene3DStatistics::streamed_fallbacks`,
 `streamed_evicted_bytes`, `Window::set_scene3d_texture_budget`), per-mip
 partial residency (denied requests degrade to the coarsest fitting mip
@@ -602,7 +788,12 @@ Settings (sliders adjust via arrows, Home/End clamp to min/max), and the
 startup workspace across Entry/ModeSelection/LoadSlots/Busy/Failure/
 Development screens with per-screen focusable collection and transition
 resets routed through `reset_pointer()`. Screen-reader/AT contracts and the
-new-game Setup sub-surface remain open.
+new-game Setup sub-surface remain open. [Status update: both have since
+shipped — the UIA bridge covers Invoke/Toggle/RangeValue/announcements
+(full fragment tree + non-Windows backends still open), and the Setup
+sub-surface gained ordered `configuration_focusables`/`galaxy_focusables`
+contracts with `focused_label`/`focused_bounds`/`seed_focused` wiring,
+pinned by `native_new_game_workspace_tests`.]
 A diagnostics-hardening lane through `34243eae` mirrors every authoritative
 validator inside `inspect_campaign_invariants`: `validate_galaxy_references`
 (settlement kind/hub/capacity/site, freight/route/order/site consistency,
@@ -741,7 +932,14 @@ Escape-cancellable). The two failures (`native_developer_diagnostics`,
 diagnostics lane — both binaries were built from their unstaged
 `inspect_diplomacy_invariants` mid-flight changes, not committed code;
 every accessibility suite passes. Remaining accessibility gaps:
-screen-reader contracts and per-surface text scaling.
+screen-reader contracts and per-surface text scaling. [Status update:
+both gaps have since shipped — the UIA bridge answers
+Invoke/Toggle/RangeValue patterns and announcements carry
+control/range state (see row-26 entries below; still open there is a
+full fragment tree and non-Windows backends), and per-surface text
+scaling reached every workspace when the canonical `native_ui::type`
+ramp and bespoke chrome sizes routed through `type::scaled`, which
+carries `NativeUiLayout::text_scale`.]
 Incremental audio streaming (`6c189626`): `AudioStreamDecoder` +
 `open_audio_stream` pull-decode 48 kHz stereo F32 on demand through a
 lazy Media Foundation reader (first `read()` binds COM on the consuming
@@ -1052,7 +1250,10 @@ channel — `render_voice_caption` gained a UI-announcement fallback
 shown only while subtitles are enabled (4s expiry). `economy_animation`
 covers dedup/preemption/eviction/drain order; the client links clean.
 Still open: platform AT bridging (UIA/AT-SPI) and per-surface
-focused-label announcements beyond the menu and HUD chrome.
+focused-label announcements beyond the menu and HUD chrome. [Status
+update: both have since landed — the UIA bridge ships Invoke/Toggle/
+RangeValue providers, and focused announcements classify across the
+workspace surfaces (see the row-26 entries below).]
 Map focus groups + HUD chrome ring (row-26 accessibility): the clean
 map now chains its always-on focus groups — `map_focus_group_` orders
 assets navigator -> fleet outliner -> HUD chrome. A nav key that would
@@ -1086,7 +1287,13 @@ returns the first visible row. The diagnostics panel's `scroll_window`
 helper, both developer indexes, the empire monitor's two lists, and
 the phenomena dump all delegate to it, deleting five copies of the
 same arithmetic. `batcher_ui` covers snap-to-edge, stale-offset
-tail clamp, and empty-list reset.
+tail clamp, and empty-list reset. Follow-up fix: an offset pinned
+at `max_scroll` stays unsnapped through `sync_rows` — floor-snapping
+stranded up to one row-height of the final entry whenever the
+viewport was not a whole-row multiple (absolute `i*stride-offset`
+consumers like the diagnostics panes; fixed-slot consumers were
+immune since their `first` index floors either way). `batcher_ui`
+pins the general-remainder case plus mid-list snapping.
 VirtualizedList configure/set_row_count (row 24): the fractional-scroll
 consumers (colony roster, editor system/detail/picker lists,
 engine-shell asset/key/project/entity/scene lists) cannot snap to row
@@ -1367,7 +1574,14 @@ pixel size by `subtitle_scale`; both the in-game and startup call sites
 pass `general_settings.saved().effective()`), and
 `NativeUiLayout::set_text_scale` multiplies only the shared font metrics
 in `for_viewport` — text enlarges without growing chrome geometry.
-`native_ui_layout` verifies fonts scale while rects stay identical.
+The same multiplier now reaches per-surface fonts: every
+`stellar::native_ui::type` rung and `type::scaled` bespoke size carries
+`text_scale`, and the workspace literal derivations (battle title,
+missions, video settings, research body/small) route through it — so
+chrome text on every workspace honors the setting. In-world labels
+(star/system naming contracts, galaxy label LOD) intentionally keep
+their fit-to-field sizes. `native_ui_layout` verifies fonts scale while
+rects stay identical and pins the ramp multiplier.
 In-app rebind UI (row 16): the settings hub Controls view binds against the
 campaign's live `InputMapper` — `context("GALAXY")` enumerates Button actions
 into rows ("Toggle pause — Space, P"), activation captures the next
@@ -1406,6 +1620,41 @@ and capturing an axis row accepts a stick deflection past a 0.5 dead
 zone or a wheel scroll (discrete keys are swallowed — they cannot drive
 an axis). Startup workspace tests cover the axis ring, deflection
 capture, cross-context steal and wheel binding.
+`--controls-settings-check` (pause-location smoke) exercises the live
+view end-to-end: snapshot every GALAXY/GALAXY_PAD binding, arm row
+capture, Escape-cancel, probe-key rebind, sibling steal, then restore
+through `rebind()` + persist and verify `galaxy-controls.json`
+round-trips through a fresh `InputMapper` (`save_contexts`
+canonicalizes — semantics, not bytes, are asserted). Its first live run
+caught the render loop indexing `control_row_rects` past the clipped
+page (UB when the action list overflows the view); the loop now bounds
+on the page, and `NativeSettingsHub::control_row_bounds` exposes row
+hitboxes to the harness. The pause location drives the live rebind
+list; under `--new-game-smoke` the same flag runs
+`check_controls_help_card` at startup — the mapperless Controls
+category must open the static help card (zero row hitboxes) and Back
+must return to the category list. The same fix revealed the shipped 15-row list overflows the
+~12-row page at every viewport — the three `GALAXY_PAD` axis rows were
+permanently off-page. `controls_scroll_` (shared `VirtualizedList`)
+pages the list: wheel ticks scroll (suspended while capture is armed —
+wheel is an axis trigger), keyboard focus-follow uses `ensure_visible`,
+offsets stay unsnapped (row-snapping strands the tail under a
+fractional viewport remainder), and rows are intersect-clipped so
+partial slivers stay clickable — the same convention as the startup
+load list. The check's scroll leg also closes live axis coverage: a
+synthetic GamepadAxis deflection past the dead zone captures a real
+axis binding on the paged-in tail row, feeding a sibling-owned axis
+exercises the steal end-to-end, and D-key presses on the focused row
+cycle its device pin (any → pad 1..4 → any) through the same
+in-campaign path. The notices are observable too: `update` drains
+`take_notice()` into `AccessibilityAnnouncer` as Status items pending
+until `scene()`'s caption pass, so the check peeks
+`NativeCampaign::announcer().latest()` and asserts the steal and pin
+announcements land. Every trigger kind is covered live — right-click
+(MouseButton:3), `GamepadPressed`, wheel-on-axis, the discrete-key
+swallow, left-click cancel — and that sweep caught pointer loss leaving
+an armed capture active; `PointerCancelled` now disarms like every
+other surface's cancel-pending convention.
 Multi-pad is plumbed end-to-end: the platform opens up to four pads into
 stable slots, `InputEvent.gamepad_device`/`RawInputEvent.device` carry
 the slot, and `InputBinding.device` pins a binding to one pad via the

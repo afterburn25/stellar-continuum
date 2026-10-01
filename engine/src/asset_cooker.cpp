@@ -24,7 +24,7 @@ struct Recipe {std::string alias,source,expected,category,group;std::vector<std:
 Json read_json(const std::filesystem::path&p){std::ifstream f(p);if(!f)throw std::runtime_error("Missing cooker input: "+asset_path_utf8(p));return Json::parse(f);}
 void write_json(const std::filesystem::path&p,const Json&j){std::filesystem::create_directories(p.parent_path());std::ofstream f(p);f<<j.dump(2);if(!f)throw std::runtime_error("Cannot write: "+asset_path_utf8(p));}
 std::string digest(std::string_view text){return digest_hex(sha256(std::span(reinterpret_cast<const std::uint8_t*>(text.data()),text.size())));}
-void safe_relative(const std::string&s){auto p=std::filesystem::u8path(s);if(s.empty()||p.is_absolute()||s.find(':')!=s.npos||s.find('\\')!=s.npos)throw std::runtime_error("Unsafe cooker source: "+s);for(const auto&part:p)if(part==".."||part==".")throw std::runtime_error("Unsafe cooker source: "+s);}
+void safe_relative(const std::string&s){auto p=path_from_utf8(s);if(s.empty()||p.is_absolute()||s.find(':')!=s.npos||s.find('\\')!=s.npos)throw std::runtime_error("Unsafe cooker source: "+s);for(const auto&part:p)if(part==".."||part==".")throw std::runtime_error("Unsafe cooker source: "+s);}
 std::string group_for(std::string_view s){if(s.find("/audio/")!=s.npos)return "Audio";if(s.find("stellar-eruptions")!=s.npos||s.find("phenomena")!=s.npos)return "VFX";if(s.find("background")!=s.npos||s.find("starfield")!=s.npos||s.find("/space/")!=s.npos||s.find("/galaxies/")!=s.npos)return "Backgrounds";if(s.find("/ships/")!=s.npos)return "Ships";if(s.find("/planets/")!=s.npos||s.find("/moons/")!=s.npos||s.find("/sol/")!=s.npos||s.find("/rings/")!=s.npos||s.find("/stellar/")!=s.npos||s.find("small-bodies")!=s.npos)return "Celestial";if(s.starts_with("assets/visual/"))return "UI";return "Core";}
 std::string category_for(std::string_view s){if(s.ends_with("normal.png"))return "normal";if(s.ends_with("properties.png"))return "properties";const auto g=group_for(s);if(g=="Backgrounds")return "background";if(g=="UI")return "ui";if(g=="VFX")return "vfx";return "critical";}
 std::map<std::string,Recipe> discover(const AssetCookOptions&o,Json&excluded){
@@ -102,7 +102,7 @@ void cook_asset_repository(const AssetCookOptions&o){
  // Source and recursive dependency fingerprints precede workers, so changes in
  // imported metadata invalidate dependent products deterministically.
  std::map<std::string,std::string> hashes,keys;std::set<std::string> visiting;
- for(const auto&[id,r]:recipes){const auto hash=sha256_file(o.root/std::filesystem::u8path(r.source));if(!r.expected.empty()&&hash!=r.expected)throw std::runtime_error("Reviewed asset SHA mismatch: "+r.source);hashes[id]=hash;}
+ for(const auto&[id,r]:recipes){const auto hash=sha256_file(o.root/path_from_utf8(r.source));if(!r.expected.empty()&&hash!=r.expected)throw std::runtime_error("Reviewed asset SHA mismatch: "+r.source);hashes[id]=hash;}
  std::function<std::string(const std::string&)> fingerprint=[&](const auto&id)->std::string{
   if(keys.contains(id))return keys.at(id);if(!recipes.contains(id))throw std::runtime_error("Missing dependency: "+id);if(!visiting.insert(id).second)throw std::runtime_error("Cyclic asset dependency: "+id);
   const auto&r=recipes.at(id);std::string input=std::string(cooker_version)+"/windows/"+STELLAR_COOKER_IMPLEMENTATION_HASH+"/"+o.profile+"/"+r.category+"/"+hashes.at(id);
@@ -115,7 +115,7 @@ void cook_asset_repository(const AssetCookOptions&o){
  std::vector<Recipe> ordered;for(auto&[name,r]:recipes)ordered.push_back(std::move(r));std::vector<Cooked> cooked(ordered.size());
  std::atomic_size_t next{},done{};std::mutex console;std::vector<std::jthread> workers;
  for(unsigned t=0;t<std::clamp(o.threads,1u,16u);++t)workers.emplace_back([&]{for(;;){const auto i=next++;if(i>=ordered.size())break;const auto&r=ordered[i];auto&c=cooked[i];try{
-   const auto source=o.root/std::filesystem::u8path(r.source);const auto&source_hash=hashes.at(r.alias);
+   const auto source=o.root/path_from_utf8(r.source);const auto&source_hash=hashes.at(r.alias);
    c.group=r.group;c.key=keys.at(r.alias);
    const auto cached=o.cache/(c.key+".json");Json meta;
    if(!o.clean&&std::filesystem::is_regular_file(cached)){try{meta=read_json(cached);bool valid=meta.at("chunks").is_array()&&!meta.at("chunks").empty();for(const auto&ch:meta.at("chunks")){const auto name=ch.at("file").get<std::string>();safe_relative(name);if(name.find('/')!=name.npos)throw std::runtime_error("Invalid cache name");const auto file=o.cache/name;if(!std::filesystem::is_regular_file(file)||sha256_file(file)!=ch.at("storedHash").get<std::string>()){valid=false;break;}}if(valid)c.hit=true;}catch(const std::exception&){meta=Json{};}}

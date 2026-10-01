@@ -4,6 +4,7 @@
 #include <stellar/core/exploration_advance.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
+#include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/persistable_fresh_campaign.hpp>
 #include <stellar/core/player_campaign_recovery.hpp>
 
@@ -170,6 +171,72 @@ void reconnaissance_projection(CampaignFrame &frame) {
               surveyed_row->reconnaissance->fully_surveyed,
           "Completed reconnaissance did not preserve full-survey knowledge.");
   *scout = original;
+}
+
+void composition_projection(CampaignFrame &frame) {
+  NativeFleetController controller;
+  constexpr std::uint64_t generation = 74;
+  auto &world = frame.runtime().world().campaign();
+  const auto initial = controller.build(frame, generation);
+  require(!initial.own_fleets.empty(), "Authored fixture lacks an owned fleet.");
+  auto fleet = std::ranges::find(world.fleets, initial.own_fleets.front().id,
+                                 &FleetState::id);
+  require(fleet != world.fleets.end(), "Owned fleet disappeared.");
+  const auto original = *fleet;
+
+  // Synthesized member: the projection must fall back to fleet fields and
+  // report an intact vessel when no battle record exists.
+  fleet->tactical_vessel.reset();
+  fleet->design_id = "patrol_corvette";
+  fleet->embarked_population_millions = 2.5;
+  fleet->cargo_materials = 9.;
+  fleet->cargo_material_capacity = 30.;
+  const auto plain = controller.build(frame, generation);
+  const auto plain_row = std::ranges::find(plain.own_fleets, fleet->id,
+                                           &NativeOwnFleet::id);
+  require(plain_row != plain.own_fleets.end() && plain_row->vessel_count == 1 &&
+              plain_row->members.size() == 1,
+          "Single-vessel fleet did not project one member row.");
+  {
+    const auto &member = plain_row->members.front();
+    require(member.name == fleet->name && !member.has_vessel_state &&
+                member.hull_fraction == 1.f &&
+                member.embarked_population_millions == 2.5 &&
+                member.cargo_materials == 9. &&
+                member.cargo_material_capacity == 30.,
+            "Synthesized member did not inherit fleet identity and payload.");
+    require(!member.design_name.empty(),
+            "Member design name was not resolved at the view boundary.");
+  }
+
+  // Retained vessel record: the member row must carry the sealed tactical
+  // state — name, design, flags, subsystem fractions and battle record.
+  MassiveVesselState vessel;
+  vessel.id = campaign_vessel_id_for_fleet(fleet->id);
+  vessel.name = "ISS Testbed";
+  vessel.design_id = "patrol_corvette";
+  vessel.is_flagship = true;
+  vessel.hull_fraction = .55f;
+  vessel.engine_fraction = .75f;
+  vessel.battles_fought = 3;
+  vessel.confirmed_kills = 1;
+  fleet->tactical_vessel = vessel;
+  const auto tested = controller.build(frame, generation);
+  const auto tested_row = std::ranges::find(tested.own_fleets, fleet->id,
+                                            &NativeOwnFleet::id);
+  require(tested_row != tested.own_fleets.end() &&
+              tested_row->members.size() == 1,
+          "Battle-tested fleet lost its member row.");
+  {
+    const auto &member = tested_row->members.front();
+    require(member.has_vessel_state && member.name == "ISS Testbed" &&
+                member.is_flagship && member.hull_fraction == .55f &&
+                member.engine_fraction == .75f &&
+                member.battles_fought == 3 && member.confirmed_kills == 1 &&
+                member.vessel_id == campaign_vessel_id_for_fleet(fleet->id),
+            "Member row did not seal the retained vessel record.");
+  }
+  *fleet = original;
 }
 
 void science_survey_projection(CampaignFrame &frame) {
@@ -656,6 +723,9 @@ int main(int argc, char **argv) try {
   auto science_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
                                     fs::absolute(argv[4]));
   science_survey_projection(science_frame);
+  auto composition_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
+                                        fs::absolute(argv[4]));
+  composition_projection(composition_frame);
   observer_and_commands(frame);
   auto developer_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]), fs::absolute(argv[4]));
   developer_fleet_inspection(developer_frame);

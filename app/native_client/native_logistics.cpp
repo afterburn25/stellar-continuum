@@ -100,7 +100,8 @@ CivilizationLogisticsCoverage canonical_project(const FreshCampaignState &campai
   const EconomyWorldView world{campaign.civilizations, campaign.bodies,
                                construction, fleets};
   return civilization_logistics_coverage(world, campaign.colonies,
-                                         campaign.economies, civilization_id);
+                                         campaign.economies, campaign.systems,
+                                         civilization_id);
 }
 
 std::string condition_label(const SupplyCondition condition,
@@ -223,6 +224,33 @@ View make_view(const FreshCampaignState &campaign, const int civilization_id,
                              external.support_demand_per_day,
                              external.import_requirement_per_day,
                              external.has_represented_interstellar_freight_corridor});
+  }
+  // Interstellar corridor edges: prospective freight links from the home
+  // system to each owned external system. Rows whose endpoints or identity
+  // cannot be verified are dropped rather than partially disclosed — the same
+  // sealing rule as the home node/link graph.
+  for (const auto &link : coverage.external_links) {
+    if (link.civilization_id != civilization_id ||
+        link.home_system_id != network.home_system_id)
+      continue;
+    const auto from_record = std::ranges::find(campaign.systems,
+                                               link.home_system_id,
+                                               &StellarSystem::id);
+    const auto endpoint = std::ranges::find(campaign.systems,
+                                            link.external_system_id,
+                                            &StellarSystem::id);
+    if (from_record == campaign.systems.end() ||
+        endpoint == campaign.systems.end())
+      continue;
+    view.external_links.push_back(
+        {link.external_system_id, from_record->name, endpoint->name,
+         link.represented
+             ? link.enabled
+                   ? resolve(locale, "SUPPLY_LINK_OPERATIONAL", "Operational")
+                   : resolve(locale, "SUPPLY_LINK_DISABLED", "Disabled")
+             : resolve(locale, "SUPPLY_LINK_PROSPECTIVE", "Prospective"),
+         link.capacity_per_day, link.required_per_day, link.transit_days,
+         link.enabled, link.bidirectional, link.represented});
   }
   return view;
 }

@@ -197,6 +197,10 @@ struct Window::Storage {
     return -1;
   }
   std::unique_ptr<Scene3DRenderer> scene3d;
+  // The requested 3D texture-streaming budget survives until the renderer is
+  // lazily created on the first 3D frame — the setter is not silently dropped
+  // when hosts retune before any Scene3DView draws.
+  std::uint64_t scene3d_texture_budget{maximum_scene3d_texture_cache_bytes};
   // MemoryTracker VRAM attribution — the 3D backend reports its resident
   // texture/mesh/render-target bytes once a scene3d view draws.
   engine::MemoryTracker::SubsystemId gpu_texture_subsystem{engine::MemoryTracker::invalid_subsystem},
@@ -608,7 +612,9 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
   const auto elapsed_ms=[](const auto started){return std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-started).count();};
   const auto submission_started=timing?std::optional{std::chrono::steady_clock::now()}:std::nullopt;
   const auto has_3d=[](const auto& commands){return std::any_of(commands.begin(),commands.end(),[](const auto& c){return std::holds_alternative<Scene3DView>(c);});};
-  if(!storage_->scene3d&&(has_3d(draw_list.world)||has_3d(draw_list.overlay)))storage_->scene3d=std::make_unique<Scene3DRenderer>(storage_->device,storage_->renderer);
+  if(!storage_->scene3d&&(has_3d(draw_list.world)||has_3d(draw_list.overlay))){
+    storage_->scene3d=std::make_unique<Scene3DRenderer>(storage_->device,storage_->renderer);
+    storage_->scene3d->set_texture_budget(storage_->scene3d_texture_budget);}
   if(storage_->scene3d){
     storage_->scene3d->prepare(draw_list);
     // VRAM attribution: report the backend's resident texture, mesh and
@@ -621,7 +627,7 @@ void Window::draw(const DrawList &draw_list,const std::optional<std::filesystem:
       storage_->gpu_target_subsystem=tracker.register_subsystem("scene3d-targets");
     }
     const auto gpu_stats=storage_->scene3d->statistics();
-    tracker.report(storage_->gpu_texture_subsystem,gpu_stats.texture_cache_bytes,maximum_scene3d_texture_cache_bytes);
+    tracker.report(storage_->gpu_texture_subsystem,gpu_stats.texture_cache_bytes,gpu_stats.texture_budget_bytes);
     tracker.report(storage_->gpu_mesh_subsystem,gpu_stats.mesh_cache_bytes,maximum_mesh3d_cache_bytes);
     tracker.report(storage_->gpu_target_subsystem,gpu_stats.target_bytes,0);
   }
@@ -710,6 +716,15 @@ int Window::drawable_width()const noexcept{return storage_->width;}int Window::d
 std::size_t Window::text_cache_entries()const noexcept{return storage_->text_cache.size();}std::size_t Window::text_cache_bytes()const noexcept{return storage_->text_cache_bytes;}
 std::size_t Window::image_cache_entries()const noexcept{return storage_->image_cache.size();}std::size_t Window::image_cache_resident_bytes()const noexcept{return storage_->image_cache_resident_bytes;}std::uint64_t Window::image_upload_count()const noexcept{return storage_->image_uploads;}
 Scene3DStatistics Window::scene3d_statistics()const noexcept{return storage_->scene3d?storage_->scene3d->statistics():Scene3DStatistics{};}
-void Window::set_scene3d_texture_budget(std::uint64_t bytes){if(storage_->scene3d)storage_->scene3d->set_texture_budget(bytes);}
+std::size_t Window::scene3d_target_bytes(const DrawList& draw)const noexcept{
+  const std::size_t bytes_per_pixel=storage_->scene3d?storage_->scene3d->bytes_per_pixel():16u;
+  std::size_t total=0;
+  const auto add=[bytes_per_pixel,&total](const Scene3DView& view){total+=scene3d_view_target_bytes(view,bytes_per_pixel);};
+  for(const auto& command:draw.world)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+  for(const auto& command:draw.overlay)if(const auto* view=std::get_if<Scene3DView>(&command))add(*view);
+  return total;}
+void Window::set_scene3d_texture_budget(std::uint64_t bytes){
+  storage_->scene3d_texture_budget=bytes;
+  if(storage_->scene3d)storage_->scene3d->set_texture_budget(bytes);}
 } // namespace stellar::native_map
 

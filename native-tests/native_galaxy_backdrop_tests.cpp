@@ -433,6 +433,22 @@ void background_capacity_cancel_and_failure(const std::filesystem::path &root) {
           "Background galaxy failure lacked its path or retained a pending request.");
 }
 
+void stranded_core_fog_poll_releases_reservation(const std::filesystem::path &root) {
+  auto queue=std::make_shared<ImagePreparationQueue>();
+  NativeGalaxyBackdropAssets assets(root);
+  assets.use_background_preparation(queue);
+  require(!assets.request_undisclosed_core_fog()&&assets.pending_count()==1,
+          "Cold core fog was not queued.");
+  // The ticket finishing while no map draws used to hold its reservation
+  // forever — a full-budget consumer (the 32 MiB sky plate) then starved.
+  // poll() must collect it without any view rendering.
+  await([&]{assets.poll();return assets.pending_count()==0;});
+  require(static_cast<bool>(assets.undisclosed_core_fog()),
+          "poll() discarded the completed core fog image.");
+  require(queue->reserved_bytes()==0,
+          "poll() collected the fog image but kept its queue reservation.");
+}
+
 void supplied_morphology_layers(const std::filesystem::path& root) {
   NativeGalaxyBackdropAssets assets(root);NativeGalaxyBackdrop backdrop(assets);
   for(int m=0;m<6;++m){
@@ -494,6 +510,7 @@ int main(int argc, char **argv) {
     background_layers_and_pixels(root);
     background_capacity_cancel_and_failure(root);
     oversized_artwork_is_never_cached();
+    stranded_core_fog_poll_releases_reservation(root);
     supplied_morphology_layers(root);
     if(argc==3){
       NativeGalaxyBackdropAssets loose(root);
@@ -507,7 +524,7 @@ int main(int argc, char **argv) {
       stellar::engine::unmount_asset_registry();
       std::cout << "Cooked background parity and bounded preparation passed\n";
     }
-    std::cout << "native galaxy backdrop: 9/9 cases passed\n";
+    std::cout << "native galaxy backdrop: 10/10 cases passed\n";
     return 0;
   } catch (const std::exception &error) {
     std::cerr << "native galaxy backdrop failure: " << error.what() << '\n';

@@ -47,6 +47,8 @@ constexpr std::array<const char*,4> kCorridorKeys{"SUPPLY_COL_STATUS","SUPPLY_CO
 constexpr std::array<const char*,4> kCorridorFallbacks{"STATUS","CAPACITY / DAY","USED / DAY","TRANSIT"};
 constexpr std::array<const char*,4> kExternalKeys{"SUPPLY_COL_STATUS","SUPPLY_COL_LOCAL","SUPPLY_COL_DEMAND","SUPPLY_COL_IMPORT"};
 constexpr std::array<const char*,4> kExternalFallbacks{"STATUS","LOCAL / DAY","DEMAND / DAY","IMPORT / DAY"};
+constexpr std::array<const char*,4> kExternalLinkKeys{"SUPPLY_COL_STATUS","SUPPLY_COL_CAPACITY","SUPPLY_COL_DEMAND","SUPPLY_COL_TRANSIT"};
+constexpr std::array<const char*,4> kExternalLinkFallbacks{"STATUS","CAPACITY / DAY","DEMAND / DAY","TRANSIT"};
 bool pointer_event(InputEventType type) {
   return type==InputEventType::LeftPressed||type==InputEventType::LeftReleased||
     type==InputEventType::RightPressed||type==InputEventType::RightReleased||
@@ -110,11 +112,13 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
     const View& view,const SupplyLayout& layout,int width,int height) const {
   if(rows_.valid&&rows_.viewport_width==width&&rows_.viewport_height==height&&
      rows_.measurer_revision==measurer_revision_&&rows_.nodes==view.nodes&&
-     rows_.links==view.links&&rows_.external==view.external)return rows_;
+     rows_.links==view.links&&rows_.external==view.external&&
+     rows_.external_links==view.external_links)return rows_;
   rows_={};rows_.viewport_width=width;rows_.viewport_height=height;
   rows_.measurer_revision=measurer_revision_;rows_.nodes=view.nodes;
   rows_.links=view.links;rows_.external=view.external;
-  rows_.rows.reserve(view.nodes.size()+view.links.size()+view.external.size()+2);
+  rows_.external_links=view.external_links;
+  rows_.rows.reserve(view.nodes.size()+view.links.size()+view.external.size()+view.external_links.size()+3);
   const auto s=layout.scale;const int font=static_cast<int>(15.f*s);
   for(std::size_t index=0;index<view.nodes.size();++index){
     const auto& node=view.nodes[index];
@@ -149,6 +153,18 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
       rows_.height+=row_height+6.f*s;
     }
   }
+  if(!view.external_links.empty()){
+    rows_.rows.push_back({0,rows_.height+8.f*s,46.f*s,0.f,5});
+    rows_.height+=54.f*s+6.f*s;
+    for(std::size_t index=0;index<view.external_links.size();++index){
+      const auto& link=view.external_links[index];
+      const auto name=text_height(measure_,link.from+(link.bidirectional?" <-> ":" -> ")+link.to,layout.body.width*.30f-20.f*s,font);
+      const auto state=text_height(measure_,link.status,layout.body.width*.22f-16.f*s,font);
+      const auto row_height=std::max({44.f*s,name+20.f*s,state+20.f*s});
+      rows_.rows.push_back({index,rows_.height,row_height,name,6});
+      rows_.height+=row_height+6.f*s;
+    }
+  }
   const auto fit_row=[&](const auto& keys,const auto& fallbacks,std::size_t column0,auto& out_sizes){
     constexpr std::array<float,5> spans{.30f,.22f,.16f,.16f,.16f};
     for(std::size_t i=0;i<keys.size();++i){
@@ -158,6 +174,7 @@ const SupplyWorkspace::CachedRows &SupplyWorkspace::rows_for(
   fit_row(kHeadingKeys,kHeadingFallbacks,0,rows_.heading_sizes);
   fit_row(kCorridorKeys,kCorridorFallbacks,1,rows_.corridor_sizes);
   fit_row(kExternalKeys,kExternalFallbacks,1,rows_.external_sizes);
+  fit_row(kExternalLinkKeys,kExternalLinkFallbacks,1,rows_.external_link_sizes);
   rows_.valid=true;return rows_;
 }
 SupplyCommand SupplyWorkspace::handle(const InputEvent& event,const View& view,int width,int height) {
@@ -310,6 +327,37 @@ void SupplyWorkspace::render(DrawList& out,const View& view,int width,int height
       theme::hover_tooltip(out,visible,pointer_,external.name,
           tr("SUPPLY_TIP_EXTERNAL",
              "Supply coverage of owned colonies outside the home system. Local is the system's own daily capacity, Demand what its colonies require, and Import the shortfall a corridor would have to carry."),
+          width,height,s,theme::Tone::Neutral);
+      continue;
+    }
+    if(row.kind==5){
+      label(out,{box.x,box.y+6.f*s,box.width,20.f*s},
+          tr("SUPPLY_LINKS_TITLE","INTERSTELLAR LINKS"),font,
+          theme::color::keyline_strong,b);
+      for(std::size_t i=0;i<kExternalLinkKeys.size();++i)
+        label(out,{box.x+b.width*columns[i+1]+8.f*s,box.y+24.f*s,b.width*spans[i+1]-16.f*s,18.f*s},
+              tr(kExternalLinkKeys[i],kExternalLinkFallbacks[i]),rows.external_link_sizes[i],muted,b);
+      if(const auto rule=theme::clipped({box.x,box.y+row.height-3.f*s,box.width,1.f},b))
+        theme::fill(out,*rule,theme::color::keyline);
+      continue;
+    }
+    if(row.kind==6){
+      theme::fill(out,visible,theme::color::surface_secondary);
+      const auto& link=view.external_links[row.index];
+      const Color status_tone=!link.represented?muted
+          :!link.enabled?theme::color::danger:cyan;
+      const auto title=link.from+(link.bidirectional?" <-> ":" -> ")+link.to;
+      label(out,{box.x+8.f*s,box.y+10.f*s,b.width*.30f-20.f*s,row.name_height},
+            title,font,ink,b);
+      const std::array<std::string,4> values_text{link.status,
+          number(link.capacity_per_day),number(link.required_per_day),
+          trf("SUPPLY_TRANSIT_DAYS",{number(link.transit_days)},"{0} d")};
+      for(std::size_t i=1;i<columns.size();++i)
+        label(out,{box.x+b.width*columns[i]+8.f*s,box.y+12.f*s,b.width*spans[i]-16.f*s,row.height-20.f*s},values_text[i-1],font,
+              i==1?status_tone:i==3&&link.required_per_day>.00001&&!link.represented?amber:ink,b);
+      theme::hover_tooltip(out,visible,pointer_,title,
+          tr("SUPPLY_TIP_INTERSTELLAR_LINK",
+             "A prospective freight corridor between the home system and an owned external system. Capacity is the civilization's cargo-handling ceiling, Demand the external system's daily import requirement, and Transit the one-way travel time. Prospective corridors carry no freight until the corridor is represented."),
           width,height,s,theme::Tone::Neutral);
       continue;
     }

@@ -263,6 +263,9 @@ struct Scene3dEntity {
   // First-order orbital beaming for material orbiting local +Y (accretion
   // discs, ring forward-scatter), [-1,1]; negative spins retrograde.
   float orbital_beaming{0.f};
+  // Doppler color shift paired with the beaming [0,1] — the bright
+  // lane blueshifts, the dim lane redshifts; 0 keeps brightness-only.
+  float orbital_beaming_tint{0.f};
   // Henyey–Greenstein scattering phase: positive brightens the backlit
   // sheet (dusty rings), negative boosts opposition (icy regolith).
   // [-1,1]; 0 disables.
@@ -273,6 +276,10 @@ struct Scene3dEntity {
   // the single-lobe phase.
   float forward_scatter_back{0.f};
   float forward_scatter_back_mix{0.f};
+  // Rayleigh-style wavelength weight for the phase lobes [0,1] —
+  // blue-tilts the scattered light (icy dust reads blue instead of
+  // achromatic white); 0 keeps achromatic scatter.
+  float forward_scatter_hue{0.f};
   // Spectral-class star photosphere preset (K): derives blackbody tint,
   // emissive response, and a temperature-graded limb coefficient.
   // [100,100000]; 0 leaves the material untouched. Overrides `tint`
@@ -282,8 +289,14 @@ struct Scene3dEntity {
   // builds the Shakura–Sunyaev radial blackbody texture plus orbital
   // beaming via accretion_disc_material3d. The `inner`/`outer` values
   // describe the annulus mesh the material is authored for; pair with
-  // an "annulus:i,o" mesh spec at matching radii.
-  std::array<float,4> accretion{0.f,0.f,0.f,0.f};
+  // an "annulus:i,o" mesh spec at matching radii. Optional tail
+  // `[spiral,arms,turns]` bakes grand-design density-wave arms: spiral
+  // depth [0,1], integral m-mode arms 1..4, log-spiral winding [-4,4]
+  // (trailing positive). An eighth entry appends `shear` — Keplerian
+  // differential rotation, rad/s at the inner edge [-8,8] scrolling
+  // azimuthally at rho^(-3/2). Documents emitting only the four base
+  // entries keep the uniform disc; a seven-entry tail omits shear.
+  std::array<float,8> accretion{0.f,0.f,0.f,0.f,0.f,0.f,0.f,0.f};
   // Image-shaped emission volume (nebula, plasma plume): `volume` is a
   // {depth,density,seed,steps,scatter} block; depth (0,0.75] enables the
   // front-to-back march inside the closed proxy, steps bounds the

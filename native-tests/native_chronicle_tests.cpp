@@ -13,6 +13,15 @@ void require(bool value, const char *message) {
   if (!value) throw std::runtime_error(message);
 }
 
+[[nodiscard]] bool has_text(const native_map::DrawList &draw,
+                            std::string_view value) {
+  for (const auto &command : draw.overlay)
+    if (const auto *label = std::get_if<native_map::Text>(&command);
+        label && label->value.contains(value))
+      return true;
+  return false;
+}
+
 engine::EventHistory make_history() {
   engine::EventHistory history;
   const auto add = [&](double day, std::string category, std::string summary,
@@ -271,6 +280,53 @@ void entry_navigation() {
   require(nav && *nav == 4, "Located entry did not navigate to system");
   require(!view.navigation(), "Navigation did not clear after take");
 
+  // Hovering a navigable card, its DIP action, or a filter control surfaces
+  // the behavior explainer — same vocabulary the focus ring announces.
+  view.open(history, 1);
+  const auto hover = [&](float x, float y) {
+    native_map::InputEvent move;
+    move.type = native_map::InputEventType::PointerMove;
+    move.position = {x, y};
+    (void)view.handle(move, 1280, 800);
+    native_map::DrawList tips;
+    view.render(tips, 1280, 800);
+    return tips;
+  };
+  require(has_text(hover(450.f, 135.f), "Focus this event's system on the map."),
+          "Navigable card did not explain its map hand-off on hover.");
+  require(has_text(hover(830.f, 152.f), "Open diplomacy with this contact."),
+          "DIP action did not explain its diplomacy hand-off on hover.");
+  require(has_text(hover(807.f, 110.f),
+                   "Cycle the event-domain filter"),
+          "Domain filter did not explain its cycle on hover.");
+
+  // German catalog at the compact viewport: the same hover path must
+  // surface the shipped strings (the shared tooltip helper wraps and
+  // clamps inside the canvas, so the longer German text still fits).
+  engine::LocalizationTable german("de", "en");
+  std::string german_error;
+  require(german.load_file(std::string(STELLAR_LOCALE_DIR) + "/de.json",
+                           &german_error),
+          ("de.json rejected: " + german_error).c_str());
+  view.set_localization(&german);
+  const auto hover_de = [&](float x, float y) {
+    native_map::InputEvent move;
+    move.type = native_map::InputEventType::PointerMove;
+    move.position = {x, y};
+    (void)view.handle(move, 640, 360);
+    native_map::DrawList tips;
+    view.render(tips, 640, 360);
+    return tips;
+  };
+  require(has_text(hover_de(200.f, 112.f), "auf der Karte fokussieren"),
+          "German card tip missing at 640x360");
+  require(has_text(hover_de(475.f, 127.f),
+                   "Diplomatie mit diesem Kontakt"),
+          "German DIP tip missing at 640x360");
+  require(has_text(hover_de(455.f, 89.f), "Bereichsfilter durchschalten"),
+          "German domain-filter tip missing at 640x360");
+  view.set_localization(nullptr);
+
   // The locationless card navigates nowhere.
   view.close();
   view.open(history, 1);
@@ -347,6 +403,31 @@ void tag_focus() {
           "Re-clicking the focused chip did not clear it");
   require(view.current().entries.size() == 4,
           "Unfocused snapshot did not restore all entries");
+
+  // An unfocused chip announces the filter it would apply; once focused it
+  // announces the clear behavior instead.
+  const auto chip_tip = [&] {
+    native_map::InputEvent move;
+    move.type = native_map::InputEventType::PointerMove;
+    move.position = {450.f, 175.f};
+    (void)view.handle(move, 1280, 800);
+    native_map::DrawList tips;
+    view.render(tips, 1280, 800);
+    return tips;
+  };
+  require(has_text(chip_tip(), "Filter the feed to events tagged"),
+          "Unfocused tag chip did not explain its filter on hover.");
+  press.position = {450.f, 175.f};
+  release.position = press.position;
+  require(view.handle(press, 1280, 800) && view.handle(release, 1280, 800),
+          "Chip re-focus missed");
+  require(view.tag_filter() == "system:5", "Chip focus not restored");
+  require(has_text(chip_tip(), "Clear this tag filter."),
+          "Focused tag chip did not announce its clear behavior on hover.");
+  // Restore the unfocused state the following focus-button leg expects.
+  require(view.handle(press, 1280, 800) && view.handle(release, 1280, 800),
+          "Chip unfocus click missed");
+  require(view.tag_filter().empty(), "Chip did not unfocus after tips");
 
   // Focus again, then clear via the X focus button in the intro row.
   require(view.handle(press, 1280, 800) &&

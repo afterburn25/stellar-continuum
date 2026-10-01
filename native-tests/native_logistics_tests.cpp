@@ -47,7 +47,8 @@ CivilizationLogisticsCoverage canonical(const FreshCampaignState &state, int id)
   const auto fleets = economic_fleet_projection(state.fleets);
   return civilization_logistics_coverage({state.civilizations, state.bodies,
                                           construction, fleets},
-                                         state.colonies, state.economies, id);
+                                         state.colonies, state.economies,
+                                         state.systems, id);
 }
 
 void observer_and_missing_state_are_unavailable() {
@@ -254,6 +255,35 @@ void external_coverage_projects_owned_distant_systems() {
                                         row.name == "Sol";
                                }),
           "foreign or home system leaked into external coverage rows");
+
+  // Interstellar link edges: one prospective corridor per external system —
+  // endpoints resolved through sealed system records, metrics copied verbatim
+  // from the canonical coverage. Frontier sits 30 ly from Sol.
+  require(view.external_links.size() == expected.external_links.size() &&
+              !view.external_links.empty(),
+          "external corridor edges were truncated from the view");
+  for (const auto &row : view.external_links) {
+    const auto link = std::ranges::find(
+        expected.external_links, row.system_id,
+        &ExternalLogisticsLink::external_system_id);
+    require(link != expected.external_links.end(),
+            "external link row lost its canonical edge");
+    require(row.from == "Sol" && row.to == "Frontier",
+            "external link endpoints did not resolve system names");
+    require(row.capacity_per_day == link->capacity_per_day &&
+                row.required_per_day == link->required_per_day &&
+                row.transit_days == link->transit_days &&
+                row.enabled == link->enabled &&
+                row.bidirectional == link->bidirectional &&
+                row.represented == link->represented,
+            "external link row rewrote canonical corridor metrics");
+    require(!row.represented && !row.enabled &&
+                row.status == "Prospective" && row.bidirectional &&
+                std::abs(row.transit_days - 30. / 22.) < 1e-9,
+            "prospective corridor status or transit derivation diverged");
+    require(row.required_per_day >= 0.,
+            "external link reported a negative corridor requirement");
+  }
 }
 
 void identity_generation_and_clear_do_not_keep_stale_view() {

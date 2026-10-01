@@ -2327,42 +2327,72 @@ void commit_scene3_field(Shell &shell) {
           catch (const std::exception &) { break; }
           if (a >= -0.5f && a <= 0.5f) { next.band_shear = a; valid = true; }
           break;
-  case 61:
-          try { a = std::stof(shell.scene3_buffer); }
-          catch (const std::exception &) { break; }
-          if (a >= -1.f && a <= 1.f) { next.orbital_beaming = a; valid = true; }
-          break;
+  case 61: {
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          std::string part;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 1 && parts.size() <= 2) {
+            try { a = std::stof(parts[0]); valid = a >= -1.f && a <= 1.f; }
+            catch (const std::exception &) { break; }
+            if (!valid) break;
+            next.orbital_beaming = a;
+            if (parts.size() == 2) {
+              try { a = std::stof(parts[1]); }
+              catch (const std::exception &) { valid = false; break; }
+              if (!(a >= 0.f && a <= 1.f)) { valid = false; break; }
+              next.orbital_beaming_tint = a;
+            }
+          }
+          break; }
   case 62:
           try { a = std::stof(shell.scene3_buffer); }
           catch (const std::exception &) { break; }
           if (a >= 100.f && a <= 100000.f) { next.star_kelvin = a; valid = true; }
           break;
   case 63: {
-          float inner, outer, kelvin, beam;
-          valid = parse_quad(shell.scene3_buffer, inner, outer, kelvin,
-                             beam);
-          if (valid && inner > 0.f && outer > inner &&
-              kelvin >= 100.f && kelvin <= 100000.f &&
-              beam >= -1.f && beam <= 1.f)
-            next.accretion = {inner, outer, kelvin, beam};
-          else valid = false;
+          std::istringstream csv(shell.scene3_buffer);
+          std::vector<std::string> parts;
+          std::string part;
+          while (std::getline(csv, part, ',')) parts.push_back(part);
+          if (parts.size() >= 4 && parts.size() <= 7) {
+            float v[7]{};
+            int n = 0;
+            for (; n < (int)parts.size(); ++n) {
+              try { v[n] = std::stof(parts[n]); }
+              catch (const std::exception &) { n = -1; break; }
+            }
+            if (n >= 4 && v[0] > 0.f && v[1] > v[0] &&
+                v[2] >= 100.f && v[2] <= 100000.f &&
+                v[3] >= -1.f && v[3] <= 1.f && v[4] >= 0.f &&
+                v[4] <= 1.f && v[5] >= 0.f && v[5] <= 4.f &&
+                std::floor(v[5]) == v[5] &&
+                (v[4] == 0.f || v[5] >= 1.f) &&
+                std::abs(v[6]) <= 4.f) {
+              next.accretion = {v[0], v[1], v[2], v[3],
+                                v[4], v[5], v[6]};
+              valid = true;
+            }
+          }
           break; }
   case 64: {
           std::istringstream csv(shell.scene3_buffer);
           std::vector<std::string> toks;
           std::string tok;
           while (std::getline(csv, tok, ',')) toks.push_back(tok);
-          float v[3]{};
+          float v[4]{};
           int n = 0;
-          for (; n < 3 && n < (int)toks.size(); ++n) {
+          for (; n < 4 && n < (int)toks.size(); ++n) {
             try { v[n] = std::stof(toks[n]); }
             catch (const std::exception &) { n = -1; break; }
           }
           if (n > 0 && v[0] >= -1.f && v[0] <= 1.f && v[1] >= -1.f &&
-              v[1] <= 1.f && v[2] >= 0.f && v[2] <= 1.f) {
+              v[1] <= 1.f && v[2] >= 0.f && v[2] <= 1.f &&
+              v[3] >= 0.f && v[3] <= 1.f) {
             next.forward_scatter = v[0];
             next.forward_scatter_back = n > 1 ? v[1] : 0.f;
             next.forward_scatter_back_mix = n > 2 ? v[2] : 0.f;
+            next.forward_scatter_hue = n > 3 ? v[3] : 0.f;
             valid = true;
           }
           break; }
@@ -2690,7 +2720,9 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
           e.accretion[1] > e.accretion[0] &&
           std::abs(e.accretion[3]) <= 1.f) {
         const auto disc = accretion_disc_material3d(
-            e.accretion[0], e.accretion[1], e.accretion[2], e.accretion[3]);
+            e.accretion[0], e.accretion[1], e.accretion[2],
+            e.accretion[3], e.accretion[4],
+            static_cast<int>(e.accretion[5]), e.accretion[6]);
         if (e.texture.empty()) inst.material.texture = disc.texture;
         inst.material.ambient = disc.ambient;
         inst.material.diffuse = disc.diffuse;
@@ -2752,9 +2784,11 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
       inst.material.band_turbulence = e.band_turbulence;
       inst.material.band_diff = e.band_diff;
       inst.material.orbital_beaming = e.orbital_beaming;
+      inst.material.orbital_beaming_tint = e.orbital_beaming_tint;
       inst.material.forward_scatter = e.forward_scatter;
       inst.material.forward_scatter_back = e.forward_scatter_back;
       inst.material.forward_scatter_back_mix = e.forward_scatter_back_mix;
+      inst.material.forward_scatter_hue = e.forward_scatter_hue;
       // Emission volume: the entity texture is the emission image and
       // the volume branch requires transparency (mirrors runtime host).
       if (e.volume_depth > 0.f && inst.material.texture) {
@@ -3152,8 +3186,14 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         ed(70),
         "drift uv/s -0.25..0.25[,turbulence -8..8[,equator boost -8..8]]");
   field(shell.hit3_orbitbeam, "orbitalBeam",
-        entity ? std::to_string(entity->orbital_beaming) : "", ed(61),
-        "approaching-lane brightening -1..1 - accretion discs");
+        entity ? std::to_string(entity->orbital_beaming) +
+                     (entity->orbital_beaming_tint == 0.f
+                          ? ""
+                          : "," +
+                                std::to_string(
+                                    entity->orbital_beaming_tint))
+               : "", ed(61),
+        "approaching-lane brightening -1..1[,doppler tint 0..1] - accretion discs");
   field(shell.hit3_starkelvin, "starKelvin",
         entity ? std::to_string(static_cast<long long>(entity->star_kelvin)) : "", ed(62),
         "photosphere kelvin 100..100000 - blackbody tint + limb");
@@ -3161,22 +3201,35 @@ void render_scene3(DrawList &out, Shell &shell, UiRect body, float s) {
         entity ? std::to_string(entity->accretion[0]) + "," +
                      std::to_string(entity->accretion[1]) + "," +
                      std::to_string(entity->accretion[2]) + "," +
-                     std::to_string(entity->accretion[3])
+                     std::to_string(entity->accretion[3]) +
+                     (entity->accretion[4] == 0.f &&
+                              entity->accretion[5] == 0.f &&
+                              entity->accretion[6] == 0.f
+                          ? ""
+                          : "," + std::to_string(entity->accretion[4]) +
+                                "," + std::to_string(entity->accretion[5]) +
+                                "," + std::to_string(entity->accretion[6]))
                : "",
-        ed(63), "inner,outer,kelvin,beaming - annulus disc preset");
+        ed(63), "inner,outer,kelvin,beaming[,spiral 0..1,arms 1..4,turns -4..4] - annulus disc preset");
   field(shell.hit3_fwdscatter, "fwdScatter",
         entity ? std::to_string(entity->forward_scatter) +
                      (entity->forward_scatter_back == 0.f &&
-                              entity->forward_scatter_back_mix == 0.f
+                              entity->forward_scatter_back_mix == 0.f &&
+                              entity->forward_scatter_hue == 0.f
                           ? ""
                           : "," + std::to_string(
                                 entity->forward_scatter_back) +
                                 "," +
                                 std::to_string(
-                                    entity->forward_scatter_back_mix))
+                                    entity->forward_scatter_back_mix) +
+                                (entity->forward_scatter_hue == 0.f
+                                     ? ""
+                                     : "," +
+                                           std::to_string(
+                                               entity->forward_scatter_hue)))
                : "",
         ed(64),
-        "backlit brightening -1..1[,backLobe -1..1,mix 0..1] - dusty rings, icy opposition");
+        "backlit brightening -1..1[,backLobe -1..1,mix 0..1[,rayleigh hue 0..1]] - dusty rings, icy opposition");
   field(shell.hit3_volume, "volume",
         entity && entity->volume_depth > 0.f
             ? std::to_string(entity->volume_depth) + "," +
@@ -7314,25 +7367,43 @@ int main(int argc, char **argv) {
                             std::to_string(se->band_turbulence) + "," +
                             std::to_string(se->band_diff));
             else if (shell.hit3_orbitbeam.contains(event.position) && se)
-              edit3(61, std::to_string(se->orbital_beaming));
+              edit3(61, std::to_string(se->orbital_beaming) +
+                            (se->orbital_beaming_tint == 0.f
+                                 ? ""
+                                 : "," +
+                                       std::to_string(
+                                           se->orbital_beaming_tint)));
             else if (shell.hit3_starkelvin.contains(event.position) && se)
               edit3(62, std::to_string(static_cast<long long>(se->star_kelvin)));
             else if (shell.hit3_accretion.contains(event.position) && se)
               edit3(63, std::to_string(se->accretion[0]) + "," +
                             std::to_string(se->accretion[1]) + "," +
                             std::to_string(se->accretion[2]) + "," +
-                            std::to_string(se->accretion[3]));
+                            std::to_string(se->accretion[3]) +
+                            (se->accretion[4] == 0.f &&
+                                     se->accretion[5] == 0.f &&
+                                     se->accretion[6] == 0.f
+                                 ? ""
+                                 : "," + std::to_string(se->accretion[4]) +
+                                       "," + std::to_string(se->accretion[5]) +
+                                       "," + std::to_string(se->accretion[6])));
             else if (shell.hit3_fwdscatter.contains(event.position) && se)
               edit3(64, std::to_string(se->forward_scatter) +
                             (se->forward_scatter_back == 0.f &&
-                                     se->forward_scatter_back_mix == 0.f
+                                     se->forward_scatter_back_mix == 0.f &&
+                                     se->forward_scatter_hue == 0.f
                                  ? ""
                                  : "," +
                                        std::to_string(
                                            se->forward_scatter_back) +
                                        "," +
                                        std::to_string(
-                                           se->forward_scatter_back_mix)));
+                                           se->forward_scatter_back_mix) +
+                                       (se->forward_scatter_hue == 0.f
+                                            ? ""
+                                            : "," +
+                                                  std::to_string(
+                                                      se->forward_scatter_hue))));
             else if (shell.hit3_volume.contains(event.position) && se)
               edit3(65, std::to_string(se->volume_depth) + "," +
                             std::to_string(se->volume_density) + "," +

@@ -9,7 +9,10 @@ layout(set=2,binding=0) uniform sampler2D hdr_source;
 // filling these, so the shader never branches on quality itself.
 layout(set=3,binding=0) uniform PostUniform {
     vec4 a; // exposure, bloom strength, bloom threshold, contrast
-    vec4 b; // saturation, sharpen, vignette, unused
+    vec4 b; // saturation, sharpen, vignette, color-matrix enable
+    vec4 c; // color matrix column 0 (xyz)
+    vec4 d; // column 1
+    vec4 e; // column 2
 } post;
 layout(location=0) out vec4 color;
 const float KNEE=0.9;
@@ -61,6 +64,10 @@ void main() {
     // where the scene was transparent, instead of being killed by premultiply.
     alpha=clamp(alpha+dot(emit,vec3(0.2126,0.7152,0.0722)),0.0,1.0);
     vec3 resolved=tonemap(max(c,vec3(0.0)));
+    // Channel remap in display space (e.g. color-blind simulation): runs
+    // on the resolved LDR color so simulation matrices stay in the
+    // display-referred domain they were fitted on.
+    if(post.b.w>0.5)resolved=mat3(post.c.xyz,post.d.xyz,post.e.xyz)*resolved;
     // Vignette darkens post-tonemap display values so the corner falloff is
     // perceptually uniform instead of compressing through the knee.
     if(post.b.z>0.0){

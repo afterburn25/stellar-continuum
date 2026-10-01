@@ -703,11 +703,14 @@ int main() {
         turret.band_turbulence = 1.4f;
         turret.band_diff = 0.6f;
         turret.orbital_beaming = 0.65f;
+        turret.orbital_beaming_tint = 0.35f;
         turret.star_kelvin = 5800.0;
-        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f};
+        turret.accretion = {0.3f, 1.f, 12000.f, -0.6f, 0.4f, 3.f, 1.f,
+                            0.55f};
         turret.forward_scatter = 0.4f;
         turret.forward_scatter_back = -0.35f;
         turret.forward_scatter_back_mix = 0.25f;
+        turret.forward_scatter_hue = 0.55f;
         turret.texture = "maps/turret.png";
         turret.volume_depth = 0.3f;
         turret.volume_density = 6.f;
@@ -789,9 +792,11 @@ int main() {
                   ms->limb_darkening_q == 0.3f &&
                   ms->limb_darkening_mid == 0.2f &&
                   ms->band_shear == -0.3f && ms->orbital_beaming == 0.65f &&
+                  ms->orbital_beaming_tint == 0.35f &&
                   ms->forward_scatter == 0.4f && ms->band_waves == 0.7f &&
                   ms->forward_scatter_back == -0.35f &&
                   ms->forward_scatter_back_mix == 0.25f &&
+                  ms->forward_scatter_hue == 0.55f &&
                   ms->band_drift == 0.12f && ms->band_turbulence == 1.4f &&
                   ms->band_diff == 0.6f,
               "spawn_scene3d materialsurface component");
@@ -814,7 +819,8 @@ int main() {
               "no starKelvin does not attach a component");
         const auto *ad = world3.get<AccretionDisc>(turret_e);
         check(ad != nullptr && ad->inner == 0.3f && ad->outer == 1.f &&
-                  ad->kelvin == 12000.f && ad->beaming == -0.6f,
+                  ad->kelvin == 12000.f && ad->beaming == -0.6f &&
+                  ad->shear_rate == 0.55f,
               "spawn_scene3d accretiondisc component");
         check(world3.get<AccretionDisc>(ship_e) == nullptr,
               "no accretion key does not attach a component");
@@ -891,9 +897,11 @@ int main() {
                       rms->limb_darkening_mid == 0.2f &&
                       rms->band_shear == -0.3f &&
                       rms->orbital_beaming == 0.65f &&
+                      rms->orbital_beaming_tint == 0.35f &&
                       rms->forward_scatter == 0.4f &&
                       rms->forward_scatter_back == -0.35f &&
                       rms->forward_scatter_back_mix == 0.25f &&
+                      rms->forward_scatter_hue == 0.55f &&
                       rms->band_waves == 0.7f &&
                       rms->band_drift == 0.12f &&
                       rms->band_turbulence == 1.4f &&
@@ -912,7 +920,9 @@ int main() {
                   "starphotosphere codec round-trips");
             const auto *rad = restored.get<AccretionDisc>(*re_turret);
             check(rad != nullptr && rad->inner == 0.3f &&
-                      rad->kelvin == 12000.f && rad->beaming == -0.6f,
+                      rad->kelvin == 12000.f && rad->beaming == -0.6f &&
+                      rad->spiral == 0.4f && rad->spiral_arms == 3.f &&
+                      rad->spiral_turns == 1.f && rad->shear_rate == 0.55f,
                   "accretiondisc codec round-trips");
             const auto *rev = restored.get<EmissionVolume>(*re_turret);
             check(rev != nullptr && rev->depth == 0.3f &&
@@ -964,13 +974,19 @@ int main() {
                   out.entities[1].limb_darkening_mid == 0.2f &&
                   out.entities[1].band_shear == -0.3f &&
                   out.entities[1].orbital_beaming == 0.65f &&
+                  out.entities[1].orbital_beaming_tint == 0.35f &&
                   out.entities[1].star_kelvin == 5800.0 &&
                   out.entities[1].accretion[0] == 0.3f &&
                   out.entities[1].accretion[2] == 12000.f &&
                   out.entities[1].accretion[3] == -0.6f &&
+                  out.entities[1].accretion[4] == 0.4f &&
+                  out.entities[1].accretion[5] == 3.f &&
+                  out.entities[1].accretion[6] == 1.f &&
+                  out.entities[1].accretion[7] == 0.55f &&
                   out.entities[1].forward_scatter == 0.4f &&
                   out.entities[1].forward_scatter_back == -0.35f &&
                   out.entities[1].forward_scatter_back_mix == 0.25f &&
+                  out.entities[1].forward_scatter_hue == 0.55f &&
                   out.entities[1].band_waves == 0.7f &&
                   out.entities[1].band_drift == 0.12f &&
                   out.entities[1].band_turbulence == 1.4f,
@@ -1026,6 +1042,9 @@ int main() {
         check(card != nullptr && card->billboard() &&
                   card->bounds_max().x == 1.f,
               "resolve_mesh_spec card spec did not build a billboard");
+        const auto flared = resolve_mesh_spec("flared_annulus:.4,1,.2", nullptr);
+        check(flared != nullptr && flared->bounds_max().y > 0.1f,
+              "resolve_mesh_spec flared_annulus spec did not build a flared disc");
         // Ray straight down over the ship: box:2,1,1 scaled 2, yaw 90 —
         // top face sits at y = 5 + 0.5*2 = 6 → distance 4 from y=10.
         const auto down = raycast_world3d(restored, entities3d(restored),

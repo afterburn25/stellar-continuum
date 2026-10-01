@@ -34,6 +34,7 @@ int main(int argc,char** argv)try{
    for(int quality=0;quality<4;++quality){art.begin_frame(1,1,seconds++,true,quality);DrawList draw;art.append(draw,{400,300},110,s,0,clip);
      check(art.records().size()==1&&art.records()[0].id==id&&art.records()[0].variant==variant,"Coverage lost identity or variant");
      check(draw.world.size()==1&&std::holds_alternative<Scene3DView>(draw.world[0]),"Surface effect is not native 3D");
+     check(std::get<Scene3DView>(draw.world[0]).options.quality==static_cast<RenderQuality3D>(quality),"Eruption view ignored the quality tier");
      const auto& material=std::get<Scene3DView>(draw.world[0]).scene->instances().at(0).material;
      check(material.texture->width()==std::array{256,512,1024,1024}[quality],"High-quality artwork was downsampled below the prepared close-up tier");
      check(*s.stellar_activity==before,"Graphics quality changed simulation");
@@ -56,6 +57,9 @@ int main(int argc,char** argv)try{
    };
    const float dim=opacity(.001,.5),bright=opacity(100000.,.5),powerful=opacity(100000.,2.);
    check(dim>0&&bright>dim&&powerful>bright&&powerful<=1,"Host luminosity/magnitude exposure loses ordering or saturates faint detail");
+   const auto variation=[&](EruptionArtwork& a){float tv=0,prev=0;for(int i=0;i<40;++i){a.begin_frame(4,1+duration*(.2+.005*i),seconds+i,true,2);DrawList d;a.append(d,{250,250},160,s,0,clip);const float v=std::get<Scene3DView>(d.world.at(0)).scene->instances().at(0).material.opacity;if(i)tv+=std::abs(v-prev);prev=v;}return tv;};
+   EruptionArtwork flicker(root),calm(root);calm.set_reduce_flashing(true);
+   check(variation(flicker)>variation(calm)+.01f,"Reduce-flashing leaves the authored eruption flicker ungated");
  }
  art.begin_frame(2,1+duration*2,seconds+.05,true,2);DrawList fast;art.append(fast,{250,250},160,s,0,clip);
  check(art.records().size()==1&&art.records()[0].progress<.67,"Accelerated time discarded minimum display time");

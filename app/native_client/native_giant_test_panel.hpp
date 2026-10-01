@@ -112,7 +112,11 @@ class NativeGiantTestPanel {
     stellar::native_planets::append_instances(objects,a,*maps,{},1,1024,snapshot.simulation_days,light,view);
     for(auto& o:objects)if(o.material.shadow&&((o.material.shadow->shape==AnalyticShadowShape3D::Annulus&&!ring_shadow_)||(o.material.shadow->shape==AnalyticShadowShape3D::Ellipsoid&&!planet_shadow_)))o.material.shadow.reset();
     Camera3D camera;camera.position={0,0,8};camera.projection=Projection3D::Perspective;camera.vertical_fov_radians=static_cast<float>(2*std::atan((a.rings.enabled?a.rings.outer_radius:1)*1.2/8));camera.near_plane=.1f;camera.far_plane=20;
-    out.overlay.emplace_back(Scene3DView{Scene3D::create(camera,std::move(objects)),l.view});
+    Scene3DView preview{Scene3D::create(camera,std::move(objects)),l.view};
+    // The orbit/star-direction scrub doubles as the shader clock so band
+    // drift and turbulence animate with each phase step reviewers take.
+    preview.options.time=static_cast<float>(phase_);
+    out.overlay.emplace_back(std::move(preview));
    }else text(l.view,"Loading reviewed material…");
    float y=l.panel.y+507*l.s;const auto line=[&](std::string s){text({l.panel.x+630*l.s,y,556*l.s,23*l.s},std::move(s));y+=24*l.s;};
    line(stellar::core::planet_appearance_display_name(a)+" · "+a.source_asset_id);line("Ring: "+(a.rings.enabled?a.rings.asset_id:"none"));

@@ -48,8 +48,11 @@ View build(const stellar::core::FreshCampaignState& world,const stellar::native_
   for(const auto& f:fleets.own_fleets){const auto found=fleet_index.find(f.id);if(found==fleet_index.end()||!seen.insert(f.id).second)continue;const auto& source=*found->second;
     Row r;r.key={Category::Fleets,f.id};r.name=f.name;r.system_id=f.current_system_id.value_or(-1);
     const auto location=f.current_system_id?system_name(*f.current_system_id):resolve(locale,"ASSETS_EN_ROUTE","En route");
-    // Each canonical FleetState currently represents one commissioned vessel.
-    r.detail=resolved(locale,"ASSETS_FLEET_DETAIL",{location},"1 ship · {0}");r.activity=role(f.role,locale)+" · ";
+    // Member count comes from the canonical fleet_composition projection the
+    // fleet view-model carries — never a hardcoded single-vessel assumption.
+    r.detail=resolved(locale,
+        f.vessel_count==1?"ASSETS_FLEET_DETAIL_ONE":"ASSETS_FLEET_DETAIL_MANY",
+        {std::to_string(f.vessel_count),location},"{0} ship · {1}");r.activity=role(f.role,locale)+" · ";
     std::string order=resolve(locale,"ASSETS_ORDER_IDLE","Idle");
     if(source.combat&&source.combat->retreat_started)order=resolve(locale,"ASSETS_ORDER_RETREATING","Retreating");
     else if(source.return_to_base_requested)order=resolve(locale,"ASSETS_ORDER_RETURNING","Returning to base");

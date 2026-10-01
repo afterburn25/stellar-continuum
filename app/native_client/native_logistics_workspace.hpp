@@ -42,7 +42,9 @@ private:
     float y{}, height{}, name_height{};
     // 0 = node row (index into View::nodes), 1 = corridor section header,
     // 2 = corridor row (index into View::links), 3 = external coverage
-    // section header, 4 = external system row (index into View::external).
+    // section header, 4 = external system row (index into View::external),
+    // 5 = interstellar-links section header, 6 = interstellar link row
+    // (index into View::external_links).
     int kind{};
   };
   struct CachedRows {
@@ -51,12 +53,14 @@ private:
     std::vector<NodeRow> nodes;
     std::vector<LinkRow> links;
     std::vector<ExternalRow> external;
+    std::vector<ExternalLinkRow> external_links;
     std::vector<CachedRow> rows;
     // Measure-fitted header fonts — computed with the row geometry so an
     // unchanged render does not re-measure.
     std::array<int, 5> heading_sizes{};
     std::array<int, 4> corridor_sizes{};
     std::array<int, 4> external_sizes{};
+    std::array<int, 4> external_link_sizes{};
     float height{};
     bool valid{};
   };

@@ -56,7 +56,7 @@ void capture_window(App& a){
 void finish(App& a){
   if(a.worker.joinable())a.worker.join();a.busy=false;
   if(a.success){label(a.status,removing?L"Stellar Continuum has been removed. Your saves and settings are safe.":L"Stellar Continuum is ready. All installed files passed verification.");SendMessageW(a.bar,PBM_SETPOS,1000,0);label(a.action,L"Done");EnableWindow(a.action,TRUE);EnableWindow(a.cancel_button,FALSE);
-    if(!removing&&SendMessageW(a.launch,BM_GETCHECK,0,0)==BST_CHECKED)ShellExecuteW(a.window,L"open",(a.root/"stellar-continuum-native.exe").c_str(),nullptr,a.root.c_str(),SW_SHOWNORMAL);
+    if constexpr(!removing){if(SendMessageW(a.launch,BM_GETCHECK,0,0)==BST_CHECKED)ShellExecuteW(a.window,L"open",(a.root/"stellar-continuum-native.exe").c_str(),nullptr,a.root.c_str(),SW_SHOWNORMAL);}
   }else{std::lock_guard lock(a.mutex);label(a.status,si::widen(a.error)+L"\r\nLog: "+a.platform.log_path().wstring());label(a.action,L"Retry");EnableWindow(a.action,TRUE);EnableWindow(a.cancel_button,TRUE);label(a.cancel_button,L"Close");if(!a.installed){EnableWindow(a.browse,TRUE);EnableWindow(a.location,TRUE);}for(auto h:{a.desktop,a.developer,a.launch})EnableWindow(h,TRUE);}
 }
 LRESULT CALLBACK window_proc(HWND window,UINT message,WPARAM w,LPARAM l){

@@ -1,4 +1,5 @@
 #include <stellar/core/logistics.hpp>
+#include <stellar/core/galaxy_catalog.hpp>
 #include <nlohmann/json.hpp>
 #include <cmath>
 #include <fstream>
@@ -15,6 +16,9 @@ void equal(const Json& a,const Json& e,const std::string& path) {
  check(a==e,path+": expected "+e.dump()+", got "+a.dump());
 }
 struct Input {std::vector<Civilization> civs;std::vector<Colony> colonies;std::vector<CivilizationEconomy> economies;std::vector<EconomyConstructionState> construction;
+ // The oracle fixture's World.Systems is always empty — external link rows
+ // only resolve when endpoint records exist, so this stays inert for parity.
+ std::vector<StellarSystem> systems;
  EconomyWorldView world() const{return {civs,{},construction,{}};}};
 Input input(const Json& value) { Input out; auto& w=value.at("World"); for(auto& x:w.at("Civilizations")){ Civilization c;c.id=x.at("Id");c.name=x.at("Name");c.home_system_id=x.at("HomeSystemId");c.archetype=x.at("Archetype");auto&t=x.at("Traits");c.traits={t.at("Aggression"),t.at("Territoriality"),t.at("Greed"),t.at("ScientificCuriosity"),t.at("RiskTolerance"),t.at("SurvivalPriority"),t.at("HonorBound")};c.is_player=x.at("IsPlayer");c.development_stage=x.at("DevelopmentStage");c.is_seeded_ancient=x.at("IsSeededAncient");c.expansion_allowed=x.at("ExpansionAllowed");c.neutral_unless_provoked=x.at("NeutralUnlessProvoked");c.species_id=x.at("SpeciesId");out.civs.push_back(c);}
  for(auto&x:w.at("Colonies")){Colony c;c.id=x.at("Id");c.civilization_id=x.at("CivilizationId");c.system_id=x.at("SystemId");if(!x.at("PlanetaryBodyId").is_null())c.planetary_body_id=x.at("PlanetaryBodyId");c.name=x.at("Name");c.kind=x.at("Kind");c.population_species_id=x.at("PopulationSpeciesId");c.population_millions=x.at("PopulationMillions");c.infrastructure=x.at("Infrastructure");c.stability=x.at("Stability");out.colonies.push_back(c);}
@@ -38,7 +42,7 @@ int main(int argc,char**argv){try{
  for(auto& test:fixture.at("Cases")) {
   const auto name=test.at("Name").get<std::string>(); auto state=input(test); const auto before=state; const auto id=test.at("Arguments").at("CivilizationId").get<int>();
   std::optional<CivilizationLogisticsSnapshot> l; std::optional<HomeSystemLogisticsNetwork> h; std::optional<CivilizationLogisticsCoverage> c; std::string error;
-  try { auto world=state.world(); l=economy_logistics(world,state.colonies,state.economies,id); h=home_system_logistics(world,state.colonies,state.economies,id); c=civilization_logistics_coverage(world,state.colonies,state.economies,id); }
+  try { auto world=state.world(); l=economy_logistics(world,state.colonies,state.economies,id); h=home_system_logistics(world,state.colonies,state.economies,id); c=civilization_logistics_coverage(world,state.colonies,state.economies,state.systems,id); }
   catch(const std::exception& exception) { error=exception.what(); }
   unchanged(before,state,name);
   if(test.contains("ExpectedError")) { check(!error.empty(),name+": expected native error"); check(error==test.at("ExpectedError").get<std::string>(),name+": wrong native error: "+error); continue; }

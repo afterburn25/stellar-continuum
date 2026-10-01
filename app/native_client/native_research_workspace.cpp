@@ -283,7 +283,7 @@ ResearchWorkspaceLayout::for_viewport(int width, int height,
   const float s=std::min(std::clamp(height/1080.f,.8f,2.f),
                          std::max(.45f,(height-top-60.f)/462.f));
   const float g=10*s;
-  l.scale=s;l.compact=s<.8f;l.title_font_pixels=theme::type::title(s);l.body_font_pixels=std::max(13,static_cast<int>(16*s));l.small_font_pixels=std::max(12,static_cast<int>(14*s));
+  l.scale=s;l.compact=s<.8f;l.title_font_pixels=theme::type::title(s);l.body_font_pixels=std::max(13,theme::type::scaled(16.f,s));l.small_font_pixels=std::max(12,theme::type::scaled(14.f,s));
   const float x=native_navigation_content_left*chrome.scale,right=width-12*s;
   l.surface={x,top,right-x,height-top-10*s};l.title={x,top,350*s,32*s};l.labs={x,top+36*s,right-x-115*s,25*s};
   l.close={right-160*s,top,160*s,34*s};

@@ -88,6 +88,22 @@ struct NativeScienceSurveyStatus {
   bool operator==(const NativeScienceSurveyStatus &) const = default;
 };
 
+// One member vessel of an inspectable fleet — sealed copy of the canonical
+// FleetCompositionMember with presentation-resolved design/flag labels.
+struct NativeFleetMember {
+  std::int64_t vessel_id{};
+  std::string name;
+  std::string design_name;
+  bool is_flagship{}, is_carrier{}, is_interdictor{}, is_story_ship{};
+  float hull_fraction{1.f}, engine_fraction{1.f}, sensor_fraction{1.f},
+      warp_drive_fraction{1.f}, reactor_fraction{1.f};
+  int battles_fought{}, confirmed_kills{};
+  bool destroyed{}, escaped{}, has_vessel_state{};
+  double embarked_population_millions{};
+  double cargo_materials{}, cargo_material_capacity{};
+  [[nodiscard]] bool operator==(const NativeFleetMember &) const = default;
+};
+
 struct NativeOwnFleet {
   int id{};
   std::string name;
@@ -119,6 +135,11 @@ struct NativeOwnFleet {
   double embarked_population_millions{};
   bool has_vessel_state{};
   float hull_integrity{1.f};
+  // Sealed member-vessel roster — the canonical fleet_composition projection
+  // with design names resolved at presentation. Empty only when the fleet
+  // record itself is out of scope for the observer.
+  std::vector<NativeFleetMember> members;
+  int vessel_count{};
   bool foreign_inspection{};
   int owner_civilization_id{};
   std::string owner_name;

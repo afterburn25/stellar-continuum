@@ -16,7 +16,7 @@ void number(std::vector<std::uint8_t>& p,int width,int x,int y,std::size_t n){
 }
 int main(int argc,char** argv)try{
  if(argc<3)throw std::invalid_argument("Usage: stellar_planet_asset_audit source-directory output-directory [filename-filter]");
- auto root=std::filesystem::u8path(argv[1]),out=std::filesystem::u8path(argv[2]);std::filesystem::create_directories(out);
+ auto root=path_from_utf8(argv[1]),out=path_from_utf8(argv[2]);std::filesystem::create_directories(out);
  std::vector<std::filesystem::path> files;for(const auto& entry:std::filesystem::recursive_directory_iterator(root))if(entry.is_regular_file()&&(argc<4||entry.path().filename()==argv[3])){auto ext=entry.path().extension().string();std::ranges::transform(ext,ext.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});if(ext==".png"||ext==".jpg"||ext==".jpeg"||ext==".webp")files.push_back(entry.path());}std::sort(files.begin(),files.end());
  nlohmann::json records=nlohmann::json::array();constexpr int cell=288,footer=24,cols=4,rows=4,width=cell*cols,height=(cell+footer)*rows;std::vector<std::uint8_t> pixels;
  for(std::size_t i=0;i<files.size();++i){if(i%16==0){pixels.assign(width*height*4,16);for(std::size_t k=3;k<pixels.size();k+=4)pixels[k]=255;}

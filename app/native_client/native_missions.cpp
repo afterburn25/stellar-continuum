@@ -838,9 +838,9 @@ MissionLayout mission_layout_for(const NativeMissionBoard &board,
              sh = static_cast<float>(height);
   layout.scale = std::min(sw / 1600.f, sh / 900.f);
   const auto scale = layout.scale;
-  layout.heading_font_pixels = std::max(14, static_cast<int>(18.f * scale));
-  layout.body_font_pixels = std::max(10, static_cast<int>(13.f * scale));
-  layout.small_font_pixels = std::max(9, static_cast<int>(11.f * scale));
+  layout.heading_font_pixels = std::max(14, stellar::native_ui::type::scaled(18.f, scale));
+  layout.body_font_pixels = std::max(10, stellar::native_ui::type::scaled(13.f, scale));
+  layout.small_font_pixels = std::max(9, stellar::native_ui::type::scaled(11.f, scale));
   // Anchor below the shared workspace top so the header never slips under
   // the navigation bar at small viewports.
   const auto panel_top =

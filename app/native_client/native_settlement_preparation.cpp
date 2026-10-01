@@ -1,5 +1,6 @@
 #include "native_settlement_preparation.hpp"
 #include "native_data_names.hpp"
+#include "native_shipbuilding_messages.hpp"
 
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
 #include <stellar/core/colonization_runtime.hpp>
@@ -26,12 +27,15 @@ Option build_option(const ShipbuildingReadView &read,
                     const SovereignCurrencyDefinition &currency,
                     const std::string_view design_id,
                     const double expedition_cost,
-                    const double establishment_days) {
+                    const double establishment_days,
+                    const stellar::engine::LocalizationTable *locale) {
   const auto *design = find_ship_design(design_id);
   const auto assessment = assess_start_ship_build(read, civilization_id, design_id);
   Option option;
   option.design_id = std::string(design_id);
-  option.design_name = design ? design->name : "Unavailable";
+  option.design_name =
+      design ? stellar::native_data::ship_design_name(locale, *design)
+             : "Unavailable";
   if (design) {
     option.industry_cost = design->industry_cost;
     option.minimum_build_days = design->industry_cost / shipbuilding_industry_per_day;
@@ -41,7 +45,11 @@ Option build_option(const ShipbuildingReadView &read,
   option.expedition_cost = expedition_cost;
   option.formatted_expedition_cost = currency.format(expedition_cost);
   option.establishment_days = establishment_days;
-  option.shipbuilding_blocker = assessment.blocker;
+  option.shipbuilding_blocker =
+      assessment.blocker
+          ? stellar::native_shipbuilding::localized_message(locale,
+                                                            *assessment.blocker)
+          : std::optional<std::string>{};
   return option;
 }
 }  // namespace
@@ -103,11 +111,11 @@ std::optional<View> build_settlement_preparation(CampaignFrame &frame,
   result.colony_ship = build_option(
       read, player->id, result.currency, "colony_ship",
       ColonizationSimulation::colony_expedition_credit_cost,
-      ColonizationSimulation::colony_establishment_days);
+      ColonizationSimulation::colony_establishment_days, locale);
   result.resource_outpost = build_option(
       read, player->id, result.currency, "resource_outpost_ship",
       ColonizationSimulation::resource_outpost_expedition_credit_cost,
-      ColonizationSimulation::outpost_establishment_days);
+      ColonizationSimulation::outpost_establishment_days, locale);
   return result;
 }
 }  // namespace stellar::native_settlement_preparation

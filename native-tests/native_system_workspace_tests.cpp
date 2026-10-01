@@ -195,9 +195,27 @@ int main(int argc,char**argv)try{
   (void)artwork_ui.handle({InputEventType::Wheel,star_position,{},1000},1280,720);
   legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(artwork_ui.viewport()->scale==55.f&&observed_radius<=350.f&&observed_radius>=300.f,"Maximum system zoom invalid: scale="+std::to_string(artwork_ui.viewport()->scale)+" star radius="+std::to_string(observed_radius));
+  float g_quadratic=0;
+  {
+    const auto photosphere=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.limb_darkening>0;});});
+    require(photosphere!=legacy_draw.world.end(),"Spectral Sol emitted no limb-darkened photosphere");
+    const auto&star_material=std::get<Scene3DView>(*photosphere).scene->instances().front().material;
+    require(star_material.limb_darkening_q>0&&star_material.limb_darkening_mid>0,"Photosphere lost its three-term limb profile");
+    g_quadratic=star_material.limb_darkening_q;
+  }
   legacy.stellar_object=generate_stellar_physics(1,StellarObjectType::OHotBlueStar);
   artwork_ui.refresh(legacy);observed_art.clear();legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
   require(observed_art=="o-hot-blue","Physical stellar identity must take precedence over legacy class");
+  {
+    const auto o_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.limb_darkening>0;});});
+    require(o_view!=legacy_draw.world.end(),"O-class primary emitted no limb-darkened photosphere");
+    const auto&o_material=std::ranges::find_if(std::get<Scene3DView>(*o_view).scene->instances(),[](const auto&i){return i.material.limb_darkening>0;})->material;
+    require(o_material.limb_darkening_q>g_quadratic,"Hot-star nonlinear limb term should exceed the cooler Sun's");
+  }
   for(const auto survey:{SystemSurveyLevel::unknown,SystemSurveyLevel::detected,SystemSurveyLevel::partially_surveyed}){
     require(!stellar::native_stellar::observed_stellar_artwork(survey,legacy.stellar_object,legacy.primary_stellar_class),"Incomplete survey leaked supplied stellar identity");
     if(survey==SystemSurveyLevel::partially_surveyed){
@@ -209,6 +227,61 @@ int main(int argc,char**argv)try{
     const auto value=static_cast<StellarClass>(spectral);
     const auto art=stellar::native_stellar::observed_stellar_artwork(SystemSurveyLevel::fully_surveyed,std::nullopt,value);
     require(art.has_value()==(value!=StellarClass::Protostar),"Legacy stellar class lost its supplied artwork mapping");
+  }
+  {
+    legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::BlackHole;
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto disc_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(disc_view!=legacy_draw.world.end(),"Black-hole primary emitted no beamed accretion disc");
+    const auto&disc_material=std::ranges::find_if(std::get<Scene3DView>(*disc_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
+    require(disc_material.texture&&disc_material.texture->height()==64,"Accretion disc did not bake its spiral-arm texture");
+    require(disc_material.orbital_beaming_tint>0,"Accretion disc lost its paired doppler tint");
+    // legacy_draw is cleared below for each re-render — capture the quiescent
+    // tint by value; the material reference dangles once the world vector frees.
+    const float quiescent_tint=disc_material.orbital_beaming_tint;
+    legacy.stellar_object=generate_stellar_physics(7,StellarObjectType::AccretingBlackHole);
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto active_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(active_view!=legacy_draw.world.end(),"Accreting black hole emitted no beamed disc");
+    const auto&active_material=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->material;
+    require(active_material.orbital_beaming_tint>quiescent_tint,"Accreting and quiescent discs are not differentiated");
+    const auto active_rotation=std::ranges::find_if(std::get<Scene3DView>(*active_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->rotation;
+    artwork_ui.advance_tumble(4,true);
+    legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto spun_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(spun_view!=legacy_draw.world.end(),"Accreting disc vanished while the clock ran");
+    const auto spun_rotation=std::ranges::find_if(std::get<Scene3DView>(*spun_view).scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;})->rotation;
+    require(spun_rotation.w!=active_rotation.w||spun_rotation.x!=active_rotation.x||spun_rotation.y!=active_rotation.y||spun_rotation.z!=active_rotation.z,"Accretion spiral did not revolve with game time");
+    require(std::get<Scene3DView>(*spun_view).options.time>0.f,"Star scene carries no scene clock for animated material terms");
+    legacy.stellar_object=generate_stellar_physics(13,StellarObjectType::JetBlackHole);
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto jet_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){
+        return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});});
+    require(jet_view!=legacy_draw.world.end(),"Jet black hole emitted no luminous jet spindle");
+    const auto&jet_instance=*std::ranges::find_if(std::get<Scene3DView>(*jet_view).scene->instances(),[](const auto&i){
+      return i.material.transparent&&i.material.ambient>0&&i.material.diffuse==0&&i.material.pbr&&i.material.pbr->emissive_strength>1.f;});
+    require(jet_instance.material.texture&&jet_instance.material.texture->height()==64,"Jet spindle lost its base-glow gradient");
+    require(jet_instance.scale>0,"Jet spindle submitted with no authoritative reach");
+    legacy.stellar_object.reset();legacy.primary_stellar_class=StellarClass::Protostar;
+    artwork_ui.refresh(legacy);legacy_draw={};artwork_ui.render(legacy_draw,1280,720);
+    const auto proto_view=std::ranges::find_if(legacy_draw.world,[](const WorldCommand&command){
+      const auto*view=std::get_if<Scene3DView>(&command);
+      return view&&std::ranges::any_of(view->scene->instances(),[](const auto&i){return i.material.orbital_beaming>0;});});
+    require(proto_view!=legacy_draw.world.end(),"Protostar emitted no protoplanetary debris disc");
+    const auto&proto_scene=std::get<Scene3DView>(*proto_view).scene->instances();
+    require(std::ranges::any_of(proto_scene,[](const auto&i){return i.material.limb_darkening_mid>0;}),"Protostar lost its physical photosphere beneath the debris disc");
+    const auto&proto_disc=*std::ranges::find_if(proto_scene,[](const auto&i){return i.material.orbital_beaming>0;});
+    require(proto_disc.material.orbital_beaming_tint>0&&proto_disc.material.orbital_beaming_tint<quiescent_tint,
+      "Protoplanetary disc should carry a gentler doppler split than a relativistic flow");
+    legacy.primary_stellar_class=StellarClass::GYellowDwarf;
   }
   // Read-only preparation is bound to the exact admitted body and observer.
   NativeSystemWorkspace preparation_ui;
