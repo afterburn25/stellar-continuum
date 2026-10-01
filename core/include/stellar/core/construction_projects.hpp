@@ -37,6 +37,13 @@ ConstructionCancellationResult cancel_construction_project(ConstructionWorld wor
 double construction_cancellation_refund_preview(const ConstructionState& state, std::string_view project_id);
 double construction_industry_demand(ConstructionReadView world, int civilization_id,
     double simulation_days = std::numeric_limits<double>::infinity());
+// Resolved-input variant for batch callers that already indexed the
+// civilization's construction row and colonies: `state` may be null — the
+// same missing-row throw as the lookup version still fires; `owned` must
+// carry the civilization's colonies in world order.
+double construction_industry_demand(ConstructionReadView world,
+    const ConstructionState* state, std::span<const Colony* const> owned,
+    double simulation_days);
 void ensure_automatic_construction_orders(ConstructionWorld world);
 struct ConstructionIndustryBudget { int civilization_id{}; double industry{}; };
 std::vector<ConstructionEvent> advance_construction(ConstructionWorld world,

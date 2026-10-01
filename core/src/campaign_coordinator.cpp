@@ -587,13 +587,28 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          const auto shipbuilding = shipbuilding_world(
              campaign, shipbuilding_capability_, strategic_,
              use_strategic_shipbuilding_preferences_);
-         // Civ-keyed index (ADR 0002 option a): the loop used to
+         // Civ-keyed indexes (ADR 0002 option a): the loop used to
          // linear-scan economies twice per civilization (the find_if
-         // below plus campaign_industry_weights). emplace keeps the
-         // earliest element, matching find_if's first-match semantics.
+         // below plus campaign_industry_weights) plus construction,
+         // shipyard and colony rows inside the *_industry_demand calls.
+         // emplace keeps the earliest element, matching find_if's
+         // first-match semantics.
          std::unordered_map<int, const CivilizationEconomy *> economy_index;
          for (const auto &candidate : campaign.economies)
            economy_index.emplace(candidate.civilization_id, &candidate);
+         std::unordered_map<int, const ConstructionState *>
+             construction_index;
+         for (const auto &candidate : campaign.construction)
+           construction_index.emplace(candidate.civilization_id,
+                                      &candidate);
+         std::unordered_map<int, const ShipyardState *> shipyard_index;
+         for (const auto &candidate : campaign.shipyards)
+           shipyard_index.emplace(candidate.civilization_id, &candidate);
+         std::unordered_map<int, std::vector<const Colony *>>
+             colony_buckets;
+         for (const auto &colony : campaign.colonies)
+           colony_buckets[colony.civilization_id].push_back(&colony);
+         static const std::vector<const Colony *> empty_colonies;
          for (const auto &civilization : campaign.civilizations) {
            if (civilization.is_seeded_ancient)
              continue;
@@ -601,15 +616,23 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
            if (found_economy == economy_index.end())
              throw std::runtime_error("Sequence contains no matching element");
            const auto *economy = found_economy->second;
+           const auto ci = construction_index.find(civilization.id);
+           const auto yi = shipyard_index.find(civilization.id);
+           const auto bi = colony_buckets.find(civilization.id);
            const IndustryAllocationContext context{
                civilization.id,
                std::max(economy->industry, 0.0),
-               construction_industry_demand(construction.read(),
-                                            civilization.id,
-                                            phase_days),
-               shipbuilding_industry_demand(shipbuilding.read(),
-                                            civilization.id,
-                                            phase_days)};
+               construction_industry_demand(
+                   construction.read(),
+                   ci == construction_index.end() ? nullptr : ci->second,
+                   bi == colony_buckets.end()
+                       ? std::span<const Colony *const>{empty_colonies}
+                       : std::span<const Colony *const>{bi->second},
+                   phase_days),
+               shipbuilding_industry_demand(
+                   shipbuilding.read(),
+                   yi == shipyard_index.end() ? nullptr : yi->second,
+                   phase_days)};
            validate_allocation_value(context.available_industry,
                                      "AvailableIndustry");
            validate_allocation_value(context.construction_demand,

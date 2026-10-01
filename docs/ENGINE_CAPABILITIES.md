@@ -223,15 +223,22 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `core/src/surface_construction.cpp` (owned-colony
   `surface_construction_industry_demand`/`advance_surface_construction`
   overloads, `site_demand` extraction),
-  `core/src/campaign_coordinator.cpp` (economy index in the
-  industry-allocation phase).
+  `core/src/construction_projects.cpp` + `core/src/shipbuilding.cpp`
+  (resolved-input `*_industry_demand` overloads),
+  `core/src/campaign_coordinator.cpp` (economy, construction-state,
+  shipyard and colony-bucket indexes in the industry-allocation phase).
 - **Public interface:** additive overloads only —
   `campaign_industry_weights(const CivilizationEconomy*)`,
   `civilization_operating_funding(const CivilizationEconomy*)`,
   `surface_construction_industry_demand(ConstructionReadView,
-  std::span<Colony* const>, double)` and
+  std::span<Colony* const>, double)` /
+  `std::span<const Colony* const>`,
   `advance_surface_construction(ConstructionWorld,
-  std::span<Colony* const>, int, CivilizationEconomy*, double, double)`.
+  std::span<Colony* const>, int, CivilizationEconomy*, double, double)`,
+  `construction_industry_demand(ConstructionReadView,
+  const ConstructionState*, std::span<const Colony* const>, double)` and
+  `shipbuilding_industry_demand(ShipbuildingReadView,
+  const ShipyardState*, double)`.
   All existing signatures unchanged; the span versions delegate and keep
   their throw ordering (the nullable `economy` preserves the lazy
   missing-row throw at the `budget > 0` spend gate).
@@ -251,12 +258,9 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   persists. Removes O(civs) linear lookups per civ per step
   (~5–8 scans/civ in `advance_construction` alone); each skipped
   iteration was a cheap id compare, so the win is asymptotic.
-- **Limitations:** `construction_industry_demand`/
-  `shipbuilding_industry_demand` still scan construction/shipyard spans
-  per civ in the allocation loop (const-side buckets need separate span
-  types); `select_ai_design`'s fleet `any_of` scans and `lock`/`promote`'s
-  bounded promotion-time lookups are left as-is; indexes are rebuilt per
-  call with no cross-phase reuse.
+- **Limitations:** `select_ai_design`'s fleet `any_of` scans and
+  `lock`/`promote`'s bounded promotion-time lookups are left as-is;
+  indexes are rebuilt per call with no cross-phase reuse.
 - **Future reuse:** `civ_index_of` is the generic shape — any batch loop
   that resolves civ-keyed rows repeatedly can index once; the
   resolved-pointer extraction pattern lets public per-civ entry points

@@ -195,8 +195,18 @@ missing-economy throw. Oracles unchanged and green:
 `construction_projects_parity`, `surface_construction_parity`,
 `shipbuilding_parity`, `shipyard_state_parity`,
 `industry_allocation_parity`, `campaign_coordinator_parity`,
-`campaign_frame_parity`. Deferred: the per-civ `*_industry_demand`
-scans in the allocation loop (const-side buckets), `select_ai_design`
+`campaign_frame_parity`. Fifth option-(a) deployment (landed
+2026-10-01): the allocation loop's remaining per-civ rescans —
+`run_industry_allocation` now indexes `campaign.construction`,
+`campaign.shipyards` and civ→ordered-colony buckets once per phase and
+feeds resolved rows through new overloads
+(`construction_industry_demand(ConstructionReadView, const
+ConstructionState*, span<const Colony* const>, double)`,
+`shipbuilding_industry_demand(ShipbuildingReadView, const
+ShipyardState*, double)`, and a const-element
+`surface_construction_industry_demand` span). Null resolved rows throw
+the same `out_of_range` the lookups produced; public civ-id overloads
+remain (shipbuilding delegates). Deferred: `select_ai_design`
 fleet scans, `promote`/`lock` promotion-time lookups, and
 strategic-AI/colonization/combat internals.
 

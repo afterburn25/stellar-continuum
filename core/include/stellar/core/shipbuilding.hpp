@@ -130,6 +130,12 @@ ShipbuildingCancellationResult cancel_ship_build(ShipbuildingWorld world,
 double shipbuilding_industry_demand(
     ShipbuildingReadView world, int civilization_id,
     double simulation_days = std::numeric_limits<double>::infinity());
+// Resolved-input variant for batch callers that already indexed the
+// civilization's shipyard row: `state` may be null — the same missing-row
+// throw as the lookup version still fires.
+double shipbuilding_industry_demand(
+    ShipbuildingReadView world, const ShipyardState* state,
+    double simulation_days);
 void ensure_automatic_ship_orders(ShipbuildingWorld world);
 std::vector<ShipbuildingEvent> advance_shipbuilding(
     ShipbuildingWorld world,

@@ -840,16 +840,23 @@ ShipbuildingCancellationResult cancel_ship_build(ShipbuildingWorld world,
 }
 
 double shipbuilding_industry_demand(ShipbuildingReadView world,
+                                    const ShipyardState *state,
+                                    double days) {
+  if (!state)
+    throw std::out_of_range("Sequence contains no matching element");
+  if (!state->active_design_id)
+    return 0;
+  const auto &design = get_ship_design(*state->active_design_id);
+  return math_min(
+      math_max(0, design.industry_cost - state->active_build_progress),
+      shipbuilding_industry_per_day * math_max(0, days));
+}
+double shipbuilding_industry_demand(ShipbuildingReadView world,
                                     int civilization_id, double days) {
   const auto &state = first(world.shipyards, [=](const auto &s) {
     return s.civilization_id == civilization_id;
   });
-  if (!state.active_design_id)
-    return 0;
-  const auto &design = get_ship_design(*state.active_design_id);
-  return math_min(
-      math_max(0, design.industry_cost - state.active_build_progress),
-      shipbuilding_industry_per_day * math_max(0, days));
+  return shipbuilding_industry_demand(world, &state, days);
 }
 void ensure_automatic_ship_orders(ShipbuildingWorld world) {
   const auto shipyards = civ_index_of(world.shipyards);

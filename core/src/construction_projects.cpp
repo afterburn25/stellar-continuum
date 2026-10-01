@@ -374,6 +374,21 @@ cancel_construction_project(ConstructionWorld w, int id, std::string_view pid) {
               c.format(o.authorization_credits) + ".",
           o.authorization_credits};
 }
+double construction_industry_demand(ConstructionReadView w,
+                                    const ConstructionState *s,
+                                    std::span<const Colony *const> owned,
+                                    double days) {
+  if (!s)
+    throw std::out_of_range("Sequence contains no matching element");
+  double project_demand = 0;
+  if (s->active_project_id) {
+    auto &p = get_construction_project(*s->active_project_id);
+    project_demand =
+        std::min(std::max(0., p.industry_cost - s->active_project_progress),
+                 construction_project_industry_per_day * std::max(0., days));
+  }
+  return project_demand + surface_construction_industry_demand(w, owned, days);
+}
 double construction_industry_demand(ConstructionReadView w, int id,
                                     double days) {
   auto *s = state_for(w, id);

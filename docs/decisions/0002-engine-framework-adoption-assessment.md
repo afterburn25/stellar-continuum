@@ -155,15 +155,30 @@ The adoption frontier is not authority migration — it is:
    no longer rescan — the public span signatures delegate, preserving the
    lazy missing-economy throw (funding still falls back on a null row;
    the spend still throws only when budget > 0). Remaining rescans,
-   documented rather than fixed: `construction_industry_demand`/
-   `shipbuilding_industry_demand` per-civ scans in the allocation loop
-   (const-side buckets need separate span types), `select_ai_design`'s
+   documented rather than fixed: `select_ai_design`'s
    fleet `any_of` scans, `promote`/`lock`'s bounded promotion-time
    lookups, and `strategic_.advance`/colonization/combat internals.
    Seeded-oracle gate: `construction_projects_parity`,
    `surface_construction_parity`, `shipbuilding_parity`,
    `shipyard_state_parity`, `industry_allocation_parity`,
    `campaign_coordinator_parity`, `campaign_frame_parity` — all unchanged.
+
+   **Fifth deployment (landed):** the allocation loop's last per-civ
+   rescans. `run_industry_allocation` now builds
+   `unordered_map<int, const T*>` indexes for `campaign.construction`,
+   `campaign.shipyards` and a `civ -> ordered colonies` bucket map once
+   per phase, then resolves each civilization's rows a single time.
+   `construction_industry_demand` gained a resolved-input overload
+   (`const ConstructionState*` + `span<const Colony* const>`) and
+   `shipbuilding_industry_demand` a `const ShipyardState*` overload;
+   `surface_construction_industry_demand` gained the const-element span
+   overload both need. Each overload throws the same
+   `out_of_range("Sequence contains no matching element")` on a null
+   resolved row that `state_for`/`first` produced, and colony demand
+   iterates the civ's bucket in world order — identical to the filtered
+   full-span scans they replace. The public civ-id overloads remain;
+   the shipbuilding one delegates to the resolved body. Seeded-oracle
+   gate: same set as the fourth deployment, unchanged.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`

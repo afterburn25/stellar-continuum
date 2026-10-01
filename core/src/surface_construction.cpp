@@ -646,6 +646,13 @@ double surface_construction_industry_demand(ConstructionReadView w,
     sum += site_demand(*c, days);
   return sum;
 }
+double surface_construction_industry_demand(ConstructionReadView w,
+    std::span<const Colony *const> owned, double days) {
+  double sum = 0;
+  for (const auto *c : owned)
+    sum += site_demand(*c, days);
+  return sum;
+}
 double surface_construction_industry_demand(ConstructionReadView w, int civ,
                                             double days) {
   double sum = 0;
