@@ -3,6 +3,7 @@
 #include <stellar/core/interstellar_distance.hpp>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
@@ -15,7 +16,28 @@ double source_max(double first, double second) {
              ? std::numeric_limits<double>::quiet_NaN()
              : std::max(first, second);
 }
+std::uint64_t next_knowledge_instance_nonce() {
+  static std::atomic<std::uint64_t> counter{1};
+  return counter.fetch_add(1, std::memory_order_relaxed);
+}
 } // namespace
+
+CivilizationKnowledgeState::CivilizationKnowledgeState()
+    : instance_nonce_(next_knowledge_instance_nonce()) {}
+
+void CivilizationKnowledgeState::bump_survey_revision(int civilization_id) {
+  ++survey_revisions_[civilization_id];
+}
+
+std::uint64_t
+CivilizationKnowledgeState::survey_level_revision(int civilization_id) const {
+  const auto found = survey_revisions_.find(civilization_id);
+  return found == survey_revisions_.end() ? 0 : found->second;
+}
+
+std::uint64_t CivilizationKnowledgeState::instance_nonce() const noexcept {
+  return instance_nonce_;
+}
 
 bool CivilizationKnowledgeState::has_galactic_core_access(int id) const {
   return core_access_.contains(id);
@@ -43,7 +65,11 @@ bool CivilizationKnowledgeState::record_galactic_core_exploration(int id) {
 
 CivilizationKnowledgeState::Survey &
 CivilizationKnowledgeState::ensure_survey(int civilization_id, int system_id) {
-  return surveys_[civilization_id].try_emplace(system_id).first->second;
+  auto [entry, inserted] =
+      surveys_[civilization_id].try_emplace(system_id);
+  if (inserted)
+    bump_survey_revision(civilization_id);
+  return entry->second;
 }
 
 bool CivilizationKnowledgeState::is_system_known(int civilization_id,
@@ -131,6 +157,8 @@ bool CivilizationKnowledgeState::record_reconnaissance(int civilization_id,
   knowledge.progress =
       std::clamp(source_max(knowledge.progress, progress_floor), 0.0, 0.999999);
   knowledge.level = SystemSurveyLevel::partially_surveyed;
+  if (knowledge.level != old_level)
+    bump_survey_revision(civilization_id);
   return knowledge.level != old_level ||
          std::abs(knowledge.progress - old_progress) > 0.0000001;
 }
@@ -144,14 +172,15 @@ bool CivilizationKnowledgeState::advance_system_survey(int civilization_id,
   auto &knowledge = ensure_survey(civilization_id, system_id);
   if (knowledge.level == SystemSurveyLevel::fully_surveyed)
     return false;
-  const bool was_fully_surveyed =
-      knowledge.level == SystemSurveyLevel::fully_surveyed;
+  const auto old_level = knowledge.level;
   knowledge.progress =
       std::clamp(knowledge.progress + progress_delta, 0.0, 1.0);
   knowledge.level = knowledge.progress >= 1.0
                         ? SystemSurveyLevel::fully_surveyed
                         : SystemSurveyLevel::partially_surveyed;
-  return !was_fully_surveyed &&
+  if (knowledge.level != old_level)
+    bump_survey_revision(civilization_id);
+  return old_level != SystemSurveyLevel::fully_surveyed &&
          knowledge.level == SystemSurveyLevel::fully_surveyed;
 }
 
@@ -161,7 +190,10 @@ bool CivilizationKnowledgeState::mark_system_fully_surveyed(
   auto &knowledge = ensure_survey(civilization_id, system_id);
   const bool changed = knowledge.level != SystemSurveyLevel::fully_surveyed ||
                        knowledge.progress < 1.0;
+  const auto old_level = knowledge.level;
   knowledge = {SystemSurveyLevel::fully_surveyed, 1.0};
+  if (knowledge.level != old_level)
+    bump_survey_revision(civilization_id);
   return changed;
 }
 

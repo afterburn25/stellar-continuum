@@ -10,7 +10,9 @@
 #include <cstdint>
 #include <cmath>
 #include <limits>
+#include <optional>
 #include <stdexcept>
+#include <type_traits>
 
 namespace stellar::core {
 namespace {
@@ -91,6 +93,30 @@ const Civilization &first_civilization(
   if (found == civilizations.end())
     throw std::runtime_error("Sequence contains no matching element");
   return *found;
+}
+
+std::uint64_t idle_colonies_signature(std::span<const Colony> colonies) {
+  const auto mix = [](std::uint64_t state, std::uint64_t value) {
+    return state ^ (value + 0x9e3779b97f4a7c15ull + (state << 6) +
+                    (state >> 2));
+  };
+  std::uint64_t signature = colonies.size();
+  for (const auto &colony : colonies) {
+    signature = mix(signature, static_cast<std::uint64_t>(
+                                   static_cast<std::uint32_t>(colony.id)));
+    signature =
+        mix(signature,
+            static_cast<std::uint64_t>(
+                static_cast<std::uint32_t>(colony.civilization_id)));
+    signature = mix(signature, static_cast<std::uint64_t>(
+                                   static_cast<std::uint32_t>(
+                                       colony.system_id)));
+    signature =
+        mix(signature, static_cast<std::uint64_t>(
+                           static_cast<std::underlying_type_t<
+                               SettlementKind>>(colony.kind)));
+  }
+  return signature;
 }
 
 bool is_survey_fleet(const FleetState &fleet) {
@@ -400,6 +426,11 @@ ExplorationMissionOrderAssessment ExplorationSimulation::issue_order(
   return assessment;
 }
 
+ExplorationSimulation::IdleVerdictStats
+ExplorationSimulation::idle_verdict_stats() const noexcept {
+  return idle_verdict_stats_;
+}
+
 std::vector<ExplorationEvent>
 ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
                                double simulation_delta) const {
@@ -411,6 +442,7 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
     return {};
 
   std::vector<ExplorationEvent> events;
+  std::optional<std::uint64_t> colonies_signature;
   for (auto &fleet : world.fleets) {
     if (!fleet.is_active)
       continue;
@@ -445,6 +477,36 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
     if (fleet.transit_phase == FleetTransitPhase::None &&
         !fleet.destination_system_id && civilization_uses_ai(civilization,world.control) &&
         is_survey_fleet(fleet)) {
+      // The verdict memo is only provably complete for the canonical reach
+      // provider: an injected ExplorationReachAssessment may consult state
+      // outside the key, so it always gets a fresh evaluation.
+      const bool memoize = mission_planner_.uses_canonical_reach();
+      if (!colonies_signature)
+        colonies_signature = idle_colonies_signature(world.colonies);
+      const IdleSurveyVerdict verdict{world.systems.data(),
+                                      world.systems.size(),
+                                      &world.knowledge,
+                                      world.knowledge.instance_nonce(),
+                                      world.knowledge.survey_level_revision(
+                                          fleet.civilization_id),
+                                      &world.lanes,
+                                      world.lanes.instance_nonce(),
+                                      *colonies_signature,
+                                      fleet.civilization_id,
+                                      fleet.role,
+                                      fleet.current_system_id,
+                                      fleet.fuel_remaining_light_years,
+                                      fleet.fuel_capacity_light_years,
+                                      fleet.maximum_leg_range_light_years,
+                                      fleet.return_to_base_requested};
+      if (const auto recorded = idle_survey_verdicts_.find(fleet.id);
+          memoize && recorded != idle_survey_verdicts_.end() &&
+          recorded->second == verdict) {
+        ++idle_verdict_stats_.hits;
+        continue;
+      } else if (memoize) {
+        ++idle_verdict_stats_.misses;
+      }
       ExplorationAiMissionCoordinator coordinator(mission_planner_);
       const auto selection = coordinator.select_mission(
           {world.systems, world.bodies, world.fleets, world.colonies,
@@ -461,6 +523,12 @@ ExplorationSimulation::advance(ExplorationAdvanceWorldView world,
         // Do not manufacture fuel for old saves that are already stranded.
         // Persist an actionable explanation and retry when the world changes.
         if(!recovery.accepted)fleet.return_to_base_failure_reason=recovery.message;
+      }
+      if (memoize && !selection.candidate) {
+        if (idle_survey_verdicts_.size() >= 65536)
+          idle_survey_verdicts_.clear();
+        idle_survey_verdicts_[fleet.id] = verdict;
+        ++idle_verdict_stats_.stored;
       }
     }
 

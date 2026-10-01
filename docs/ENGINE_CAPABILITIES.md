@@ -62,6 +62,64 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
 
 ## Implementation records (newest first)
 
+## Exploration idle-survey verdict cadence — ADR 0002 option (a) (2026-10-01)
+
+- **Purpose:** the first phase-internal per-entity cadence deployment
+  recommended by `docs/decisions/0002-...-assessment.md`. Idle AI
+  scout/science fleets with no supported survey work previously re-ran
+  `ExplorationAiMissionCoordinator::select_mission` — an
+  O(systems × lane-reach) planner sweep — on every simulation tick.
+  For this pure-verdict entity class "due" means "a verdict-affecting
+  input changed", so the cadence is a revision-gated memo rather than a
+  time accumulator.
+- **Modules:** `core/src/exploration_advance.cpp` (memo gate inside the
+  fleet loop), `core/src/knowledge.cpp` (per-civilization survey-level
+  revision counter), `core/src/lane_network.cpp` (instance nonce),
+  `core/include/stellar/core/exploration_advance.hpp`,
+  `core/include/stellar/core/knowledge.hpp`,
+  `core/include/stellar/core/lane_network.hpp`.
+- **Public interface:**
+  `CivilizationKnowledgeState::survey_level_revision(int)` — a monotonic
+  per-civilization counter bumped when a survey entry is inserted or its
+  level transitions (progress-only updates cannot flip any
+  needs-work/priority verdict and do not bump);
+  `CivilizationKnowledgeState::instance_nonce()` and
+  `InterstellarLaneNetwork::instance_nonce()` — runtime object identity
+  that survives same-address replacement and in-place move-assign
+  rebuilds; `ExplorationSimulation::idle_verdict_stats()` — hit/miss/
+  stored diagnostics for the cadence layer.
+- **Consumers:** `ExplorationSimulation::advance` consults
+  `idle_survey_verdicts_` per idle AI survey fleet; a matching key
+  reproduces the exact no-op the planner would return. The memo key
+  covers every verdict-affecting input: survey-level revision, systems
+  span identity, lane-network nonce, a content signature over the colony
+  set (id/civilization/system/kind), and the fleet's civilization, role,
+  current system, fuel, fuel capacity, leg range and return-to-base flag.
+  Reservations and candidate ordering are excluded because they cannot
+  flip an empty verdict. Injected `ExplorationReachAssessment` providers
+  bypass the memo — their input set is unknowable.
+- **Tests:** `exploration_idle_cadence` — revision bump rules
+  (insertion/level-transition vs progress-only), retained-verdict reuse,
+  fleet-reach and colony-set invalidation, injected-provider bypass;
+  `exploration_idle_cadence_400` — 400 idle fleets × 200 ticks:
+  80,000 evaluations in ~2.7 ms vs a ~121 ms fresh-sweep estimate
+  (~44x), all through retained verdicts. Seeded oracle unchanged:
+  `campaign_coordinator_parity`, `exploration_advance_parity`,
+  `knowledge_persistence_parity` all pass.
+- **Save/performance impact:** runtime-only state; nothing serialized and
+  a cold memo simply re-plans once. Save/load parity is preserved because
+  every verdict is recomputed from live inputs when its key mismatches.
+  Fleet fuel refuelling changes naturally invalidate parked fleets.
+- **Limitations:** only the empty-verdict ("no supported work") outcome
+  is retained — fleets that find work always plan fresh; in-place
+  mutation of `StellarSystem` geometry fields is outside the key
+  (same contract as the upstream astronomy-static assumption);
+  `freight` is the next option-(a) candidate and is not yet cadenced.
+- **Future reuse:** the revision+nonce keying pattern transfers directly
+  to the freight entity loop and to any future pure-verdict entity class;
+  a time-based next-due accumulator remains available for classes whose
+  verdicts can degrade with elapsed time rather than discrete inputs.
+
 ## Starfield-quality live propagation + streamer budget (2026-09-29)
 
 - **Purpose:** the STARFIELD QUALITY video setting was wired to the

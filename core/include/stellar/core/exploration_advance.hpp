@@ -5,9 +5,11 @@
 #include <stellar/core/civilization_control.hpp>
 #include <stellar/core/galaxy_phenomena.hpp>
 
+#include <cstdint>
 #include <optional>
 #include <span>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace stellar::core {
@@ -89,13 +91,50 @@ public:
   std::vector<ExplorationEvent>
   advance(ExplorationAdvanceWorldView world, double simulation_delta) const;
 
+  // Diagnostics for the ADR 0002 phase-internal cadence layer: how many
+  // idle-AI evaluations reused a retained "no supported survey work"
+  // verdict versus ran the full planner.
+  struct IdleVerdictStats {
+    std::uint64_t hits{}, misses{}, stored{};
+  };
+  [[nodiscard]] IdleVerdictStats idle_verdict_stats() const noexcept;
+
 private:
   [[nodiscard]] ExplorationMissionOrderAssessment
   issue_order(ExplorationOrderWorldView world, int fleet_id,
               int destination_system_id, bool require_survey_work) const;
+  // Phase-internal cadence (ADR 0002): a runtime-only memo of the last
+  // "no supported survey work" verdict per idle AI survey fleet, keyed on
+  // every input that can flip the verdict — knowledge survey revisions,
+  // lane-network and colony-set signatures, and the fleet's own
+  // reach-affecting fields. A hit reproduces the exact no-op the full
+  // planner would produce; any changed input falls through to fresh
+  // evaluation. Never serialized; a cold memo simply re-plans.
+  struct IdleSurveyVerdict {
+    const StellarSystem *systems_data{};
+    std::size_t systems_size{};
+    const CivilizationKnowledgeState *knowledge{};
+    std::uint64_t knowledge_nonce{};
+    std::uint64_t survey_revision{};
+    const InterstellarLaneNetwork *lanes{};
+    std::uint64_t lanes_nonce{};
+    std::uint64_t colonies_signature{};
+    int civilization_id{};
+    FleetRole role{};
+    std::optional<int> current_system_id{};
+    double fuel_remaining_light_years{};
+    double fuel_capacity_light_years{};
+    double maximum_leg_range_light_years{};
+    bool return_to_base_requested{};
+
+    friend bool operator==(const IdleSurveyVerdict &,
+                           const IdleSurveyVerdict &) = default;
+  };
   ExplorationMissionPlanner mission_planner_;
   MissionFuelPolicy ai_fuel_policy_;
   SurveyOperationsProfiler survey_profiler_;
+  mutable std::unordered_map<int, IdleSurveyVerdict> idle_survey_verdicts_;
+  mutable IdleVerdictStats idle_verdict_stats_{};
 };
 
 } // namespace stellar::core

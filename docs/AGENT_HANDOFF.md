@@ -131,6 +131,20 @@ serialized as `coverage.externalLinks`), and per-vessel fleet composition
 and consumed by the controlled-assets ship count). Suite: 328/328;
 live smokes green at every quality tier and both density extremes.
 
+**ADR 0002 executor cadence (landed 2026-10-01):** first option-(a)
+deployment — `ExplorationSimulation` retains a revision-gated "no
+supported survey work" verdict per idle AI survey fleet
+(`idle_survey_verdicts_`), keyed on every verdict-affecting input:
+`CivilizationKnowledgeState::survey_level_revision` (bumps on survey
+insertions and level transitions only), `InterstellarLaneNetwork::
+instance_nonce` (survives in-place rebuilds), a colony-set signature and
+the fleet's reach fields. Diagnostics via `idle_verdict_stats()`; custom
+reach providers bypass the memo. Measured ~44x on the idle-evaluation
+path (`exploration_idle_cadence_400`: 80k evaluations in ~2.7 ms vs
+~121 ms fresh-sweep estimate). `campaign_coordinator_parity` and the
+knowledge/lane/exploration oracles are unchanged and green. Next
+candidate: `freight` — see the ADR's status note.
+
 Hardening contracts added late in the workstream that future changes must
 preserve:
 
@@ -353,10 +367,16 @@ its 12 strategic phases (economy → economy_storage) as Active-tier
 `SimulationExecutor` tasks dependency-chained to the historical order —
 same behavior (`campaign_coordinator_parity` green), but per-phase
 cadence demotion, budgets and wakeups are now configuration instead of
-restructuring. Next: further Core/game
-adoption — per-entity executor cadence inside heavy phases and
-framework consumers (population/colony/flow/logistics/AI/warfare)
-against real campaign state. Second Core adoption landed:
+restructuring. First per-entity cadence landed (ADR 0002 option a):
+`ExplorationSimulation` retains a revision-gated "no supported survey
+work" verdict per idle AI survey fleet — keyed on
+`CivilizationKnowledgeState::survey_level_revision`,
+`InterstellarLaneNetwork::instance_nonce`, a colony-set signature and the
+fleet's reach-affecting fields — cutting ~44x on idle evaluations
+(`exploration_idle_cadence`/`_400`; `campaign_coordinator_parity`
+unchanged). Next: the same pattern for `freight`, then further Core/game
+adoption — framework consumers (population/colony/flow/logistics/AI/
+warfare) against real campaign state. Second Core adoption landed:
 `core/planetary_adapter` — `to_engine_environment(const
 PlanetaryBody&)` projects authoritative planet environment into engine
 `PlanetEnvironment` (direct temperature/gravity, kPa→atm pressure,

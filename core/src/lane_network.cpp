@@ -6,6 +6,7 @@
 #include <set>
 
 #include <algorithm>
+#include <atomic>
 #include <bit>
 #include <cmath>
 #include <limits>
@@ -456,11 +457,20 @@ struct InterstellarLaneNetwork::Impl {
   }
 };
 
+namespace {
+std::uint64_t next_lane_network_nonce() {
+  static std::atomic<std::uint64_t> counter{1};
+  return counter.fetch_add(1, std::memory_order_relaxed);
+}
+} // namespace
+
 InterstellarLaneNetwork::InterstellarLaneNetwork(
     std::span<const StellarSystem> systems)
-    : impl_(std::make_unique<Impl>(systems)) {}
+    : impl_(std::make_unique<Impl>(systems)),
+      nonce_(next_lane_network_nonce()) {}
 InterstellarLaneNetwork::InterstellarLaneNetwork(
-    const std::vector<StellarSystem> *systems) {
+    const std::vector<StellarSystem> *systems)
+    : nonce_(next_lane_network_nonce()) {
   impl_ = systems == nullptr ? std::make_unique<Impl>(std::span<const StellarSystem>{})
                              : std::make_unique<Impl>(*systems);
   impl_->source_is_null = systems == nullptr;

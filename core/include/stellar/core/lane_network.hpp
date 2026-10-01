@@ -3,6 +3,7 @@
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -96,9 +97,16 @@ public:
 
   std::size_t cached_route_tree_count() const;
 
+  // Runtime identity for cache coherence — each constructed network gets a
+  // fresh nonce, and a move-assigned replacement carries its own, so an
+  // in-place rebuild at the same address is distinguishable. Never
+  // serialized.
+  std::uint64_t instance_nonce() const noexcept { return nonce_; }
+
 private:
   struct Impl;
   std::unique_ptr<Impl> impl_;
+  std::uint64_t nonce_{};
 };
 
 } // namespace stellar::core

@@ -2,6 +2,7 @@
 
 #include <stellar/core/civilization_catalog.hpp>
 
+#include <cstdint>
 #include <map>
 #include <set>
 #include <span>
@@ -31,6 +32,7 @@ struct KnowledgeSnapshot {
 
 class CivilizationKnowledgeState {
 public:
+  CivilizationKnowledgeState();
   bool has_galactic_core_access(int civilization_id) const;
   bool is_galactic_core_discovered(int civilization_id) const;
   std::vector<int> galactic_core_observers() const;
@@ -57,6 +59,17 @@ public:
   create_initial(std::span<const StellarSystem> systems,
                  std::span<const Civilization> civilizations,
                  float sensor_range);
+  // Monotonic per-civilization counter bumped when a survey entry is
+  // inserted or its level changes — the cheap invalidation signal for
+  // consumers caching survey-work verdicts. Progress-only updates do not
+  // bump it: they cannot change any needs-work or priority verdict.
+  // Runtime only — never serialized; save/load restarts it at the
+  // restored state.
+  std::uint64_t survey_level_revision(int civilization_id) const;
+  // Runtime identity: distinguishes a distinct state object reused at the
+  // same address. Copied along with the state so a restored snapshot
+  // identifies as the lineage it was taken from.
+  std::uint64_t instance_nonce() const noexcept;
 private:
   struct Survey { SystemSurveyLevel level{SystemSurveyLevel::detected}; double progress{}; };
   Survey &ensure_survey(int civilization_id, int system_id);
@@ -66,5 +79,8 @@ private:
   std::map<int, std::set<int>> civilizations_;
   std::vector<int> civilization_observer_order_;
   std::map<int, std::map<int, Survey>> surveys_;
+  std::map<int, std::uint64_t> survey_revisions_;
+  std::uint64_t instance_nonce_{};
+  void bump_survey_revision(int civilization_id);
 };
 } // namespace stellar::core

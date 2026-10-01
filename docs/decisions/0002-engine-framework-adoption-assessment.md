@@ -66,6 +66,30 @@ The adoption frontier is not authority migration — it is:
    ordering, a materially larger contract change. Option (a) is the
    right-sized first move; (b) only if cadence bookkeeping itself becomes
    the hot path.
+
+   **Status (landed):** the first option-(a) deployment is in
+   `ExplorationSimulation::advance`. The idle-AI survey-fleet path is a
+   pure-verdict class — for it "due" means "a verdict-affecting input
+   changed", so the cadence is implemented as a revision-gated memo rather
+   than a time accumulator: `idle_survey_verdicts_` retains the
+   "no supported survey work" outcome per fleet, keyed on knowledge
+   survey-level revisions (`CivilizationKnowledgeState::
+   survey_level_revision`, bumped on survey-entry insertion and level
+   transitions), lane-network identity (`InterstellarLaneNetwork::
+   instance_nonce`, which survives in-place rebuilds through
+   move-assignment), a content signature over the colony set, and every
+   fleet field the reach/return assessments consume. Reservations and
+   candidate ordering are deliberately outside the key because they cannot
+   flip an empty verdict; injected `ExplorationReachAssessment` providers
+   bypass the memo entirely since their input set is unknowable.
+   Diagnostics: `ExplorationSimulation::idle_verdict_stats()` reports
+   hits/misses/stored. Coverage: `exploration_idle_cadence` (revision,
+   fleet-field, colony-set invalidation, injected-reach bypass) and
+   `exploration_idle_cadence_400` (scale run; measured ~44x on the idle
+   evaluation path — 80k retained evaluations in ~2.7 ms against a fresh
+   `select_mission` baseline). Seeded-oracle gate:
+   `campaign_coordinator_parity` unchanged. `freight` remains the next
+   option-(a) candidate; executor-level entity tasks (b) stay deferred.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). Similar cheap wins may exist on the logistics
