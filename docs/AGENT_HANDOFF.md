@@ -174,7 +174,24 @@ throw. Oracles unchanged and green: `campaign_economy_parity`,
 `campaign_coordinator_parity`, `campaign_frame_parity`,
 `industry_allocation_parity`, `galaxy_economy_persistence_parity`,
 `economy_scale_5000_colonies`. Win is asymptotic (E×C → E+C), not a
-small-scale constant win.
+small-scale constant win. Fourth option-(a) deployment (landed
+2026-10-01): civ-keyed `unordered_map` indexes (`civ_index_of`) in the
+automatic-orders, industry-allocation, construction and shipbuilding
+batch loops — `state_for`/`economy_for`/`first(shipyards)`/budget
+`find_if` scans are resolved once per call instead of per civilization;
+the per-civ construction body was extracted to
+`advance_construction_resolved` so the batch path reuses resolved
+pointers while the public entry keeps its lookup semantics; a
+`campaign_industry_weights(const CivilizationEconomy*)` overload feeds
+the allocation loop from its already-resolved row. Throw ordering and
+first-match semantics preserved (`emplace` keeps the earliest element).
+Oracles unchanged and green: `construction_projects_parity`,
+`surface_construction_parity`, `shipbuilding_parity`,
+`shipyard_state_parity`, `industry_allocation_parity`,
+`campaign_coordinator_parity`, `campaign_frame_parity`. Deferred: the
+`surface_construction_*` colony sweeps per civ (cross-TU bucket
+overloads), the per-civ `*_industry_demand` scans, `select_ai_design`
+fleet scans, and strategic-AI/colonization/combat internals.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

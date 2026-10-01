@@ -14,6 +14,10 @@ struct CivilizationIndustryAllocation {
 };
 IndustryPriorityWeights campaign_industry_weights(std::span<const CivilizationEconomy> economies,
     int civilization_id, IndustryPriorityWeights fallback = {});
+// Resolves weights against an already-located economy row — for batch
+// loops that indexed economies once rather than scanning per call.
+IndustryPriorityWeights campaign_industry_weights(const CivilizationEconomy* economy,
+    IndustryPriorityWeights fallback = {});
 CivilizationIndustryAllocation allocate_industry(const IndustryAllocationContext& context,
     IndustryPriorityWeights weights = {});
 struct IndustryPriorityChangeResult { bool accepted{}; std::string message; };

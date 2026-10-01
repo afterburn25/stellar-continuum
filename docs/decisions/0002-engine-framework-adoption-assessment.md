@@ -130,6 +130,32 @@ The adoption frontier is not authority migration — it is:
    `campaign_coordinator_parity`, `campaign_frame_parity`,
    `industry_allocation_parity`, `galaxy_economy_persistence_parity`,
    `economy_scale_5000_colonies` — all unchanged.
+
+   **Fourth deployment (landed):** the same audit extended to the
+   industry-allocation, construction and shipbuilding phases, whose batch
+   loops linearly rescanned civ-keyed rows per civilization —
+   `state_for`/`economy_for`/`civ_for`/`first(shipyards)` are all
+   `find_if` scans. `advance_construction`,
+   `ensure_automatic_construction_orders`, `advance_core` (shipbuilding)
+   and `ensure_automatic_ship_orders` now build per-call
+   `unordered_map<int, T*>` indexes (`civ_index_of`, `emplace` preserving
+   find_if's first-match) and resolve each row once; the per-civ body of
+   `advance_construction_for_civilization` was extracted to
+   `advance_construction_resolved` so the batch path reuses resolved
+   pointers while the public entry point keeps its lookup semantics and
+   throws. Throw ordering and lazy-lookup positions are preserved exactly.
+   `campaign_industry_weights` gained a `const CivilizationEconomy*`
+   overload so the industry-allocation loop resolves weights from the row
+   it already found. Remaining rescans, documented rather than fixed:
+   `surface_construction_industry_demand`/`advance_surface_construction`
+   colony sweeps per civ (needs pointer-bucket overloads across TUs),
+   `construction_industry_demand`/`shipbuilding_industry_demand` in the
+   allocation loop, `select_ai_design`'s fleet `any_of` scans, and
+   `strategic_.advance`/colonization/combat internals.
+   Seeded-oracle gate: `construction_projects_parity`,
+   `surface_construction_parity`, `shipbuilding_parity`,
+   `shipyard_state_parity`, `industry_allocation_parity`,
+   `campaign_coordinator_parity`, `campaign_frame_parity` — all unchanged.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`

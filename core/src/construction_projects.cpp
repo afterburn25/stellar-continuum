@@ -6,6 +6,7 @@
 #include <array>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_map>
 
 namespace stellar::core {
 namespace {
@@ -96,6 +97,22 @@ const Civilization *civ_for(std::span<const Civilization> cs, int id) {
       std::find_if(cs.begin(), cs.end(), [=](auto &c) { return c.id == id; });
   return i == cs.end() ? nullptr : &*i;
 }
+// Per-call civ-keyed index (ADR 0002 option a): batch loops below used to
+// linear-scan construction/economy/budget rows per civilization. emplace
+// keeps the earliest element, preserving find_if's first-match semantics.
+template <class T>
+std::unordered_map<int, T *> civ_index_of(std::span<T> items) {
+  std::unordered_map<int, T *> index;
+  for (auto &item : items)
+    index.emplace(item.civilization_id, &item);
+  return index;
+}
+// Resolved-pointer per-civilization construction advance — same body the
+// public advance_construction_for_civilization runs after its lookups, so
+// the batch loop can resolve each row once through the indexes above.
+std::vector<ConstructionEvent> advance_construction_resolved(
+    ConstructionWorld w, const Civilization &c, ConstructionState &s,
+    CivilizationEconomy &e, double budget, double days);
 bool done(const ConstructionState &s, std::string_view id) {
   return std::find(s.completed_project_ids.begin(),
                    s.completed_project_ids.end(),
@@ -368,18 +385,22 @@ double construction_industry_demand(ConstructionReadView w, int id,
   return project_demand + surface_construction_industry_demand(w, id, days);
 }
 void ensure_automatic_construction_orders(ConstructionWorld w) {
+  const auto states = civ_index_of(w.construction);
+  const auto economies = civ_index_of(w.economies);
   for (auto &c : w.civilizations) {
     if (c.is_seeded_ancient)
       continue;
-    auto *s = state_for(w, c.id);
-    if (!s)
+    const auto si = states.find(c.id);
+    if (si == states.end())
       throw std::out_of_range("Sequence contains no matching element");
+    auto *s = si->second;
     promote(w.read(), c.id, *s);
     if (!civilization_uses_ai(c,w.control) || s->active_project_id || !s->queued_projects.empty())
       continue;
-    auto *e = economy_for(w, c.id);
-    if (!e)
+    const auto ei = economies.find(c.id);
+    if (ei == economies.end())
       throw std::out_of_range("Sequence contains no matching element");
+    auto *e = ei->second;
     auto a = available_construction_projects(w.read(), c.id);
     std::sort(a.begin(), a.end(), [&](auto &x, auto &y) {
       auto score = [&](auto &p) {
@@ -407,6 +428,53 @@ void ensure_automatic_construction_orders(ConstructionWorld w) {
       }
   }
 }
+namespace {
+std::vector<ConstructionEvent> advance_construction_resolved(
+    ConstructionWorld w, const Civilization &c, ConstructionState &s,
+    CivilizationEconomy &e, double budget, double days) {
+  const int id = c.id;
+  promote(w.read(), id, s);
+  if (!std::isfinite(e.industry))
+    throw std::out_of_range("Available Industry must be finite.");
+  if (!std::isfinite(budget))
+    throw std::out_of_range("Industry budgets must be finite.");
+  double avail = std::min(std::max(0., budget), std::max(0., e.industry));
+  double sd = surface_construction_industry_demand(w.read(), id, days),
+         pd = s.active_project_id
+                  ? std::min(construction_project_industry_per_day * days,
+                             std::max(0., get_construction_project(
+                                              *s.active_project_id)
+                                                  .industry_cost -
+                                              s.active_project_progress))
+                  : 0;
+  double sb =
+      sd > 0 ? std::min(sd, std::min(avail, sd + pd) * sd / (sd + pd)) : 0;
+  advance_surface_construction(w, id, sb, days);
+  avail = std::min(e.industry, std::max(0., avail - sb));
+  std::vector<ConstructionEvent> r;
+  if (!s.active_project_id)
+    return r;
+  auto &p = get_construction_project(*s.active_project_id);
+  double rem = std::max(0., p.industry_cost - s.active_project_progress),
+         sp = std::min(
+             rem,
+             std::min(avail, construction_project_industry_per_day * days));
+  if (sp <= 0 && rem > .0001)
+    return r;
+  e.industry -= sp;
+  s.active_project_progress += sp;
+  if (s.active_project_progress + .0001 < p.industry_cost)
+    return r;
+  if (!done(s, p.id))
+    s.completed_project_ids.push_back(p.id);
+  s.active_project_id.reset();
+  s.active_project_progress = 0;
+  s.active_project_authorization_credits = 0;
+  r.push_back({id, p.id, c.name + " completed " + p.name + "."});
+  promote(w.read(), id, s);
+  return r;
+}
+} // namespace
 std::vector<ConstructionEvent>
 advance_construction_for_civilization(ConstructionWorld w, int id,
                                       double budget, double days) {
@@ -424,46 +492,7 @@ advance_construction_for_civilization(ConstructionWorld w, int id,
   auto *e = economy_for(w, id);
   if (!s || !e)
     throw std::out_of_range("Sequence contains no matching element");
-  promote(w.read(), id, *s);
-  if (!std::isfinite(e->industry))
-    throw std::out_of_range("Available Industry must be finite.");
-  if (!std::isfinite(budget))
-    throw std::out_of_range("Industry budgets must be finite.");
-  double avail = std::min(std::max(0., budget), std::max(0., e->industry));
-  double sd = surface_construction_industry_demand(w.read(), id, days),
-         pd = s->active_project_id
-                  ? std::min(construction_project_industry_per_day * days,
-                             std::max(0., get_construction_project(
-                                              *s->active_project_id)
-                                                  .industry_cost -
-                                              s->active_project_progress))
-                  : 0;
-  double sb =
-      sd > 0 ? std::min(sd, std::min(avail, sd + pd) * sd / (sd + pd)) : 0;
-  advance_surface_construction(w, id, sb, days);
-  avail = std::min(e->industry, std::max(0., avail - sb));
-  std::vector<ConstructionEvent> r;
-  if (!s->active_project_id)
-    return r;
-  auto &p = get_construction_project(*s->active_project_id);
-  double rem = std::max(0., p.industry_cost - s->active_project_progress),
-         sp = std::min(
-             rem,
-             std::min(avail, construction_project_industry_per_day * days));
-  if (sp <= 0 && rem > .0001)
-    return r;
-  e->industry -= sp;
-  s->active_project_progress += sp;
-  if (s->active_project_progress + .0001 < p.industry_cost)
-    return r;
-  if (!done(*s, p.id))
-    s->completed_project_ids.push_back(p.id);
-  s->active_project_id.reset();
-  s->active_project_progress = 0;
-  s->active_project_authorization_credits = 0;
-  r.push_back({id, p.id, c->name + " completed " + p.name + "."});
-  promote(w.read(), id, *s);
-  return r;
+  return advance_construction_resolved(w, *c, *s, *e, budget, days);
 }
 std::vector<ConstructionEvent> advance_construction(
     ConstructionWorld w,
@@ -475,25 +504,34 @@ std::vector<ConstructionEvent> advance_construction(
   if (days == 0)
     return {};
   ensure_automatic_construction_orders(w);
+  const auto states = civ_index_of(w.construction);
+  const auto economies = civ_index_of(w.economies);
+  std::unordered_map<int, const ConstructionIndustryBudget *> budget_index;
+  if (budgets)
+    for (const auto &budget : *budgets)
+      budget_index.emplace(budget.civilization_id, &budget);
   std::vector<ConstructionEvent> r;
   for (auto &c : w.civilizations) {
     if (c.is_seeded_ancient)
       continue;
-    auto *e = economy_for(w, c.id);
-    if (!e)
+    const auto ei = economies.find(c.id);
+    if (ei == economies.end())
       throw std::out_of_range("Sequence contains no matching element");
+    auto *e = ei->second;
     double b = 0;
     if (budgets) {
-      auto i = std::find_if(budgets->begin(), budgets->end(),
-                            [&](auto &x) { return x.civilization_id == c.id; });
-      if (i != budgets->end())
-        b = i->industry;
+      const auto i = budget_index.find(c.id);
+      if (i != budget_index.end())
+        b = i->second->industry;
     } else {
       if (!std::isfinite(e->industry))
         throw std::out_of_range("Available Industry must be finite.");
       b = e->industry;
     }
-    auto x = advance_construction_for_civilization(w, c.id, b, days);
+    const auto si = states.find(c.id);
+    if (si == states.end())
+      throw std::out_of_range("Sequence contains no matching element");
+    auto x = advance_construction_resolved(w, c, *si->second, *e, b, days);
     r.insert(r.end(), x.begin(), x.end());
   }
   return r;

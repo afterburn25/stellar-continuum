@@ -7,6 +7,7 @@
 #include <cmath>
 #include <map>
 #include <stdexcept>
+#include <unordered_map>
 #include <utility>
 
 namespace stellar::core {
@@ -586,16 +587,20 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          const auto shipbuilding = shipbuilding_world(
              campaign, shipbuilding_capability_, strategic_,
              use_strategic_shipbuilding_preferences_);
+         // Civ-keyed index (ADR 0002 option a): the loop used to
+         // linear-scan economies twice per civilization (the find_if
+         // below plus campaign_industry_weights). emplace keeps the
+         // earliest element, matching find_if's first-match semantics.
+         std::unordered_map<int, const CivilizationEconomy *> economy_index;
+         for (const auto &candidate : campaign.economies)
+           economy_index.emplace(candidate.civilization_id, &candidate);
          for (const auto &civilization : campaign.civilizations) {
            if (civilization.is_seeded_ancient)
              continue;
-           const auto economy = std::find_if(
-               campaign.economies.begin(), campaign.economies.end(),
-               [&](const auto &candidate) {
-                 return candidate.civilization_id == civilization.id;
-               });
-           if (economy == campaign.economies.end())
+           const auto found_economy = economy_index.find(civilization.id);
+           if (found_economy == economy_index.end())
              throw std::runtime_error("Sequence contains no matching element");
+           const auto *economy = found_economy->second;
            const IndustryAllocationContext context{
                civilization.id,
                std::max(economy->industry, 0.0),
@@ -612,8 +617,7 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
            validate_allocation_value(context.shipbuilding_demand,
                                      "ShipbuildingDemand");
            const auto weights = campaign_industry_weights(
-               campaign.economies, civilization.id,
-               strategic_.get_industry_weights(civilization.id));
+               economy, strategic_.get_industry_weights(civilization.id));
            auto allocation = allocate_industry(context, weights);
            upsert_budget(step_.construction_budgets, civilization.id,
                          allocation.construction_allocated);

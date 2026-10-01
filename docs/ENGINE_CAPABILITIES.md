@@ -206,6 +206,53 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   loop filters one shared span by an owner key and must preserve world
   order — build the index once, iterate the bucket.
 
+## Civ-keyed row indexes in construction/shipbuilding batch loops — ADR 0002 option (a) (2026-10-01)
+
+- **Purpose:** the same audit found the civ-keyed rescan pattern in the
+  industry-allocation, construction and shipbuilding phases — each
+  per-civilization loop iteration linearly rescanned construction states,
+  economies, shipyards and budget rows (`state_for`/`economy_for`/
+  `first(shipyards)`/`find_if` on budgets). The reduction indexes each
+  civ-keyed collection once per call.
+- **Modules:** `core/src/construction_projects.cpp` (`civ_index_of`,
+  `advance_construction_resolved` extraction), `core/src/shipbuilding.cpp`
+  (`civ_index_of`, `resolve_budget` pointer overload, indexed
+  `advance_core`/`ensure_automatic_ship_orders`),
+  `core/src/industry_allocation.cpp` (`campaign_industry_weights` pointer
+  overload), `core/src/campaign_coordinator.cpp` (economy index in the
+  industry-allocation phase).
+- **Public interface:** `campaign_industry_weights(const
+  CivilizationEconomy*, IndustryPriorityWeights)` is the only API
+  addition — additive; the span overload delegates. All existing
+  signatures unchanged.
+- **Consumers:** phases 2–5 of the coordinator (`automatic_orders`,
+  `industry_allocation`, `construction`, `shipbuilding`) consume the
+  indexed paths; every public entry point (`advance_construction_for_
+  civilization`, `start_ship_build`, command handlers) keeps the original
+  lookup semantics and throws.
+- **Tests:** seeded oracles unchanged on the shipped binary —
+  `construction_projects_parity`, `surface_construction_parity`,
+  `shipbuilding_parity`, `shipyard_state_parity`,
+  `construction_currency_parity`, `industry_allocation_parity`,
+  `campaign_coordinator_parity`, `campaign_frame_parity`,
+  `shipbuilding_start_assessment`, `construction_order_assessment`, plus
+  the `native_*_controller`/`_workspace` consumers.
+- **Save/performance impact:** indexes live for one call — nothing
+  persists. Removes O(civs) linear lookups per civ per step
+  (~5–8 scans/civ in `advance_construction` alone); each skipped
+  iteration was a cheap id compare, so the win is asymptotic.
+- **Limitations:** the colony sweeps inside
+  `surface_construction_industry_demand`/`advance_surface_construction`
+  still rescan per civ (bucket overloads across TUs deferred);
+  `construction_industry_demand`/`shipbuilding_industry_demand` still
+  scan construction/shipyard spans per civ in the allocation loop;
+  `select_ai_design`'s fleet `any_of` scans and `lock`'s promotion-time
+  lookups are bounded and left as-is.
+- **Future reuse:** `civ_index_of` is the generic shape — any batch loop
+  that resolves civ-keyed rows repeatedly can index once; the
+  resolved-pointer extraction pattern lets public per-civ entry points
+  share the body.
+
 ## Starfield-quality live propagation + streamer budget (2026-09-29)
 
 - **Purpose:** the STARFIELD QUALITY video setting was wired to the

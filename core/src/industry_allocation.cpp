@@ -48,8 +48,12 @@ IndustryPriorityWeights campaign_industry_weights(std::span<const CivilizationEc
     const auto found=std::find_if(economies.begin(),economies.end(),[=](const auto& economy) {
         return economy.civilization_id == civilization_id;
     });
-    if (found == economies.end() || !found->industry_priority) return fallback;
-    return weights_for(*found->industry_priority);
+    return campaign_industry_weights(found == economies.end() ? nullptr : &*found, fallback);
+}
+IndustryPriorityWeights campaign_industry_weights(const CivilizationEconomy* economy,
+    IndustryPriorityWeights fallback) {
+    if (!economy || !economy->industry_priority) return fallback;
+    return weights_for(*economy->industry_priority);
 }
 
 CivilizationIndustryAllocation allocate_industry(const IndustryAllocationContext& context,

@@ -9,6 +9,7 @@
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <unordered_map>
 #include <unordered_set>
 
 namespace stellar::core {
@@ -321,6 +322,25 @@ bool resolve_population_return(ShipbuildingReadView world, int civilization_id,
   }
   return true;
 }
+// Per-call civ-keyed index (ADR 0002 option a): the batch loop below used
+// to linear-scan shipyard/economy/budget rows per civilization. emplace
+// keeps the earliest element, preserving find_if's first-match semantics.
+template <class T>
+std::unordered_map<int, T *> civ_index_of(std::span<T> items) {
+  std::unordered_map<int, T *> index;
+  for (auto &item : items)
+    index.emplace(item.civilization_id, &item);
+  return index;
+}
+double resolve_budget(const ConstructionIndustryBudget *item,
+                      double available) {
+  if (!item)
+    return 0;
+  if (!std::isfinite(item->industry))
+    throw std::out_of_range(
+        "Industry budgets must be finite. (Parameter 'industryBudgets')");
+  return math_min(available, math_max(0, item->industry));
+}
 double resolve_budget(
     std::optional<std::span<const ConstructionIndustryBudget>> budgets, int id,
     double available) {
@@ -329,12 +349,7 @@ double resolve_budget(
   auto item =
       std::find_if(budgets->begin(), budgets->end(),
                    [=](const auto &b) { return b.civilization_id == id; });
-  if (item == budgets->end())
-    return 0;
-  if (!std::isfinite(item->industry))
-    throw std::out_of_range(
-        "Industry budgets must be finite. (Parameter 'industryBudgets')");
-  return math_min(available, math_max(0, item->industry));
+  return resolve_budget(item == budgets->end() ? nullptr : &*item, available);
 }
 const ShipDesignDefinition *select_ai_design(ShipbuildingReadView world,
                                              const Civilization &civilization) {
@@ -488,23 +503,38 @@ advance_core(ShipbuildingWorld world,
     return {};
   if (!only)
     ensure_automatic_ship_orders(world);
+  const auto shipyards = civ_index_of(world.shipyards);
+  const auto economies = civ_index_of(world.economies);
+  std::unordered_map<int, const ConstructionIndustryBudget *> budget_index;
+  if (budgets)
+    for (const auto &budget : *budgets)
+      budget_index.emplace(budget.civilization_id, &budget);
   std::vector<ShipbuildingEvent> events;
   for (const auto &civilization : world.civilizations) {
     if (only && civilization.id != *only || civilization.is_seeded_ancient)
       continue;
-    auto &state = first(world.shipyards, [&](const auto &s) {
-      return s.civilization_id == civilization.id;
-    });
+    const auto shipyard = shipyards.find(civilization.id);
+    if (shipyard == shipyards.end())
+      throw std::out_of_range("Sequence contains no matching element");
+    auto &state = *shipyard->second;
     if (!state.active_design_id)
       continue;
     const auto &design = get_ship_design(*state.active_design_id);
-    auto &economy = first(world.economies, [&](const auto &e) {
-      return e.civilization_id == civilization.id;
-    });
+    const auto found_economy = economies.find(civilization.id);
+    if (found_economy == economies.end())
+      throw std::out_of_range("Sequence contains no matching element");
+    auto &economy = *found_economy->second;
     const double remaining =
         math_max(0, design.industry_cost - state.active_build_progress);
     const double available =
-        resolve_budget(budgets, civilization.id, economy.industry);
+        !budgets ? economy.industry
+                 : resolve_budget(
+                       [&] -> const ConstructionIndustryBudget * {
+                         const auto item = budget_index.find(civilization.id);
+                         return item == budget_index.end() ? nullptr
+                                                           : item->second;
+                       }(),
+                       economy.industry);
     const double spend = math_min(
         remaining, math_min(available, shipbuilding_industry_per_day * days));
     if (spend <= 0 && remaining > .0001)
@@ -822,12 +852,14 @@ double shipbuilding_industry_demand(ShipbuildingReadView world,
       shipbuilding_industry_per_day * math_max(0, days));
 }
 void ensure_automatic_ship_orders(ShipbuildingWorld world) {
+  const auto shipyards = civ_index_of(world.shipyards);
   for (const auto &civilization : world.civilizations) {
     if (civilization.is_seeded_ancient || !civilization_uses_ai(civilization,world.control))
       continue;
-    auto &state = first(world.shipyards, [&](const auto &s) {
-      return s.civilization_id == civilization.id;
-    });
+    const auto found = shipyards.find(civilization.id);
+    if (found == shipyards.end())
+      throw std::out_of_range("Sequence contains no matching element");
+    auto &state = *found->second;
     if (state.active_design_id)
       continue;
     if (const auto *design = select_ai_design(world.read(), civilization))
