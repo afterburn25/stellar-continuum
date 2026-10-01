@@ -146,12 +146,20 @@ The adoption frontier is not authority migration — it is:
    throws. Throw ordering and lazy-lookup positions are preserved exactly.
    `campaign_industry_weights` gained a `const CivilizationEconomy*`
    overload so the industry-allocation loop resolves weights from the row
-   it already found. Remaining rescans, documented rather than fixed:
+   it already found. The colony sweeps then followed the same pattern:
+   `advance_construction` builds a `civ_buckets_of` colony index once and
+   feeds each civ's ordered bucket through
    `surface_construction_industry_demand`/`advance_surface_construction`
-   colony sweeps per civ (needs pointer-bucket overloads across TUs),
-   `construction_industry_demand`/`shipbuilding_industry_demand` in the
-   allocation loop, `select_ai_design`'s fleet `any_of` scans, and
-   `strategic_.advance`/colonization/combat internals.
+   owned-pointer overloads, with the resolved `CivilizationEconomy*`
+   passed through so `civilization_operating_funding` and `economy_for`
+   no longer rescan — the public span signatures delegate, preserving the
+   lazy missing-economy throw (funding still falls back on a null row;
+   the spend still throws only when budget > 0). Remaining rescans,
+   documented rather than fixed: `construction_industry_demand`/
+   `shipbuilding_industry_demand` per-civ scans in the allocation loop
+   (const-side buckets need separate span types), `select_ai_design`'s
+   fleet `any_of` scans, `promote`/`lock`'s bounded promotion-time
+   lookups, and `strategic_.advance`/colonization/combat internals.
    Seeded-oracle gate: `construction_projects_parity`,
    `surface_construction_parity`, `shipbuilding_parity`,
    `shipyard_state_parity`, `industry_allocation_parity`,

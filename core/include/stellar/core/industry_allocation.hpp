@@ -24,4 +24,7 @@ struct IndustryPriorityChangeResult { bool accepted{}; std::string message; };
 IndustryPriorityChangeResult set_industry_priority(std::span<CivilizationEconomy> economies,
     int actor_civilization_id, int target_civilization_id, IndustryPriority priority);
 double civilization_operating_funding(std::span<const CivilizationEconomy> economies, int civilization_id);
+// Resolves funding against an already-located economy row — a null row
+// falls back exactly like the span overload does for a missing entry.
+double civilization_operating_funding(const CivilizationEconomy* economy);
 } // namespace stellar::core

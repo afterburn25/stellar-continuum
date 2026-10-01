@@ -63,6 +63,16 @@ ConstructionOrderResult set_surface_building_enabled(ConstructionWorld world, in
 ConstructionOrderResult set_surface_building_priority(ConstructionWorld world, int civilization_id, int colony_id, int building_id, bool prioritized);
 double surface_construction_industry_demand(ConstructionReadView world, int civilization_id,
     double simulation_days = std::numeric_limits<double>::infinity());
+// Per-civ colony-bucket variants (ADR 0002 option a): batch callers group
+// colonies once per call instead of re-filtering the world span per
+// civilization. `owned` must carry the civilization's colonies in world
+// order. `economy` may be null — operating funding falls back exactly as
+// the economy span lookup does for a missing row, and the industry spend
+// still throws when budget > 0 requires the row.
+double surface_construction_industry_demand(ConstructionReadView world,
+    std::span<Colony* const> owned, double simulation_days);
+void advance_surface_construction(ConstructionWorld world, std::span<Colony* const> owned,
+    int civilization_id, CivilizationEconomy* economy, double budget, double simulation_days);
 void advance_surface_construction(ConstructionWorld world, int civilization_id, double budget, double simulation_days = 1.0);
 void validate_surface_construction(const Colony& colony);
 } // namespace stellar::core

@@ -185,13 +185,20 @@ pointers while the public entry keeps its lookup semantics; a
 `campaign_industry_weights(const CivilizationEconomy*)` overload feeds
 the allocation loop from its already-resolved row. Throw ordering and
 first-match semantics preserved (`emplace` keeps the earliest element).
-Oracles unchanged and green: `construction_projects_parity`,
-`surface_construction_parity`, `shipbuilding_parity`,
-`shipyard_state_parity`, `industry_allocation_parity`,
-`campaign_coordinator_parity`, `campaign_frame_parity`. Deferred: the
-`surface_construction_*` colony sweeps per civ (cross-TU bucket
-overloads), the per-civ `*_industry_demand` scans, `select_ai_design`
-fleet scans, and strategic-AI/colonization/combat internals.
+The colony sweeps followed (landed 2026-10-01): `advance_construction`
+groups colonies once via `civ_buckets_of` and feeds each civ's ordered
+bucket through owned-pointer overloads of
+`surface_construction_industry_demand`/`advance_surface_construction`,
+passing the resolved `CivilizationEconomy*` so funding/spend lookups no
+longer rescan — the public span signatures delegate, keeping the lazy
+missing-economy throw. Oracles unchanged and green:
+`construction_projects_parity`, `surface_construction_parity`,
+`shipbuilding_parity`, `shipyard_state_parity`,
+`industry_allocation_parity`, `campaign_coordinator_parity`,
+`campaign_frame_parity`. Deferred: the per-civ `*_industry_demand`
+scans in the allocation loop (const-side buckets), `select_ai_design`
+fleet scans, `promote`/`lock` promotion-time lookups, and
+strategic-AI/colonization/combat internals.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

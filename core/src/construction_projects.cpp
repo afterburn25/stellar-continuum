@@ -107,12 +107,16 @@ std::unordered_map<int, T *> civ_index_of(std::span<T> items) {
     index.emplace(item.civilization_id, &item);
   return index;
 }
-// Resolved-pointer per-civilization construction advance — same body the
-// public advance_construction_for_civilization runs after its lookups, so
-// the batch loop can resolve each row once through the indexes above.
-std::vector<ConstructionEvent> advance_construction_resolved(
-    ConstructionWorld w, const Civilization &c, ConstructionState &s,
-    CivilizationEconomy &e, double budget, double days);
+// Colony grouping preserving world order inside each civilization bucket —
+// the surface-construction sweeps used to re-filter the full span per civ.
+template <class T>
+std::unordered_map<int, std::vector<T *>>
+civ_buckets_of(std::span<T> items) {
+  std::unordered_map<int, std::vector<T *>> index;
+  for (auto &item : items)
+    index[item.civilization_id].push_back(&item);
+  return index;
+}
 bool done(const ConstructionState &s, std::string_view id) {
   return std::find(s.completed_project_ids.begin(),
                    s.completed_project_ids.end(),
@@ -430,7 +434,8 @@ void ensure_automatic_construction_orders(ConstructionWorld w) {
 }
 namespace {
 std::vector<ConstructionEvent> advance_construction_resolved(
-    ConstructionWorld w, const Civilization &c, ConstructionState &s,
+    ConstructionWorld w, std::span<Colony *const> owned,
+    const Civilization &c, ConstructionState &s,
     CivilizationEconomy &e, double budget, double days) {
   const int id = c.id;
   promote(w.read(), id, s);
@@ -439,7 +444,7 @@ std::vector<ConstructionEvent> advance_construction_resolved(
   if (!std::isfinite(budget))
     throw std::out_of_range("Industry budgets must be finite.");
   double avail = std::min(std::max(0., budget), std::max(0., e.industry));
-  double sd = surface_construction_industry_demand(w.read(), id, days),
+  double sd = surface_construction_industry_demand(w.read(), owned, days),
          pd = s.active_project_id
                   ? std::min(construction_project_industry_per_day * days,
                              std::max(0., get_construction_project(
@@ -449,7 +454,7 @@ std::vector<ConstructionEvent> advance_construction_resolved(
                   : 0;
   double sb =
       sd > 0 ? std::min(sd, std::min(avail, sd + pd) * sd / (sd + pd)) : 0;
-  advance_surface_construction(w, id, sb, days);
+  advance_surface_construction(w, owned, id, &e, sb, days);
   avail = std::min(e.industry, std::max(0., avail - sb));
   std::vector<ConstructionEvent> r;
   if (!s.active_project_id)
@@ -492,7 +497,12 @@ advance_construction_for_civilization(ConstructionWorld w, int id,
   auto *e = economy_for(w, id);
   if (!s || !e)
     throw std::out_of_range("Sequence contains no matching element");
-  return advance_construction_resolved(w, *c, *s, *e, budget, days);
+  std::vector<Colony *> owned;
+  owned.reserve(w.colonies.size());
+  for (auto &colony : w.colonies)
+    if (colony.civilization_id == id)
+      owned.push_back(&colony);
+  return advance_construction_resolved(w, owned, *c, *s, *e, budget, days);
 }
 std::vector<ConstructionEvent> advance_construction(
     ConstructionWorld w,
@@ -506,6 +516,8 @@ std::vector<ConstructionEvent> advance_construction(
   ensure_automatic_construction_orders(w);
   const auto states = civ_index_of(w.construction);
   const auto economies = civ_index_of(w.economies);
+  const auto colony_buckets = civ_buckets_of(w.colonies);
+  static const std::vector<Colony *> empty_colonies;
   std::unordered_map<int, const ConstructionIndustryBudget *> budget_index;
   if (budgets)
     for (const auto &budget : *budgets)
@@ -531,7 +543,11 @@ std::vector<ConstructionEvent> advance_construction(
     const auto si = states.find(c.id);
     if (si == states.end())
       throw std::out_of_range("Sequence contains no matching element");
-    auto x = advance_construction_resolved(w, c, *si->second, *e, b, days);
+    const auto bi = colony_buckets.find(c.id);
+    const auto &owned =
+        bi == colony_buckets.end() ? empty_colonies : bi->second;
+    auto x = advance_construction_resolved(w, owned, c, *si->second, *e, b,
+                                           days);
     r.insert(r.end(), x.begin(), x.end());
   }
   return r;

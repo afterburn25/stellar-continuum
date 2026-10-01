@@ -110,7 +110,10 @@ double civilization_operating_funding(std::span<const CivilizationEconomy> econo
     const auto found=std::find_if(economies.begin(),economies.end(),[=](const auto& economy) {
         return economy.civilization_id == civilization_id;
     });
-    const auto value=found == economies.end() ? 1.0 : found->last_base_operations_funding_fraction;
+    return civilization_operating_funding(found == economies.end() ? nullptr : &*found);
+}
+double civilization_operating_funding(const CivilizationEconomy* economy) {
+    const auto value=economy ? economy->last_base_operations_funding_fraction : 1.0;
     return std::isfinite(value) ? std::clamp(value,0.0,1.0) : 0.0;
 }
 } // namespace stellar::core

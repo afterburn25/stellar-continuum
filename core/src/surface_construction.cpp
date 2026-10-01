@@ -623,32 +623,49 @@ ConstructionOrderResult set_surface_building_priority(ConstructionWorld w,
                          "power before normal buildings."
                    : n + " returned to normal operating priority."};
 }
+namespace {
+double site_demand(const Colony &c, double days) {
+  double sum = 0;
+  for (auto &b : c.surface_buildings)
+    if (!b.is_complete) {
+      auto *d = find_surface_building(b.type_id);
+      if (!d)
+        throw std::invalid_argument(
+            "The surface building has an unknown type.");
+      sum +=
+          std::min(surface_industry_per_site_per_day * std::max(0., days),
+                   std::max(0., d->industry_cost - b.industry_progress));
+    }
+  return sum;
+}
+} // namespace
+double surface_construction_industry_demand(ConstructionReadView w,
+    std::span<Colony *const> owned, double days) {
+  double sum = 0;
+  for (const auto *c : owned)
+    sum += site_demand(*c, days);
+  return sum;
+}
 double surface_construction_industry_demand(ConstructionReadView w, int civ,
                                             double days) {
   double sum = 0;
   for (auto &c : w.colonies)
     if (c.civilization_id == civ)
-      for (auto &b : c.surface_buildings)
-        if (!b.is_complete) {
-          auto *d = find_surface_building(b.type_id);
-          if (!d)
-            throw std::invalid_argument(
-                "The surface building has an unknown type.");
-          sum +=
-              std::min(surface_industry_per_site_per_day * std::max(0., days),
-                       std::max(0., d->industry_cost - b.industry_progress));
-        }
+      sum += site_demand(c, days);
   return sum;
 }
-void advance_surface_construction(ConstructionWorld w, int civ, double budget,
+void advance_surface_construction(ConstructionWorld w,
+                                  std::span<Colony *const> owned, int civ,
+                                  CivilizationEconomy *e, double budget,
                                   double days) {
   if (!std::isfinite(budget) || budget < 0 || !std::isfinite(days) || days < 0)
     throw std::out_of_range("Surface construction requires finite nonnegative "
                             "industry and elapsed days.");
-  auto work = days * civilization_operating_funding(w.economies, civ);
+  auto work = days * civilization_operating_funding(e);
   if (work > 0)
-    for (auto &c : w.colonies)
-      if (c.civilization_id == civ) {
+    for (auto *cp : owned) {
+      auto &c = *cp;
+      {
         if (c.surface_hub_upgrade_days_remaining > 0) {
           c.surface_hub_upgrade_days_remaining =
               std::max(0., c.surface_hub_upgrade_days_remaining - work);
@@ -674,21 +691,20 @@ void advance_surface_construction(ConstructionWorld w, int civ, double budget,
             }
           }
       }
+    }
   if (budget <= 0)
     return;
-  auto *e = economy_for(w, civ);
   if (!e)
     throw std::runtime_error("Sequence contains no matching element");
-  auto demand = surface_construction_industry_demand(w.read(), civ, days);
+  auto demand = surface_construction_industry_demand(w.read(), owned, days);
   if (demand <= 0)
     return;
   auto avail = std::min({demand, e->industry, budget});
   double spent = 0;
   std::vector<std::pair<int, SurfaceBuilding *>> sites;
-  for (auto &c : w.colonies)
-    if (c.civilization_id == civ)
-      for (auto &b : c.surface_buildings)
-        sites.emplace_back(c.id, &b);
+  for (auto *cp : owned)
+    for (auto &b : cp->surface_buildings)
+      sites.emplace_back(cp->id, &b);
   std::stable_sort(sites.begin(), sites.end(),
                    [](const auto &a, const auto &b) {
                      return a.first != b.first ? a.first < b.first
@@ -712,6 +728,16 @@ void advance_surface_construction(ConstructionWorld w, int civ, double budget,
     }
   }
   e->industry = std::max(0., e->industry - spent);
+}
+void advance_surface_construction(ConstructionWorld w, int civ, double budget,
+                                  double days) {
+  std::vector<Colony *> owned;
+  owned.reserve(w.colonies.size());
+  for (auto &c : w.colonies)
+    if (c.civilization_id == civ)
+      owned.push_back(&c);
+  advance_surface_construction(w, owned, civ, economy_for(w, civ), budget,
+                               days);
 }
 void validate_surface_construction(const Colony &c) {
   if(c.surface_hub_level<0 || c.surface_hub_level>3)

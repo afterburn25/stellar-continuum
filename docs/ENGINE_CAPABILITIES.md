@@ -215,16 +215,26 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `first(shipyards)`/`find_if` on budgets). The reduction indexes each
   civ-keyed collection once per call.
 - **Modules:** `core/src/construction_projects.cpp` (`civ_index_of`,
-  `advance_construction_resolved` extraction), `core/src/shipbuilding.cpp`
-  (`civ_index_of`, `resolve_budget` pointer overload, indexed
-  `advance_core`/`ensure_automatic_ship_orders`),
-  `core/src/industry_allocation.cpp` (`campaign_industry_weights` pointer
-  overload), `core/src/campaign_coordinator.cpp` (economy index in the
+  `civ_buckets_of`, `advance_construction_resolved` extraction),
+  `core/src/shipbuilding.cpp` (`civ_index_of`, `resolve_budget` pointer
+  overload, indexed `advance_core`/`ensure_automatic_ship_orders`),
+  `core/src/industry_allocation.cpp` (`campaign_industry_weights` and
+  `civilization_operating_funding` pointer overloads),
+  `core/src/surface_construction.cpp` (owned-colony
+  `surface_construction_industry_demand`/`advance_surface_construction`
+  overloads, `site_demand` extraction),
+  `core/src/campaign_coordinator.cpp` (economy index in the
   industry-allocation phase).
-- **Public interface:** `campaign_industry_weights(const
-  CivilizationEconomy*, IndustryPriorityWeights)` is the only API
-  addition — additive; the span overload delegates. All existing
-  signatures unchanged.
+- **Public interface:** additive overloads only —
+  `campaign_industry_weights(const CivilizationEconomy*)`,
+  `civilization_operating_funding(const CivilizationEconomy*)`,
+  `surface_construction_industry_demand(ConstructionReadView,
+  std::span<Colony* const>, double)` and
+  `advance_surface_construction(ConstructionWorld,
+  std::span<Colony* const>, int, CivilizationEconomy*, double, double)`.
+  All existing signatures unchanged; the span versions delegate and keep
+  their throw ordering (the nullable `economy` preserves the lazy
+  missing-row throw at the `budget > 0` spend gate).
 - **Consumers:** phases 2–5 of the coordinator (`automatic_orders`,
   `industry_allocation`, `construction`, `shipbuilding`) consume the
   indexed paths; every public entry point (`advance_construction_for_
@@ -241,13 +251,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   persists. Removes O(civs) linear lookups per civ per step
   (~5–8 scans/civ in `advance_construction` alone); each skipped
   iteration was a cheap id compare, so the win is asymptotic.
-- **Limitations:** the colony sweeps inside
-  `surface_construction_industry_demand`/`advance_surface_construction`
-  still rescan per civ (bucket overloads across TUs deferred);
-  `construction_industry_demand`/`shipbuilding_industry_demand` still
-  scan construction/shipyard spans per civ in the allocation loop;
-  `select_ai_design`'s fleet `any_of` scans and `lock`'s promotion-time
-  lookups are bounded and left as-is.
+- **Limitations:** `construction_industry_demand`/
+  `shipbuilding_industry_demand` still scan construction/shipyard spans
+  per civ in the allocation loop (const-side buckets need separate span
+  types); `select_ai_design`'s fleet `any_of` scans and `lock`/`promote`'s
+  bounded promotion-time lookups are left as-is; indexes are rebuilt per
+  call with no cross-phase reuse.
 - **Future reuse:** `civ_index_of` is the generic shape — any batch loop
   that resolves civ-keyed rows repeatedly can index once; the
   resolved-pointer extraction pattern lets public per-civ entry points
