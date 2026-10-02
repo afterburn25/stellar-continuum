@@ -5298,6 +5298,86 @@ and packaging — and expansion work was kept only where additive.
 - Packaging scripts previously required PowerShell 7; they now also run on
   Windows PowerShell 5.1 with identical output bytes.
 
+## Authored ship design, components and fleet doctrine (2026-10-02)
+
+P2 workstream on `game/ui-visual-overhaul`: a civilization-authored ship
+design surface backed by a component catalog, a fleet standing-doctrine
+model, and the native Design Bureau UI.
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Ship hull and component catalogs** (`core/ship_components.*`): six hull
+  frames (`survey_frame`, `research_frame`, `escort_frame`, `colony_frame`,
+  `freight_frame`, `outpost_frame`) and eighteen components across eight slot
+  kinds (Engine, Warp, Sensor, Weapon, Defense, Utility, Cargo, Habitation).
+  Components carry additive stat deltas (industry/credit cost, strategic
+  speed, leg range, fuel endurance, sensors, cargo, crew, shields, armor,
+  hull, weapon damage, optional weapon interval) plus capability
+  prerequisites and optional tactical payloads (`MassiveWeaponGroup`,
+  `MassiveModuleState`) that bridge into battle loadouts.
+- **Authored ship designs** (`AuthoredShipDesign`): per-civilization designs
+  validated against hull slot plans, required slots, slot-fit and
+  prerequisites via `validate_authored_ship_design`. Resolution is on demand
+  into ordinary `ShipDesignDefinition` values (`resolve_authored_ship_design`,
+  `resolve_ship_design`), so shipbuilding, freight, diagnostics and voice
+  consumers reuse canonical rules unchanged.
+- **Authoritative design service** (`create_ship_design`,
+  `update_ship_design_metadata`, `retire_ship_design`): civilization-scoped
+  commands with deterministic ID allocation; `create_ship_design` accepts the
+  caller's capability query (adaptive research supplies its own; the legacy
+  technology adapter is the default). Authored designs persist on
+  `FreshCampaignState::authored_ship_designs` through the galaxy payload DTO
+  tail — absent in old saves, additive when present.
+- **Combat integration**: `resolve_authored_combat_profile` produces
+  `CombatProfileDefinition` overrides stamped onto `FleetCombatState` as
+  `profile_override` (the fleet keeps a valid catalog `profile_id`, so
+  `ensure_fleet_combat_state` never resets authored fleets); weapon/module
+  components derive `MassiveCombatLoadout` via `massive_loadout_from_authored`.
+- **Fleet doctrine** (`FleetDoctrine` on `FleetState`): posture
+  (`HoldFast`/`EngageAtWill`) plus auto-retreat hull fraction in `[0, 1]`,
+  validated by `set_fleet_doctrine`, consumed by the combat simulation's
+  auto-engage/retreat logic, and persisted with clamping/rejection of invalid
+  values on load.
+- **Native Design Bureau UI** (`native_ship_design_controller`/`workspace`):
+  opened from the shipyard's DESIGN BUREAU button. Projects the player's
+  authored designs, the hull/component catalogs with per-item lock reasons, a
+  live draft editor (hull + per-slot component cycling, required-slot
+  defaults), a resolved-stats/issue panel, and revision-bounded
+  commit/retire/rename commands that re-validate authoritatively. Retirement
+  is confirmation-gated and blocked while a shipyard order references the
+  design. Keyboard focus, Escape/click-outside close, and announcement hooks
+  follow the established workspace pattern.
+- **Native fleet doctrine controls**: an owned fleet's details panel exposes
+  a posture toggle and an auto-retreat threshold ladder (0/25/50/75%)
+  dispatched through `NativeFleetController::issue_doctrine` with generation
+  and selection checks; foreign-inspected fleets keep read-only projection.
+- **Tests:** `ship_components_tests` (catalogs, validation, resolution,
+  doctrine, persistence round-trip), `native_ship_design_controller_tests`
+  (catalog projection, compose preview, commit/retire/rename, stale
+  generation/revision rejection, retirement blockers, locked-campaign
+  rejection), `native_ship_design_workspace_tests` (layout, selection,
+  cycling, release-gated commit/retire, keyboard focus), and
+  `native_fleet_controller_tests` doctrine coverage (projection, selection
+  binding, stale generation, invalid threshold, foreign rejection).
+
+### ENGINE LIMITATIONS REMAINING
+
+- The Design Bureau edits composition only for new designs — committed
+  designs cannot be refitted in place (update is metadata-only); a new
+  revision requires a fresh design. The rename path exists on the controller
+  but has no UI affordance yet.
+- The draft editor cycles components per slot; it does not show the live
+  `compose` stats diff between successive choices, and the design list does
+  not scroll beyond the visible window.
+- Doctrine postures are `HoldFast`/`EngageAtWill` only; auto-retreat consumes
+  a coarse four-rung ladder. No per-doctrine engagement range, focus-fire, or
+  formation vocabulary yet.
+- Authored designs are player-authored through the UI; there is no AI or
+  scripted-civilization design authoring, and no design sharing/gifting
+  between civilizations.
+- Component prerequisites reuse the ship-design capability vocabulary; there
+  is no per-component cost scaling, upkeep, or salvage.
+
 ## Notes
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,

@@ -73,6 +73,8 @@ add_library(stellar_native_client_logic STATIC
   app/native_client/native_settlement_preparation.cpp
   app/native_client/native_settlement_workspace.cpp
   app/native_client/native_ship_art_assets.cpp
+  app/native_client/native_ship_design_controller.cpp
+  app/native_client/native_ship_design_workspace.cpp
   app/native_client/native_shipyard_controller.cpp
   app/native_client/native_shipyard_workspace.cpp
   app/native_client/native_small_body_panel.cpp

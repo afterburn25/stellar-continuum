@@ -46,6 +46,10 @@ struct FleetWorkspaceLayout {
   stellar::native_map::UiRect order_hold;
   stellar::native_map::UiRect order_defend;
   stellar::native_map::UiRect order_retreat;
+  // Standing-doctrine row for armed fleets: posture toggle + auto-retreat
+  // threshold cycle. Stacked above the order row.
+  stellar::native_map::UiRect doctrine_posture;
+  stellar::native_map::UiRect doctrine_retreat;
   stellar::native_map::UiRect locate;
   stellar::native_map::UiRect military_locate;
   stellar::native_map::UiRect civilian_locate;
@@ -66,7 +70,9 @@ enum class FleetWorkspaceCommandKind {
   MilitaryOrder,
   Locate,
   Recovery,
-  OpenColony
+  OpenColony,
+  DoctrinePosture,
+  DoctrineRetreat
 };
 
 struct FleetWorkspaceCommand {
@@ -82,6 +88,8 @@ struct FleetWorkspaceCommand {
   std::optional<stellar::native_fleet::NativeMilitaryOrderQuote> military_order_quote;
   stellar::core::MilitaryOrderType military_order{stellar::core::MilitaryOrderType::Hold};
   std::optional<stellar::native_fleet::NativeFleetLocateQuote> locate_quote;
+  // Desired doctrine when kind is DoctrinePosture/DoctrineRetreat.
+  stellar::core::FleetDoctrine doctrine{};
 };
 
 class NativeFleetWorkspace final {
@@ -176,7 +184,8 @@ private:
   [[nodiscard]] std::vector<FocusRect>
   focusables(const FleetWorkspaceLayout &) const;
   FleetWorkspacePresentation presentation_;
-  enum class PressTarget { None, Hold, Defend, Retreat, Locate };
+  enum class PressTarget { None, Hold, Defend, Retreat, Locate,
+                           DoctrinePosture, DoctrineRetreat };
   [[nodiscard]] const stellar::native_fleet::NativeOwnFleet *
   selected_fleet() const noexcept;
   void clear_pressed_action() noexcept;

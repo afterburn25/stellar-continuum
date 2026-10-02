@@ -2,6 +2,7 @@
 #include <stellar/core/civilization_catalog.hpp>
 #include <stellar/core/combat_state.hpp>
 #include <stellar/core/ship_designs.hpp>
+#include <functional>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -112,11 +113,16 @@ std::optional<ShipDesignDefinition> resolve_ship_design(
 std::string allocate_ship_design_id(
     std::span<const AuthoredShipDesign> designs, int civilization_id);
 
+// Callers may supply the campaign's configured shipbuilding capability query
+// (adaptive research supplies its own; absent, the legacy/prototype adapter
+// over campaign.technologies is used).
+using ShipDesignCapabilityQuery = std::function<bool(int, std::string_view)>;
+
 // Authoritative design commands against campaign state. Validation runs before
 // any mutation; rejected commands leave the campaign untouched.
-ShipDesignCommandResult create_ship_design(FreshCampaignState &campaign,
-                                           int civilization_id,
-                                           AuthoredShipDesign spec);
+ShipDesignCommandResult create_ship_design(
+    FreshCampaignState &campaign, int civilization_id, AuthoredShipDesign spec,
+    const ShipDesignCapabilityQuery &capability_query = {});
 ShipDesignCommandResult update_ship_design_metadata(
     FreshCampaignState &campaign, int civilization_id,
     std::string_view design_id, std::string name, std::string description);

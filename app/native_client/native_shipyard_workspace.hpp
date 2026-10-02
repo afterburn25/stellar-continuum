@@ -32,12 +32,14 @@ struct ShipyardWorkspaceLayout {
   stellar::native_map::UiRect feedback;
   stellar::native_map::UiRect action;
   stellar::native_map::UiRect categories,search,sort,filter,minus,plus,quantity,favorite;
+  // Opens the ship design bureau overlay from the build-orders header.
+  stellar::native_map::UiRect bureau;
 
   [[nodiscard]] static ShipyardWorkspaceLayout for_viewport(int width,
                                                              int height) noexcept;
 };
 
-enum class ShipyardWorkspaceCommandKind { None, Start, PrepareCancel, Cancel, MoveUp, MoveDown };
+enum class ShipyardWorkspaceCommandKind { None, Start, PrepareCancel, Cancel, MoveUp, MoveDown, OpenDesignBureau };
 
 struct ShipyardWorkspaceCommand {
   ShipyardWorkspaceCommandKind kind{ShipyardWorkspaceCommandKind::None};

@@ -79,6 +79,8 @@
 #include "native_research_art.hpp"
 #include "native_session_messages.hpp"
 #include "native_shipbuilding_messages.hpp"
+#include "native_ship_design_controller.hpp"
+#include "native_ship_design_workspace.hpp"
 #include "native_shipyard_controller.hpp"
 #include "native_shipyard_workspace.hpp"
 #include "native_system_view.hpp"
@@ -195,6 +197,8 @@ using namespace stellar::native_research;
 using namespace stellar::native_research_ui;
 using namespace stellar::native_shipyard;
 using namespace stellar::native_shipyard_ui;
+using namespace stellar::native_ship_design;
+using namespace stellar::native_ship_design_ui;
 namespace native_audio = stellar::native_audio;
 namespace native_battle_ui = stellar::native_battle_ui;
 namespace native_developer = stellar::native_developer;
@@ -1057,6 +1061,8 @@ class NativeCampaign final {
     system_workspace_.set_localization(&table);
     battle_workspace_.set_localization(&table);
     shipyard_workspace_.set_localization(&table);
+    ship_design_workspace_.set_localization(&table);
+    ship_design_controller_.set_localization(&table);
     notification_view_.set_localization(&table);
     chronicle_view_.set_localization(&table);
     assets_.set_localization(&table);
@@ -6529,6 +6535,7 @@ class NativeCampaign final {
   // buttons should reach it even before its ring claims keyboard focus.
   [[nodiscard]] bool navigable_surface_visible()const{
     return research_workspace_.visible()||shipyard_workspace_.visible()||
+           ship_design_workspace_.visible()||
            economy_workspace_.visible()||supply_workspace_.visible()||
            construction_workspace_.visible()||chronicle_view_.visible()||
            notification_view_.visible()||colony_roster_.visible()||
@@ -6616,6 +6623,7 @@ class NativeCampaign final {
 
       battle_workspace_.discard_campaign();battle_refresh_elapsed_=0.;battle_art_bindings_.clear();battle_art_plan_.clear();
       settlement_workspace_.discard_campaign();
+      ship_design_workspace_.discard_campaign();
       colony_entry_view_.reset();
       system_workspace_.discard_campaign();
       planet_discs_.discard_campaign();
@@ -6624,6 +6632,7 @@ class NativeCampaign final {
       refresh_fleets(true);
       if(research_workspace_.visible())refresh_research(true);
       if(shipyard_workspace_.visible())refresh_shipyard(true);
+      if(ship_design_workspace_.visible())refresh_ship_design(true);
       if(construction_workspace_.visible())refresh_construction(true);
       install_replay_observer();
     }
@@ -7759,6 +7768,7 @@ class NativeCampaign final {
         else if(diplomacy_workspace_.visible())diplomacy_workspace_.close();
         else if(colony_workspace_.visible())colony_workspace_.close();
         else if(construction_workspace_.visible())construction_workspace_.close();
+        else if(ship_design_workspace_.visible())ship_design_workspace_.close();
         else if(shipyard_workspace_.visible()){if(shipyard_workspace_.popover_open())(void)shipyard_workspace_.handle(event,width,height);else shipyard_workspace_.close();}
         else if(research_workspace_.visible()){if(research_workspace_.popover_open())(void)research_workspace_.handle(event,width,height);else research_workspace_.close();}
         else if(inspection_card_.visible()){inspection_card_.clear();selected_id_.reset();}
@@ -7772,6 +7782,7 @@ class NativeCampaign final {
         (void)supply_workspace_.handle(event,supply_controller_.view(),width,height);
         (void)economy_workspace_.handle(event,economy_controller_.view(),width,height);
         (void)research_workspace_.handle(event,width,height);
+        (void)ship_design_workspace_.handle(event,width,height);
         (void)shipyard_workspace_.handle(event,width,height);
         (void)construction_workspace_.handle(event,width,height);
         (void)diplomacy_workspace_.handle(event,width,height);
@@ -7806,6 +7817,16 @@ class NativeCampaign final {
           announcer_.announce_focus(construction_workspace_.focused_label(cl),announcement_bounds(construction_workspace_.focused_bounds(cl)));}
         if(command.kind!=ConstructionWorkspaceCommandKind::None)
           execute_construction(command);
+        if(command.captured)continue;
+      }
+      if(ship_design_workspace_.visible()){
+        const int focus_before=ship_design_workspace_.focus();
+        const auto command=ship_design_workspace_.handle(event,width,height);
+        if(command.captured&&ship_design_workspace_.focus()!=focus_before)
+          announcer_.announce_focus(ship_design_workspace_.focused_label(
+              ship_design_workspace_.layout(width,height)));
+        if(command.kind!=ShipDesignWorkspaceCommandKind::None)
+          execute_ship_design(command);
         if(command.captured)continue;
       }
       if(shipyard_workspace_.visible()){
@@ -7921,6 +7942,8 @@ class NativeCampaign final {
       refresh_fleets(false);
       shipyard_refresh_elapsed_+=elapsed;
       refresh_shipyard(false);
+      ship_design_refresh_elapsed_+=elapsed;
+      refresh_ship_design(false);
       construction_refresh_elapsed_+=elapsed;
       refresh_construction(false);
       diplomacy_refresh_elapsed_+=elapsed;
@@ -8384,6 +8407,7 @@ class NativeCampaign final {
     }
     research_workspace_.render(out, width, height);
     shipyard_workspace_.render(out, width, height, &ship_art_);
+    ship_design_workspace_.render(out, width, height);
     construction_workspace_.render(out, width, height);
     diplomacy_workspace_.render(out, width, height, &diplomacy_portrait_provider_);
     colony_workspace_.planetary().globe().set_simulation_days(session_->frame().clock().simulation_days());
@@ -9192,6 +9216,11 @@ class NativeCampaign final {
       return;
     }
     NativeShipyardCommandOutcome outcome;
+    if(command.kind==ShipyardWorkspaceCommandKind::OpenDesignBureau){
+      ship_design_workspace_.open();
+      refresh_ship_design(true);
+      return;
+    }
     if(command.kind==ShipyardWorkspaceCommandKind::PrepareCancel){
       auto &clock=session_->frame().clock();
       if(clock.speed()!=StrategicSpeed::Paused)
@@ -9216,6 +9245,57 @@ class NativeCampaign final {
     if(outcome.accepted)publish_notification("Ships",stellar::native_shipbuilding::localized_message(locale_,outcome.message));
     refresh_shipyard(true);
     shipyard_workspace_.set_notice(outcome.message,outcome.accepted);
+  }
+
+  void refresh_ship_design(bool force){
+    if(!ship_design_workspace_.visible())return;
+    if(!force&&ship_design_refresh_elapsed_<.2)return;
+    ship_design_workspace_.set_view(ship_design_controller_.build(
+        session_->frame(),session_->cache().generation));
+    ship_design_refresh_elapsed_=0.;
+  }
+
+  void execute_ship_design(const ShipDesignWorkspaceCommand &command){
+    if(command.kind==ShipDesignWorkspaceCommandKind::Close){
+      return;
+    }
+    if(command.kind==ShipDesignWorkspaceCommandKind::CycleHull){
+      ship_design_workspace_.cycle_hull_command(command.direction);
+      return;
+    }
+    if(command.kind==ShipDesignWorkspaceCommandKind::CycleComponent){
+      ship_design_workspace_.cycle_component_command(command.slot_index,
+                                                     command.direction);
+      return;
+    }
+    if(command.kind==ShipDesignWorkspaceCommandKind::SelectDesign){
+      refresh_ship_design(true);
+      return;
+    }
+    const auto &view=ship_design_workspace_.view();
+    if(!view){
+      ship_design_workspace_.set_notice(
+          tr("DESIGN_NOTICE_LOADING","The design bureau is still loading."),false);
+      return;
+    }
+    stellar::native_ship_design::NativeShipDesignCommandOutcome outcome;
+    if(command.kind==ShipDesignWorkspaceCommandKind::Commit)
+      outcome=ship_design_controller_.commit(
+          session_->frame(),session_->cache().generation,view->design_revision,
+          ship_design_workspace_.suggest_draft_name(),
+          ship_design_workspace_.draft_hull_id(),
+          ship_design_workspace_.draft_component_ids());
+    else if(command.kind==ShipDesignWorkspaceCommandKind::Retire)
+      outcome=ship_design_controller_.retire(
+          session_->frame(),session_->cache().generation,view->design_revision,
+          command.design_id);
+    else return;
+    if(outcome.accepted){
+      publish_notification("Ships",outcome.message);
+      if(audio_confirm_)audio_confirm_();
+    }
+    refresh_ship_design(true);
+    ship_design_workspace_.set_notice(outcome.message,outcome.accepted);
   }
 
   void refresh_construction(bool force){
@@ -9668,6 +9748,17 @@ class NativeCampaign final {
       }
       fleet_workspace_.set_notice(message,outcome.accepted);
       refresh_fleets(true);refresh_system_travel(true);return;
+    }
+    if(command.kind==FleetWorkspaceCommandKind::DoctrinePosture||
+       command.kind==FleetWorkspaceCommandKind::DoctrineRetreat){
+      const auto outcome=fleet_controller_.issue_doctrine(
+          session_->frame(),session_->cache().generation,command.fleet_id,
+          command.doctrine.posture,command.doctrine.auto_retreat_hull_fraction);
+      const auto message=observer_safe_fleet_message(outcome.message,observed_system_names(),locale_);
+      last_fleet_command_accepted_=outcome.accepted;
+      if(outcome.accepted){if(audio_confirm_)audio_confirm_();}
+      fleet_workspace_.set_notice(message,outcome.accepted);
+      refresh_fleets(true);return;
     }
     if(command.kind==FleetWorkspaceCommandKind::Locate){
       if(!command.locate_quote)return;
@@ -10316,6 +10407,10 @@ class NativeCampaign final {
   NativeFleetWorkspace fleet_workspace_{FleetWorkspacePresentation::SelectedCommands};
   NativeShipyardController shipyard_controller_;
   NativeShipyardWorkspace shipyard_workspace_;
+  stellar::native_ship_design::NativeShipDesignController
+      ship_design_controller_;
+  stellar::native_ship_design_ui::NativeShipDesignWorkspace
+      ship_design_workspace_;
   NativeConstructionController construction_controller_;
   NativeConstructionWorkspace construction_workspace_;
   NativeDiplomacyController diplomacy_controller_;
@@ -10408,6 +10503,7 @@ class NativeCampaign final {
   double research_refresh_elapsed_{};
   double fleet_refresh_elapsed_{};
   double shipyard_refresh_elapsed_{};
+  double ship_design_refresh_elapsed_{};
   double construction_refresh_elapsed_{};
   double diplomacy_refresh_elapsed_{};
   double colony_refresh_elapsed_{};

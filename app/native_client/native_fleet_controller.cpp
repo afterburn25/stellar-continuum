@@ -255,6 +255,8 @@ NativeFleetMapView NativeFleetController::build(
         .mission_order_revision = fleet.mission_order_revision,
         .combat_power = own_fleet_combat_power(fleet),
     };
+    item.doctrine_posture = fleet.doctrine.posture;
+    item.auto_retreat_hull_fraction = fleet.doctrine.auto_retreat_hull_fraction;
     if (const auto status = status_by_id.find(fleet.id);
         status != status_by_id.end())
       item.combat_status = status->second;
@@ -611,6 +613,32 @@ NativeFleetOrderOutcome NativeFleetController::issue_selected_military_order(
   return {outcome.accepted,
           native_military::localized_message(locale_, outcome.message),
           after ? after->mission_order_revision : quote.mission_order_revision};
+}
+
+NativeFleetOrderOutcome NativeFleetController::issue_doctrine(
+    CampaignFrame &frame, std::uint64_t campaign_generation, int fleet_id,
+    FleetDoctrinePosture posture, double auto_retreat_hull_fraction) {
+  require_owner();
+  if (!generation_ || *generation_ != campaign_generation ||
+      selected_fleet_id_ != fleet_id)
+    return {false, tr("FLEET_MSG_SELECTION_DETAILS",
+                      "The fleet selection changed; refresh fleet details first.")};
+  auto player = context(frame);
+  if (player.world.active_combat_encounter &&
+      !player.world.active_combat_encounter->reconciled)
+    return {false, tr("FLEET_MSG_TACTICAL_BLOCKED",
+                      "Doctrine changes are unavailable during tactical combat.")};
+  auto *fleet = find_owned(player, fleet_id);
+  if (!fleet)
+    return {false, tr("FLEET_MSG_SELECT_OWNED",
+                      "Select an active owned fleet.")};
+  const FleetDoctrine doctrine{posture, auto_retreat_hull_fraction};
+  if (!stellar::core::set_fleet_doctrine(*fleet, doctrine))
+    return {false, tr("FLEET_MSG_DOCTRINE_INVALID",
+                      "That doctrine is not valid for this fleet."),
+            fleet->mission_order_revision};
+  return {true, tr("FLEET_MSG_DOCTRINE_SET", "Doctrine updated."),
+          fleet->mission_order_revision};
 }
 
 NativeFleetLocateOutcome NativeFleetController::locate_selected(

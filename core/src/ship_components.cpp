@@ -424,17 +424,21 @@ std::string allocate_ship_design_id(std::span<const AuthoredShipDesign> designs,
 
 namespace {
 
-ShipDesignReadView authored_view(const FreshCampaignState &campaign) {
+ShipDesignReadView authored_view(
+    const FreshCampaignState &campaign,
+    const ShipDesignCapabilityQuery &capability_query) {
   ShipDesignReadView view;
   view.construction = campaign.construction;
   view.authored_designs = campaign.authored_ship_designs;
-  view.capability_query = [technologies = &campaign.technologies](
-                              int civilization_id,
-                              std::string_view capability_id) {
-    return prototype_shipbuilding_has_capability(*technologies,
-                                                 civilization_id,
-                                                 capability_id);
-  };
+  view.capability_query =
+      capability_query
+          ? capability_query
+          : ShipDesignCapabilityQuery{
+                [technologies = &campaign.technologies](
+                    int civilization_id, std::string_view capability_id) {
+                  return prototype_shipbuilding_has_capability(
+                      *technologies, civilization_id, capability_id);
+                }};
   return view;
 }
 
@@ -447,9 +451,9 @@ bool civilization_exists(const FreshCampaignState &campaign,
 
 } // namespace
 
-ShipDesignCommandResult create_ship_design(FreshCampaignState &campaign,
-                                           int civilization_id,
-                                           AuthoredShipDesign spec) {
+ShipDesignCommandResult create_ship_design(
+    FreshCampaignState &campaign, int civilization_id, AuthoredShipDesign spec,
+    const ShipDesignCapabilityQuery &capability_query) {
   if (!civilization_exists(campaign, civilization_id))
     return {false, "Unknown civilization."};
   spec.owner_civilization_id = civilization_id;
@@ -459,7 +463,8 @@ ShipDesignCommandResult create_ship_design(FreshCampaignState &campaign,
   else if (find_authored_ship_design(campaign.authored_ship_designs, spec.id))
     return {false, "A ship design with id '" + spec.id + "' already exists."};
   const auto validation =
-      validate_authored_ship_design(spec, authored_view(campaign),
+      validate_authored_ship_design(spec,
+                                    authored_view(campaign, capability_query),
                                     civilization_id);
   if (!validation.valid()) {
     std::string message = "Ship design is invalid:";

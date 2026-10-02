@@ -2,6 +2,7 @@
 
 #include <stellar/core/campaign_frame.hpp>
 #include <stellar/core/fleet_power_observation.hpp>
+#include <stellar/core/fleet_state.hpp>
 #include <stellar/core/own_combat_fleet_status.hpp>
 
 #include <cstdint>
@@ -143,6 +144,9 @@ struct NativeOwnFleet {
   bool foreign_inspection{};
   int owner_civilization_id{};
   std::string owner_name;
+  // Standing combat doctrine projected for presentation/commands.
+  stellar::core::FleetDoctrinePosture doctrine_posture{};
+  double auto_retreat_hull_fraction{};
 };
 
 // A historic intelligence record owns no current position. The strategic
@@ -221,6 +225,11 @@ public:
       stellar::core::MilitaryOrderType);
   [[nodiscard]] NativeFleetLocateOutcome locate_selected(
       stellar::core::CampaignFrame &, const NativeFleetLocateQuote &);
+  // Applies a validated standing doctrine to the selected owned fleet.
+  [[nodiscard]] NativeFleetOrderOutcome issue_doctrine(
+      stellar::core::CampaignFrame &, std::uint64_t campaign_generation,
+      int fleet_id, stellar::core::FleetDoctrinePosture posture,
+      double auto_retreat_hull_fraction);
   [[nodiscard]] std::optional<int> selection() const;
   void set_localization(
       const stellar::engine::LocalizationTable *table) noexcept {

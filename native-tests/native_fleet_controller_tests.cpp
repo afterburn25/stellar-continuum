@@ -307,6 +307,63 @@ void science_survey_projection(CampaignFrame &frame) {
   *science = original;
 }
 
+void doctrine_commands(CampaignFrame &frame) {
+  NativeFleetController controller;
+  constexpr std::uint64_t generation = 61;
+  const auto view = controller.build(frame, generation);
+  require(!view.own_fleets.empty(), "Authored fixture lacks an owned fleet.");
+  auto &world = frame.runtime().world().campaign();
+  const auto owned = view.own_fleets.front().id;
+  auto live = std::ranges::find(world.fleets, owned, &FleetState::id);
+  require(live != world.fleets.end(), "Owned fleet disappeared.");
+  require(view.own_fleets.front().doctrine_posture == live->doctrine.posture &&
+              view.own_fleets.front().auto_retreat_hull_fraction ==
+                  live->doctrine.auto_retreat_hull_fraction,
+          "Fleet doctrine was not projected into the fleet row.");
+
+  // Doctrine commands bind to the controller selection.
+  require(!controller.issue_doctrine(frame, generation, owned,
+                                     FleetDoctrinePosture::EngageAtWill, .5)
+               .accepted,
+          "Doctrine was applied without a fleet selection.");
+  require(controller.select(frame, generation, owned).accepted,
+          "Owned fleet could not be selected.");
+  require(!controller.issue_doctrine(frame, generation + 1, owned,
+                                     FleetDoctrinePosture::EngageAtWill, .5)
+               .accepted &&
+              live->doctrine.posture == FleetDoctrinePosture::HoldFast,
+          "A stale campaign generation mutated fleet doctrine.");
+  require(!controller.issue_doctrine(frame, generation, owned,
+                                     FleetDoctrinePosture::HoldFast, 1.5)
+               .accepted &&
+              live->doctrine.auto_retreat_hull_fraction <= 1.,
+          "An out-of-range retreat threshold mutated doctrine.");
+  const auto outcome =
+      controller.issue_doctrine(frame, generation, owned,
+                                FleetDoctrinePosture::EngageAtWill, .25);
+  require(outcome.accepted &&
+              live->doctrine.posture == FleetDoctrinePosture::EngageAtWill &&
+              live->doctrine.auto_retreat_hull_fraction == .25,
+          "Doctrine command did not update authoritative fleet state.");
+  const auto after = controller.build(frame, generation);
+  const auto row =
+      std::ranges::find(after.own_fleets, owned, &NativeOwnFleet::id);
+  require(row != after.own_fleets.end() &&
+              row->doctrine_posture == FleetDoctrinePosture::EngageAtWill &&
+              row->auto_retreat_hull_fraction == .25,
+          "Updated doctrine did not project back into the fleet row.");
+
+  const auto foreign = std::ranges::find_if(world.fleets, [&](const auto &f) {
+    return f.is_active && f.civilization_id != world.player_civilization_id;
+  });
+  require(foreign != world.fleets.end(), "Authored fixture lacks a foreign fleet.");
+  require(!controller.issue_doctrine(frame, generation, foreign->id,
+                                     FleetDoctrinePosture::EngageAtWill, .5)
+               .accepted &&
+              foreign->doctrine.posture == FleetDoctrinePosture::HoldFast,
+          "Doctrine command reached a foreign fleet.");
+}
+
 void observer_and_commands(CampaignFrame &frame) {
   NativeFleetController controller;
   constexpr std::uint64_t generation = 11;
@@ -727,6 +784,9 @@ int main(int argc, char **argv) try {
                                         fs::absolute(argv[4]));
   composition_projection(composition_frame);
   observer_and_commands(frame);
+  auto doctrine_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),
+                                     fs::absolute(argv[4]));
+  doctrine_commands(doctrine_frame);
   auto developer_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]), fs::absolute(argv[4]));
   developer_fleet_inspection(developer_frame);
   auto recovery_frame = loaded_frame(fs::absolute(argv[1]), fs::absolute(argv[3]),

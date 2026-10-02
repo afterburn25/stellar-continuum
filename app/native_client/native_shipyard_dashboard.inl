@@ -11,6 +11,9 @@ ShipyardWorkspaceLayout ShipyardWorkspaceLayout::for_viewport(int width,int heig
   const float x=p.x+14*s,y=p.y+82*s,gap=10*s,bottom=p.y+ph-14*s;
   const float side=146*s,right=344*s,inner=pw-28*s,center=inner-side-right-2*gap;
   l.orders={x,bottom-214*s,inner-right-gap,214*s};
+  // Design bureau entry rides the orders panel header — y-sorting keeps it
+  // after the design controls in the keyboard focus order.
+  l.bureau={l.orders.x+l.orders.width-140*s,l.orders.y+2*s,132*s,26*s};
   l.categories={x,y,side,l.orders.y-y-gap};
   l.search={x+side+gap,y,center-212*s,34*s};
   l.sort={l.search.x+l.search.width+8*s,y,112*s,34*s};l.filter={l.sort.x+l.sort.width+8*s,y,84*s,34*s};
@@ -62,6 +65,7 @@ std::vector<NativeShipyardWorkspace::FocusItem> NativeShipyardWorkspace::focusab
                       std::optional<UiRect> unclipped=std::nullopt,int lane=0){
     if(r.width>0&&r.height>0)items.push_back({r,t,std::move(label),unclipped,lane});};
   push(l.close,1,tr("SHIPYARD_CLOSE","Close shipyard"));
+  push(l.bureau,2,tr("SHIPYARD_BUREAU","Open ship design bureau"));
   for(int i=0;i<static_cast<int>(ship_categories.size());++i)push({l.categories.x,l.categories.y+i*54*s,l.categories.width,48*s},10+i,tr(ship_category_keys[i],ship_categories[i]));
   push(l.search,20,tr("SHIPYARD_SEARCH","Search ships"));
   push(l.sort,21,trf("SHIPYARD_SORT_LABEL",{tr(ship_sort_keys[sort_],ship_sorts[sort_])},"Sort: {0}"));
@@ -204,6 +208,7 @@ ShipyardWorkspaceCommand NativeShipyardWorkspace::handle(const InputEvent& e,int
   }
   if(e.type!=InputEventType::LeftPressed)return {ShipyardWorkspaceCommandKind::None,l.surface.contains(e.position)};
   if(l.close.contains(e.position)){close();return {ShipyardWorkspaceCommandKind::None,true};}
+  if(l.bureau.contains(e.position))return {ShipyardWorkspaceCommandKind::OpenDesignBureau,true};
   if(!l.surface.contains(e.position))return {};
   focus_=-1;
   search_focused_=l.search.contains(e.position);if(search_focused_)return {ShipyardWorkspaceCommandKind::None,true};
@@ -258,6 +263,7 @@ void NativeShipyardWorkspace::render(DrawList& out,int w,int h,stellar::native_s
     clipped_text({r.x+8*s,r.y+234*s,r.width-16*s,20*s},*clip,trf("SHIPYARD_BUILD_MINIMUM",{stellar::native_campaign::format_campaign_duration_localized(locale_,d.minimum_build_days_at_full_shipyard_rate)},"{0} minimum"),muted,l.small_font_pixels);
   }
   stellar::native_ui_style::menu_panel(out,l.orders);theme::section_header(out,{l.orders.x+10*s,l.orders.y+6*s,l.orders.width-20*s,22*s},trf("SHIPYARD_ORDERS_HEADING",{std::to_string(view_?view_->orders.size():0)},"BUILD ORDERS  /  {0}"),l.small_font_pixels);
+  button(l.bureau,tr("SHIPYARD_BUREAU","DESIGN BUREAU"));
   const UiRect queue{l.orders.x+5*s,l.orders.y+30*s,l.orders.width-10*s,l.orders.height-35*s};
   if(!view_||view_->orders.empty())theme::empty_state(out,queue,tr("SHIPYARD_NO_ORDERS","No ships are under construction."),tr("SHIPYARD_NO_ORDERS_HINT","Queued builds appear here."),l.body_font_pixels);
   if(view_)for(std::size_t i=0;i<view_->orders.size();++i){const auto& o=view_->orders[i];const UiRect r{l.orders.x,queue.y-order_scroll_.scroll_offset+i*64*s,l.orders.width,60*s};const auto clip=intersection(r,queue);if(!clip)continue;

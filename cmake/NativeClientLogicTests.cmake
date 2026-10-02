@@ -244,6 +244,26 @@ if(MSVC)
   target_compile_options(stellar_native_shipyard_workspace_tests PRIVATE /WX)
 endif()
 
+add_executable(stellar_native_ship_design_controller_tests
+  native-tests/native_ship_design_controller_tests.cpp)
+target_link_libraries(stellar_native_ship_design_controller_tests PRIVATE stellar_native_client_logic)
+target_include_directories(stellar_native_ship_design_controller_tests PRIVATE app/native_client)
+target_link_libraries(stellar_native_ship_design_controller_tests PRIVATE stellar_core stellar_json)
+add_test(NAME native_ship_design_controller COMMAND stellar_native_ship_design_controller_tests
+  "${CMAKE_SOURCE_DIR}/data/research/v1"
+  "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+set_tests_properties(native_ship_design_controller PROPERTIES TIMEOUT 90)
+add_executable(stellar_native_ship_design_workspace_tests
+  native-tests/native_ship_design_workspace_tests.cpp)
+target_link_libraries(stellar_native_ship_design_workspace_tests PRIVATE stellar_native_client_logic)
+target_include_directories(stellar_native_ship_design_workspace_tests PRIVATE app/native_client engine/include)
+target_link_libraries(stellar_native_ship_design_workspace_tests PRIVATE stellar_core)
+add_test(NAME native_ship_design_workspace COMMAND stellar_native_ship_design_workspace_tests)
+if(MSVC)
+  target_compile_options(stellar_native_ship_design_controller_tests PRIVATE /WX)
+  target_compile_options(stellar_native_ship_design_workspace_tests PRIVATE /WX)
+endif()
+
 add_executable(stellar_native_construction_controller_tests
   native-tests/native_construction_controller_tests.cpp)
 target_link_libraries(stellar_native_construction_controller_tests PRIVATE stellar_native_client_logic)

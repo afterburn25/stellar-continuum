@@ -185,7 +185,17 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
   const auto order_width = (inner_width - 2.f * order_gap) / 3.f;
   const auto details_action_height=std::min(28.f*scale,details.height);
   const auto details_action_y=details.y+details.height-details_action_height;
-  const UiRect order_hold{details.x, details_action_y,order_width,details_action_height};
+  // The doctrine row anchors the details footer so the release-gated order
+  // buttons keep their established keyboard-focus order directly above it;
+  // each half-width doctrine control carries one axis (posture / threshold).
+  const auto doctrine_width = (inner_width - order_gap) * .5f;
+  const UiRect doctrine_posture{details.x, details_action_y, doctrine_width,
+                                details_action_height};
+  const UiRect doctrine_retreat{doctrine_posture.x + doctrine_width + order_gap,
+                                details_action_y, doctrine_width,
+                                details_action_height};
+  const auto order_action_y = details_action_y - details_action_height - order_gap;
+  const UiRect order_hold{details.x, order_action_y,order_width,details_action_height};
   const UiRect order_defend{order_hold.x + order_width + order_gap, order_hold.y,
                             order_width, order_hold.height};
   const UiRect order_retreat{order_defend.x + order_width + order_gap, order_hold.y,
@@ -210,7 +220,8 @@ FleetWorkspaceLayout FleetWorkspaceLayout::for_viewport(int width,
            {confirm.x, confirm.y, (confirm.width - 8.f * scale) * .5f, confirm.height},
            {confirm.x + (confirm.width + 8.f * scale) * .5f, confirm.y,
            (confirm.width - 8.f * scale) * .5f, confirm.height},
-           order_hold, order_defend, order_retreat, locate, military_locate,
+           order_hold, order_defend, order_retreat, doctrine_posture,
+           doctrine_retreat, locate, military_locate,
           civilian_locate, engage};
 }
 
@@ -370,6 +381,8 @@ NativeFleetWorkspace::PressTarget NativeFleetWorkspace::pressed_target_at(
   if(layout.order_hold.contains(point)) return PressTarget::Hold;
   if(layout.order_defend.contains(point)) return PressTarget::Defend;
   if(layout.order_retreat.contains(point)) return PressTarget::Retreat;
+  if(layout.doctrine_posture.contains(point)) return PressTarget::DoctrinePosture;
+  if(layout.doctrine_retreat.contains(point)) return PressTarget::DoctrineRetreat;
   if(layout.locate.contains(point)||layout.military_locate.contains(point)||
      layout.civilian_locate.contains(point)) return PressTarget::Locate;
   return PressTarget::None;
@@ -465,6 +478,15 @@ std::vector<NativeFleetWorkspace::FocusRect> NativeFleetWorkspace::focusables(
       } else if (fleet->locate) {
         out.push_back({layout.locate, tr("FLEET_LOCATE", "LOCATE")});
       }
+      if (!fleet->foreign_inspection && fleet->military_order_quote) {
+        out.push_back({layout.doctrine_posture,
+                       fleet->doctrine_posture ==
+                               stellar::core::FleetDoctrinePosture::EngageAtWill
+                           ? tr("FLEET_DOCTRINE_ENGAGE", "Doctrine: engage at will")
+                           : tr("FLEET_DOCTRINE_HOLD", "Doctrine: hold fast")});
+        out.push_back({layout.doctrine_retreat,
+                       tr("FLEET_DOCTRINE_RETREAT_BTN", "Auto-retreat threshold")});
+      }
     }
     if (!preview_ && fleet->recovery) {
       const auto queued = fleet->recovery->return_requested;
@@ -555,6 +577,28 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       command.kind=FleetWorkspaceCommandKind::Locate;
       command.fleet_id=fleet->id;
       command.locate_quote=std::move(locate);
+    } else if(!military&&!locate&&
+        (pressed==PressTarget::DoctrinePosture||pressed==PressTarget::DoctrineRetreat)) {
+      // Recompute the ladder step against the live fleet so a mid-press
+      // refresh cannot double-apply a toggle.
+      stellar::core::FleetDoctrine doctrine{fleet->doctrine_posture,
+          fleet->auto_retreat_hull_fraction};
+      if(pressed==PressTarget::DoctrinePosture) {
+        doctrine.posture=doctrine.posture==stellar::core::FleetDoctrinePosture::HoldFast?
+            stellar::core::FleetDoctrinePosture::EngageAtWill:
+            stellar::core::FleetDoctrinePosture::HoldFast;
+        command.kind=FleetWorkspaceCommandKind::DoctrinePosture;
+      } else {
+        constexpr double rungs[]={0.,.25,.5,.75};
+        double next=rungs[0];
+        for(std::size_t i=0;i<4;++i)
+          if(std::abs(fleet->auto_retreat_hull_fraction-rungs[i])<1e-6){
+            next=rungs[(i+1)%4];break;}
+        doctrine.auto_retreat_hull_fraction=next;
+        command.kind=FleetWorkspaceCommandKind::DoctrineRetreat;
+      }
+      command.fleet_id=fleet->id;
+      command.doctrine=doctrine;
     }
     return command;
   }
@@ -646,6 +690,8 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
       if(const auto *fleet=selected_fleet();fleet) {
         const auto target=pressed_target_at(event.position,layout);
         const bool military_target=target==PressTarget::Hold||target==PressTarget::Defend||target==PressTarget::Retreat;
+        const bool doctrine_target=(target==PressTarget::DoctrinePosture||target==PressTarget::DoctrineRetreat)&&
+            !fleet->foreign_inspection&&fleet->military_order_quote;
         const bool locate_target=fleet->locate&&
             ((fleet->recovery&&layout.civilian_locate.contains(event.position))||
              (fleet->military_order_quote&&layout.military_locate.contains(event.position))||
@@ -655,6 +701,14 @@ FleetWorkspaceCommand NativeFleetWorkspace::handle(
           pressed_bounds_=target==PressTarget::Hold?layout.order_hold:
               target==PressTarget::Defend?layout.order_defend:layout.order_retreat;
           pressed_military_quote_=fleet->military_order_quote;
+          pressed_locate_quote_.reset();
+          return {FleetWorkspaceCommandKind::None,true};
+        }
+        if(doctrine_target) {
+          pressed_action_=target;
+          pressed_bounds_=target==PressTarget::DoctrinePosture?
+              layout.doctrine_posture:layout.doctrine_retreat;
+          pressed_military_quote_.reset();
           pressed_locate_quote_.reset();
           return {FleetWorkspaceCommandKind::None,true};
         }
@@ -1002,16 +1056,24 @@ void NativeFleetWorkspace::render(
         fleet->military_order_quote.has_value();
     const bool recovery_locate = !preview_ && !pending_return_ &&
         fleet->recovery.has_value() && fleet->locate.has_value();
+    // Standing doctrine rides with the armed-fleet action stack — unarmed
+    // fleets carry no engagement posture worth commanding, and the details
+    // pane keeps its full height for composition telemetry.
+    const bool doctrine_controls = !preview_ && !pending_return_ &&
+        !fleet->foreign_inspection && armed_order;
     auto details_bounds = layout.details;
     if (armed_order || recovery_locate)
+      details_bounds.height = std::max(0.f, details_bounds.height - 36.f * layout.scale);
+    if (doctrine_controls)
       details_bounds.height = std::max(0.f, details_bounds.height - 36.f * layout.scale);
     // Clip rows against the whole details block so composition rows can
     // never spill into the route preview, while the armed-fleet stack —
     // which predates the clip — keeps rendering across the rail gap.
     const UiRect details_clip = layout.details;
     // Recovery locate draws its action rail inside the details footer —
-    // keep stat rows from rendering underneath it. The armed-order stack
-    // intentionally spans the rail gap, so its clip stays untouched.
+    // keep stat rows from rendering underneath it. The armed-fleet stack
+    // (orders + doctrine) intentionally spans the rail gap, so its clip
+    // stays untouched; buttons overdraw any telemetry that reaches them.
     UiRect stat_clip = details_clip;
     if (recovery_locate)
       stat_clip.height =
@@ -1126,6 +1188,21 @@ void NativeFleetWorkspace::render(
     } else if (recovery_locate) {
       // Recovery keeps both paid-mission controls in the confirm rail.
       action_button(layout.civilian_locate,tr("FLEET_LOCATE","LOCATE"));
+    }
+    if (doctrine_controls) {
+      const auto posture_label =
+          fleet->doctrine_posture ==
+                  stellar::core::FleetDoctrinePosture::EngageAtWill
+              ? tr("FLEET_DOCTRINE_ENGAGE", "DOCTRINE: ENGAGE AT WILL")
+              : tr("FLEET_DOCTRINE_HOLD", "DOCTRINE: HOLD FAST");
+      action_button(layout.doctrine_posture, posture_label);
+      const auto retreat_label =
+          fleet->auto_retreat_hull_fraction > 0.
+              ? trf("FLEET_DOCTRINE_RETREAT_AT",
+                    {number(fleet->auto_retreat_hull_fraction * 100., 0)},
+                    "AUTO-RETREAT AT {0}% HULL")
+              : tr("FLEET_DOCTRINE_RETREAT_OFF", "AUTO-RETREAT: OFF");
+      action_button(layout.doctrine_retreat, retreat_label);
     }
     std::string route;
     if (preview_) {
