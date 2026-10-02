@@ -510,6 +510,22 @@ preserve:
   backend-native timestamp path). The shell Profiler tool's MIN button
   cycles 0/1us/10us/100us; `profiler` covers threshold filtering and
   aggregate retention.
+- Gameplay scripting platform M1 (engine layer): `scripted_content.cpp`
+  + `scripted_content.hpp`. `ScriptedContentRuntime` loads
+  `scripted_events` JSON documents — composable `all`/`any`/`not` trigger
+  trees over typed `ScriptScope` (global/civilization/colony/system/body/
+  fleet/origin; id=-1 = contextual from `ScriptFiringContext`),
+  `on`-event and `poll_days` firing modes, once-per-campaign + cooldown,
+  deterministic weighted selection via a persisted splitmix64 roll
+  stream, delayed weighted `follow_ups` (cycle-checked at load), strict
+  validation with `{file, object_id, message}` diagnostics, and
+  serialize/restore of runtime state. All game-state access runs through
+  `ScriptedContentAdapter` (validate leaf checks/effects at load,
+  enumerate firing contexts, evaluate, apply effects, fire notification)
+  so the engine never touches authoritative state — the Core adapter is
+  the next milestone. `scripted_content` test covers every rejection
+  shape plus poll cadence, deterministic rolls, delayed chains and save
+  round-trip.
 
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being
