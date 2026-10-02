@@ -313,6 +313,22 @@ int main(int argc, char** argv) {
               streamed_voice_stopped.queued_voice_bytes == 0,
           "stop_voice did not release a mid-stream voice decoder");
 
+    // An undecodable cue must not disturb the voice channel: either the
+    // rewind binds fail at admission (throws), or the first read faults
+    // mid-service and latches voice_stream_faulted for the caller.
+    bool undecodable_voice_rejected = false;
+    try {
+      output.play_voice(open_audio_stream(truncated));
+      output.service();
+      undecodable_voice_rejected = output.diagnostics().voice_stream_faulted;
+    } catch (const AudioStreamError&) {
+      undecodable_voice_rejected = true;
+    }
+    check(undecodable_voice_rejected, "undecodable voice stream was accepted silently");
+    const auto after_voice_fault = output.diagnostics();
+    check(!after_voice_fault.voice_active && !after_voice_fault.voice_streaming,
+          "faulted voice stream disturbed the voice channel");
+
     for (int voice = 0; voice < 8; ++voice) output.play_effect(short_loop);
     const auto eight = output.diagnostics();
     check(eight.active_effects <= 8 && eight.effect_play_count == 8, "effect voices did not honor the eight-voice bound");

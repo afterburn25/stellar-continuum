@@ -100,6 +100,10 @@ struct AudioDiagnostics final {
   bool music_streaming{};
   bool voice_active{};
   bool voice_streaming{};
+  // Latched when a streamed cue faults mid-decode — the cue is dropped and
+  // the voice queue cleared so the owner can disable voice without losing
+  // music/effects to one bad asset.
+  bool voice_stream_faulted{};
   std::size_t queued_voice_bytes{};
   std::size_t available_voice_bytes{};
   std::size_t voice_queue_limit_bytes{};

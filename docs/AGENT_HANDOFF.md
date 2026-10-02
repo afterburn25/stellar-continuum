@@ -1153,12 +1153,19 @@ active filter step. `play_dialogue_pcm` (runtime-synthesized PCM) stays
 clip-based. Also fixed a `AudioStreamDecoder::read` edge: an EOS flag
 arriving with an overrunning final sample stranded its `pending` tail
 forever — pending now drains even after EOS, trimming a sub-chunk
-artifact at stream end. Coverage: engine streamed-voice start/drain/
-stop lifecycle + null/oversized rejection; the director suite's queued
-scientist-cue tests now exercise the streamed path end-to-end; 3/3
-audio suites green. Remaining: effects stay whole-clip (latency-
-critical, ≤1 MiB each); spatial buses and a decoded-PCM budget are
-still open.
+artifact at stream end. Fault containment is voice-scoped: a cue that
+fails mid-decode latches `AudioDiagnostics::voice_stream_faulted`
+(output drops the cue, clears the voice queue, restores the music duck)
+and the director calls `disable_voice` — matching the pre-streaming
+load-failure semantics (voice unavailable, audio continues) rather than
+failing the whole output; a bind-time failure in `play_voice`'s rewind
+surfaces as a thrown `AudioStreamError` the director's voice path maps
+the same way. Coverage: engine streamed-voice start/drain/stop
+lifecycle, null/oversized rejection, undecodable-source faulting; the
+director suite's queued scientist-cue tests now exercise the streamed
+path end-to-end; 3/3 audio suites green. Remaining: effects stay
+whole-clip (latency-critical, ≤1 MiB each); spatial buses and a
+decoded-PCM budget are still open.
 Roster search (row-24 Table filtering UI): `RosterWorkspace` gained a
 pointer-focused search field driving `TableModel::refilter` — the
 shared model's first filtering consumer. Case-insensitive contains runs

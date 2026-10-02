@@ -426,6 +426,9 @@ struct AudioOutput::Storage {
   std::uint64_t next_age{};
   std::uint64_t effect_play_count{};
   std::uint64_t voice_play_count{};
+  // Latched when a voice stream read faults — a corrupt cue must not take
+  // down music/effects, so the caller can retire voice without failing audio.
+  bool voice_fault{};
   std::array<std::byte, music_chunk_bytes> music_scratch{};
   std::vector<float> pan_scratch;
   float master{0.78f};
@@ -642,8 +645,20 @@ void AudioOutput::service() {
       if (storage_->voice_decoder) {
         auto& decoder = *storage_->voice_decoder;
         auto* scratch = reinterpret_cast<float*>(storage_->music_scratch.data());
-        const auto written = decoder.read(
-            std::span<float>(scratch, (amount / bytes_per_frame) * audio_channels));
+        std::size_t written{};
+        try {
+          written = decoder.read(
+              std::span<float>(scratch, (amount / bytes_per_frame) * audio_channels));
+        } catch (const AudioStreamError&) {
+          // A corrupt/undecodable cue retires the voice channel rather than
+          // propagating — callers see voice_stream_faulted and disable voice
+          // without failing the whole audio output.
+          storage_->voice_fault = true;
+          storage_->voice_decoder.reset();
+          SDL_ClearAudioStream(storage_->voice_stream);
+          apply_gains();
+          break;
+        }
         if (written > 0) {
           require_sdl(SDL_PutAudioStreamData(storage_->voice_stream, scratch,
                                              static_cast<int>(written * sizeof(float))),
@@ -757,7 +772,7 @@ AudioDiagnostics AudioOutput::diagnostics() const {
   return {static_cast<std::size_t>(queued), music_queue_limit, active, storage_->effect_play_count,
           storage_->music_started, storage_->music_decoder != nullptr,
           storage_->voice_clip != nullptr || storage_->voice_decoder != nullptr,
-          storage_->voice_decoder != nullptr,
+          storage_->voice_decoder != nullptr, storage_->voice_fault,
           static_cast<std::size_t>(queued_voice), static_cast<std::size_t>(available_voice),
           voice_queue_limit, storage_->voice_play_count, SDL_GetAudioStreamGain(storage_->music_stream),
           SDL_GetAudioStreamGain(storage_->voice_stream)};

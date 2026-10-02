@@ -177,6 +177,7 @@ void NativeAudioDirector::fail(std::string message, bool device_fault) {
   stats_.music_streaming = false;
   stats_.queued_music_bytes = 0;
   stats_.voice_active = false;
+  stats_.voice_streaming = false;
   stats_.queued_voice_bytes = 0;
   voice_queue_.clear();
   // Device-level faults (unplugged/default device errors, SDL stream failures)
@@ -199,6 +200,7 @@ void NativeAudioDirector::fail(std::string message, bool device_fault) {
 void NativeAudioDirector::disable_voice(std::string message) {
   stats_.voice_available = false;
   stats_.voice_active = false;
+  stats_.voice_streaming = false;
   stats_.queued_voice_bytes = 0;
   voice_queue_.clear();
   if (!voice_diagnostic_emitted_) {
@@ -271,6 +273,9 @@ void NativeAudioDirector::service() {
     stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
     stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
     stats_.voice_streaming = diagnostics.voice_streaming;
+    // A streamed cue that faults mid-decode retires voice for the session
+    // (same outcome as a load-time decode failure) — not the whole output.
+    if (diagnostics.voice_stream_faulted) disable_voice("audio voice stream decode failed");
     service_voice();
   } catch (const stellar::engine::audio::AudioStreamError& error) {
     fail(std::string{"audio stream failure: "} + error.what());
@@ -334,7 +339,9 @@ void NativeAudioDirector::service_voice() {
     stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
     stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
   } catch (const stellar::engine::audio::AudioStreamError& error) {
-    fail(std::string{"audio voice stream failed: "} + error.what());
+    // Corrupt/undecodable cue media retires voice, not the audio device.
+    try { output_->stop_voice(); } catch (...) {}
+    disable_voice(std::string{"audio voice stream failed: "} + error.what());
   } catch (const std::exception& error) {
     fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }
