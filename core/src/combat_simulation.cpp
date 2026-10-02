@@ -8,6 +8,7 @@
 #include <map>
 #include <stdexcept>
 #include <tuple>
+#include <unordered_set>
 
 namespace stellar::core {
 namespace {
@@ -305,8 +306,14 @@ std::set<int> actively_threatened(const FleetMap &all,
 void process_retreats(std::span<FleetState> fleets, const TargetPlan &targets,
                       double days, const CombatHostilityView &hostility,
                       std::vector<CombatEvent> &events) {
-  auto all = index_fleets(fleets, false);
-  auto threatened = actively_threatened(all, targets, hostility);
+  // ADR 0002 option (a): the fleet index is only needed to resolve
+  // threatened targets. With no target plan the threatened set is empty,
+  // so skip the O(n log n) index build on the dominant no-combat tick.
+  const auto threatened =
+      targets.insertion_order.empty()
+          ? std::set<int>{}
+          : actively_threatened(index_fleets(fleets, false), targets,
+                                hostility);
   std::vector<FleetState *> ordered;
   for (auto &f : fleets)
     if (f.is_active)
@@ -466,6 +473,24 @@ std::vector<CombatEvent> CombatSimulation::advance(CombatWorldView world,
   for (auto [id, f] : active)
     ensure_fleet_combat_state(*f);
   auto targets = build_targets(active, hostility_);
+  if (targets.lookup.empty() && active_engagements_.empty()) {
+    // ADR 0002 option (a): with no attack/defend plan and no live
+    // engagements, fire produces no actions, no engagement can start or
+    // end, and the post-fire survivor re-scan reproduces the same empty
+    // plan — skip the four extra fleet indexes and second target pass.
+    // Weapon cooldowns still decay and retreat orders still resolve; both
+    // mutate serialized fleet combat state. The duplicate-id validation
+    // the skipped full index performed must also still fire here — the
+    // original threw on duplicate inactive ids before any fire/retreat
+    // processing.
+    std::unordered_set<int> seen_ids;
+    for (const auto &fleet : world.fleets)
+      if (!seen_ids.emplace(fleet.id).second)
+        duplicate(fleet.id);
+    static_cast<void>(build_fire(active, targets, days));
+    process_retreats(world.fleets, targets, days, hostility_, events);
+    return events;
+  }
   auto current = engagement_set(targets);
   auto all = index_fleets(world.fleets, false);
   for (auto key : current)

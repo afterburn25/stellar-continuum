@@ -232,9 +232,20 @@ const> owned, economies, id, include_research, power_days, body_index)`.
 Canonical benchmark: `adaptive_research` 4,526 → 1,049 ms (−77%), step
 mean 2.75 → 1.82 ms (30% below the ~2.59 ms pre-audit baseline),
 identical `finalStateHash` `b57c03d1…`; 33/33 adaptive+economy+
-coordinator oracle slice green. Remaining large costs: `combat`
-(2,408 ms) and autosave latency (~1.7 s × 8 per run — the persistence
-debt item).
+coordinator oracle slice green. Eighth option-(a) deployment (landed
+2026-10-01): `CombatSimulation::advance` — the largest remaining phase
+at 2,408 ms of pure bookkeeping with zero engagements — built five
+`std::map` fleet indexes plus a second survivor `build_targets` pass
+every tick. A fast path now short-circuits when both the target plan
+and `active_engagements_` are empty: cooldown decay (`build_fire`) and
+retreat resolution (`process_retreats`) still run, an O(n) duplicate-id
+scan preserves the `invalid_argument` the skipped index threw
+(`advance-duplicate-inactive` oracle), and `process_retreats`' index is
+lazy. Canonical benchmark: `combat` 2,408 → 1,641 ms (−32%), identical
+hash. Autosave measurement corrected (`a363ac72`): the benchmark now
+exercises the shipped streaming path — capture ~27–30 ms on-thread,
+stream+write ~1.11 s absorbed by the background save job in-game;
+~66.7 MB output byte-identical (pinned by `engine_scale3d_tests`).
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

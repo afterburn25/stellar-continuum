@@ -239,6 +239,34 @@ The adoption frontier is not authority migration — it is:
    `surface_colony_output` recomputation and bounded per-civ
    shortlist/funding evaluation; `combat` (2,408 ms) and autosave
    latency (~1.7 s × 8) are the largest remaining step costs.
+   **Eighth deployment (landed):** `CombatSimulation::advance`, the
+   post-audit profile's largest remaining core phase — 2,408 ms total
+   (~0.6 ms/tick) spent on pure bookkeeping with zero engagements. Each
+   tick built **five** `std::map` fleet indexes (`active`, `all`,
+   `apply_fire`'s, `process_retreats`' and `all_after`) plus a second
+   `build_targets` pass over survivors regardless of whether any
+   engagement could exist. A fast path now short-circuits when the
+   target plan and `active_engagements_` are both empty: no fire
+   actions can exist, no engagement can start or end, and the survivor
+   re-scan reproduces the same empty plan. Observable per-tick state is
+   preserved — weapon-cooldown decay (`build_fire`) and retreat-order
+   resolution (`process_retreats`) still run, and an O(n)
+   duplicate-id scan replicates the `invalid_argument` the skipped
+   full-fleet index threw before any processing (the
+   `advance-duplicate-inactive` oracle pins it). `process_retreats`
+   also builds its index lazily — the threatened-set lookup is
+   unreachable with an empty insertion order. Canonical measurement
+   (under ambient load): `combat` **2,408 → 1,641 ms** (−32%),
+   `finalStateHash` `b57c03d1…` identical. Remaining combat cost is
+   the required once-per-tick active index plus the
+   cooldown/retreat/order scans — genuine per-fleet state work, not
+   rescans. Separately, the benchmark autosave was found to measure a
+   path the game never ships: production captures the save DTO
+   (~27–30 ms on-thread) then streams `JsonStreamWriter` output to an
+   atomic file write on a background job; the benchmark now exercises
+   that path (byte-identical, pinned by `engine_scale3d_tests`) and
+   reports capture vs stream/write split — ~1.11 s off-thread in-game
+   (commit `a363ac72`).
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`

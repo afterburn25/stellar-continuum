@@ -291,6 +291,35 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   resolved-pointer extraction pattern lets public per-civ entry points
   share the body.
 
+## Combat no-engagement fast path — ADR 0002 option (a) (2026-10-01)
+
+- **Purpose:** `CombatSimulation::advance` was the post-audit profile's
+  largest remaining core phase (2,408 ms over the canonical 4,000-tick
+  run, ~0.6 ms/tick) while producing zero engagements — every tick
+  built five `std::map` fleet indexes and ran a second `build_targets`
+  pass over post-fire survivors regardless of whether any attack or
+  defend order existed.
+- **Modules:** `core/src/combat_simulation.cpp` (`advance`,
+  `process_retreats`).
+- **Public interface:** unchanged — the fast path is internal to
+  `advance`.
+- **Consumers:** the coordinator's `combat` phase; command/preview
+  entry points untouched.
+- **Tests:** `combat_simulation_parity` (incl. the
+  `advance-duplicate-inactive` throw oracle), `combat_command_runtime`,
+  `own_combat_fleet_status`, `campaign_massive_*`, `campaign_frame` and
+  `campaign_coordinator` oracles green; canonical benchmark
+  `finalStateHash` `b57c03d1…` identical.
+- **Save/performance impact:** no schema change; canonical benchmark
+  `combat` 2,408 → 1,641 ms (−32%, run under ambient load — the
+  phase-share drop is the reliable signal). The skipped work is only
+  provably-dead work; weapon-cooldown decay, retreat resolution and the
+  duplicate-id throw ordering are preserved exactly.
+- **Limitations:** the fast path applies only when the target plan and
+  active engagements are both empty — live engagements take the
+  original full path; `process_retreats` still sorts all active fleets
+  for event ordering; per-call maps remain (no cross-tick reuse).
+
 ## Starfield-quality live propagation + streamer budget (2026-09-29)
 
 - **Purpose:** the STARFIELD QUALITY video setting was wired to the
