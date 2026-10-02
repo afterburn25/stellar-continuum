@@ -1955,6 +1955,15 @@ quote") was a use-after-free in the test, not a sim flake — the
 localization block's `confirm_placement` reallocating `push_back`, so
 `preview_removal` saw a heap-dependent building id. The assertion now
 uses the `site_id` copy captured before the mutation.
+Follow-on: the galaxy map has its first transform gizmo — pressing on a
+star marker (same 14 px pick radius as the click) grabs it instead of
+panning; PointerMove writes `positionX`/`positionY` overrides through
+absolute cursor→world mapping (mid-drag wheel zoom stays glued) with
+the grab offset preserved, and LeftReleased commits the pre-drag
+document snapshot as one undo step (moved ≥ 6 px) or restores the
+grabbed edit row untouched and selects (a click). Esc cancels
+in-flight without touching history. Orbit/body-view gizmos remain
+open.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

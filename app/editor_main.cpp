@@ -202,6 +202,22 @@ struct Editor {
   Point drag_origin{};
   Point camera_origin{};
   bool dragging{};
+  // Galaxy-view transform drag: a press landing on a system marker grabs
+  // it instead of panning. `drag_edit_restore`/`drag_edit_present` hold
+  // the grabbed system's edit row so a sub-threshold release (a click)
+  // restores it untouched; `drag_snapshot` holds the pre-drag document so
+  // a real drag commits exactly one undo step.
+  std::optional<std::size_t> drag_system;
+  // The grabbed system's catalog id — recorded at press so a background
+  // regeneration swapping `systems` can't point release/cancel at the
+  // wrong record.
+  int drag_system_id{};
+  // Marker world position minus the cursor's world position at grab, so
+  // the marker tracks the pointer without snapping its center to it.
+  Point drag_grab_offset{};
+  std::optional<edproj::SystemEdit> drag_edit_restore;
+  bool drag_edit_present{};
+  std::optional<edproj::EditorProject> drag_snapshot;
 
   std::size_t selected{static_cast<std::size_t>(-1)};
   std::size_t selected_body{static_cast<std::size_t>(-1)}; // index into bodies
@@ -1802,6 +1818,13 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
                       std::clamp(ed.pixels_per_unit * .25f, .5f, 3.f),
                color});
   }
+  if (ed.drag_system && *ed.drag_system < ed.systems.size()) {
+    const auto &sys = ed.systems[*ed.drag_system];
+    const auto p = world_to_screen(ed, system_position_x(ed, sys),
+                                   system_position_y(ed, sys));
+    out.overlay.push_back(StrokedRectangle{
+        {p.x - 13, p.y - 13, 26, 26}, {240, 200, 90, 255}});
+  }
   if (ed.selected < ed.systems.size()) {
     const auto &sys = ed.systems[ed.selected];
     const auto p = world_to_screen(ed, system_position_x(ed, sys), system_position_y(ed, sys));
@@ -2319,6 +2342,19 @@ int main(int argc, char **argv) {
             ed.picker_open = false;
           } else if (ed.menu_open) {
             ed.menu_open = false;
+          } else if (ed.drag_system) {
+            // Cancel an in-flight transform drag: restore the row and drop
+            // the snapshot without touching history.
+            const auto sys_id = ed.drag_system_id;
+            if (ed.drag_edit_present)
+              ed.edits[sys_id] = *ed.drag_edit_restore;
+            else
+              ed.edits.erase(sys_id);
+            ed.drag_system.reset();
+            ed.drag_edit_restore.reset();
+            ed.drag_edit_present = false;
+            ed.drag_snapshot.reset();
+            rebuild_detail_rows(ed);
           } else if (ed.editing != Field::None) {
             ed.editing = Field::None;
             window.set_text_input(false);
@@ -2671,12 +2707,53 @@ int main(int argc, char **argv) {
                 submit_generate();
               }
             if (ed.viewport.contains(event.position)) {
-              ed.dragging = true;
               ed.drag_origin = event.position;
-              ed.camera_origin =
-                  ed.view == WorkspaceView::Galaxy   ? ed.camera
-                  : ed.view == WorkspaceView::System ? ed.sys_camera
-                                                     : ed.body_camera;
+              if (ed.view == WorkspaceView::Galaxy) {
+                // Transform drag: a press on a marker grabs it (same
+                // bounded pick radius as the click). Empty space pans.
+                float best = 14.f;
+                for (std::size_t i = 0; i < ed.systems.size(); ++i) {
+                  const auto p =
+                      world_to_screen(ed, system_position_x(ed, ed.systems[i]),
+                                      system_position_y(ed, ed.systems[i]));
+                  const float d = std::hypot(p.x - event.position.x,
+                                             p.y - event.position.y);
+                  if (d < best) {
+                    best = d;
+                    ed.drag_system = i;
+                  }
+                }
+              }
+              if (ed.drag_system) {
+                const auto &sys = ed.systems[*ed.drag_system];
+                ed.drag_system_id = sys.id;
+                const float cursor_x =
+                    ed.camera.x + (event.position.x - ed.viewport.x -
+                                   ed.viewport.width * .5f) /
+                                      ed.pixels_per_unit;
+                const float cursor_y =
+                    ed.camera.y + (event.position.y - ed.viewport.y -
+                                   ed.viewport.height * .5f) /
+                                      ed.pixels_per_unit;
+                ed.drag_grab_offset = {
+                    system_position_x(ed, sys) - cursor_x,
+                    system_position_y(ed, sys) - cursor_y};
+                const auto prev = ed.edits.find(sys.id);
+                ed.drag_edit_present = prev != ed.edits.end();
+                ed.drag_edit_restore =
+                    ed.drag_edit_present
+                        ? std::optional<edproj::SystemEdit>{prev->second}
+                        : std::nullopt;
+                ed.drag_snapshot =
+                    edproj::EditorProject{ed.seed, ed.system_count, ed.edits,
+                                          ed.body_edits, ed.project_name};
+              } else {
+                ed.dragging = true;
+                ed.camera_origin =
+                    ed.view == WorkspaceView::Galaxy   ? ed.camera
+                    : ed.view == WorkspaceView::System ? ed.sys_camera
+                                                       : ed.body_camera;
+              }
             }
           }
         }
@@ -2760,6 +2837,42 @@ int main(int argc, char **argv) {
               rebuild_detail_rows(ed);
             }
           }
+        }
+        if (event.type == InputEventType::LeftReleased && ed.drag_system) {
+          const auto sys_id = ed.drag_system_id;
+          const auto index = *ed.drag_system;
+          // A regeneration that landed mid-drag swaps `systems`; the edit
+          // key stays valid but the index may not.
+          const bool valid_index = index < ed.systems.size();
+          const float moved =
+              std::abs(event.position.x - ed.drag_origin.x) +
+              std::abs(event.position.y - ed.drag_origin.y);
+          if (moved < 6.f) {
+            // A click: move events may already have written sub-pixel
+            // overrides — restore the row exactly as it was.
+            if (ed.drag_edit_present)
+              ed.edits[sys_id] = *ed.drag_edit_restore;
+            else
+              ed.edits.erase(sys_id);
+            if (ed.viewport.contains(event.position) && valid_index) {
+              ed.selected = index;
+              rebuild_detail_rows(ed);
+            }
+          } else {
+            // One undo step restores the pre-drag document; redo stays
+            // intact until a real transform lands.
+            if (ed.drag_snapshot)
+              ed.history.commit(*ed.drag_snapshot);
+            if (valid_index) {
+              ed.selected = index;
+              ed.status = "moved " + display_name(ed, ed.systems[index]);
+            }
+            rebuild_detail_rows(ed);
+          }
+          ed.drag_system.reset();
+          ed.drag_edit_restore.reset();
+          ed.drag_edit_present = false;
+          ed.drag_snapshot.reset();
         }
         // List row clicks select and center; wheel scrolls the list.
         if (event.type == InputEventType::LeftReleased &&
@@ -2879,6 +2992,20 @@ int main(int argc, char **argv) {
             ed.sys_camera = target;
           else
             ed.body_camera = target;
+        }
+        if (event.type == InputEventType::PointerMove && ed.drag_system) {
+          // Absolute cursor→world mapping keeps the marker glued to the
+          // pointer even if a wheel event rescales the map mid-drag.
+          const auto &v = ed.viewport;
+          auto &row = ed.edits[ed.drag_system_id];
+          row.position_x =
+              ed.camera.x + (event.position.x - v.x - v.width * .5f) /
+                                ed.pixels_per_unit +
+              ed.drag_grab_offset.x;
+          row.position_y =
+              ed.camera.y + (event.position.y - v.y - v.height * .5f) /
+                                ed.pixels_per_unit +
+              ed.drag_grab_offset.y;
         }
         if (event.type == InputEventType::Wheel &&
             ed.viewport.contains(event.position)) {
