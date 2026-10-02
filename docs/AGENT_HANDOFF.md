@@ -510,6 +510,27 @@ preserve:
   backend-native timestamp path). The shell Profiler tool's MIN button
   cycles 0/1us/10us/100us; `profiler` covers threshold filtering and
   aggregate retention.
+- Gameplay scripting platform M2b (startup loading + seed pack):
+  `core::load_scripted_content_directory(campaign, dir)` in
+  `campaign_scripted_content.cpp` enumerates a document directory sorted,
+  `.json`-only, aggregating `{file, object_id, message}` diagnostics per
+  document (a malformed file reports its name and does not block the rest;
+  a missing dir reports one file-level error). `NativeCampaignSession`
+  loads `Data/scripted/v1` next to the exe on both fresh and loaded
+  campaign paths; the documents are staged by the `stellar_runtime_data`
+  custom target (shares `stellar-continuum`'s output dir with the native
+  client) and installed under `Data/scripted`. The shipped seed pack `data/scripted/v1/` carries 15
+  documents: anomalies (debris_cache, data_vault + decrypt/corrupt
+  follow-up chain, ancient_beacon + echo chain, live_mine + origin_trace,
+  terraforming_cache), colony events (boom, epidemic + contained/lingers
+  chain, frontier_relic, harvest_surge, sabotage_scare) and diplomacy
+  (rapprochement, rivalry_hardening, war_bulletin, first_impressions,
+  border_grievance — gated on `not at_war`). Civilization-typed args
+  accept reserved names `"player"` and `"origin"` (resolved at load via
+  `player_civilization_id` / the firing context civ), including
+  `chronicle_record`'s `visible_to`. `campaign_scripted_content` test
+  covers directory loading, reserved-name resolution, chronicle
+  visibility and asserts the shipped pack validates error-free.
 - Gameplay scripting platform M2 (Core integration): `campaign_scripted_content.cpp`
   + `campaign_scripted_content.hpp`. `IntegratedAdaptiveCampaignRuntime` now
   owns a `ScriptedContentRuntime` (seeded from the campaign seed) and a

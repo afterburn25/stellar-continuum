@@ -498,11 +498,21 @@ foreach(locale_file IN LISTS STELLAR_LOCALE_FILES)
   get_filename_component(locale_name "${locale_file}" NAME)
   list(APPEND STELLAR_LOCALE_COPY_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy_if_different "${locale_file}" "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale/${locale_name}")
 endforeach()
+# Shipped scripted-content documents: every data/scripted/v1/*.json loads into
+# each campaign's ScriptedContentRuntime at session create/load.
+file(GLOB STELLAR_SCRIPTED_FILES CONFIGURE_DEPENDS "${CMAKE_SOURCE_DIR}/data/scripted/v1/*.json")
+set(STELLAR_SCRIPTED_COPY_COMMANDS "")
+foreach(scripted_file IN LISTS STELLAR_SCRIPTED_FILES)
+  get_filename_component(scripted_name "${scripted_file}" NAME)
+  list(APPEND STELLAR_SCRIPTED_COPY_COMMANDS COMMAND ${CMAKE_COMMAND} -E copy_if_different "${scripted_file}" "$<TARGET_FILE_DIR:stellar-continuum>/Data/scripted/v1/${scripted_name}")
+endforeach()
 add_custom_target(stellar_runtime_data ALL
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy"
   COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "$<TARGET_FILE_DIR:stellar-continuum>/Data/astronomy/hyg-nearby-500-v1.json"
   COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/locale"
   ${STELLAR_LOCALE_COPY_COMMANDS}
+  COMMAND ${CMAKE_COMMAND} -E make_directory "$<TARGET_FILE_DIR:stellar-continuum>/Data/scripted/v1"
+  ${STELLAR_SCRIPTED_COPY_COMMANDS}
   ${STELLAR_RESEARCH_RUNTIME_COPY_COMMANDS}
   COMMENT "Synchronizing runtime stellar catalog" VERBATIM)
 add_dependencies(stellar-continuum stellar_runtime_data)
@@ -515,6 +525,8 @@ endif()
 install(TARGETS stellar-continuum RUNTIME DESTINATION .)
 install(FILES export/runtime-config.json DESTINATION Configuration)
 install(FILES data/astronomy/hyg-nearby-500-v1.json data/astronomy/README.md DESTINATION Data/astronomy)
+install(DIRECTORY data/scripted DESTINATION Data
+  FILES_MATCHING PATTERN "*.json")
 foreach(STELLAR_RESEARCH_FILE IN LISTS STELLAR_RESEARCH_RUNTIME_FILES)
   cmake_path(GET STELLAR_RESEARCH_FILE PARENT_PATH STELLAR_RESEARCH_PARENT)
   install(FILES "data/research/v1/${STELLAR_RESEARCH_FILE}"

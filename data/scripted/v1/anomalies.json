@@ -1,0 +1,159 @@
+{
+  "schema": "stellar_scripted_events_v1",
+  "scripted_events": [
+    {
+      "id": "anomaly.debris_cache",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 10,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "250"}},
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "40"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.debris_cache",
+                  "summary": "Survey teams recover a sealed debris cache: salvage and industrial feedstock are hauled aboard.",
+                  "significance": "0.3"}}
+      ]
+    },
+    {
+      "id": "anomaly.data_vault",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 5,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "120"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.data_vault",
+                  "summary": "An intact data vault yields fragments of a precursor archive. Decryption will take time.",
+                  "significance": "0.6"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.data_vault.decrypt", "delay_days": 14, "weight": 3},
+        {"id": "anomaly.data_vault.corrupt", "delay_days": 7, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.data_vault.decrypt",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "200"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.data_vault.decrypt",
+                  "summary": "The precursor archive decrypts cleanly — navigational tables and materials science of remarkable depth.",
+                  "significance": "0.7"}}
+      ]
+    },
+    {
+      "id": "anomaly.data_vault.corrupt",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-100"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.data_vault.corrupt",
+                  "summary": "The data vault's decryption fails; a countermeasure wipes the archive and damages the expedition's equipment.",
+                  "significance": "0.5"}}
+      ]
+    },
+    {
+      "id": "anomaly.ancient_beacon",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 3,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "60"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.ancient_beacon"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.ancient_beacon",
+                  "summary": "A dormant relay older than any known civilization answers the survey ping with a repeating coordinate cypher.",
+                  "significance": "0.8"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.ancient_beacon.echo", "delay_days": 30, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.ancient_beacon.echo",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_coordinates"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.ancient_beacon.echo",
+                  "summary": "The relay cypher resolves into a stable coordinate set — somewhere unexplored, something is still transmitting.",
+                  "significance": "0.8"}}
+      ]
+    },
+    {
+      "id": "anomaly.live_mine",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 2,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-200"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.live_mine",
+                  "summary": "The 'anomaly' is an armed orbital mine. The survey ship escapes with hull damage and a salvage bill.",
+                  "significance": "0.7"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.live_mine.origin_trace", "delay_days": 25, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.live_mine.origin_trace",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "90"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.live_mine.origin_trace",
+                  "summary": "Forensics on the recovered mine fragments trace its manufacture to no catalogued civilization.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.terraforming_cache",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 4,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "100"}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "40"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.terraforming_cache",
+                  "summary": "Abandoned atmospheric processors still hold usable catalysts — a gift to colonial engineering.",
+                  "significance": "0.5"}}
+      ]
+    }
+  ]
+}

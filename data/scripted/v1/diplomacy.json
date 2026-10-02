@@ -1,0 +1,131 @@
+{
+  "schema": "stellar_scripted_events_v1",
+  "scripted_events": [
+    {
+      "id": "diplomacy.rapprochement",
+      "poll_days": 90,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 180,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"not": {"check": "at_war",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "trust", "value": "10"}},
+        {"check": "random_chance", "args": {"probability": "0.3"}}
+      ]},
+      "effects": [
+        {"do": "modify_relationship",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "trust": "8", "cooperation": "4",
+                  "reason": "scripted rapprochement"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.rapprochement",
+                  "summary": "Quiet diplomatic exchanges bear fruit: a neighboring civilization warms to continued contact.",
+                  "significance": "0.5",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "diplomacy.rivalry_hardening",
+      "poll_days": 90,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 200,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "hostility",
+                  "value": "40"}},
+        {"check": "random_chance", "args": {"probability": "0.25"}}
+      ]},
+      "effects": [
+        {"do": "modify_relationship",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "hostility": "10", "respect": "3",
+                  "reason": "scripted rivalry hardening"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.rivalry_hardening",
+                  "summary": "Hardliners gain ground abroad: rhetoric against our expansion sharpens in a rival's assembly.",
+                  "significance": "0.6",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "diplomacy.war_bulletin",
+      "poll_days": 45,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 120,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"check": "at_war",
+         "scope": {"kind": "civilization", "id": -1}},
+        {"check": "random_chance", "args": {"probability": "0.3"}}
+      ]},
+      "effects": [
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.war_bulletin",
+                  "summary": "War continues on a distant front; casualty reports mount on both sides.",
+                  "significance": "0.3"}}
+      ]
+    },
+    {
+      "id": "diplomacy.first_impressions",
+      "poll_days": 30,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "trust",
+                  "value": "-100"}}
+      ]},
+      "effects": [
+        {"do": "modify_relationship",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "respect": "3",
+                  "reason": "scripted first impressions"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.first_impressions",
+                  "summary": "First impressions settle: a contacted civilization formally assesses our conduct.",
+                  "significance": "0.4",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "diplomacy.border_grievance",
+      "poll_days": 120,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"not": {"check": "at_war",
+                 "scope": {"kind": "civilization", "id": -1},
+                 "args": {"civilization": "player"}}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "hostility",
+                  "value": "70"}},
+        {"check": "elapsed_days_at_least", "args": {"days": "200"}},
+        {"check": "random_chance", "args": {"probability": "0.15"}}
+      ]},
+      "effects": [
+        {"do": "declare_war",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.border_grievance",
+                  "summary": "A grievance hardened into a declaration: a rival civilization declares war.",
+                  "significance": "0.9",
+                  "visible_to": "player"}}
+      ]
+    }
+  ]
+}

@@ -10,9 +10,11 @@
 #include <stellar/core/player_campaign_json.hpp>
 #include <stellar/core/player_campaign_persistence.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -204,6 +206,121 @@ void persistence(core::IntegratedAdaptiveCampaignRuntime &campaign,
           "consumed anomaly sites persist through save/load");
 }
 
+// Session wiring loads definitions from a directory on start and reload —
+// definitions are content files, never save data.
+void directory_loading(core::IntegratedAdaptiveCampaignRuntime &campaign) {
+  const fs::path dir =
+      fs::temp_directory_path() / "stellar_scripted_dir_test";
+  std::error_code ec;
+  fs::remove_all(dir, ec);
+  fs::create_directories(dir);
+  {
+    std::ofstream out(dir / "b_second.json");
+    out << R"json({"scripted_events":[{
+      "id":"dir.second","poll_days":5,
+      "scope":{"kind":"civilization","id":-1},
+      "trigger":{"check":"civilization_is_player",
+                 "scope":{"kind":"civilization","id":-1}},
+      "effects":[{"do":"grant_science","scope":{"kind":"civilization","id":-1},
+                  "args":{"amount":"7"}}]}]})json";
+  }
+  {
+    std::ofstream out(dir / "a_first.json");
+    out << R"json({"scripted_events":[{
+      "id":"dir.first","poll_days":5,
+      "scope":{"kind":"civilization","id":-1},
+      "trigger":{"check":"civilization_is_player",
+                 "scope":{"kind":"civilization","id":-1}},
+      "effects":[{"do":"grant_credits","scope":{"kind":"civilization","id":-1},
+                  "args":{"amount":"9"}}]}]})json";
+  }
+  {
+    std::ofstream ignored(dir / "not_a_document.txt");
+    ignored << "ignored";
+  }
+  auto errors = core::load_scripted_content_directory(campaign, dir);
+  require(errors.empty(), "clean directory loads without errors");
+  require(campaign.scripted_content().definition("dir.first") != nullptr &&
+              campaign.scripted_content().definition("dir.second") != nullptr,
+          "directory loader registers every document");
+  require(core::load_scripted_content_directory(campaign, dir / "missing")
+                  .front()
+                  .file.size() > 0,
+          "a missing directory reports a file-level error");
+  {
+    std::ofstream broken(dir / "c_broken.json");
+    broken << "{not json";
+  }
+  errors = core::load_scripted_content_directory(campaign, dir);
+  const auto broken_it = std::ranges::find_if(
+      errors, [](const auto &e) { return e.file == "c_broken.json"; });
+  require(broken_it != errors.end(),
+          "a malformed document reports its filename");
+  require(campaign.scripted_content().definition("dir.first") != nullptr,
+          "earlier documents survive a later malformed file");
+  fs::remove_all(dir, ec);
+}
+
+// Civilization reference args resolve reserved names: "player" and "origin".
+void civilization_arg_conventions(
+    core::IntegratedAdaptiveCampaignRuntime &campaign) {
+  const int player = campaign.world().campaign().player_civilization_id;
+  std::vector<engine::ScriptLoadError> errors;
+  require(campaign.load_scripted_document(
+              R"json({"scripted_events":[{
+                "id":"conv.player","poll_days":1,
+                "scope":{"kind":"civilization","id":-1},
+                "trigger":{"check":"civilization_is_player",
+                           "scope":{"kind":"civilization","id":-1}},
+                "effects":[{"do":"grant_credits",
+                            "scope":{"kind":"civilization","id":-1},
+                            "args":{"amount":"3"}},
+                           {"do":"modify_relationship",
+                            "scope":{"kind":"civilization","id":-1},
+                            "args":{"civilization":"player","trust":"1"}},
+                           {"do":"chronicle_record",
+                            "args":{"category":"scripted.conv.player",
+                                    "summary":"reserved-name smoke",
+                                    "visible_to":"player"}}]}]})json",
+              "conventions.json", &errors),
+          "reserved civilization names validate at load");
+  [[maybe_unused]] const auto step = campaign.advance(1.0, 100.0);
+  const auto records =
+      campaign.history().query({.category = "scripted.conv.player"});
+  require(!records.empty(), "chronicle_record ran during the advance");
+  if (!records.empty()) {
+    const auto &visible = records.front()->visible_to;
+    require(std::ranges::find(visible,
+                              static_cast<std::uint64_t>(player)) !=
+                visible.end(),
+            "visible_to 'player' resolves to the player civilization");
+  }
+}
+
+// The shipped seed pack loads cleanly through the directory loader — this
+// is what a normal campaign session does at startup.
+void seed_pack_loads(core::IntegratedAdaptiveCampaignRuntime &campaign,
+                     const fs::path &research_root) {
+  const fs::path scripted_dir =
+      research_root.parent_path().parent_path() / "scripted" / "v1";
+  const auto errors =
+      core::load_scripted_content_directory(campaign, scripted_dir);
+  for (const auto &error : errors)
+    std::cerr << "seed pack error in " << error.file << ": " << error.message
+              << '\n';
+  require(errors.empty(), "shipped scripted pack validates without errors");
+  const auto &runtime = campaign.scripted_content();
+  for (const char *id : {"anomaly.debris_cache", "anomaly.data_vault",
+                         "anomaly.ancient_beacon", "anomaly.live_mine",
+                         "anomaly.terraforming_cache", "colony.boom",
+                         "colony.epidemic", "colony.frontier_relic",
+                         "colony.harvest_surge", "colony.sabotage_scare",
+                         "diplomacy.rapprochement", "diplomacy.rivalry_hardening",
+                         "diplomacy.war_bulletin", "diplomacy.first_impressions",
+                         "diplomacy.border_grievance"})
+    require(runtime.definition(id) != nullptr, id);
+}
+
 } // namespace
 
 int main(int argc, char **argv) {
@@ -225,6 +342,9 @@ int main(int argc, char **argv) {
     anomaly_scope_once(campaign);
     chronicle_visibility(campaign);
     persistence(campaign, research_root);
+    directory_loading(campaign);
+    civilization_arg_conventions(campaign);
+    seed_pack_loads(campaign, research_root);
   } catch (const std::exception &error) {
     std::cerr << "UNCAUGHT: " << error.what() << '\n';
     return 1;

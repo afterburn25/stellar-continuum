@@ -9,6 +9,7 @@
 #include <stellar/engine/scripted_content.hpp>
 
 #include <cstdint>
+#include <filesystem>
 #include <span>
 #include <string>
 #include <string_view>
@@ -42,6 +43,11 @@ script_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
 //   at_war                   civ      [{civilization}]
 //   system_known             system   (observer: args.civilization or context)
 //   system_fully_surveyed    system   (observer: args.civilization or context)
+//
+// Civilization reference arguments ("civilization", "visible_to") accept a
+// concrete id or a reserved name: "player" (the campaign's player
+// civilization) or "origin" (the firing context's origin — the other party
+// in a contact/war event). Unresolvable references no-op/false at runtime.
 //   body_has_anomaly         body
 //   civilization_is_player   civ
 //   elapsed_days_at_least    global   {days}
@@ -57,7 +63,8 @@ script_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
 //   resolve_anomaly            body     (consumes the anomaly site)
 //   reveal_system              system   (observer: args.civilization or context)
 //   grant_capability           civ      {capability}
-//   chronicle_record           any      {category, summary, significance?}
+//   chronicle_record           any      {category, summary, significance?,
+//                                        visible_to?}
 //
 // Effects route through authoritative services: diplomacy through
 // DiplomacySimulation (which validates and journals), economy through
@@ -107,5 +114,17 @@ private:
   engine::EventHistory *history_{};
   double day_{};
 };
+
+// Loads every `*.json` document directly under `root` into the campaign's
+// scripted runtime. Enumeration is lexicographic by filename so document
+// load order (and therefore definition registration order) is
+// deterministic across platforms. Errors are aggregated across all
+// documents — an empty return means the directory loaded cleanly. A
+// missing or non-directory root reports one error; hosts decide whether
+// that is fatal for their session.
+[[nodiscard]] std::vector<engine::ScriptLoadError>
+load_scripted_content_directory(
+    IntegratedAdaptiveCampaignRuntime &campaign,
+    const std::filesystem::path &root);
 
 } // namespace stellar::core

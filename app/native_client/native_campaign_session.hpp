@@ -67,6 +67,12 @@ struct NativeCampaignSessionDependencies {
       stellar::core::write_prepared_campaign};
   NativeCampaignLoader loader{stellar::core::load_existing_player_campaign_v17};
   std::function<void(stellar::core::CampaignFrame &)> validate_candidate;
+  // Data-defined scripted content root (e.g. <install>/Data/scripted/v1).
+  // Every *.json document loads into the campaign's scripted runtime on
+  // fresh start and again on save restore — definitions are content, not
+  // save data. Empty disables loading. A present directory loads strictly:
+  // any malformed document fails the session with file+id diagnostics.
+  std::filesystem::path scripted_root;
   bool developer_session{};
 };
 

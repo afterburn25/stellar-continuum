@@ -1,6 +1,7 @@
 #include "native_campaign_session.hpp"
 
 #include <stellar/core/adaptive_research_strategic_runtime.hpp>
+#include <stellar/core/campaign_scripted_content.hpp>
 
 #include <algorithm>
 #include <chrono>
@@ -41,6 +42,23 @@ void validate_dependencies(const NativeCampaignSessionDependencies &dependencies
   if (!dependencies.loader) {
     throw std::invalid_argument("A native campaign loader is required.");
   }
+}
+
+// Loads the configured scripted-content root into the runtime. A present
+// directory is strict — malformed content fails session creation with the
+// aggregated file/object diagnostics rather than silently dropping events.
+void load_scripted_content(IntegratedAdaptiveCampaignRuntime &runtime,
+                           const std::filesystem::path &root) {
+  if (root.empty()) return;
+  const auto errors = load_scripted_content_directory(runtime, root);
+  if (errors.empty()) return;
+  std::string message = "Scripted content failed to load:";
+  for (const auto &error : errors) {
+    message += "\n  " + error.file;
+    if (!error.object_id.empty()) message += " (" + error.object_id + ")";
+    message += ": " + error.message;
+  }
+  throw std::runtime_error(message);
 }
 
 } // namespace
@@ -152,6 +170,7 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_fresh(
     throw std::invalid_argument("A native campaign save path is required.");
   }
   validate_dependencies(dependencies);
+  load_scripted_content(runtime, dependencies.scripted_root);
   auto live = std::make_unique<Live>(
       std::move(runtime), StrategicClock{}, save_path, 1, false,
       dependencies.save_writer, 1,dependencies.developer_session);
@@ -196,8 +215,13 @@ std::unique_ptr<NativeCampaignSession> NativeCampaignSession::create_loaded(
   clock.restore(day);
   clock.set_speed(StrategicSpeed::Normal);
   clock.set_speed(StrategicSpeed::Paused);
+  auto runtime = std::move(loaded.campaign).activate();
+  // Definitions are content, not save data: restore rebuilt the runtime
+  // state (fired flags, cooldowns, scheduled follow-ups, roll stream), now
+  // re-register the documents so scheduled events can resolve again.
+  load_scripted_content(runtime, dependencies.scripted_root);
   auto live = std::make_unique<Live>(
-      std::move(loaded.campaign).activate(), std::move(clock), save_path, 1,
+      std::move(runtime), std::move(clock), save_path, 1,
       recovered, dependencies.save_writer, 1,dependencies.developer_session);
   if (live->frame.clock().simulation_days() != day) {
     throw std::runtime_error("Loaded campaign clock does not match its saved day.");

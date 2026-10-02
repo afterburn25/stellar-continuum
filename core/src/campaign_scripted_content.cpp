@@ -4,10 +4,12 @@
 #include <stellar/core/detail/adaptive_research_campaign_state_access.hpp>
 #include <stellar/core/detail/adaptive_research_state_writer.hpp>
 #include <stellar/core/diplomacy_lifecycle.hpp>
+#include <stellar/engine/asset_registry.hpp>
 
 #include <algorithm>
 #include <charconv>
 #include <cmath>
+#include <iterator>
 #include <optional>
 #include <utility>
 
@@ -62,6 +64,30 @@ bool requires_arg(std::span<const std::pair<std::string, std::string>> args,
     return false;
   }
   return true;
+}
+
+// Civilization reference arguments accept a concrete id or a reserved
+// name: "player" resolves to the campaign's player civilization, "origin"
+// to the firing context's origin civilization (the other party in a
+// contact/war event). Returns nullopt when the reference cannot resolve.
+std::optional<std::int64_t>
+arg_civilization(std::span<const std::pair<std::string, std::string>> args,
+                 std::string_view key, const ScriptFiringContext &context,
+                 const CampaignSimulationState &world) {
+  const auto value = arg_of(args, key);
+  if (!value) return std::nullopt;
+  if (*value == "player") return world.campaign().player_civilization_id;
+  if (*value == "origin") return context.origin;
+  if (const auto id = arg_int(args, key)) return *id;
+  return std::nullopt;
+}
+
+bool valid_civilization_arg(
+    std::span<const std::pair<std::string, std::string>> args,
+    std::string_view key) {
+  const auto value = arg_of(args, key);
+  return value && (*value == "player" || *value == "origin" ||
+                   arg_int(args, key).has_value());
 }
 
 const char *scope_name(ScriptScopeKind kind) {
@@ -341,6 +367,8 @@ std::string CampaignScriptedContentAdapter::validate_condition(
         !requires_arg(args, "civilization", error, name) ||
         !requires_arg(args, "value", error, name))
       return error;
+    if (!valid_civilization_arg(args, "civilization"))
+      return "relationship_at_least civilization must be an id, \"player\" or \"origin\"";
     if (const auto axis = arg_of(args, "axis"); axis && !valid_axis(*axis))
       return "relationship_at_least axis must be trust|hostility|fear|respect|cooperation";
     return arg_number(args, "value") ? "" : "relationship_at_least value must be a number";
@@ -348,11 +376,17 @@ std::string CampaignScriptedContentAdapter::validate_condition(
   if (name == "at_war") {
     if (!scope_is(leaf.scope, ScriptScopeKind::civilization, error, name))
       return error;
+    if (arg_of(args, "civilization") &&
+        !valid_civilization_arg(args, "civilization"))
+      return "at_war civilization must be an id, \"player\" or \"origin\"";
     return {};
   }
   if (name == "system_known" || name == "system_fully_surveyed") {
     if (!scope_is(leaf.scope, ScriptScopeKind::system, error, name))
       return error;
+    if (arg_of(args, "civilization") &&
+        !valid_civilization_arg(args, "civilization"))
+      return name + " civilization must be an id, \"player\" or \"origin\"";
     return {};
   }
   if (name == "body_has_anomaly") {
@@ -388,6 +422,8 @@ std::string CampaignScriptedContentAdapter::validate_effect(
     if (!scope_is(effect.scope, ScriptScopeKind::civilization, error, name) ||
         !requires_arg(args, "civilization", error, name))
       return error;
+    if (!valid_civilization_arg(args, "civilization"))
+      return "modify_relationship civilization must be an id, \"player\" or \"origin\"";
     static const std::string_view axes[] = {"trust", "hostility", "fear",
                                             "respect", "cooperation"};
     bool any_axis = false;
@@ -406,7 +442,9 @@ std::string CampaignScriptedContentAdapter::validate_effect(
     if (!scope_is(effect.scope, ScriptScopeKind::civilization, error, name) ||
         !requires_arg(args, "civilization", error, name))
       return error;
-    return {};
+    return valid_civilization_arg(args, "civilization")
+               ? ""
+               : name + " civilization must be an id, \"player\" or \"origin\"";
   }
   if (name == "resolve_anomaly") {
     if (!scope_is(effect.scope, ScriptScopeKind::body, error, name))
@@ -416,6 +454,9 @@ std::string CampaignScriptedContentAdapter::validate_effect(
   if (name == "reveal_system") {
     if (!scope_is(effect.scope, ScriptScopeKind::system, error, name))
       return error;
+    if (arg_of(args, "civilization") &&
+        !valid_civilization_arg(args, "civilization"))
+      return "reveal_system civilization must be an id, \"player\" or \"origin\"";
     return {};
   }
   if (name == "grant_capability") {
@@ -434,6 +475,9 @@ std::string CampaignScriptedContentAdapter::validate_effect(
     if (const auto significance = arg_of(args, "significance");
         significance && !arg_number(args, "significance"))
       return "chronicle_record significance must be a number";
+    if (arg_of(args, "visible_to") &&
+        !valid_civilization_arg(args, "visible_to"))
+      return "chronicle_record visible_to must be an id, \"player\" or \"origin\"";
     return {};
   }
   return "unknown effect '" + name + "'";
@@ -534,9 +578,10 @@ bool CampaignScriptedContentAdapter::evaluate_condition(
   }
   if (name == "relationship_at_least") {
     if (id < 0) return false;
-    const auto target = arg_int(args, "civilization");
+    const auto target =
+        arg_civilization(args, "civilization", context, *world_);
     const auto value = arg_number(args, "value");
-    if (!target || !value) return false;
+    if (!target || !value || *target < 0) return false;
     const auto relationship = diplomacy_state_->get_relationship(
         static_cast<int>(id), static_cast<int>(*target));
     if (!relationship) return false;
@@ -546,8 +591,10 @@ bool CampaignScriptedContentAdapter::evaluate_condition(
   }
   if (name == "at_war") {
     if (id < 0) return false;
-    const auto target = arg_int(args, "civilization");
-    if (target) {
+    if (arg_of(args, "civilization")) {
+      const auto target =
+          arg_civilization(args, "civilization", context, *world_);
+      if (!target || *target < 0) return false;
       const auto relationship = diplomacy_state_->get_relationship(
           static_cast<int>(id), static_cast<int>(*target));
       return relationship && relationship->political_state ==
@@ -566,7 +613,8 @@ bool CampaignScriptedContentAdapter::evaluate_condition(
   if (name == "system_known" || name == "system_fully_surveyed") {
     if (id < 0) return false;
     const auto observer =
-        arg_int(args, "civilization").value_or(context.civilization);
+        arg_civilization(args, "civilization", context, *world_)
+            .value_or(context.civilization);
     if (observer < 0) return false;
     return name == "system_known"
                ? campaign.knowledge.is_system_known(static_cast<int>(observer),
@@ -609,8 +657,9 @@ void CampaignScriptedContentAdapter::apply_effect(
   if (name == "modify_relationship" || name == "set_hostile" ||
       name == "declare_war") {
     if (id < 0) return;
-    const auto target = arg_int(args, "civilization");
-    if (!target) return;
+    const auto target =
+        arg_civilization(args, "civilization", context, *world_);
+    if (!target || *target < 0) return;
     try {
       if (name == "declare_war") {
         diplomacy_.declare_war(static_cast<int>(id), static_cast<int>(*target),
@@ -651,7 +700,8 @@ void CampaignScriptedContentAdapter::apply_effect(
   if (name == "reveal_system") {
     if (id < 0) return;
     const auto observer =
-        arg_int(args, "civilization").value_or(context.civilization);
+        arg_civilization(args, "civilization", context, *world_)
+            .value_or(context.civilization);
     if (observer < 0) return;
     world_->campaign().knowledge.reveal_system(static_cast<int>(observer),
                                                static_cast<int>(id));
@@ -683,6 +733,14 @@ void CampaignScriptedContentAdapter::apply_effect(
           static_cast<std::uint64_t>(context.civilization));
     if (context.system >= 0) record.location = context.system;
     record.visible_to = record.actors;
+    // An explicit audience (e.g. "player") widens visibility beyond the
+    // involved actors so player-directed scripted news reaches the player.
+    if (const auto audience =
+            arg_civilization(args, "visible_to", context, *world_);
+        audience && *audience >= 0 &&
+        !std::ranges::contains(record.visible_to,
+                               static_cast<std::uint64_t>(*audience)))
+      record.visible_to.push_back(static_cast<std::uint64_t>(*audience));
     std::vector<engine::HistoryEvent> batch{std::move(record)};
     widen_history_visibility(batch, world_->campaign());
     for (auto &entry : batch) history_->record(std::move(entry));
@@ -713,6 +771,44 @@ void CampaignScriptedContentAdapter::event_fired(
   std::vector<engine::HistoryEvent> batch{std::move(record)};
   widen_history_visibility(batch, world_->campaign());
   for (auto &entry : batch) history_->record(std::move(entry));
+}
+
+std::vector<engine::ScriptLoadError> load_scripted_content_directory(
+    IntegratedAdaptiveCampaignRuntime &campaign,
+    const std::filesystem::path &root) {
+  std::vector<engine::ScriptLoadError> errors;
+  std::error_code ec;
+  if (!std::filesystem::is_directory(root, ec) || ec) {
+    errors.push_back({root.string(), {},
+                      "scripted content directory not found"});
+    return errors;
+  }
+  std::vector<std::filesystem::path> documents;
+  for (const auto &entry : std::filesystem::directory_iterator(root, ec)) {
+    if (ec) break;
+    if (entry.is_regular_file(ec) && entry.path().extension() == ".json")
+      documents.push_back(entry.path());
+  }
+  if (ec) {
+    errors.push_back(
+        {root.string(), {},
+         "scripted content directory enumeration failed: " + ec.message()});
+    return errors;
+  }
+  std::ranges::sort(documents);
+  for (const auto &path : documents) {
+    const auto file = path.filename().generic_string();
+    auto stream = engine::resource_stream(path);
+    if (!stream) {
+      errors.push_back({file, {}, "unable to read scripted document"});
+      continue;
+    }
+    const std::string document{std::istreambuf_iterator<char>(stream),
+                               std::istreambuf_iterator<char>()};
+    [[maybe_unused]] const bool loaded =
+        campaign.load_scripted_document(document, file, &errors);
+  }
+  return errors;
 }
 
 } // namespace stellar::core

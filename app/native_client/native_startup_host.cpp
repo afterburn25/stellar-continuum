@@ -6,12 +6,25 @@ namespace stellar::native_startup_ui {
 using namespace stellar::native_setup;
 using namespace stellar::native_startup;
 
+namespace {
+// The config's scripted root fills the session dependencies unless the
+// caller already chose a different root.
+stellar::native_map::NativeCampaignSessionDependencies
+with_scripted_root(stellar::native_map::NativeCampaignSessionDependencies deps,
+                   const std::filesystem::path &root) {
+  if (deps.scripted_root.empty()) deps.scripted_root = root;
+  return deps;
+}
+} // namespace
+
 NativeStartupHost::NativeStartupHost(
     StartupHostConfig config,
     stellar::native_map::NativeCampaignSessionDependencies dependencies,
     NativeDetachedCampaignGenerator generator)
     : config_(std::move(config)),
-      startup_(std::move(dependencies), std::move(generator)) {}
+      startup_(with_scripted_root(std::move(dependencies),
+                                  config_.scripted_root),
+               std::move(generator)) {}
 
 NativeNewCampaignSetupView NativeStartupHost::setup() const {
   return setup_controller_.build(developer_mode_);

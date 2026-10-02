@@ -696,8 +696,9 @@ void control_label(DrawList &out, UiRect bounds, std::string value, Color color,
   const auto asset_root=std::filesystem::absolute(options.asset_root);
 
   const auto research_root=asset_root/"Data/research/v1";
+  NativeCampaignSessionDependencies dependencies;
+  dependencies.scripted_root=asset_root/"Data/scripted/v1";
   if(options.load){
-    NativeCampaignSessionDependencies dependencies;
     dependencies.developer_session=options.dev_game;
     return NativeCampaignSession::load_startup(research_root,options.save_path,STELLAR_GAME_VERSION,
       [](const PlayerCampaignRestorationProgress &progress){std::cerr<<"Loading: "<<static_cast<int>(progress.fraction*100.)<<"% "<<progress.status<<'\n';},std::move(dependencies));
@@ -708,7 +709,7 @@ void control_label(DrawList &out, UiRect bounds, std::string value, Color color,
       seed_persistable_fresh_campaign(options.seed,
         load_nearby_catalog(asset_root/"Data/astronomy/hyg-nearby-500-v1.json"),
         {utc_timestamp(),500,6,1,"terran_baseline",StellarPopulationOptions{}})),
-    research_root,options.save_path,STELLAR_GAME_VERSION);
+    research_root,options.save_path,STELLAR_GAME_VERSION,std::move(dependencies));
 }
 
 struct GalaxyArtSceneEvidence {
@@ -10758,7 +10759,7 @@ int main(int argc,char **argv){
     stellar::engine::AccessibilityAnnouncer startup_announcer;
     std::optional<stellar::native_audio::VoiceCaption> startup_announcement;
     const auto startup_config=[&]{
-      StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,STELLAR_GAME_VERSION},asset_root,utc_timestamp};
+      StartupEntryConfig config{{asset_root/"Data/research/v1",asset_root/"Data/astronomy/hyg-nearby-500-v1.json",options.save_path,asset_root/"Data/scripted/v1",STELLAR_GAME_VERSION},asset_root,utc_timestamp};
       config.developer_access=&developer_access;config.locale=&locale_table;
       config.audio=audio_hooks;config.audio_settings=&audio_settings;config.video_settings=&video_settings;config.general_settings=&general_settings;config.settings_hub=&settings_hub;config.voice_settings=&voice_settings;config.announcer=&startup_announcer;config.accessibility_bridge=&accessibility_bridge;config.caption=[&](DrawList& draw,int w,int h){while(auto item=startup_announcer.take()){if(item->kind==stellar::engine::AnnouncementKind::Focus)accessibility_bridge.focus_changed(item->text,item->bounds,item->range,item->control,item->checked,item->value,item->expanded);else accessibility_bridge.announce(item->text);if(!item->text.empty())startup_announcement={"",std::move(item->text),std::chrono::steady_clock::now()+std::chrono::seconds(4)};}std::optional<stellar::native_audio::VoiceCaption> ui;if(startup_announcement&&std::chrono::steady_clock::now()<startup_announcement->expires_at&&audio.voice_preferences().subtitles)ui=startup_announcement;stellar::native_audio::render_voice_caption(draw,&audio,w,h,[&](const Text& t){return window.measure_text(t);},general_settings.saved().effective(),nullptr,ui);};return config;
     };

@@ -11,6 +11,9 @@
 namespace stellar::native_startup_ui {
 struct StartupHostConfig {
   std::filesystem::path research_root, catalog_path, default_save_path;
+  // Data-defined scripted content root (e.g. <install>/Data/scripted/v1).
+  // Applied to session dependencies when the caller did not set one.
+  std::filesystem::path scripted_root;
   std::string game_version;
 };
 struct StartupHostResult {

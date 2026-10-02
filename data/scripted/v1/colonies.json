@@ -1,0 +1,126 @@
+{
+  "schema": "stellar_scripted_events_v1",
+  "scripted_events": [
+    {
+      "id": "colony.boom",
+      "poll_days": 40,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 90,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "3"}},
+        {"check": "random_chance", "args": {"probability": "0.3"}}
+      ]},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "60"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.boom",
+                  "summary": "A colony reports a population and industry surge as new districts come online.",
+                  "significance": "0.3"}}
+      ]
+    },
+    {
+      "id": "colony.epidemic",
+      "poll_days": 50,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 150,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "6"}},
+        {"check": "random_chance", "args": {"probability": "0.12"}}
+      ]},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-50"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.epidemic",
+                  "summary": "A viral outbreak sweeps a colony's habitat decks; quarantine slows industrial output.",
+                  "significance": "0.5"}}
+      ],
+      "follow_ups": [
+        {"id": "colony.epidemic.contained", "delay_days": 20, "weight": 4},
+        {"id": "colony.epidemic.lingers", "delay_days": 20, "weight": 1}
+      ]
+    },
+    {
+      "id": "colony.epidemic.contained",
+      "scope": {"kind": "colony", "id": -1},
+      "effects": [
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.epidemic.contained",
+                  "summary": "The outbreak is contained; the colony's clinics credit early quarantine.",
+                  "significance": "0.3"}}
+      ]
+    },
+    {
+      "id": "colony.epidemic.lingers",
+      "scope": {"kind": "colony", "id": -1},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-30"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.epidemic.lingers",
+                  "summary": "The epidemic lingers in the lower habitats, dragging on the colony's recovery.",
+                  "significance": "0.4"}}
+      ]
+    },
+    {
+      "id": "colony.frontier_relic",
+      "poll_days": 120,
+      "scope": {"kind": "colony", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "1"}},
+        {"check": "random_chance", "args": {"probability": "0.35"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "60"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.frontier_relic",
+                  "summary": "Settlers breaking ground for a new habitat uncover a manufactured relic in the bedrock.",
+                  "significance": "0.4"}}
+      ]
+    },
+    {
+      "id": "colony.harvest_surge",
+      "poll_days": 60,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 60,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "2"}},
+        {"check": "random_chance", "args": {"probability": "0.2"}}
+      ]},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "100"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.harvest_surge",
+                  "summary": "A bumper export season pads a colony's contribution to the treasury.",
+                  "significance": "0.25"}}
+      ]
+    },
+    {
+      "id": "colony.sabotage_scare",
+      "poll_days": 80,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 200,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "10"}},
+        {"check": "random_chance", "args": {"probability": "0.1"}}
+      ]},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-60"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.sabotage_scare",
+                  "summary": "A sabotage scare locks down an orbital elevator; inspections cost the colony's sponsors dearly.",
+                  "significance": "0.4"}}
+      ]
+    }
+  ]
+}
