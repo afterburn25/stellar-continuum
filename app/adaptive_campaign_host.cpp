@@ -17,6 +17,7 @@
 #include <stellar/engine/runtime_paths.hpp>
 
 #include <algorithm>
+#include <array>
 #include <chrono>
 #include <cmath>
 #include <fstream>
@@ -354,6 +355,7 @@ int run_adaptive_campaign_host(
   double initialization_total_ms = 0.0, step_total_ms = 0.0;
   std::vector<double> step_times;
   std::vector<double> autosave_times;
+  std::array<double, 2> autosave_stage_ms{};
   std::size_t autosave_bytes = 0;
   const auto autosave_path =
       std::filesystem::temp_directory_path() /
@@ -412,17 +414,33 @@ int run_adaptive_campaign_host(
       if (options.autosave_every > 0 &&
           (tick + 1) % options.autosave_every == 0) {
         const auto save_started = std::chrono::steady_clock::now();
-        const auto save_json = encode_player_campaign_v17_json(
-            capture_player_campaign_v17(
-                runtime, {(tick + 1) * options.step_days,
-                          "adaptive-benchmark", "2050-03-21T00:00:00Z"}));
-        stellar::engine::write_file_atomically(
-            autosave_path, std::as_bytes(std::span(save_json)));
-        autosave_bytes = save_json.size();
+        const auto save_dom = capture_player_campaign_v17(
+            runtime, {(tick + 1) * options.step_days,
+                      "adaptive-benchmark", "2050-03-21T00:00:00Z"});
+        const auto capture_done = std::chrono::steady_clock::now();
+        // Measure the shipped autosave path: the game's save controller
+        // streams the captured payload through JsonStreamWriter on a
+        // background job (byte-identical to encode_player_campaign_v17_json
+        // per engine_scale3d_tests). Synchronous here so the timing is
+        // attributable; the game absorbs this off-thread.
+        std::size_t streamed_bytes = 0;
+        stellar::engine::write_file_atomically_stream(
+            autosave_path, [&](const stellar::engine::AtomicTextSink &sink) {
+              stream_player_campaign_v17_json(
+                  save_dom, [&](std::string_view text) {
+                    streamed_bytes += text.size();
+                    sink(text);
+                  });
+            });
+        const auto write_done = std::chrono::steady_clock::now();
+        autosave_bytes = streamed_bytes;
         autosave_times.push_back(std::chrono::duration<double, std::milli>(
-                                     std::chrono::steady_clock::now() -
-                                     save_started)
+                                     write_done - save_started)
                                      .count());
+        autosave_stage_ms[0] +=
+            std::chrono::duration<double, std::milli>(capture_done - save_started).count();
+        autosave_stage_ms[1] +=
+            std::chrono::duration<double, std::milli>(write_done - capture_done).count();
       }
     }
     final_diagnostic = adaptive_diagnostic(runtime, campaign_diagnostic);
@@ -493,6 +511,10 @@ int run_adaptive_campaign_host(
       {"autosavePeakMs",
        autosave_times.empty() ? 0.0 : autosave_times.back()},
       {"autosaveBytes", autosave_bytes},
+      {"autosaveCaptureMeanMs",
+       autosave_times.empty() ? 0.0 : autosave_stage_ms[0] / autosave_times.size()},
+      {"autosaveStreamWriteMeanMs",
+       autosave_times.empty() ? 0.0 : autosave_stage_ms[1] / autosave_times.size()},
       {"stressFleetsPerCivilization", options.stress_fleets},
       {"phaseTimings", phase_timings},
       {"sensorContactsRecorded", sensor_contacts},
