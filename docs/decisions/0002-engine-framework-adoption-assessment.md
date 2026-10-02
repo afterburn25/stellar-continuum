@@ -260,7 +260,11 @@ The adoption frontier is not authority migration — it is:
    `finalStateHash` `b57c03d1…` identical. Remaining combat cost is
    the required once-per-tick active index plus the
    cooldown/retreat/order scans — genuine per-fleet state work, not
-   rescans. Separately, the benchmark autosave was found to measure a
+   rescans. A subsequent quiet-machine canonical run puts `combat` at
+   1,061 ms and step mean at **1.42 ms** — 45% below the ~2.59 ms
+   pre-audit baseline — with no phase above ~1.1 s (combat 1,061 /
+   adaptive_research 975 / automatic_orders 961 / construction 884 /
+   economy 822 ms). Separately, the benchmark autosave was found to measure a
    path the game never ships: production captures the save DTO
    (~27–30 ms on-thread) then streams `JsonStreamWriter` output to an
    atomic file write on a background job; the benchmark now exercises
