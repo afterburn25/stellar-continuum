@@ -287,6 +287,25 @@ struct Editor {
   std::vector<std::filesystem::path> embedded_assets;
   std::shared_ptr<const RgbaImage> asset_preview;
   std::string asset_preview_name;
+  // Document lifecycle: `dirty` marks content differing from disk (every
+  // mutation — edits, regen, undo — sets it; save/load/new clear it).
+  // `first_result_done` excludes the boot generate from that rule: it is
+  // the document's own content, not a user change.
+  bool first_result_done{};
+  // `pending_discard` drives the unsaved-changes confirm modal; the
+  // pending action runs after SAVE or DISCARD, CANCEL aborts it.
+  bool dirty{};
+  enum class PendingDiscard : std::uint8_t {
+    None,
+    Quit,
+    OpenProject,
+    NewProject,
+  };
+  PendingDiscard pending_discard{PendingDiscard::None};
+  std::filesystem::path pending_open_path;
+  // Set when the confirm modal approves a quit; the frame loop honours it.
+  bool quit_confirmed{};
+  UiRect confirm_rect{}, confirm_save{}, confirm_discard{}, confirm_cancel{};
   // Project open picker: *.json files under projects_dir, modal overlay.
   // Recently used paths list first; the first picker_recent_count rows
   // carry the "recent" tag and may point outside projects_dir.
@@ -545,6 +564,15 @@ bool trait(const std::unordered_map<int, edproj::SystemEdit> &map,
   return record.*generated;
 }
 
+// Records the pre-mutation snapshot for undo and marks the document
+// changed relative to disk. Document-replacing operations (load, new
+// project) commit the old document directly and clear dirty afterwards.
+void commit_document(Editor &ed) {
+  ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                     ed.project_name});
+  ed.dirty = true;
+}
+
 // Commits the in-progress field buffer into the annotation layer, recording
 // an undo snapshot only when the value actually changes. In the system
 // workspace with a body selected, fields bind to that body's record.
@@ -557,8 +585,7 @@ void commit_active_field(Editor &ed) {
     }
   } else if (ed.editing == Field::ProjectName) {
     if (ed.project_name != ed.edit_buffer) {
-      ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
-                         ed.project_name});
+      commit_document(ed);
       ed.project_name = ed.edit_buffer;
     }
   } else if (ed.editing == Field::BodyRadius ||
@@ -619,8 +646,7 @@ void commit_active_field(Editor &ed) {
                                : std::optional<double>{};
       if (ed.edit_buffer.empty()) {
         if (current) {
-          ed.history.commit({ed.seed, ed.system_count, ed.edits,
-                             ed.body_edits, ed.project_name});
+          commit_document(ed);
           (map[target->first].*member).reset();
           rebuild_detail_rows(ed);
         }
@@ -630,8 +656,7 @@ void commit_active_field(Editor &ed) {
           if (!std::isfinite(value) || !valid(value))
             throw std::runtime_error("out of range");
           if (!current || *current != value) {
-            ed.history.commit({ed.seed, ed.system_count, ed.edits,
-                               ed.body_edits, ed.project_name});
+            commit_document(ed);
             map[target->first].*member = value;
             rebuild_detail_rows(ed);
           }
@@ -657,9 +682,7 @@ void commit_active_field(Editor &ed) {
                         : (ed.editing == Field::Name ? it->second.name
                                                      : it->second.note);
     if (current_value != ed.edit_buffer) {
-      ed.history.commit(
-          {ed.seed, ed.system_count, ed.edits, ed.body_edits,
-           ed.project_name});
+      commit_document(ed);
       auto &stored = map[target->first];
       (ed.editing == Field::Name ? stored.name : stored.note) =
           ed.edit_buffer;
@@ -678,6 +701,7 @@ void apply_undo(Editor &ed) {
     ed.edits = std::move(state->edits);
     ed.body_edits = std::move(state->body_edits);
     ed.project_name = std::move(state->name);
+    ed.dirty = true; // content diverges from the last save either way
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
     ed.status = "undo";
@@ -691,6 +715,7 @@ void apply_redo(Editor &ed) {
     ed.edits = std::move(state->edits);
     ed.body_edits = std::move(state->body_edits);
     ed.project_name = std::move(state->name);
+    ed.dirty = true;
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
     ed.status = "redo";
@@ -1503,6 +1528,50 @@ void render_save_as(DrawList &out, Editor &ed, float s, float w, float h) {
   }
 }
 
+// Modal unsaved-changes confirm drawn topmost: SAVE / DISCARD / CANCEL.
+void render_confirm(DrawList &out, Editor &ed, float s, float w, float h) {
+  ed.confirm_rect = ed.confirm_save = ed.confirm_discard =
+      ed.confirm_cancel = {};
+  if (ed.pending_discard == Editor::PendingDiscard::None) return;
+  const int font = static_cast<int>(13 * s);
+  const float pw = std::min(440 * s, w - 60 * s);
+  const float ph = 128 * s;
+  const UiRect r{(w - pw) * .5f, (h - ph) * .5f, pw, ph};
+  ed.confirm_rect = r;
+  out.overlay.push_back(FilledRectangle{r, {8, 20, 32, 250}});
+  out.overlay.push_back(StrokedRectangle{r, accent});
+  out.overlay.push_back(Text{{r.x + 14 * s, r.y + 10 * s}, "UNSAVED CHANGES",
+                             accent, font + 1, 0, std::nullopt,
+                             TextAlign::Left, FontFace::Heading});
+  const char *action =
+      ed.pending_discard == Editor::PendingDiscard::Quit
+          ? "quit"
+      : ed.pending_discard == Editor::PendingDiscard::NewProject
+          ? "start a new project"
+          : "open another project";
+  out.overlay.push_back(
+      Text{{r.x + 14 * s, r.y + 16 * s + font},
+           std::string("Save the project before you ") + action + "?",
+           ink, font});
+  const float bw = (r.width - 40 * s) / 3.f;
+  const float by = r.y + r.height - 44 * s;
+  ed.confirm_save = {r.x + 14 * s, by, bw, 32 * s};
+  ed.confirm_discard = {r.x + 20 * s + bw, by, bw, 32 * s};
+  ed.confirm_cancel = {r.x + 26 * s + bw * 2.f, by, bw, 32 * s};
+  for (const auto &[rect, label] :
+       {std::pair{ed.confirm_save, "SAVE"},
+        std::pair{ed.confirm_discard, "DISCARD"},
+        std::pair{ed.confirm_cancel, "CANCEL"}}) {
+    if (rect.contains(Point{ed.pointer_x, ed.pointer_y}))
+      out.overlay.push_back(FilledRectangle{rect, row_hover});
+    out.overlay.push_back(StrokedRectangle{rect, panel_edge});
+    out.overlay.push_back(
+        Text{{rect.x + rect.width * .5f,
+              rect.y + (32 * s - font) * .5f - 1},
+             label, ink, font, rect.width, rect, TextAlign::Center});
+  }
+}
+
 // Discovers embedded assets under a project directory's assets/ folder and
 // decodes the first png for the inspector preview.
 void refresh_embedded_assets(Editor &ed) {
@@ -1634,6 +1703,7 @@ void save_project_into(Editor &ed, const std::filesystem::path &root) {
     }
     refresh_embedded_assets(ed);
     update_recent(ed);
+    ed.dirty = false;
     ed.status = "saved " + ed.project_path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
                 " annotations" +
@@ -1669,6 +1739,7 @@ void load_project(Editor &ed, const std::filesystem::path &path) {
     if (!project.name.empty()) ed.project_name = std::move(project.name);
     update_recent(ed);
     refresh_embedded_assets(ed);
+    ed.dirty = false;
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
     ed.status = "loaded " + path.filename().string() + " - " +
@@ -1758,19 +1829,31 @@ constexpr std::array<const char *, 5> menu_labels{
     "NEW PROJECT", "SAVE   ctrl+s", "RENAME / SAVE AS",
     "SAVE TO FOLDER...", "OPEN PROJECT...   ctrl+o"};
 
+// New Project: clears the annotation document, keeps the galaxy. The
+// fresh untitled document counts as clean — it has no file to diverge
+// from and no annotations yet.
+void new_project(Editor &ed) {
+  ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
+                     ed.project_name});
+  ed.edits.clear();
+  ed.body_edits.clear();
+  ed.project_name = "untitled";
+  ed.project_path = ed.projects_dir / "editor-project.json";
+  ed.project_dir_form = false;
+  ed.dirty = false;
+  rebuild_filter(ed);
+  rebuild_detail_rows(ed);
+  ed.status = "new project";
+}
+
 // Executes a FILE menu item by row index.
 void run_menu_item(Editor &ed, Window &window, std::size_t item) {
   switch (item) {
-  case 0: // New Project: clear the annotation document, keep the galaxy.
-    ed.history.commit({ed.seed, ed.system_count, ed.edits, ed.body_edits,
-                       ed.project_name});
-    ed.edits.clear();
-    ed.body_edits.clear();
-    ed.project_name = "untitled";
-    ed.project_path = ed.projects_dir / "editor-project.json";
-    rebuild_filter(ed);
-    rebuild_detail_rows(ed);
-    ed.status = "new project";
+  case 0:
+    if (ed.dirty)
+      ed.pending_discard = Editor::PendingDiscard::NewProject;
+    else
+      new_project(ed);
     break;
   case 1:
     save_project(ed);
@@ -1786,6 +1869,32 @@ void run_menu_item(Editor &ed, Window &window, std::size_t item) {
     break;
   case 4:
     open_picker(ed);
+    break;
+  }
+}
+
+// Resolves the unsaved-changes modal: 0 saves first (aborting the pending
+// action if the save fails and the document stays dirty), 1 discards,
+// 2 cancels.
+void resolve_discard(Editor &ed, int choice) {
+  const auto pending = ed.pending_discard;
+  ed.pending_discard = Editor::PendingDiscard::None;
+  if (choice == 2 || pending == Editor::PendingDiscard::None) return;
+  if (choice == 0) {
+    save_project(ed);
+    if (ed.dirty) return; // save failed — keep the document, abort
+  }
+  switch (pending) {
+  case Editor::PendingDiscard::Quit:
+    ed.quit_confirmed = true;
+    break;
+  case Editor::PendingDiscard::OpenProject:
+    load_project(ed, ed.pending_open_path);
+    break;
+  case Editor::PendingDiscard::NewProject:
+    new_project(ed);
+    break;
+  case Editor::PendingDiscard::None:
     break;
   }
 }
@@ -2320,7 +2429,12 @@ int main(int argc, char **argv) {
 
     for (;;) {
       const auto snapshot = window.poll();
-      if (snapshot.quit_requested) break;
+      if (snapshot.quit_requested) {
+        if (ed.dirty)
+          ed.pending_discard = Editor::PendingDiscard::Quit;
+        else
+          break;
+      }
 
       {
         std::lock_guard lock(result_mutex);
@@ -2335,6 +2449,11 @@ int main(int argc, char **argv) {
           ed.seed = result_seed;
           ed.system_count = result_count;
           ed.generate_ms = result_ms;
+          // Seed/count are document fields — a committed regeneration
+          // diverges the project from its last save (the boot generate
+          // excepted: it IS the document's content).
+          if (ed.first_result_done) ed.dirty = true;
+          ed.first_result_done = true;
           ed.selected = static_cast<std::size_t>(-1);
           ed.selected_body = static_cast<std::size_t>(-1);
           ed.focus_body = static_cast<std::size_t>(-1);
@@ -2354,6 +2473,21 @@ int main(int argc, char **argv) {
       ed.pointer_x = snapshot.pointer.x;
       ed.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
+        // The unsaved-changes confirm modal owns input while open.
+        if (ed.pending_discard != Editor::PendingDiscard::None) {
+          if (event.type == InputEventType::EscapePressed)
+            resolve_discard(ed, 2);
+          else if (event.type == InputEventType::LeftPressed) {
+            if (ed.confirm_save.contains(event.position))
+              resolve_discard(ed, 0);
+            else if (ed.confirm_discard.contains(event.position))
+              resolve_discard(ed, 1);
+            else if (ed.confirm_cancel.contains(event.position) ||
+                     !ed.confirm_rect.contains(event.position))
+              resolve_discard(ed, 2);
+          }
+          continue;
+        }
         if (event.type == InputEventType::EscapePressed) {
           if (ed.save_as_open) {
             ed.save_as_open = false;
@@ -2383,6 +2517,8 @@ int main(int argc, char **argv) {
             ed.view = WorkspaceView::Galaxy;
             ed.selected_body = static_cast<std::size_t>(-1);
             rebuild_detail_rows(ed);
+          } else if (ed.dirty) {
+            ed.pending_discard = Editor::PendingDiscard::Quit;
           } else {
             return 0;
           }
@@ -2407,7 +2543,7 @@ int main(int argc, char **argv) {
           commit_active_field(ed);
           window.set_text_input(false);
           run_menu_item(ed, window,
-                        event.key == 's' ? 1 : (event.key == 'o' ? 3 : 0));
+                        event.key == 's' ? 1 : (event.key == 'o' ? 4 : 0));
           continue;
         }
         // Text editing takes precedence while a field has focus.
@@ -2573,9 +2709,7 @@ int main(int argc, char **argv) {
             open_picker(ed);
           } else if (ed.hit_bookmark.contains(event.position)) {
             if (const auto target = annotation_target(ed)) {
-              ed.history.commit(
-                  {ed.seed, ed.system_count, ed.edits, ed.body_edits,
-                   ed.project_name});
+              commit_document(ed);
               auto &map = annotation_map(ed, target->second);
               map[target->first].bookmarked =
                   !map[target->first].bookmarked;
@@ -2586,9 +2720,7 @@ int main(int argc, char **argv) {
                      ed.hit_rare.contains(event.position) ||
                      ed.hit_prewarp.contains(event.position)) {
             if (const auto target = annotation_target(ed)) {
-              ed.history.commit(
-                  {ed.seed, ed.system_count, ed.edits, ed.body_edits,
-                   ed.project_name});
+              commit_document(ed);
               auto &map = annotation_map(ed, target->second);
               auto &field =
                   ed.hit_anomaly.contains(event.position)
@@ -2945,8 +3077,10 @@ int main(int argc, char **argv) {
           } else {
             // One undo step restores the pre-drag document; redo stays
             // intact until a real transform lands.
-            if (ed.drag_snapshot)
+            if (ed.drag_snapshot) {
               ed.history.commit(*ed.drag_snapshot);
+              ed.dirty = true;
+            }
             if (valid_index) {
               if (body_target) {
                 ed.selected_body = index;
@@ -3035,7 +3169,13 @@ int main(int argc, char **argv) {
             const auto idx = static_cast<std::size_t>(
                 std::max(0.f, std::floor(local / ed.picker_list.row_height)));
             if (idx < ed.project_files.size()) {
-              load_project(ed, ed.project_files[idx]);
+              if (ed.dirty) {
+                // Confirm first — loading discards the unsaved document.
+                ed.pending_open_path = ed.project_files[idx];
+                ed.pending_discard = Editor::PendingDiscard::OpenProject;
+              } else {
+                load_project(ed, ed.project_files[idx]);
+              }
               ed.picker_open = false;
             }
           }
@@ -3275,10 +3415,13 @@ int main(int argc, char **argv) {
       bx += 90 * s;
       ed.hit_project_name = {bx, bar.y + 10 * s, 170 * s, 32 * s};
       field_box(draw, ed.hit_project_name,
-                ed.editing == Field::ProjectName ? ed.edit_buffer
-                                                 : ed.project_name,
+                ed.editing == Field::ProjectName
+                    ? ed.edit_buffer
+                    : ed.project_name + (ed.dirty ? " *" : ""),
                 ed.editing == Field::ProjectName, "project name",
                 static_cast<int>(13 * s));
+
+      if (ed.quit_confirmed) break;
 
       // Workspace: viewport + right column split into inspector and the
       // searchable systems list.
@@ -3330,6 +3473,7 @@ int main(int argc, char **argv) {
       render_menu(draw, ed, s);
       render_picker(draw, ed, s, w, h); // topmost modal
       render_save_as(draw, ed, s, w, h);
+      render_confirm(draw, ed, s, w, h);
       window.draw(draw);
       // Swap the seed shown in the toolbar only once generation committed.
       ed.seed = pending_seed.load();

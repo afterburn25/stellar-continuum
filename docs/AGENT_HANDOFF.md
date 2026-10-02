@@ -1969,6 +1969,16 @@ catalog id is recorded at press so a mid-drag regeneration cannot
 retarget release/cancel. Also fixed: the system-view click-pick used
 `stellar_planet_position` (generated orbit) while markers render via
 `body_position` (override-aware) — it now matches the renderer.
+Follow-on: the editor has a document lifecycle — `dirty` flags every
+mutation (commit_document wrapper on field/trait/bookmark commits,
+drag-release commit, regen past the boot result, undo/redo) and clears
+on save/load/new; the name field shows `*`. Window close and Esc-quit
+in galaxy view, NEW PROJECT, and picker row opens route through a
+topmost SAVE / DISCARD / CANCEL modal (`resolve_discard`): SAVE runs
+the normal save then the pending action, aborting if the document is
+still dirty (save failed); DISCARD proceeds; CANCEL/Esc/outside-click
+aborts. Also fixed: Ctrl+O ran menu item 3 (SAVE TO FOLDER) after the
+menu grew — it now opens the picker (item 4).
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
