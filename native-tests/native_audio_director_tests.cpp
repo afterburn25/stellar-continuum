@@ -1,3 +1,4 @@
+#include "native_audio.hpp"
 #include "native_audio_director.hpp"
 #include "native_voice_filter.hpp"
 #include <cmath>
@@ -238,6 +239,32 @@ void owner_guard(const fs::path& root) {
   other.join();
   require(rejected, "audio director accepted a non-owner call");
 }
+
+void voice_budget_denial_is_voice_scoped(const fs::path& root) {
+  namespace audio = stellar::engine::audio;
+  NativeAudioDirector director(root);
+  wait_until_ready(director);
+  director.menu_ready();
+  director.service();
+  require(director.stats().music_started && director.stats().voice_available,
+          "budget fixture did not start music with voice available");
+  const auto saved_budget = audio::decoded_pcm_budget_bytes();
+  const auto saved_rejections = audio::decoded_pcm_budget_rejections();
+  struct RestoreBudget {
+    std::uint64_t budget;
+    ~RestoreBudget() { audio::set_decoded_pcm_budget(budget); }
+  } restore{saved_budget};
+  // Admitting zero additional bytes makes the next clip creation throw —
+  // synthesized dialogue converts to an AudioClip at play time.
+  audio::set_decoded_pcm_budget(audio::decoded_pcm_live_bytes());
+  director.play_dialogue_pcm(std::make_shared<const stellar::native_audio::PcmData>(
+      stellar::native_audio::PcmData{48000, 2, std::vector<float>(24000, 0.1f)}));
+  require(audio::decoded_pcm_budget_rejections() == saved_rejections + 1,
+          "dialogue PCM denied by the budget did not count a rejection");
+  require(!director.stats().failed && director.stats().enabled &&
+              director.stats().music_started && !director.stats().voice_available,
+          "decoded PCM budget denial did not retire voice without failing audio");
+}
 }
 
 int main(int argc, char** argv) try {
@@ -252,6 +279,7 @@ int main(int argc, char** argv) try {
   invalid_gain_is_rejected(root);
   owner_guard(root);
   voice_preferences_and_filter(root);
+  voice_budget_denial_is_voice_scoped(root);
   std::cout << "Native audio director lifecycle tests passed\n";
   return 0;
 } catch (const std::exception& error) {
