@@ -1,7 +1,7 @@
 name: Stellar Engine native foundation
 on:
   push:
-    branches: ["engine/**", "cpp/**", "integration/**"]
+    branches: ["engine/**", "cpp/**", "integration/**", "game/**"]
   pull_request:
     branches: [integration, main, "engine/**", "cpp/**"]
     paths:

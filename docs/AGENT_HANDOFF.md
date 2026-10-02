@@ -268,6 +268,12 @@ place a target-specific compile definition on the shared lib, and test
 sources must not `#include` a client `.cpp` (would double-define
 against the lib).
 
+CI coverage fix: `stellar-engine.yml` push triggers now include
+`game/**` — pushes to `game/ui-visual-overhaul` ran no push CI before.
+Legacy lanes (`windows-demo.yml`, `screenshots.yml`, `voice.yml`) still
+listen on retired-era branches; their removal waits on a branch-
+retirement decision, not a code change.
+
 GPU queue telemetry: every scene3d `Command::submit` acquires an
 SDL_GPU fence (tracked in `Storage::gpu_pending`); `prepare()` polls
 the deque each frame — `gpu_pending_submits`/`gpu_oldest_pending_ms`
