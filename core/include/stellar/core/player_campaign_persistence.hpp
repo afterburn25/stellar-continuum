@@ -28,6 +28,7 @@ namespace detail {
     std::function<AdaptiveResearchCampaignSnapshot()>,
     const DiplomacyStateSnapshot &,
     std::optional<engine::EventHistory::State> event_history = std::nullopt,
+    std::optional<std::string> scripted_content = std::nullopt,
     const PlayerCampaignRestoreHooks & = {});
 }
 
@@ -75,6 +76,11 @@ struct PlayerCampaignPayloadV17Dto {
   // Campaign chronicle (EventHistory records). Absent in saves written
   // before the chronicle existed; restored runtimes then start empty.
   std::optional<engine::EventHistory::State> event_history;
+  // Scripted-content runtime state (fired flags, cooldowns, scheduled
+  // follow-ups, roll stream) as the runtime's internally-versioned JSON
+  // document. Absent in saves predating scripted content; restored runtimes
+  // then start empty. Definitions are not saved — they reload from packages.
+  std::optional<std::string> scripted_content;
 };
 
 class DiplomacyCampaignReferenceValidator final {
@@ -131,6 +137,7 @@ private:
        std::function<AdaptiveResearchCampaignSnapshot()>,
        const DiplomacyStateSnapshot &,
        std::optional<engine::EventHistory::State>,
+       std::optional<std::string>,
        const PlayerCampaignRestoreHooks &);
 };
 

@@ -72,6 +72,8 @@ std::string legacy_composed_encoding(const PlayerCampaignPayloadV17Dto &payload)
       ? player_json_detail::encode_research(*payload.adaptive_research) : nlohmann::ordered_json(nullptr);
   root["EventHistory"] = payload.event_history
       ? player_json_detail::encode_event_history(*payload.event_history) : nlohmann::ordered_json(nullptr);
+  root["ScriptedContent"] = payload.scripted_content
+      ? nlohmann::ordered_json(*payload.scripted_content) : nlohmann::ordered_json(nullptr);
   return root.dump(2);
 }
 
@@ -225,6 +227,13 @@ void check_success(RestoredPlayerCampaignV17 restored, const Json &expected,
     check(actual_json.contains("EventHistory"),
           label+": missing persistent chronicle tail");
     actual_json.erase("EventHistory");
+  }
+  // Same story for the scripted-content tail: the second load/capture above
+  // already proves "ScriptedContent" round-trips through restore/re-encode.
+  if(!expected_json.contains("ScriptedContent")){
+    check(actual_json.contains("ScriptedContent"),
+          label+": missing scripted content tail");
+    actual_json.erase("ScriptedContent");
   }
   auto& actual_bodies=actual_json["Galaxy"]["PlanetaryBodies"];
   const auto& expected_bodies=expected_json.at("Galaxy").at("PlanetaryBodies");

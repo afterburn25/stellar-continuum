@@ -510,6 +510,33 @@ preserve:
   backend-native timestamp path). The shell Profiler tool's MIN button
   cycles 0/1us/10us/100us; `profiler` covers threshold filtering and
   aggregate retention.
+- Gameplay scripting platform M2 (Core integration): `campaign_scripted_content.cpp`
+  + `campaign_scripted_content.hpp`. `IntegratedAdaptiveCampaignRuntime` now
+  owns a `ScriptedContentRuntime` (seeded from the campaign seed) and a
+  `CampaignScriptedContentAdapter`. Every `advance()` maps the step's domain
+  events onto canonical chronicle topics via `script_events_for_step`
+  (exploration/war/diplomacy/colonization/construction/shipbuilding/research
+  categories exported from campaign_event_history as
+  `exploration_event_category`/`combat_event_category`/`diplomatic_event_category`),
+  feeds them to `handle_event`, then runs cadence polls + due follow-ups.
+  The adapter validates leaf checks/effects at load and evaluates/applies
+  over authoritative state: DiplomacySimulation for relationship impacts,
+  set_hostile and declare_war (proper diplomacy authority — war on an
+  unidentified contact no-ops), CivilizationEconomy for grants,
+  CivilizationKnowledgeState for reveals, AdaptiveResearchStateWriter for
+  capability unlocks, PlanetaryBody::has_anomaly for anomaly sites
+  (exploration already emits `exploration.anomaly_surveyed` for flagged
+  bodies; `resolve_anomaly` consumes the site). Fired events chronicle as
+  `scripted.<id>` with the same involved+knowledge-widened visibility as
+  domain events. Runtime state persists as the optional `ScriptedContent`
+  v17 save member (internally versioned document; absent on old saves =
+  empty state; definitions reload from packages). `capture_developer_campaign`
+  populates the same member — any new v17 tail member must be written by both
+  capture paths and acknowledged in the `player_campaign_json_parity` /
+  `player_campaign_recovery_parity` oracles (check-present-then-erase, same as
+  `EventHistory`). `campaign_scripted_content` test covers adapter validation,
+  polled authoritative effects, topic mapping, once-per-scope anomaly sites,
+  chronicle entries, and a full capture→encode→restore→activate round-trip.
 - Gameplay scripting platform M1 (engine layer): `scripted_content.cpp`
   + `scripted_content.hpp`. `ScriptedContentRuntime` loads
   `scripted_events` JSON documents — composable `all`/`any`/`not` trigger

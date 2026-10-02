@@ -6,6 +6,7 @@
 #include <stellar/core/diplomacy_runtime.hpp>
 #include <stellar/core/fleet_combat_intelligence.hpp>
 #include <stellar/engine/history.hpp>
+#include <stellar/engine/scripted_content.hpp>
 
 #include <memory>
 #include <optional>
@@ -106,6 +107,21 @@ public:
   // player/developer save payload.
   [[nodiscard]] stellar::engine::EventHistory &history() noexcept;
   [[nodiscard]] const stellar::engine::EventHistory &history() const noexcept;
+
+  // Data-driven scripted content: definitions arrive via
+  // load_scripted_document; each advance feeds mapped domain events into
+  // the runtime and evaluates cadence-poll/scheduled triggers. Runtime
+  // state serializes into the player/developer save payload; definitions
+  // reload from packages on restore. Seeded from the campaign seed so
+  // weighted rolls are deterministic.
+  [[nodiscard]] stellar::engine::ScriptedContentRuntime &
+  scripted_content() noexcept;
+  [[nodiscard]] const stellar::engine::ScriptedContentRuntime &
+  scripted_content() const noexcept;
+  [[nodiscard]] bool
+  load_scripted_document(std::string_view document, std::string_view file,
+                         std::vector<stellar::engine::ScriptLoadError>
+                             *errors = nullptr);
 
 private:
   struct Storage;

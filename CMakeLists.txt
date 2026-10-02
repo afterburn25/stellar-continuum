@@ -234,6 +234,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/massive_combat_engine.cpp
   core/src/campaign_massive_combat.cpp
   core/src/campaign_event_history.cpp
+  core/src/campaign_scripted_content.cpp
   core/src/planetary_adapter.cpp
   core/src/campaign_colony_projection.cpp
   core/src/campaign_economy_projection.cpp
@@ -814,6 +815,12 @@ if(BUILD_TESTING)
   add_executable(stellar_scripted_content_tests native-tests/scripted_content_tests.cpp)
   target_link_libraries(stellar_scripted_content_tests PRIVATE stellar_engine)
   add_test(NAME scripted_content COMMAND stellar_scripted_content_tests)
+  add_executable(stellar_campaign_scripted_content_tests native-tests/campaign_scripted_content_tests.cpp)
+  target_link_libraries(stellar_campaign_scripted_content_tests PRIVATE stellar_core)
+  add_test(NAME campaign_scripted_content COMMAND stellar_campaign_scripted_content_tests
+    "${CMAKE_SOURCE_DIR}/data/research/v1"
+    "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
+  set_tests_properties(campaign_scripted_content PROPERTIES TIMEOUT 180)
   add_executable(stellar_crash_reporter_tests native-tests/crash_reporter_tests.cpp)
   target_link_libraries(stellar_crash_reporter_tests PRIVATE stellar_engine)
   add_test(NAME crash_reporter COMMAND stellar_crash_reporter_tests)

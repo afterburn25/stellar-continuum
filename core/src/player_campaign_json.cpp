@@ -946,11 +946,20 @@ static RestoredPlayerCampaignV17 restore_player_campaign_v17_ordered(
       !std::holds_alternative<std::nullptr_t>(history_member->data))
     event_history = decode_event_history(*history_member);
 
+  // Scripted-content runtime state: absent in saves predating the feature —
+  // restored runtimes then start with empty scripted state. The string
+  // carries the runtime's internally versioned document.
+  std::optional<std::string> scripted_content;
+  if (const auto *scripted_member = member(*root, "ScriptedContent");
+      scripted_member &&
+      !std::holds_alternative<std::nullptr_t>(scripted_member->data))
+    scripted_content = typed_string(*scripted_member, "ScriptedContent");
+
   GalaxyPayloadV16Dto galaxy_payload;
   try {
-    constexpr std::array<std::string_view, 4> excluded{
+    constexpr std::array<std::string_view, 5> excluded{
         "Diplomacy", "AdaptiveResearch", "GalaxyFormatVersion",
-        "EventHistory"};
+        "EventHistory", "ScriptedContent"};
     galaxy_payload = detail::decode_galaxy_payload_v16_ordered(
         root_value, {galaxy_format, excluded});
   } catch (const GalaxyPayloadJsonError &error) {
@@ -1008,7 +1017,8 @@ static RestoredPlayerCampaignV17 restore_player_campaign_v17_ordered(
                  "Format v17 save is missing Adaptive Research state.");
           return decode_research(*research_member);
         },
-        diplomacy, std::move(event_history), restore_hooks);
+        diplomacy, std::move(event_history), std::move(scripted_content),
+        restore_hooks);
   } catch (const PlayerCampaignJsonError &) {
     throw;
   } catch (const PlayerCampaignPersistenceDataError &error) {
@@ -1081,6 +1091,9 @@ Json encode_player_campaign_tail(const PlayerCampaignPayloadV17Dto& payload){
                                ? player_json_detail::encode_event_history(
                                      *payload.event_history)
                                : Json(nullptr);
+    tail["ScriptedContent"] = payload.scripted_content
+                                  ? Json(*payload.scripted_content)
+                                  : Json(nullptr);
     json_detail::validate_encoded_text(tail["Diplomacy"]);
     json_detail::validate_encoded_text(tail["AdaptiveResearch"]);
     json_detail::validate_encoded_text(tail["EventHistory"]);
@@ -1237,6 +1250,7 @@ DeveloperCampaignPayload capture_developer_campaign(
   common.diplomacy=diplomacy;
   common.adaptive_research=AdaptiveResearchCampaignSnapshotCodec(campaign.research_runtime()).capture(campaign.research());
   common.event_history=campaign.history().capture_state();
+  common.scripted_content=campaign.scripted_content().serialize();
   auto continuation=campaign.continuation();
   validate_developer_coverage(world);
   validate_campaign_runtime_continuation(continuation,world,options.simulation_days);

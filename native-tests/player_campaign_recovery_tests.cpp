@@ -205,6 +205,13 @@ void success_case(const Json &fixture, std::string_view name, Setup setup,
             std::string(name) + ": missing persistent chronicle tail");
     actual_state.erase("EventHistory");
   }
+  if (!expected_state.contains("ScriptedContent")) {
+    // Scripted-content runtime state was added after these saves; the same
+    // restore + recapture proves it round-trips, so drop it before comparing.
+    require(actual_state.contains("ScriptedContent"),
+            std::string(name) + ": missing scripted content tail");
+    actual_state.erase("ScriptedContent");
+  }
   auto &actual_galaxy = actual_state["Galaxy"];
   auto &expected_galaxy = expected_state["Galaxy"];
   if (!expected_galaxy.contains("StellarActivityDay")) {

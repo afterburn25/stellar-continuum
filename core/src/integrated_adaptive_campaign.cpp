@@ -1,6 +1,7 @@
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 
 #include <stellar/core/campaign_event_history.hpp>
+#include <stellar/core/campaign_scripted_content.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -81,6 +82,11 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
   // chronicle — never again this runtime's lifetime, so a capacity
   // eviction can't re-record already-chronicled entries.
   bool chronicle_diplomacy_backfill_done{};
+  // Scripted content: engine runtime holds definitions/scheduling; the
+  // adapter routes every check/effect through this campaign's authoritative
+  // state. Seeded from the campaign seed so weighted rolls are stable.
+  stellar::engine::ScriptedContentRuntime scripted;
+  CampaignScriptedContentAdapter scripted_adapter;
   bool profiling_enabled{};
   std::array<stellar::engine::PerformanceCounter,4> performance{};
 
@@ -99,7 +105,11 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
         diplomacy_runtime(diplomacy),
         core(configuration(&construction, &shipbuilding),
              strategic_runtime(&shipbuilding, &diplomacy),
-             diplomacy_runtime.create_combat_command_runtime()) {
+             diplomacy_runtime.create_combat_command_runtime()),
+        scripted(static_cast<std::uint64_t>(
+            world.campaign().seed ^ 0x5C41DED5A9B7B3E1ll)),
+        scripted_adapter(world, diplomacy, research, history) {
+    scripted.attach_adapter(&scripted_adapter);
     diplomacy_runtime.reset(current_day, true);
     auto& activity_day=world.campaign().stellar_activity_day;
     // Legacy saves without a clock start activity at the saved epoch; clamp
@@ -225,6 +235,19 @@ stellar::engine::EventHistory &IntegratedAdaptiveCampaignRuntime::history() noex
 const stellar::engine::EventHistory &IntegratedAdaptiveCampaignRuntime::history() const noexcept {
   return storage_->history;
 }
+stellar::engine::ScriptedContentRuntime &
+IntegratedAdaptiveCampaignRuntime::scripted_content() noexcept {
+  return storage_->scripted;
+}
+const stellar::engine::ScriptedContentRuntime &
+IntegratedAdaptiveCampaignRuntime::scripted_content() const noexcept {
+  return storage_->scripted;
+}
+bool IntegratedAdaptiveCampaignRuntime::load_scripted_document(
+    std::string_view document, std::string_view file,
+    std::vector<stellar::engine::ScriptLoadError> *errors) {
+  return storage_->scripted.load_document(document, file, errors);
+}
 IntegratedAdaptiveCampaignStepResult
 IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
                                             double absolute_end_day,
@@ -292,6 +315,15 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
   record_step_events(storage_->history, result, absolute_end_day,
                      storage_->world.campaign(), diplomatic_events);
   maintain_chronicle(storage_->history, absolute_end_day);
+  // Scripted content: feed this step's domain events (canonical chronicle
+  // topics) into the runtime, then run cadence polls and due scheduled
+  // follow-ups against the step's absolute end day. Effects mutate
+  // authoritative state through the adapter only.
+  storage_->scripted_adapter.set_simulation_day(absolute_end_day);
+  for (const auto &event : script_events_for_step(result, diplomatic_events))
+    storage_->scripted.handle_event(event.topic, event.context,
+                                    absolute_end_day);
+  storage_->scripted.advance(absolute_end_day);
   return result;
 }
 

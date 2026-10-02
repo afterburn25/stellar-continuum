@@ -202,6 +202,16 @@ void visible_to_involved(HistoryEvent &e) {
 
 } // namespace
 
+std::string_view exploration_event_category(ExplorationEventType type) {
+  return exploration_category(type);
+}
+std::string_view combat_event_category(CombatEventType type) {
+  return combat_category(type);
+}
+std::string_view diplomatic_event_category(DiplomaticEventKind kind) {
+  return diplomacy_category(kind);
+}
+
 std::vector<engine::HistoryEvent>
 history_events_for_step(const IntegratedAdaptiveCampaignStepResult &step,
                         double end_day,

@@ -55,6 +55,13 @@ namespace stellar::core {
 // (DiplomacyState::history_events_since) so each entry is recorded
 // exactly once across advances and save/load.
 
+// Canonical category vocabulary shared by the chronicle and the scripted-
+// content trigger topics — a scripted event's "on" name matches the
+// category string its domain event maps to here.
+[[nodiscard]] std::string_view exploration_event_category(ExplorationEventType);
+[[nodiscard]] std::string_view combat_event_category(CombatEventType);
+[[nodiscard]] std::string_view diplomatic_event_category(DiplomaticEventKind);
+
 // Converts one step's events into records (not yet appended; ids are
 // assigned by EventHistory::record).
 [[nodiscard]] std::vector<engine::HistoryEvent>
