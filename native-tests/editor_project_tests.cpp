@@ -5,6 +5,7 @@
 
 #include "../app/editor_project.hpp"
 
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -253,6 +254,31 @@ int main() {
       const std::vector<std::string> expected{
           "P/B.JSON", "q/outside.json", "p/a.json", "p/c.json"};
       require(merged == expected, "recent-first merge order is wrong");
+    }
+
+    // Save-As layout: flat unless directory form is preferred or an
+    // assets folder already exists under the target root.
+    {
+      const auto root = std::filesystem::temp_directory_path() /
+                        "stellar-editor-save-target-test";
+      std::error_code ec;
+      std::filesystem::remove_all(root, ec);
+      std::filesystem::create_directories(root);
+      const auto flat = choose_save_target(root, "alpha", false);
+      require(!flat.dir_form && flat.directory == root &&
+                  flat.file == root / "alpha.json",
+              "flat save target is wrong");
+      const auto preferred = choose_save_target(root, "beta", true);
+      require(preferred.dir_form &&
+                  preferred.directory == root / "beta" &&
+                  preferred.file == root / "beta" / "project.json",
+              "preferred directory-form save target is wrong");
+      std::filesystem::create_directories(root / "gamma" / "assets");
+      const auto discovered = choose_save_target(root, "gamma", false);
+      require(discovered.dir_form &&
+                  discovered.file == root / "gamma" / "project.json",
+              "assets folder must upgrade the save to directory form");
+      std::filesystem::remove_all(root, ec);
     }
 
     std::cout << "Editor project document checks passed.\n";

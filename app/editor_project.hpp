@@ -6,6 +6,7 @@
 #pragma once
 
 #include <cstdint>
+#include <filesystem>
 #include <optional>
 #include <span>
 #include <string>
@@ -90,6 +91,23 @@ std::string serialize_recent_projects(std::span<const std::string> paths);
 // Throws std::runtime_error on malformed JSON, missing/unsupported
 // schemaVersion, a non-array "recent", or non-string/empty entries.
 std::vector<std::string> parse_recent_projects(std::string_view text);
+
+// Where a save writes inside a chosen root directory. `stem` is the
+// sanitized project-name slug.
+struct ProjectSaveTarget {
+  // root for a flat save; root/stem for the multi-file directory form.
+  std::filesystem::path directory;
+  bool dir_form{};
+  // The file a save writes: directory/project.json or root/<stem>.json.
+  std::filesystem::path file;
+};
+
+// Picks the save layout under `root`: the directory form is chosen when
+// the caller already lives in it or root/<stem>/assets/ exists (the user
+// embeds files by dropping them there); otherwise a flat <stem>.json.
+ProjectSaveTarget choose_save_target(const std::filesystem::path &root,
+                                     std::string_view stem,
+                                     bool prefer_dir_form);
 
 // Orders a picker listing: every `recent` entry first (order preserved,
 // deduped case-insensitively), then `scanned` entries not already listed.

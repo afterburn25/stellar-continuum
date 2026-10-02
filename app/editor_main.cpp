@@ -273,6 +273,13 @@ struct Editor {
   std::size_t picker_recent_count{};
   engine::VirtualizedList picker_list;
   bool picker_open{};
+  // Save-As directory picker: modal browser over save_as_dir's
+  // subdirectories; row 0 is always the parent navigation entry.
+  bool save_as_open{};
+  std::filesystem::path save_as_dir;
+  std::vector<std::filesystem::path> save_as_dirs;
+  engine::VirtualizedList save_as_list;
+  UiRect save_as_rect{}, save_as_rows{}, save_as_save{}, save_as_cancel{};
   bool bookmark_only{}; // systems list filters to bookmarked targets
   UiRect picker_rect{}, picker_rows{};
   float pointer_x{}, pointer_y{};
@@ -1397,6 +1404,76 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
   }
 }
 
+// Modal Save-As directory browser: lists the browsed path, a ".." parent
+// entry and every subdirectory, with SAVE HERE / CANCEL buttons.
+void render_save_as(DrawList &out, Editor &ed, float s, float w, float h) {
+  if (!ed.save_as_open) {
+    ed.save_as_rect = ed.save_as_rows = ed.save_as_save = ed.save_as_cancel = {};
+    return;
+  }
+  const int font = static_cast<int>(13 * s);
+  const float pw = std::min(430 * s, w - 60 * s);
+  const float ph = std::min(380 * s, h - 120 * s);
+  const UiRect r{(w - pw) * .5f, (h - ph) * .5f, pw, ph};
+  ed.save_as_rect = r;
+  out.overlay.push_back(FilledRectangle{r, {8, 20, 32, 250}});
+  out.overlay.push_back(StrokedRectangle{r, accent});
+  out.overlay.push_back(Text{{r.x + 14 * s, r.y + 10 * s}, "SAVE TO FOLDER",
+                             accent, font + 1, 0, std::nullopt,
+                             TextAlign::Left, FontFace::Heading});
+  out.overlay.push_back(
+      Text{{r.x + 14 * s, r.y + 12 * s + font},
+           ed.save_as_dir.lexically_normal().generic_string(), muted,
+           font - 2, 0, r});
+  const float buttons = font + 14.f;
+  const UiRect rows{r.x + 10 * s, r.y + 18 * s + font * 2, r.width - 20 * s,
+                    r.height - 34 * s - font * 2 - buttons};
+  out.overlay.push_back(FilledRectangle{rows, {5, 13, 22, 255}});
+  out.overlay.push_back(StrokedRectangle{rows, panel_edge});
+  ed.save_as_list.configure(ed.save_as_dirs.size() + 1, font + 10.f,
+                            rows.height);
+  ed.save_as_rows = {rows.x, rows.y + 4 * s, rows.width, rows.height - 4 * s};
+  const auto range = ed.save_as_list.visible_range();
+  float ry = ed.save_as_rows.y - ed.save_as_list.scroll_offset +
+             range.first * ed.save_as_list.row_height;
+  for (std::size_t i = range.first; i < range.last;
+       ++i, ry += ed.save_as_list.row_height) {
+    const UiRect row{rows.x, ry, rows.width, ed.save_as_list.row_height};
+    if (row.contains(Point{ed.pointer_x, ed.pointer_y}))
+      out.overlay.push_back(FilledRectangle{row, row_hover});
+    const bool parent = i == 0;
+    out.overlay.push_back(Text{
+        {row.x + 8 * s, ry + 4 * s},
+        parent ? ".." : ed.save_as_dirs[i - 1].filename().string(),
+        parent ? muted : ink, font, 0, rows});
+  }
+  if (ed.save_as_list.max_scroll() > 0) {
+    const float track = rows.height;
+    const float thumb = std::max(
+        20.f, track * track / (track + ed.save_as_list.max_scroll()));
+    const float t =
+        ed.save_as_list.scroll_offset / ed.save_as_list.max_scroll();
+    out.overlay.push_back(
+        FilledRectangle{{rows.x + rows.width - 5.f,
+                         rows.y + t * (track - thumb), 4.f, thumb},
+                        accent});
+  }
+  const UiRect save{r.x + r.width - 110 * s, r.y + r.height - buttons - 8 * s,
+                    100 * s, buttons};
+  const UiRect cancel{r.x + 10 * s, save.y, 100 * s, buttons};
+  ed.save_as_save = save;
+  ed.save_as_cancel = cancel;
+  for (const auto &[rect, label] :
+       {std::pair{save, "SAVE HERE"}, std::pair{cancel, "CANCEL"}}) {
+    if (rect.contains(Point{ed.pointer_x, ed.pointer_y}))
+      out.overlay.push_back(FilledRectangle{rect, row_hover});
+    out.overlay.push_back(StrokedRectangle{rect, panel_edge});
+    out.overlay.push_back(
+        Text{{rect.x + 10 * s, rect.y + (buttons - font) * .5f - 1}, label, ink,
+             font, 0, rect});
+  }
+}
+
 // Discovers embedded assets under a project directory's assets/ folder and
 // decodes the first png for the inspector preview.
 void refresh_embedded_assets(Editor &ed) {
@@ -1500,25 +1577,21 @@ void update_recent(Editor &ed) {
   }
 }
 
-void save_project(Editor &ed) {
+void save_project_into(Editor &ed, const std::filesystem::path &root) {
   try {
     // Save-As by name: the document name drives the filename inside the
-    // projects directory, so renaming a project never clobbers another.
+    // chosen root, so renaming a project never clobbers another.
     const auto slug = edproj::sanitize_project_name(ed.project_name);
     const auto stem = slug.empty() ? "editor-project" : slug;
-    const auto dir = ed.projects_dir / stem;
     // Multi-file form: a project directory holding project.json + assets/.
     // Chosen when the project already lives in one or an assets folder
     // exists — the user embeds files by dropping them under <slug>/assets/.
-    const auto assets_dir = dir / "assets";
-    ed.project_dir_form =
-        ed.project_dir_form || std::filesystem::is_directory(assets_dir);
-    if (ed.project_dir_form) {
-      std::filesystem::create_directories(assets_dir);
-      ed.project_path = dir / "project.json";
-    } else {
-      ed.project_path = ed.projects_dir / (stem + ".json");
-    }
+    const auto target =
+        edproj::choose_save_target(root, stem, ed.project_dir_form);
+    ed.project_dir_form = target.dir_form;
+    if (ed.project_dir_form)
+      std::filesystem::create_directories(target.directory / "assets");
+    ed.project_path = target.file;
     const edproj::EditorProject project{ed.seed, ed.system_count, ed.edits,
                                         ed.body_edits, ed.project_name};
     const auto text = edproj::serialize_project(project);
@@ -1526,7 +1599,7 @@ void save_project(Editor &ed) {
                                   std::as_bytes(std::span(text)));
     // Upgrading a flat save to a directory retires the old single file.
     if (ed.project_dir_form) {
-      const auto stale = ed.projects_dir / (stem + ".json");
+      const auto stale = root / (stem + ".json");
       std::error_code ec;
       std::filesystem::remove(stale, ec);
     }
@@ -1619,9 +1692,42 @@ void open_picker(Editor &ed) {
     ed.status = "no saved projects in " + ed.projects_dir.filename().string();
 }
 
+void save_project(Editor &ed) { save_project_into(ed, ed.projects_dir); }
+
+// Rebuilds the Save-As browser over save_as_dir's subdirectories.
+void refresh_save_as(Editor &ed) {
+  ed.save_as_dirs.clear();
+  std::error_code ec;
+  for (const auto &entry :
+       std::filesystem::directory_iterator(ed.save_as_dir, ec))
+    if (entry.is_directory(ec)) ed.save_as_dirs.push_back(entry.path());
+  std::sort(ed.save_as_dirs.begin(), ed.save_as_dirs.end());
+  ed.save_as_list.set_row_count(ed.save_as_dirs.size() + 1); // row 0 is ".."
+  ed.save_as_list.scroll_to(0);
+}
+
+// Opens the Save-As directory picker where the project currently lives
+// (the projects directory until it is saved elsewhere).
+void open_save_as(Editor &ed) {
+  ed.save_as_dir = ed.projects_dir;
+  if (ed.project_dir_form) {
+    // Directory form lives at <root>/<slug>/project.json — its save root
+    // is the grandparent of the file.
+    if (ed.project_path.has_parent_path() &&
+        ed.project_path.parent_path().has_parent_path())
+      ed.save_as_dir = ed.project_path.parent_path().parent_path();
+  } else if (ed.project_path.has_parent_path()) {
+    ed.save_as_dir = ed.project_path.parent_path();
+  }
+  refresh_save_as(ed);
+  ed.save_as_open = true;
+  ed.status = "choose a folder - the project saves as <name>.json there";
+}
+
 // FILE menu entries, in row order.
-constexpr std::array<const char *, 4> menu_labels{
-    "NEW PROJECT", "SAVE   ctrl+s", "RENAME / SAVE AS", "OPEN PROJECT...   ctrl+o"};
+constexpr std::array<const char *, 5> menu_labels{
+    "NEW PROJECT", "SAVE   ctrl+s", "RENAME / SAVE AS",
+    "SAVE TO FOLDER...", "OPEN PROJECT...   ctrl+o"};
 
 // Executes a FILE menu item by row index.
 void run_menu_item(Editor &ed, Window &window, std::size_t item) {
@@ -1647,6 +1753,9 @@ void run_menu_item(Editor &ed, Window &window, std::size_t item) {
     ed.status = "rename the project - SAVE writes <name>.json";
     break;
   case 3:
+    open_save_as(ed);
+    break;
+  case 4:
     open_picker(ed);
     break;
   }
@@ -2204,7 +2313,9 @@ int main(int argc, char **argv) {
       ed.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
         if (event.type == InputEventType::EscapePressed) {
-          if (ed.picker_open) {
+          if (ed.save_as_open) {
+            ed.save_as_open = false;
+          } else if (ed.picker_open) {
             ed.picker_open = false;
           } else if (ed.menu_open) {
             ed.menu_open = false;
@@ -2344,6 +2455,13 @@ int main(int argc, char **argv) {
           if (ed.editing != Field::None) {
             commit_active_field(ed);
             window.set_text_input(false);
+          }
+          if (ed.save_as_open) {
+            // The Save-As browser owns input while open; a click outside
+            // dismisses it.
+            if (!ed.save_as_rect.contains(event.position))
+              ed.save_as_open = false;
+            continue;
           }
           if (ed.picker_open) {
             // The picker owns input while open; a click outside dismisses it.
@@ -2681,6 +2799,31 @@ int main(int argc, char **argv) {
             }
           }
         }
+        // Save-As buttons and directory rows.
+        if (event.type == InputEventType::LeftReleased && ed.save_as_open) {
+          if (ed.save_as_cancel.contains(event.position)) {
+            ed.save_as_open = false;
+          } else if (ed.save_as_save.contains(event.position)) {
+            save_project_into(ed, ed.save_as_dir);
+            ed.save_as_open = false;
+          } else if (ed.save_as_rows.contains(event.position)) {
+            const float local = event.position.y - ed.save_as_rows.y +
+                                ed.save_as_list.scroll_offset;
+            const auto idx = static_cast<std::size_t>(
+                std::max(0.f, std::floor(local / ed.save_as_list.row_height)));
+            if (idx == 0) {
+              if (ed.save_as_dir.has_parent_path() &&
+                  ed.save_as_dir.parent_path() != ed.save_as_dir) {
+                ed.save_as_dir = ed.save_as_dir.parent_path();
+                refresh_save_as(ed);
+              }
+            } else if (idx - 1 < ed.save_as_dirs.size()) {
+              ed.save_as_dir = ed.save_as_dirs[idx - 1];
+              refresh_save_as(ed);
+            }
+          }
+          continue; // swallow other release handling while the modal is up
+        }
         // Picker rows load the chosen project file.
         if (event.type == InputEventType::LeftReleased && ed.picker_open) {
           if (ed.picker_rows.contains(event.position)) {
@@ -2704,6 +2847,10 @@ int main(int argc, char **argv) {
               rebuild_detail_rows(ed);
               break;
             }
+        if (event.type == InputEventType::Wheel && ed.save_as_open &&
+            ed.save_as_rect.contains(event.position))
+          ed.save_as_list.scroll_to(ed.save_as_list.scroll_offset -
+                                    event.wheel_y * 40.f);
         if (event.type == InputEventType::Wheel && ed.picker_open &&
             ed.picker_rect.contains(event.position))
           ed.picker_list.scroll_to(ed.picker_list.scroll_offset -
@@ -2923,6 +3070,7 @@ int main(int argc, char **argv) {
 
       render_menu(draw, ed, s);
       render_picker(draw, ed, s, w, h); // topmost modal
+      render_save_as(draw, ed, s, w, h);
       window.draw(draw);
       // Swap the seed shown in the toolbar only once generation committed.
       ed.seed = pending_seed.load();

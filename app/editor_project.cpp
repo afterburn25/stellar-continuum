@@ -188,6 +188,19 @@ std::vector<std::string> parse_recent_projects(std::string_view text) {
   }
 }
 
+ProjectSaveTarget choose_save_target(const std::filesystem::path &root,
+                                     std::string_view stem,
+                                     bool prefer_dir_form) {
+  ProjectSaveTarget target;
+  target.dir_form =
+      prefer_dir_form ||
+      std::filesystem::is_directory(root / stem / "assets");
+  target.directory = target.dir_form ? root / stem : root;
+  target.file = target.dir_form ? target.directory / "project.json"
+                                : root / (std::string(stem) + ".json");
+  return target;
+}
+
 std::pair<std::vector<std::string>, std::size_t> merge_recent_projects(
     std::span<const std::string> scanned, std::span<const std::string> recent) {
   // Windows paths compare case-insensitively; ASCII fold is sufficient for

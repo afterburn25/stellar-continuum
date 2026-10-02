@@ -1938,8 +1938,23 @@ ordering live in `editor_project` (`serialize_recent_projects`/
 `parse_recent_projects` strict-schema JSON,
 `merge_recent_projects` case-insensitive dedupe + recent-prefix count);
 `editor_project` tests cover round-trip, rejection (non-array, wrong
-version, non-string, empty entries) and merge ordering. Save-As path
-picking beyond `<name>.json` remains open.
+version, non-string, empty entries) and merge ordering.
+Follow-on: SAVE TO FOLDER (FILE menu row 3) opens a modal directory
+browser — ".." parent navigation, sorted subdirectories, SAVE HERE /
+CANCEL — starting at the project's current save root (grandparent for
+directory form). `save_project_into(ed, root)` generalizes the old
+projects-dir-only save through `edproj::choose_save_target` (flat
+`<slug>.json`, or `<slug>/project.json` + `assets/` when the form is
+already directory or an assets folder exists at the target); an
+out-of-tree save lands in the MRU and stays reopenable there. The
+codec test covers all three target layouts against a temp directory.
+Separate fix: the intermittent `native_surface_construction_controller`
+-j4 failure ("incomplete site did not produce a cancellation/refund
+quote") was a use-after-free in the test, not a sim flake — the
+`progressed` iterator into `surface_buildings` dangled after the
+localization block's `confirm_placement` reallocating `push_back`, so
+`preview_removal` saw a heap-dependent building id. The assertion now
+uses the `site_id` copy captured before the mutation.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 
