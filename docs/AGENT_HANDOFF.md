@@ -1166,6 +1166,14 @@ director suite's queued scientist-cue tests now exercise the streamed
 path end-to-end; 3/3 audio suites green. Remaining: effects stay
 whole-clip (latency-critical, ≤1 MiB each); spatial buses and a
 decoded-PCM budget are still open.
+Shipped-path smoke: `--voice-check` now reports `streamed:true` and the
+strict `voice_check` parser proves it. Note the routed leg —
+`scientist_voice` prefers the armed gameplay voice pipeline (SAPI →
+`play_dialogue_pcm`, correctly non-streaming), so when that first play
+isn't streamed the check queues `NativeAudioDirector::speak` directly
+after the channel drains; the packaged WAV then proves streaming on the
+real path. `played` is therefore 1 (pipeline disarmed — the routed cue
+itself streams) or 2 (armed — SAPI leg + direct cue leg).
 Roster search (row-24 Table filtering UI): `RosterWorkspace` gained a
 pointer-focused search field driving `TableModel::refilter` — the
 shared model's first filtering consumer. Case-insensitive contains runs

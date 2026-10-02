@@ -7,7 +7,7 @@ import re
 
 
 _FIELDS = {"available", "played", "unknown_denied", "overlap_prevented",
-           "queue_bounded", "stopped"}
+           "queue_bounded", "stopped", "streamed"}
 
 
 def _unique_object(pairs):
@@ -29,7 +29,7 @@ def parse_native_voice_check(stdout: str) -> dict:
         raise RuntimeError("Native scientist voice check diagnostic is malformed") from error
     if not isinstance(state, dict) or set(state) != _FIELDS:
         raise RuntimeError("Native scientist voice check diagnostic has an unexpected schema")
-    for field in ("available", "unknown_denied", "overlap_prevented", "queue_bounded", "stopped"):
+    for field in ("available", "unknown_denied", "overlap_prevented", "queue_bounded", "stopped", "streamed"):
         if state.get(field) is not True:
             raise RuntimeError(f"Native scientist voice check did not prove {field}")
     played = state.get("played")

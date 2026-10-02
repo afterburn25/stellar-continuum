@@ -93,7 +93,8 @@ class NativeSystemTravelExportTests(unittest.TestCase):
                                  "confirm_count": 0, "queued_music_bytes": 2048,
                                  "boot_services": 0, "stopped": True}
                         voice = {"available": True, "played": 1, "unknown_denied": True,
-                                 "overlap_prevented": True, "queue_bounded": True, "stopped": True}
+                                 "overlap_prevented": True, "queue_bounded": True, "stopped": True,
+                                 "streamed": True}
                         if fault == "voice": voice["unknown_denied"] = False
                         voice_marker = ("audio_check=" + json.dumps(audio, separators=(",", ":")) + "\n" +
                                         "voice_check=" + json.dumps(voice, separators=(",", ":")) + "\n")

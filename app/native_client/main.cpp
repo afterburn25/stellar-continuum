@@ -11021,7 +11021,7 @@ int main(int argc,char **argv){
     std::unique_ptr<SmokeColdProfile> cold_profile;
     if(options.profile_frames)cold_profile=std::make_unique<SmokeColdProfile>();
     FrameTiming draw_timing;
-    bool voice_prepared{},voice_repeated{},voice_queue_bounded=true;
+    bool voice_prepared{},voice_repeated{},voice_queue_bounded=true,voice_streamed{},voice_cue_issued{};
     std::uint64_t voice_first_count{};
     const auto voice_deadline=std::chrono::steady_clock::now()+std::chrono::seconds(30);
     const int campaign_active_first=120;
@@ -11086,8 +11086,17 @@ int main(int argc,char **argv){
           campaign.repeat_unknown_lane_voice_input(input.drawable_width,input.drawable_height);
           voice_repeated=true;
         }
+        voice_streamed=voice_streamed||state.voice_streaming;
+        // The routed cue may resolve to synthesized dialogue when the
+        // gameplay voice pipeline is armed — that path is PCM, not a
+        // stream. When it was, exercise the packaged cue directly so the
+        // streamed path still gets end-to-end coverage.
+        if(voice_repeated&&!voice_streamed&&!state.voice_active&&!voice_cue_issued){
+          audio.speak(stellar::native_audio::VoiceCue::ReconnaissanceRequired);
+          voice_cue_issued=true;
+        }
         voice_queue_bounded=voice_queue_bounded&&state.queued_voice_bytes<=288000;
-        if(!voice_prepared||!voice_repeated)capture_frame=frames+120;
+        if(!voice_prepared||!voice_repeated||!voice_streamed)capture_frame=frames+120;
       }
       if(!input.renderable()){
         discard_elapsed=true;
@@ -11439,9 +11448,15 @@ int main(int argc,char **argv){
           audio.stop();const auto stopped=audio.stats();
           if(!stopped.stopped||stopped.music_started||stopped.queued_music_bytes!=0)throw std::runtime_error("Native audio did not stop before window teardown.");
           if(options.voice_check){
-            if(!voice_repeated||!voice_queue_bounded||voice_first_count!=1||state.voice_play_count!=voice_first_count||stopped.voice_active||stopped.queued_voice_bytes!=0)
-              throw std::runtime_error("Scientist guidance did not coalesce, bound its queue, or stop cleanly.");
-            std::cout<<"voice_check={\"available\":true,\"played\":"<<state.voice_play_count<<",\"unknown_denied\":true,\"overlap_prevented\":true,\"queue_bounded\":true,\"stopped\":true}\n";
+            const auto expected_voice_plays=voice_first_count+(voice_cue_issued?1:0);
+            if(!voice_repeated||!voice_queue_bounded||!voice_streamed||voice_first_count!=1||state.voice_play_count!=expected_voice_plays||stopped.voice_active||stopped.queued_voice_bytes!=0)
+              throw std::runtime_error("Scientist guidance did not stream, coalesce, bound its queue, or stop cleanly."
+                                       " repeated="+std::to_string(voice_repeated)+" bounded="+std::to_string(voice_queue_bounded)+
+                                       " streamed="+std::to_string(voice_streamed)+" cue_issued="+std::to_string(voice_cue_issued)+
+                                       " first="+std::to_string(voice_first_count)+
+                                       " plays="+std::to_string(state.voice_play_count)+" stopped_active="+std::to_string(stopped.voice_active)+
+                                       " stopped_queued="+std::to_string(stopped.queued_voice_bytes));
+            std::cout<<"voice_check={\"available\":true,\"played\":"<<state.voice_play_count<<",\"streamed\":true,\"unknown_denied\":true,\"overlap_prevented\":true,\"queue_bounded\":true,\"stopped\":true}\n";
           }
           std::cout<<"audio_hover_check={\"played\":"<<state.hover_count<<"}\n";
           std::cout<<"audio_check={\"assets_loaded\":true,\"music_starts\":"<<state.music_start_count<<",\"confirm_count\":"<<state.confirm_count<<",\"queued_music_bytes\":"<<state.queued_music_bytes<<",\"boot_services\":"<<audio_boot_services<<",\"stopped\":true}\n";
