@@ -400,14 +400,19 @@ preserve:
   `--new-game-restart-smoke`; `--smoke-full-exploration` requires
   developer mode.
 - Authoritative `stellar.py export windows-native-preview` verified
-  end-to-end at `d6da0498`
-  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-d6da0498-20261002T074409894463Z`,
+  end-to-end at `4990223d`
+  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-4990223d-20261002T100412139541Z`,
   receipt `docs/validation/2026-10-02-tip-export.md`):
-  fresh configure+build (1917 actions), 331/331 CTest on the first pass,
-  every `tools/stellar-export/test_*.py` module, dependency audit,
-  packaging, restricted-PATH relocated smoke, the full validator
-  battery, ZIP + SHA-256
-  `80b5b1af9cb77c07e6e1e447c37c7889a31d6ad73882131344cc5c95cffba5a1`.
+  fresh configure+build (1917 actions), 330/331 CTest on the parallel
+  pass + `developer_qa_host` green on solo retry after a load timeout
+  (effective 331/331), every `tools/stellar-export/test_*.py` module,
+  dependency audit, packaging, restricted-PATH relocated smoke, the full
+  validator battery, `voice_check` inside the export itself reporting
+  `played:2, streamed:true`, ZIP + SHA-256
+  `d13be645b21eabf71af9d57a63bb8a8cf7b48b2eefb8d8a7c8023d3e87260e7a`.
+  Commits `79fc1d58`–`4990223d` pushed mid-run had their source already
+  on disk before the affected objects compiled (verified via object
+  timestamps/symbols), so the binary is tip-equivalent.
   Validation JSON: 106 top-level booleans, only `graphicalParity` false
   (intentional). Prior authoritative exports at `217918b7`
   (SHA `e8ad75b9…`, receipt `2026-09-30-tip-export.md`) and `79ed3047`
