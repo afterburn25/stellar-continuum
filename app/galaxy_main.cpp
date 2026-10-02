@@ -486,7 +486,8 @@ Json coverage_json(const CivilizationLogisticsCoverage &value) {
 int run_galaxy_catalog(int argc, char **argv) {
   std::int64_t seed = 8374837, count = 500, repeats = 1;
   std::int64_t pre_warp_count = 6, ancient_count = 1;
-  std::int64_t simulation_ticks = 40, autosave_every = 0, stress_fleets = 0;
+  std::int64_t simulation_ticks = 40, autosave_every = 0, stress_fleets = 0,
+               stress_combat = 0;
   double step_days = 0.25;
   bool plan_homes = false, found_civilizations = false,
        founding_options = false, constrained_fallback = false,
@@ -560,6 +561,9 @@ int run_galaxy_catalog(int argc, char **argv) {
     } else if (arg == "--stress-fleets") {
       stress_fleets = signed_number(value);
       simulation_options = true;
+    } else if (arg == "--stress-combat") {
+      stress_combat = signed_number(value);
+      simulation_options = true;
     } else if (arg == "--asset-root")
       asset_root = value;
     else if (arg == "--catalog-output")
@@ -611,13 +615,16 @@ int run_galaxy_catalog(int argc, char **argv) {
         "Choose --generate-galaxy or a campaign simulation, not both");
   if (simulation_options && !simulate_campaign && !simulate_adaptive_campaign)
     throw std::invalid_argument(
-        "--ticks, --step-days, --autosave-every and --stress-fleets require a campaign simulation");
+        "--ticks, --step-days, --autosave-every, --stress-fleets and --stress-combat require a campaign simulation");
   if (autosave_every && !simulate_adaptive_campaign)
     throw std::invalid_argument(
         "--autosave-every requires --simulate-adaptive-campaign");
   if (stress_fleets && !simulate_adaptive_campaign)
     throw std::invalid_argument(
         "--stress-fleets requires --simulate-adaptive-campaign");
+  if (stress_combat && !simulate_adaptive_campaign)
+    throw std::invalid_argument(
+        "--stress-combat requires --simulate-adaptive-campaign");
   if (founding_options && !found_civilizations)
     throw std::invalid_argument(
         "Civilization options require --found-civilizations");
@@ -641,6 +648,7 @@ int run_galaxy_catalog(int argc, char **argv) {
          .player_species = player_species,
          .autosave_every = static_cast<int>(autosave_every),
          .stress_fleets = static_cast<int>(stress_fleets),
+         .stress_combat = static_cast<int>(stress_combat),
          .asset_root = asset_root,
          .output = output},
         catalog,

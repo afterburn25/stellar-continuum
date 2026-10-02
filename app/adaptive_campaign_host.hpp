@@ -22,6 +22,9 @@ struct AdaptiveCampaignHostOptions {
   std::string player_species{"terran_baseline"};
   int autosave_every{0};
   int stress_fleets{0};
+  // Number of civilization pairs placed at war at init so the shipped
+  // engage-hostiles command path produces organic combat engagements.
+  int stress_combat{0};
   std::filesystem::path asset_root;
   std::filesystem::path output;
 };

@@ -5,6 +5,7 @@
 #include <stellar/core/detail/adaptive_research_outcome_snapshot_json.hpp>
 #include <stellar/core/detail/adaptive_research_sha256.hpp>
 #include <stellar/core/diplomacy_state.hpp>
+#include <stellar/core/diplomacy_simulation.hpp>
 #include <stellar/core/fleet_transit.hpp>
 #include <stellar/core/integrated_adaptive_campaign.hpp>
 #include <stellar/core/planetary_catalog.hpp>
@@ -304,6 +305,56 @@ void inject_stress_fleets(FreshCampaignState &world, int per_civilization) {
   }
 }
 
+// War pairs used by --stress-combat are seeded through the same command
+// surfaces a live game uses: identified first contact, then declare_war.
+// Combat orders go through the coordinator's issue_engage_hostiles_order
+// at a fixed cadence, so engagements, fire, retreats and the
+// combat-diplomacy feedback bridge all run on the shipped path.
+constexpr std::int64_t stress_combat_engage_interval_ticks = 10;
+
+std::vector<int> seed_stress_wars(IntegratedAdaptiveCampaignRuntime &runtime,
+                                 int war_pairs) {
+  // Most seeded civilizations begin PreWarp and only develop warp
+  // capability mid-run — pair spacefaring civilizations first so combat
+  // starts immediately, then pair the rest so wars activate as they
+  // advance.
+  std::vector<int> combatants;
+  for (const auto &civilization : runtime.world().campaign().civilizations)
+    combatants.push_back(civilization.id);
+  std::ranges::stable_sort(combatants, {}, [&](int id) {
+    const auto &civilizations = runtime.world().campaign().civilizations;
+    return std::ranges::find(civilizations, id,
+                             &Civilization::id)
+               ->development_stage == CivilizationDevelopmentStage::PreWarp
+               ? 1
+               : 0;
+  });
+  DiplomacySimulation diplomacy(runtime.diplomacy());
+  std::vector<int> warring;
+  const int pairs =
+      std::min(war_pairs, static_cast<int>(combatants.size() / 2));
+  for (int index = 0; index < pairs; ++index) {
+    const int a = combatants[2 * index], b = combatants[2 * index + 1];
+    for (const auto [observer, target] :
+         {std::pair{a, b}, std::pair{b, a}})
+      static_cast<void>(diplomacy.process_contact_opportunity(
+          {.observer_civilization_id = observer,
+           .contact_id =
+               "stress-war-contact-" + std::to_string(target),
+           .target_civilization_id = target,
+           .observed_at_tick = 0,
+           .observed_system_id = std::nullopt,
+           .awareness = ContactAwareness::contact_established,
+           .condition = ContactCondition::active,
+           .communication_available = true,
+           .confidence = 1.0}));
+    diplomacy.declare_war(a, b, 0);
+    warring.push_back(a);
+    warring.push_back(b);
+  }
+  return warring;
+}
+
 } // namespace
 
 int run_adaptive_campaign_host(
@@ -336,6 +387,9 @@ int run_adaptive_campaign_host(
   if (options.stress_fleets < 0 || options.stress_fleets > 100000)
     throw std::invalid_argument(
         "Adaptive campaign stress fleets must be 0..100000 per civilization");
+  if (options.stress_combat < 0 || options.stress_combat > 32)
+    throw std::invalid_argument(
+        "Adaptive campaign stress combat must be 0..32 war pairs");
   (void)species_environment_profile(options.player_species);
   const auto asset_root = std::filesystem::absolute(
       options.asset_root.empty() ? stellar::engine::executable_directory()
@@ -351,7 +405,8 @@ int run_adaptive_campaign_host(
                 diplomacy_events = 0, industry_allocations = 0,
                 construction_events = 0, shipbuilding_events = 0,
                 exploration_events = 0, combat_events = 0,
-                colonization_events = 0;
+                colonization_events = 0, engage_orders_issued = 0,
+                engage_orders_accepted = 0;
   double initialization_total_ms = 0.0, step_total_ms = 0.0;
   std::vector<double> step_times;
   std::vector<double> autosave_times;
@@ -372,6 +427,10 @@ int run_adaptive_campaign_host(
     auto runtime = IntegratedAdaptiveCampaignRuntime::create_fresh(
         load_runtime(research_root), std::move(fresh_world));
     runtime.set_profiling_enabled(true);
+    const auto warring =
+        options.stress_combat > 0
+            ? seed_stress_wars(runtime, options.stress_combat)
+            : std::vector<int>{};
     const auto &world = runtime.world().campaign();
     const auto research_civilizations =
         runtime.research().civilization_ids();
@@ -389,6 +448,26 @@ int run_adaptive_campaign_host(
     const auto initial_state =
         adaptive_diagnostic(runtime, campaign_diagnostic).dump();
     for (int tick = 0; tick < options.simulation_ticks; ++tick) {
+      if (!warring.empty() &&
+          tick % stress_combat_engage_interval_ticks == 0) {
+        // Fleet ids are snapshotted before issuing — each accepted
+        // order mutates the fleet's combat state.
+        std::vector<std::pair<int, int>> candidates;
+        for (const auto &fleet : runtime.world().campaign().fleets)
+          if (fleet.is_active && fleet.role == FleetRole::Military &&
+              fleet.current_system_id &&
+              std::ranges::find(warring, fleet.civilization_id) !=
+                  warring.end() &&
+              !(fleet.combat &&
+                fleet.combat->order == MilitaryOrderType::Attack))
+            candidates.emplace_back(fleet.id, fleet.civilization_id);
+        for (const auto [fleet_id, civilization_id] : candidates) {
+          const auto accepted = runtime.core().issue_engage_hostiles_order(
+              &runtime.world(), civilization_id, fleet_id);
+          engage_orders_issued += 1;
+          engage_orders_accepted += accepted.accepted ? 1 : 0;
+        }
+      }
       const auto step_started = std::chrono::steady_clock::now();
       const auto result = runtime.advance(
           options.step_days, static_cast<double>(tick + 1) * options.step_days);
@@ -516,6 +595,9 @@ int run_adaptive_campaign_host(
       {"autosaveStreamWriteMeanMs",
        autosave_times.empty() ? 0.0 : autosave_stage_ms[1] / autosave_times.size()},
       {"stressFleetsPerCivilization", options.stress_fleets},
+      {"stressCombatWarPairs", options.stress_combat},
+      {"engageHostilesOrdersIssued", engage_orders_issued},
+      {"engageHostilesOrdersAccepted", engage_orders_accepted},
       {"phaseTimings", phase_timings},
       {"sensorContactsRecorded", sensor_contacts},
       {"adaptiveResearchEvents", adaptive_events},

@@ -101,6 +101,7 @@ int run(int argc, char **argv) {
              "--simulate-adaptive-campaign [--systems N] [--seed N] "
              "[--civilizations N] [--ancients N] [--player-species ID] "
              "[--ticks N] [--step-days DAYS] [--repeat N] "
+             "[--autosave-every N] [--stress-fleets N] [--stress-combat N] "
              "[--catalog-output new-file]\nCampaign "
              "simulation output is deterministic diagnostic data, not a player "
              "save.\n";
@@ -123,7 +124,8 @@ int run(int argc, char **argv) {
         arg == "--ancients" || arg == "--player-species" ||
         arg == "--step-days" || arg=="--output" || arg=="--years" ||
         arg=="--speed" || arg=="--checkpoint-days" || arg=="--log-level" ||
-        arg == "--autosave-every" || arg == "--stress-fleets") {
+        arg == "--autosave-every" || arg == "--stress-fleets" ||
+        arg == "--stress-combat") {
       require(i + 1 < argc, "Missing option value");
       ++i;
     }
