@@ -1957,20 +1957,16 @@ int RuntimeHost::run() {
               (t->x + ext->w * .5f - impl.cam_x) * impl.cam_zoom;
           const float screen_y =
               (t->y + ext->h * .5f - impl.cam_y) * impl.cam_zoom;
-          const float pan =
-              view > 0.f ? std::clamp(screen_x / (view * .5f) - 1.f, -1.f, 1.f)
-                         : 0.f;
-          // Corner of the view reads as distance 1 — the bounce still
-          // plays at half gain so off-center impacts stay audible.
+          // Corner of the view reads as distance 1 — the default .5 gain
+          // floor keeps off-center impacts audible.
           const float norm_x = view > 0.f ? screen_x / (view * .5f) - 1.f : 0.f;
           const float norm_y = view_h > 0.f ? screen_y / (view_h * .5f) - 1.f : 0.f;
-          const float distance =
-              std::clamp(std::hypot(std::clamp(norm_x, -1.f, 1.f),
-                                    std::clamp(norm_y, -1.f, 1.f)) /
-                             1.4142135623730951f,
-                         0.f, 1.f);
-          if (audio)
-            audio->play_effect(bounce_clip, pan, 1.f - 0.5f * distance);
+          if (audio) {
+            const auto placement =
+                ::stellar::engine::audio::spatial_effect_placement(norm_x,
+                                                                   norm_y);
+            audio->play_effect(bounce_clip, placement.pan, placement.gain);
+          }
         }
       }
       // Lifetimes tick down in sim time; expired entities self-destruct

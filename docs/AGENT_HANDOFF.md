@@ -1987,6 +1987,13 @@ CLOSE gate behind a topmost SAVE ALL / DISCARD / CANCEL overlay
 `save_scene3`, aborts the action if anything stays modified); the
 status line reports "unsaved scene+scene3d". The inline scene3d save
 block was extracted into `save_scene3` for reuse.
+Audio: `spatial_effect_placement(norm_x, norm_y, gain_floor)` in
+`engine/native_audio` maps a normalized view-space offset to a
+pan+gain placement for the positional `play_effect` overload —
+clamped radial distance rolls off toward the floor (default .5) so
+corner cues stay audible, non-finite inputs place at center.
+RuntimeHost's bounce cue now routes through it instead of open-coding
+the rolloff. World-units spatialization and mixer buses remain open.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

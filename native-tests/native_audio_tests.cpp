@@ -155,6 +155,35 @@ int main(int argc, char** argv) {
       set_decoded_pcm_budget(saved_budget);
     }
 
+    // View-space spatial placement: pan follows the clamped x offset,
+    // gain rolls off toward the floor at the view corner, and non-finite
+    // inputs place safely at center.
+    {
+      const auto centered = spatial_effect_placement(0.f, 0.f);
+      check(centered.pan == 0.f && centered.gain == 1.f,
+            "centered spatial placement did not stay centered at full gain");
+      const auto edge = spatial_effect_placement(1.f, 0.f);
+      check(edge.pan == 1.f && edge.gain < 1.f && edge.gain > .5f,
+            "edge spatial placement did not pan right with partial rolloff");
+      const auto corner = spatial_effect_placement(1.f, 1.f);
+      check(corner.pan == 1.f && std::abs(corner.gain - .5f) < 1e-6f,
+            "corner spatial placement did not reach the gain floor");
+      const auto offscreen = spatial_effect_placement(4.f, -9.f);
+      check(offscreen.pan == corner.pan && offscreen.gain == corner.gain,
+            "off-screen spatial placement did not clamp to the rim");
+      const auto silent = spatial_effect_placement(1.f, 1.f, 0.f);
+      check(silent.gain == 0.f,
+            "zero gain floor did not silence corner placements");
+      const auto loud = spatial_effect_placement(1.f, 1.f, 1.f);
+      check(loud.gain == 1.f,
+            "unit gain floor did not keep placements at full gain");
+      const auto nan = spatial_effect_placement(
+          std::numeric_limits<float>::quiet_NaN(),
+          std::numeric_limits<float>::infinity());
+      check(nan.pan == 0.f && nan.gain == 1.f,
+            "non-finite spatial placement did not fall back to center");
+    }
+
     // Streaming decode parity: pull-decoding the same files in small
     // chunks produces byte-identical canonical PCM, reports
     // end-of-stream, and rewinds cleanly for looping.

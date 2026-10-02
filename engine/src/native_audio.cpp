@@ -188,6 +188,17 @@ std::uint64_t decoded_pcm_budget_rejections() noexcept {
   return decoded_pcm_rejections.load(std::memory_order_relaxed);
 }
 
+SpatialEffectPlacement spatial_effect_placement(float norm_x, float norm_y,
+                                                float gain_floor) noexcept {
+  const float cx = std::clamp(std::isfinite(norm_x) ? norm_x : 0.f, -1.f, 1.f);
+  const float cy = std::clamp(std::isfinite(norm_y) ? norm_y : 0.f, -1.f, 1.f);
+  const float distance =
+      std::clamp(std::hypot(cx, cy) / 1.4142135623730951f, 0.f, 1.f);
+  const float f =
+      std::clamp(std::isfinite(gain_floor) ? gain_floor : .5f, 0.f, 1.f);
+  return {.pan = cx, .gain = 1.f - (1.f - f) * distance};
+}
+
 std::span<const float> AudioClip::samples() const noexcept { return samples_; }
 std::size_t AudioClip::byte_size() const noexcept { return samples_.size() * sizeof(float); }
 std::uint64_t AudioClip::sample_frames() const noexcept { return samples_.size() / audio_channels; }

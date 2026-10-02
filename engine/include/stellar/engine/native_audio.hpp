@@ -124,6 +124,22 @@ struct AudioDiagnostics final {
   float applied_voice_gain{};
 };
 
+// Placement for the positional play_effect overload: pan [-1, 1] feeds
+// the equal-power stereo split, gain [0, 1] the whole-effect attenuation.
+struct SpatialEffectPlacement final {
+  float pan{};
+  float gain{1.f};
+};
+
+// Maps a normalized view-space offset into a stereo placement: norm_x/norm_y
+// are the source's offset from the view center in half-view units (0 =
+// centered, ±1 = edge); both clamp so off-screen sources still place at the
+// rim. Pan follows the clamped x offset; gain rolls off with radial distance
+// toward `gain_floor` at the view corner, so positional cues attenuate
+// instead of cutting out. Non-finite inputs place at center (safe, audible).
+[[nodiscard]] SpatialEffectPlacement spatial_effect_placement(
+    float norm_x, float norm_y, float gain_floor = .5f) noexcept;
+
 // Owner-thread-pinned SDL output. It owns only SDL's audio subsystem reference.
 class AudioOutput final {
  public:
