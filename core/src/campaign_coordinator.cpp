@@ -679,7 +679,12 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
              phase_days);
          timing.finish(performance_[5]);
        },
-       .domain = "shipbuilding", .depends_on = {3}},
+       // Must follow construction, not just industry_allocation: both
+       // phases debit CivilizationEconomy::industry on the same elements
+       // (lost-update race in a shared wave), shipbuilding appends the
+       // shared campaign.fleets vector, and completed construction
+       // projects can produce shipyards this phase consumes.
+       .domain = "shipbuilding", .depends_on = {4}},
       {.run = [this](const eng::SimulationTickContext &) {
          eng::PhaseTimer timing(profiling_enabled_);
          auto &campaign = step_.state->campaign();
