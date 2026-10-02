@@ -5,6 +5,7 @@
 #include <stellar/engine/accessibility.hpp>
 #include <stellar/engine/asset_registry.hpp>
 #include <stellar/engine/profiler.hpp>
+#include <stellar/engine/scripted_content.hpp>
 #include <stellar/engine/ui_viewmodels.hpp>
 #include <charconv>
 #include <iomanip>
@@ -25,17 +26,27 @@ const char *campaign_domain_name(std::int64_t domain){
   }
   return "domain";
 }
+const char *script_scope_name(stellar::engine::ScriptScopeKind kind){
+  using K=stellar::engine::ScriptScopeKind;
+  switch(kind){
+    case K::global:return "global";case K::civilization:return "civilization";
+    case K::colony:return "colony";case K::system:return "system";
+    case K::body:return "body";case K::fleet:return "fleet";
+    case K::origin:return "origin";
+  }
+  return "scope";
+}
 constexpr std::array<std::string_view,11> kShadingNames{"Lit","Unlit","Albedo","Normals","Roughness","Metallic","Emissive","Lighting only","LOD","Residency","Shadows"};
 } // namespace
 class NativeDeveloperDiagnostics {
 public:
-  void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;ring_=-1;refresh(monitor);}
+  void open(const stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){visible_=true;events_=false;generation_=false;assets_=false;entities_=false;scripted_=false;list_view_.scroll_offset=0;ring_=-1;refresh(monitor);}
   void close(){visible_=false;pressed_=-1;ring_=-1;dropdown_.close();entity_search_focused_=event_search_focused_=false;}
   bool visible()const{return visible_;}
   // One-line renderer workload summary for the LIVE PERFORMANCE view —
   // the window's per-frame Scene3DStatistics, formatted by the host.
   void set_renderer_stats(std::string value){renderer_stats_=std::move(value);}
-  bool wants_text_input()const{return visible_&&(entity_search_focused_||event_search_focused_);}
+  bool wants_text_input()const{return visible_&&(entity_search_focused_||event_search_focused_||scripted_search_focused_);}
   // Keyboard-focus contract: Tab enters a ring over the chrome, the
   // view's search field (entities/events, classified Edit), the sortable
   // phase headers (performance view) and the rendered entity rows;
@@ -118,12 +129,12 @@ public:
       }
       return true;
     }
-    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_){entity_search_focused_=event_search_focused_=false;return true;}if(ring_>=0){ring_=-1;return true;}close();return true;}
+    if(e.type==InputEventType::EscapePressed){if(entity_search_focused_||event_search_focused_||scripted_search_focused_){entity_search_focused_=event_search_focused_=scripted_search_focused_=false;return true;}if(ring_>=0){ring_=-1;return true;}close();return true;}
     if(e.type==InputEventType::PointerCancelled){pressed_=-1;ring_=-1;return true;}
     // Shared scroll model — row stride/count are view-dependent, so the
     // engine VirtualizedList is configured per event/render against the
     // last rendered row set (list_rows_ refreshes every frame).
-    list_view_.row_height=(assets_?61.f:events_?57.f:33.f)*l.scale;
+    list_view_.row_height=(assets_?61.f:(events_||scripted_)?57.f:33.f)*l.scale;
     list_view_.viewport_height=l.list.height;
     list_view_.row_count=list_rows_;
     if(e.type==InputEventType::Wheel&&l.list.contains(e.position))list_view_.scroll_to(list_view_.scroll_offset-std::round(e.wheel_y)*list_view_.row_height);
@@ -131,13 +142,14 @@ public:
       ring_=-1;
       if(l.detail.contains(e.position)){open_detail_dropdown(monitor);return true;}
       if(l.shading.contains(e.position)){open_shading_dropdown();return true;}
-      pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:-1;
+      pressed_=l.close.contains(e.position)?0:l.performance.contains(e.position)?1:l.events.contains(e.position)?2:l.refresh.contains(e.position)?3:l.generation.contains(e.position)?4:l.assets.contains(e.position)?5:l.entities.contains(e.position)?6:l.scripted.contains(e.position)?9:-1;
       entity_search_focused_=entities_&&header_search_rect(l).contains(e.position);
       event_search_focused_=events_&&header_search_rect(l).contains(e.position);
+      scripted_search_focused_=scripted_&&header_search_rect(l).contains(e.position);
       // Sortable phase-table headers (default view) — same click
       // convention as the colony roster: press cycles asc→desc and the
       // scroll returns to the top.
-      if(pressed_<0&&!events_&&!generation_&&!assets_&&!entities_)
+      if(pressed_<0&&!events_&&!generation_&&!assets_&&!entities_&&!scripted_)
         for(int col=0;col<4;++col)if(phase_header_rect(l,col).contains(e.position)){activate_phase_header(col);break;}
       if(pressed_<0&&entities_&&!entities_dirty_&&entity_rows_rect(l).contains(e.position)){
         const int row=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
@@ -149,20 +161,22 @@ public:
       if(hit>=0&&hit<=6){
         const std::array<UiRect,7> rects{l.close,l.performance,l.events,l.refresh,l.generation,l.assets,l.entities};
         if(rects[static_cast<std::size_t>(hit)].contains(e.position))activate_button(hit,monitor);
+      }else if(hit==9){
+        if(l.scripted.contains(e.position))activate_button(9,monitor);
       }else if(hit>=100){
         const int row=hit-100;
         const int released=static_cast<int>((e.position.y-l.list.y+list_view_.scroll_offset)/list_view_.row_height);
         if(released==row&&entity_rows_rect(l).contains(e.position))activate_entity_row(row);
       }
     }
-    if(entity_search_focused_||event_search_focused_){
+    if(entity_search_focused_||event_search_focused_||scripted_search_focused_){
       // Pointer-focused search — the roster/navigator contract: typed
       // text edits, Backspace pops a UTF-8 code point, Tab or Return
       // commit out, and the field owns the keyboard meanwhile.
-      auto &search=entity_search_focused_?entity_search_:event_search_;
+      auto &search=entity_search_focused_?entity_search_:event_search_focused_?event_search_:scripted_search_;
       if(e.type==InputEventType::TextEntered&&search.size()+e.text.size()<=120)search+=e.text;
       else if(e.type==InputEventType::BackspacePressed&&!search.empty()){auto n=search.size()-1;while(n>0&&(static_cast<unsigned char>(search[n])&0xc0)==0x80)--n;search.resize(n);}
-      else if(e.type==InputEventType::KeyPressed&&(e.key==9u||e.key==13u))entity_search_focused_=event_search_focused_=false;
+      else if(e.type==InputEventType::KeyPressed&&(e.key==9u||e.key==13u))entity_search_focused_=event_search_focused_=scripted_search_focused_=false;
       if(entity_search_focused_&&(e.type==InputEventType::TextEntered||e.type==InputEventType::BackspacePressed))entities_dirty_=true;
       return true;
     }
@@ -239,7 +253,7 @@ public:
       out.overlay.emplace_back(Text{{r.x,r.y},std::move(value),color,font,r.width,c,TextAlign::Left,FontFace::Interface});};
     const auto button=[&](UiRect r,std::string name){native_menu_style::button(out,r,std::move(name),font,r.contains(pointer_),true,s);};
     label({l.panel.x+20*s,l.panel.y+16*s,850*s,28*s},"DEVELOPER · PERFORMANCE & DIAGNOSTICS",native_menu_style::cyan);
-    button(l.close,"CLOSE");button(l.performance,"LIVE PERFORMANCE");button(l.events,"RECENT EVENTS");button(l.refresh,"REFRESH EVENTS");button(l.generation,"GALAXY DETAILS");button(l.assets,"COOKED ASSETS");button(l.entities,"ENTITIES");
+    button(l.close,"CLOSE");button(l.performance,"LIVE PERFORMANCE");button(l.events,"RECENT EVENTS");button(l.refresh,"REFRESH EVENTS");button(l.generation,"GALAXY DETAILS");button(l.assets,"COOKED ASSETS");button(l.entities,"ENTITIES");button(l.scripted,"SCRIPTED");
     const std::array<std::string,4> levels{"Errors only","Normal","Detailed","Trace"};
     button(l.detail,"Record: "+levels.at(static_cast<std::size_t>(monitor.history().detail()))+" ▾");
     button(l.shading,"Shading: "+std::string(kShadingNames[static_cast<std::size_t>(shading_)])+" ▾");
@@ -404,6 +418,50 @@ public:
         else if(const auto*construction_tag=projected.get<CampaignConstructionTag>(e)){line("tag campaign.construction",native_menu_style::cyan);line("civ "+std::to_string(construction_tag->civilization_id));}
         else if(const auto*shipyard_tag=projected.get<CampaignShipyardTag>(e)){line("tag campaign.shipyard",native_menu_style::cyan);line("civ "+std::to_string(shipyard_tag->civilization_id));}
       }else label(detail,"Select a row — the projected entity's index, refs and tag fields list here.",native_menu_style::muted);
+    }else if(scripted_){
+      // Read-only inspector over the campaign's ScriptedContentRuntime —
+      // definitions with their live firing state (once-flags, cooldowns,
+      // poll cadence, queued follow-ups). Definitions reload per session;
+      // the state below persists through the ScriptedContent save member.
+      const auto &script=frame.runtime().scripted_content();
+      const auto &defs=script.definitions();
+      const auto query=fold_ascii(scripted_search_);
+      scripted_view_.clear();
+      for(std::size_t i=0;i<defs.size();++i){
+        const auto &d=defs[i];
+        if(query.empty()||fold_ascii(d.id+" "+d.file).find(query)!=std::string::npos)scripted_view_.push_back(i);
+      }
+      label({l.list.x,l.list.y-31*s,l.list.width-262*s,27*s},std::to_string(defs.size())+" definitions · "+std::to_string(script.scheduled().size())+" scheduled · "+
+        std::to_string(script.fired_keys().size())+" fired keys · "+std::to_string(script.cooldowns().size())+" cooldowns · runtime day "+number(script.now())+
+        (scripted_search_.empty()?"":" · "+std::to_string(scripted_view_.size())+" shown"),native_menu_style::muted);
+      render_search_field(out,header_search_rect(l),scripted_search_,scripted_search_focused_,"Search definitions…",font);
+      const auto range=scroll_window(l,57.f,scripted_view_.size(),8);
+      for(auto i=range.first;i<range.last;++i){
+        const auto &d=defs[scripted_view_[i]];const auto y=l.list.y+static_cast<float>(i)*57*s-list_view_.scroll_offset;
+        const auto clip=intersection({l.list.x,y,l.list.width,54*s},l.list);if(clip.height<=0)continue;
+        out.overlay.emplace_back(FilledRectangle{clip,{12,32,45,210}});
+        // Live firing state for this definition: campaign-once flag,
+        // per-scope fired keys ("id@<scope>"), active cooldown, next
+        // poll-due day, and queued follow-ups.
+        std::string state;
+        if(script.fired(d.id))state+="FIRED";
+        std::size_t scoped=0;const std::string prefix=d.id+"@";
+        for(const auto &key:script.fired_keys())if(key.starts_with(prefix))++scoped;
+        const auto append_state=[&](std::string part){if(!state.empty())state+=" · ";state+=std::move(part);};
+        if(scoped)append_state("fired ×"+std::to_string(scoped)+" scopes");
+        if(const auto left=script.cooldown_remaining(d.id,script.now());left>0)append_state("cooldown "+number(left)+"d");
+        for(const auto &[id,due]:script.poll_due())if(id==d.id){append_state("next poll day "+number(due));break;}
+        std::size_t queued=0;for(const auto &sch:script.scheduled())if(sch.event_id==d.id)++queued;
+        if(queued)append_state("queued ×"+std::to_string(queued));
+        if(state.empty())state="armed";
+        const std::string mode=!d.on.empty()?"on "+d.on:(d.poll_days>0?"poll "+number(d.poll_days)+"d":"manual");
+        label({l.list.x+8*s,y+3*s,l.list.width-16*s,23*s},d.id+"   —   "+state,native_menu_style::cyan,l.list);
+        label({l.list.x+8*s,y+28*s,l.list.width-16*s,23*s},mode+" · scope "+script_scope_name(d.scope.kind)+(d.scope.id>=0?" "+std::to_string(d.scope.id):"")+
+          " · weight "+number(d.weight)+" · "+std::to_string(d.effects.size())+" effects · "+std::to_string(d.follow_ups.size())+" follow-ups · "+d.file,
+          native_menu_style::ink,l.list);
+      }
+      if(defs.empty())label(l.list,"No scripted content loaded — the session's scripted root was empty, absent, or not configured.",native_menu_style::muted);
+      else if(scripted_view_.empty())label(l.list,"No definitions match the search.",native_menu_style::muted);
     }else if(!events_){
       if(!renderer_stats_.empty())
         label({l.panel.x+20*s,l.panel.y+152*s,l.panel.width-40*s,24*s},renderer_stats_,native_menu_style::muted);
@@ -482,14 +540,14 @@ public:
     if(dropdown_.visible())dropdown_.render(out,dropdown_.id()==1?l.shading:l.detail,w,h,font);
   }
 private:
-  struct Layout {float scale;UiRect panel,close,performance,events,refresh,detail,shading,list,generation,assets,entities;};
+  struct Layout {float scale;UiRect panel,close,performance,events,refresh,detail,shading,list,generation,assets,entities,scripted;};
   static Layout layout(int w,int h){
     const float s=std::clamp(std::min(w/1920.f,h/1080.f),.67f,2.f);const UiRect p{w*.5f-550*s,h*.5f-370*s,1100*s,740*s};
     return {s,p,{p.x+984*s,p.y+12*s,96*s,32*s},{p.x+20*s,p.y+64*s,242*s,38*s},
       {p.x+276*s,p.y+64*s,242*s,38*s},{p.x+532*s,p.y+64*s,242*s,38*s},{p.x+788*s,p.y+64*s,292*s,38*s},
       {p.x+788*s,p.y+110*s,292*s,34*s},
-      {p.x+20*s,p.y+186*s,1060*s,445*s},{p.x+20*s,p.y+110*s,242*s,34*s},{p.x+276*s,p.y+110*s,242*s,34*s},
-      {p.x+532*s,p.y+110*s,242*s,34*s}};
+      {p.x+20*s,p.y+186*s,1060*s,445*s},{p.x+20*s,p.y+110*s,180*s,34*s},{p.x+208*s,p.y+110*s,180*s,34*s},
+      {p.x+396*s,p.y+110*s,180*s,34*s},{p.x+584*s,p.y+110*s,180*s,34*s}};
   }
   // In the entities view the list splits: rows left, selected-entity
   // detail right — row hit-testing bounds to the rows region.
@@ -506,6 +564,7 @@ private:
     push(l.performance,1,"Live performance");push(l.events,2,"Recent events");push(l.refresh,3,"Refresh events");
     push(l.detail,7,"Record detail level");push(l.shading,8,"Shading debug view");
     push(l.generation,4,"Galaxy details");push(l.assets,5,"Cooked assets");push(l.entities,6,"Entities");
+    push(l.scripted,9,"Scripted content");
     if(entities_){
       push(header_search_rect(l),50,"Search entities",stellar::engine::AnnouncementControl::Edit);
       if(!entities_dirty_){
@@ -516,7 +575,8 @@ private:
           push(intersection({rows.x,l.list.y+static_cast<float>(i)*33.f*l.scale-list_view_.scroll_offset,rows.width,31.f*l.scale},l.list),100+static_cast<int>(i),entity_flat_[i].first->label_key);
       }
     }else if(events_)push(header_search_rect(l),51,"Search events",stellar::engine::AnnouncementControl::Edit);
-    if(!events_&&!generation_&&!assets_&&!entities_){
+    else if(scripted_)push(header_search_rect(l),52,"Search definitions",stellar::engine::AnnouncementControl::Edit);
+    if(!events_&&!generation_&&!assets_&&!entities_&&!scripted_){
       static const char *names[]{"phase","samples","mean ms","maximum ms"};
       for(int col=0;col<4;++col)push(phase_header_rect(l,col),200+col,std::string("Sort by ")+names[col]);
     }
@@ -525,12 +585,13 @@ private:
   }
   void activate_button(int hit,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(hit==0)close();
-    else if(hit==1){events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;}
-    else if(hit==2){events_=true;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;refresh(monitor);}
+    else if(hit==1){events_=false;generation_=false;assets_=false;entities_=false;scripted_=false;list_view_.scroll_offset=0;}
+    else if(hit==2){events_=true;generation_=false;assets_=false;entities_=false;scripted_=false;list_view_.scroll_offset=0;refresh(monitor);}
     else if(hit==3){list_view_.scroll_offset=0;refresh(monitor);entities_dirty_=true;}
-    else if(hit==4){generation_=true;assets_=false;entities_=false;list_view_.scroll_offset=0;}
-    else if(hit==5){assets_=true;generation_=false;entities_=false;list_view_.scroll_offset=0;}
-    else if(hit==6){entities_=true;events_=false;generation_=false;assets_=false;list_view_.scroll_offset=0;entities_dirty_=true;}
+    else if(hit==4){generation_=true;assets_=false;entities_=false;scripted_=false;list_view_.scroll_offset=0;}
+    else if(hit==5){assets_=true;generation_=false;entities_=false;scripted_=false;list_view_.scroll_offset=0;}
+    else if(hit==6){entities_=true;events_=false;generation_=false;assets_=false;scripted_=false;list_view_.scroll_offset=0;entities_dirty_=true;}
+    else if(hit==9){scripted_=true;events_=false;generation_=false;assets_=false;entities_=false;list_view_.scroll_offset=0;}
   }
   void open_detail_dropdown(stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     dropdown_.open(0,{"Errors only","Normal","Detailed","Trace"},static_cast<int>(monitor.history().detail()));
@@ -565,6 +626,7 @@ private:
   void activate_target(const FocusTarget &t,stellar::app_diagnostics::CampaignDiagnosticMonitor &monitor){
     if(t.hit==50){entity_search_focused_=true;ring_=-1;}
     else if(t.hit==51){event_search_focused_=true;ring_=-1;}
+    else if(t.hit==52){scripted_search_focused_=true;ring_=-1;}
     else if(t.hit==7)open_detail_dropdown(monitor);
     else if(t.hit==8)open_shading_dropdown();
     else if(t.hit>=200)activate_phase_header(t.hit-200);
@@ -610,7 +672,7 @@ private:
     if(r.ec!=std::errc{}||r.ptr!=id.data()+id.size())return std::nullopt;
     return stellar::engine::EntityId{static_cast<std::uint32_t>(value&0xffffffffu),static_cast<std::uint32_t>(value>>32)};
   }
-  bool generation_{},assets_{},entities_{};
+  bool generation_{},assets_{},entities_{},scripted_{};
   mutable bool entities_dirty_{true},entities_world_built_{};
   mutable stellar::engine::World entity_world_;
   mutable std::optional<stellar::core::CampaignWorldProjectionSync> entity_sync_;
@@ -645,9 +707,9 @@ private:
   std::vector<stellar::engine::DiagnosticRecord> snapshot_;stellar::native_ui::Dropdown dropdown_;
   DebugView3D shading_{DebugView3D::Lit};
   bool visible_{},events_{};int pressed_{-1},ring_{-1};Point pointer_{};
-  std::string entity_search_,event_search_;bool entity_search_focused_{},event_search_focused_{};
+  std::string entity_search_,event_search_,scripted_search_;bool entity_search_focused_{},event_search_focused_{},scripted_search_focused_{};
   mutable std::size_t entity_shown_{};
-  mutable std::vector<std::size_t> event_view_;
+  mutable std::vector<std::size_t> event_view_,scripted_view_;
   mutable stellar::engine::VirtualizedList list_view_;mutable std::size_t list_rows_{};
   std::string renderer_stats_;
   mutable stellar::engine::TableModel phase_table_;

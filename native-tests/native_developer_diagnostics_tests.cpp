@@ -47,6 +47,28 @@ int main(int argc,char **argv)try{
   check(denied&&campaign_territorial_claims(frame.runtime(),player).empty(),"Player campaign accepted omniscient monitoring/claims.");
   live.developer_provenance=provenance;
   frame.set_developer_speed(1);
+  // Scripted-content inspector fixture: a force-fired poll definition
+  // (leaving a queued follow-up) plus an armed manual definition — loaded
+  // before the baseline capture so the scripted view stays read-only
+  // against every later comparison.
+  {
+    std::vector<stellar::engine::ScriptLoadError> script_errors;
+    if(!frame.runtime().load_scripted_document(
+        R"json({"scripted_events":[
+          {"id":"diag.probe","poll_days":5,"once_per_campaign":true,
+           "scope":{"kind":"civilization","id":-1},
+           "trigger":{"check":"civilization_is_player","scope":{"kind":"civilization","id":-1}},
+           "effects":[{"do":"grant_credits","scope":{"kind":"civilization","id":-1},"args":{"amount":"1"}}],
+           "follow_ups":[{"id":"diag.probe.tail","delay_days":3}]},
+          {"id":"diag.probe.tail","scope":{"kind":"civilization","id":-1},"effects":[]},
+          {"id":"diag.armed","scope":{"kind":"global","id":-1},"effects":[]}]})json",
+        "diag.json",&script_errors)){
+      for(const auto &e:script_errors)std::cerr<<"scripted fixture: "<<e.file<<" "<<e.object_id<<" "<<e.message<<'\n';
+      check(false,"Scripted fixture failed to load.");
+    }
+    check(frame.runtime().scripted_content().fire("diag.probe",{.civilization=player},true),
+        "Scripted fixture did not force-fire.");
+  }
   stellar::app_diagnostics::CampaignDiagnosticMonitor monitor;
   monitor.observe(frame,{},"timestamp");
   const auto before=capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"});
@@ -307,6 +329,35 @@ int main(int argc,char **argv)try{
       check(shown_cards==1&&shown_cards<all&&message&&shown_count,"Events search did not isolate the matching record.");
       (void)window.handle({InputEventType::EscapePressed},w,h,monitor);
       check(!window.wants_text_input()&&window.visible(),"Escape in event search closed the panel.");
+    }
+    // Scripted view — a read-only inspector over the campaign's
+    // ScriptedContentRuntime: definitions render with their live firing
+    // state (fired flags, queued follow-ups, armed), and the same
+    // pointer-focused search idiom filters by id/file.
+    click("SCRIPTED");
+    {
+      const auto script_view=draw();bool census=false,fired_row=false,armed_row=false,queued=false;
+      for(const auto &c:script_view.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
+        if(t->value.find("definitions")!=std::string::npos&&t->value.find("runtime day")!=std::string::npos)census=true;
+        if(t->value.starts_with("diag.probe ")&&t->value.find("FIRED")!=std::string::npos)fired_row=true;
+        if(t->value.starts_with("diag.probe.tail ")&&t->value.find("queued")!=std::string::npos)queued=true;
+        if(t->value.starts_with("diag.armed ")&&t->value.find("armed")!=std::string::npos)armed_row=true;
+      }
+      check(census&&fired_row&&armed_row&&queued,"Scripted inspector did not surface definition firing state.");
+      const auto anchor=control(draw(),"Search definitions…");
+      (void)window.handle({InputEventType::LeftPressed,anchor},w,h,monitor);
+      (void)window.handle({InputEventType::LeftReleased,anchor},w,h,monitor);
+      check(window.wants_text_input(),"Scripted search did not take focus.");
+      InputEvent typed{InputEventType::TextEntered};typed.text="armed";
+      (void)window.handle(typed,w,h,monitor);
+      const auto filtered=draw();std::size_t rows=0;bool shown=false;
+      for(const auto &c:filtered.overlay)if(const auto *t=std::get_if<Text>(&c);t&&t->clip){
+        if(t->value.find("   —   ")!=std::string::npos)++rows;
+        if(t->value.find(" shown")!=std::string::npos)shown=true;
+      }
+      check(rows==1&&shown,"Scripted search did not isolate the matching definition.");
+      (void)window.handle({InputEventType::EscapePressed},w,h,monitor);
+      check(!window.wants_text_input()&&window.visible(),"Escape in scripted search closed the panel.");
     }
     check(capture_developer_campaign_json(frame.runtime(),{0,"test","2050-03-21T00:00:00Z"})==before,"Events search modified world state.");
     // Keyboard focus ring: chrome, the record-detail dropdown, sort

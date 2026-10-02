@@ -195,6 +195,25 @@ public:
   [[nodiscard]] const std::vector<ScheduledScriptedEvent> &scheduled() const noexcept {
     return scheduled_;
   }
+  // Read-only inspector surface: definition registry plus the runtime
+  // state a developer/debugger view needs (fired once-keys including
+  // "id@scope" per-scope entries, active cooldown ends, next poll due
+  // times keyed by definition id, and the runtime's simulation day).
+  [[nodiscard]] const std::vector<ScriptedEventDefinition> &definitions() const noexcept {
+    return definitions_;
+  }
+  [[nodiscard]] const std::vector<std::string> &fired_keys() const noexcept {
+    return fired_once_;
+  }
+  [[nodiscard]] const std::vector<std::pair<std::string, double>> &
+  cooldowns() const noexcept {
+    return cooldown_until_;
+  }
+  [[nodiscard]] const std::vector<std::pair<std::string, double>> &
+  poll_due() const noexcept {
+    return poll_due_;
+  }
+  [[nodiscard]] double now() const noexcept { return now_; }
   [[nodiscard]] bool fired(std::string_view event_id) const;
   [[nodiscard]] double cooldown_remaining(std::string_view event_id,
                                           double simulation_day) const;

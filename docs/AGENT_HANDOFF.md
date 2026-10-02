@@ -510,6 +510,17 @@ preserve:
   backend-native timestamp path). The shell Profiler tool's MIN button
   cycles 0/1us/10us/100us; `profiler` covers threshold filtering and
   aggregate retention.
+- Gameplay scripting platform M3 (developer inspector): the developer
+  diagnostics panel (`native_developer_diagnostics.hpp`) gained a SCRIPTED
+  view — a read-only roster of loaded definitions with live state per row
+  (FIRED / fired ×N scopes / cooldown Xd / next poll day / queued ×N /
+  armed), firing mode + scope + weight + effect/follow-up counts and
+  provenance file, plus the panel's standard pointer-focused search. The
+  engine runtime exposes the introspection via new const accessors
+  (`definitions()`, `fired_keys()`, `cooldowns()`, `poll_due()`, `now()`)
+  — no mutation surface. `native_developer_diagnostics` test loads a
+  fixture (force-fired poll def with a queued follow-up + an armed def)
+  and covers the roster, state badges, search and Escape semantics.
 - Gameplay scripting platform M2b (startup loading + seed pack):
   `core::load_scripted_content_directory(campaign, dir)` in
   `campaign_scripted_content.cpp` enumerates a document directory sorted,
