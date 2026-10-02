@@ -268,6 +268,16 @@ place a target-specific compile definition on the shared lib, and test
 sources must not `#include` a client `.cpp` (would double-define
 against the lib).
 
+GPU queue telemetry: every scene3d `Command::submit` acquires an
+SDL_GPU fence (tracked in `Storage::gpu_pending`); `prepare()` polls
+the deque each frame — `gpu_pending_submits`/`gpu_oldest_pending_ms`
+expose queue depth, `gpu_signaled`/`gpu_signal_latency_ms` cumulative
+and per-frame completion latency. SDL_GPU exposes no timestamp queries,
+so this is queue-level lag, not a per-pass timeline — and fence latency
+is a submit→poll upper bound. Surfaced in the DebugView3D overlay and
+the map smoke's `scene3d_stats` JSON; the GPU test asserts fence
+tracking engages.
+
 Allocator census extension: `AudioClip` now maintains a live decoded-PCM
 counter (`audio::decoded_pcm_live_bytes()`, atomic lifecycle accounting
 so shared_ptr-distributed clips are counted once). The client reports it

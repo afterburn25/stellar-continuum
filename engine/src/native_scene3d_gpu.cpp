@@ -6,8 +6,10 @@
 #include "generated/scene3d_shaders.hpp"
 #include <SDL3/SDL.h>
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstring>
+#include <deque>
 #include <limits>
 #include <map>
 #include <numbers>
@@ -22,11 +24,25 @@ namespace stellar::native_map {
 namespace {
 std::runtime_error gpu_error(const char* action){return std::runtime_error(std::string(action)+": "+SDL_GetError());}
 void checked(bool value,const char* action){if(!value)throw gpu_error(action);}
+struct PendingSubmit {
+  SDL_GPUFence* fence{};
+  std::chrono::steady_clock::time_point submitted{};
+};
 struct Command {
-  SDL_GPUCommandBuffer* value;
-  explicit Command(SDL_GPUDevice* device):value(SDL_AcquireGPUCommandBuffer(device)){if(!value)throw gpu_error("3D command buffer allocation failed");}
+  SDL_GPUDevice* device;SDL_GPUCommandBuffer* value;
+  std::deque<PendingSubmit>* pending{};
+  explicit Command(SDL_GPUDevice* device):device(device),value(SDL_AcquireGPUCommandBuffer(device)){if(!value)throw gpu_error("3D command buffer allocation failed");}
+  Command(SDL_GPUDevice* device,std::deque<PendingSubmit>& pending_)
+      :device(device),value(SDL_AcquireGPUCommandBuffer(device)),pending(&pending_){if(!value)throw gpu_error("3D command buffer allocation failed");}
   ~Command(){if(value)SDL_CancelGPUCommandBuffer(value);}
-  void submit(){auto* current=value;value=nullptr;checked(SDL_SubmitGPUCommandBuffer(current),"3D GPU submission failed");}
+  void submit(){auto* current=value;value=nullptr;
+    if(pending){
+      auto* fence=SDL_SubmitGPUCommandBufferAndAcquireFence(current);
+      if(!fence)throw gpu_error("3D GPU submission failed");
+      pending->push_back({fence,std::chrono::steady_clock::now()});
+      return;
+    }
+    checked(SDL_SubmitGPUCommandBuffer(current),"3D GPU submission failed");}
 };
 struct Transfer {
   SDL_GPUDevice* device;SDL_GPUTransferBuffer* value;
@@ -162,10 +178,14 @@ struct Scene3DRenderer::Storage {
   // streamer's accounting and the resident-tail granularity forever after.
   std::unordered_map<engine::TextureId,std::weak_ptr<const RgbaImage>> stream_owners;
   std::uint64_t stream_frame{},stream_registrations{};
+  // Fences acquired at each GPU submit; polled at the next prepare() so
+  // queue depth and submit→signal latency are visible without backend
+  // timestamp queries (SDL_GPU exposes fences only).
+  std::deque<PendingSubmit> gpu_pending;
   Scene3DStatistics stats;std::uint64_t serial{};std::size_t next_view{};bool hdr{},msaa_supported{};SDL_GPUTextureFormat scene_format{};
   SDL_GPUBuffer* vertex_buffer{};SDL_GPUBuffer* fragment_buffer{};SDL_GPUBuffer* shadow_buffer{};SDL_GPUBuffer* spot_shadow_buffer[4]{};SDL_GPUBuffer* omni_shadow_buffer[4]{};SDL_GPUBuffer* cascade_shadow_buffer[maximum_scene3d_shadow_cascades]{};std::size_t vertex_capacity{64},fragment_capacity{64},shadow_capacity{64},spot_shadow_capacity[4]{},omni_shadow_capacity[4]{},cascade_shadow_capacity[maximum_scene3d_shadow_cascades]{};
   Storage(SDL_GPUDevice* d,SDL_Renderer* r):device(d),renderer(r){}
-  ~Storage(){targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);for(auto* b:spot_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:omni_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:cascade_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
+  ~Storage(){for(const auto& p:gpu_pending)SDL_ReleaseGPUFence(device,p.fence);gpu_pending.clear();targets.clear();textures.clear();meshes.clear();for(auto* p:pipelines)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);for(auto* p:pipelines_ms4)if(p)SDL_ReleaseGPUGraphicsPipeline(device,p);if(tonemap_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,tonemap_pipeline);if(shadow_pipeline)SDL_ReleaseGPUGraphicsPipeline(device,shadow_pipeline);if(vertex_buffer)SDL_ReleaseGPUBuffer(device,vertex_buffer);if(fragment_buffer)SDL_ReleaseGPUBuffer(device,fragment_buffer);for(auto* b:spot_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:omni_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);for(auto* b:cascade_shadow_buffer)if(b)SDL_ReleaseGPUBuffer(device,b);if(shadow_buffer)SDL_ReleaseGPUBuffer(device,shadow_buffer);if(sampler)SDL_ReleaseGPUSampler(device,sampler);if(environment_sampler)SDL_ReleaseGPUSampler(device,environment_sampler);if(detail_sampler)SDL_ReleaseGPUSampler(device,detail_sampler);if(repeat_sampler)SDL_ReleaseGPUSampler(device,repeat_sampler);if(repeat_aniso_sampler)SDL_ReleaseGPUSampler(device,repeat_aniso_sampler);}
   void require_owner()const{if(std::this_thread::get_id()!=owner)throw std::logic_error("3D rendering must run on the window thread.");}
   void initialize(){
     SDL_GPUSamplerCreateInfo sampling{};sampling.min_filter=sampling.mag_filter=SDL_GPU_FILTER_LINEAR;
@@ -252,7 +272,7 @@ struct Scene3DRenderer::Storage {
     SDL_GPUBufferCreateInfo info{};info.usage=SDL_GPU_BUFFERUSAGE_VERTEX;info.size=vb;result->vertices=SDL_CreateGPUBuffer(device,&info);if(!result->vertices)throw gpu_error("3D vertex buffer creation failed");
     info.usage=SDL_GPU_BUFFERUSAGE_INDEX;info.size=ib;result->indices=SDL_CreateGPUBuffer(device,&info);if(!result->indices)throw gpu_error("3D index buffer creation failed");
     Transfer transfer(device,vb+ib);auto* memory=static_cast<std::byte*>(transfer.map());std::memcpy(memory,result->owner->vertices().data(),vb);std::memcpy(memory+vb,result->owner->indices().data(),ib);SDL_UnmapGPUTransferBuffer(device,transfer.value);
-    Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D mesh copy pass failed");
+    Command command(device,gpu_pending);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D mesh copy pass failed");
     SDL_GPUTransferBufferLocation from{transfer.value,0};SDL_GPUBufferRegion to{result->vertices,0,vb};SDL_UploadToGPUBuffer(copy,&from,&to,false);
     from.offset=vb;to={result->indices,0,ib};SDL_UploadToGPUBuffer(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);command.submit();
     meshes.emplace(result->owner.get(),result);stats.mesh_cache_bytes+=result->bytes();++stats.mesh_uploads;return result;
@@ -338,7 +358,7 @@ struct Scene3DRenderer::Storage {
       std::size_t transfer_bytes=0;for(std::size_t i=base;i<levels.size();++i)transfer_bytes+=((levels[i].blocks.size()+15)/16)*16;
       Transfer transfer(device,static_cast<Uint32>(transfer_bytes));auto* memory=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
       for(std::size_t i=base;i<levels.size();++i){std::memcpy(memory+offset,levels[i].blocks.data(),levels[i].blocks.size());offset+=((levels[i].blocks.size()+15)/16)*16;}SDL_UnmapGPUTransferBuffer(device,transfer.value);
-      Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Cooked texture upload failed");offset=0;
+      Command command(device,gpu_pending);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Cooked texture upload failed");offset=0;
       for(Uint32 level=base;level<levels.size();++level){const auto&m=levels[level];SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=block?(m.width+3)/4*4:m.width;from.rows_per_layer=block?(m.height+3)/4*4:m.height;
         SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level-base;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=((m.blocks.size()+15)/16)*16;
       }SDL_EndGPUCopyPass(copy);command.submit();textures.emplace(result->owner.get(),result);stats.texture_cache_bytes+=result->bytes();++stats.texture_uploads;return result;
@@ -352,7 +372,7 @@ struct Scene3DRenderer::Storage {
       result->texture=make_texture(device,tail.width,tail.height,SDL_GPU_TEXTUREFORMAT_BC1_RGBA_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER,static_cast<Uint32>(image.bc1_mips().size()-bc1_base));
       Transfer transfer(device,static_cast<Uint32>(result->gpu_bytes));auto* data=static_cast<std::uint8_t*>(transfer.map());std::size_t offset=0;
       for(std::size_t i=bc1_base;i<image.bc1_mips().size();++i){std::memcpy(data+offset,image.bc1_mips()[i].blocks.data(),image.bc1_mips()[i].blocks.size());offset+=image.bc1_mips()[i].blocks.size();}SDL_UnmapGPUTransferBuffer(device,transfer.value);
-      Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Compressed texture copy pass failed");offset=0;
+      Command command(device,gpu_pending);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("Compressed texture copy pass failed");offset=0;
       for(Uint32 level=bc1_base;level<image.bc1_mips().size();++level){const auto& m=image.bc1_mips()[level];
         SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.offset=static_cast<Uint32>(offset);from.pixels_per_row=(m.width+3)/4*4;from.rows_per_layer=(m.height+3)/4*4;
         SDL_GPUTextureRegion to{};to.texture=result->texture;to.mip_level=level-bc1_base;to.w=m.width;to.h=m.height;to.d=1;SDL_UploadToGPUTexture(copy,&from,&to,false);offset+=m.blocks.size();
@@ -366,7 +386,7 @@ struct Scene3DRenderer::Storage {
     result->gpu_bytes=0;{int w=base_width,h=base_height;for(std::uint32_t i=0;i<tail_levels;++i){result->gpu_bytes+=static_cast<std::size_t>(w)*h*4;if(w==1&&h==1)break;w=std::max(1,w/2);h=std::max(1,h/2);}}
     result->texture=make_texture(device,base_width,base_height,SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,SDL_GPU_TEXTUREUSAGE_SAMPLER|SDL_GPU_TEXTUREUSAGE_COLOR_TARGET,tail_levels);
     Transfer transfer(device,static_cast<Uint32>(level0.size()));std::memcpy(transfer.map(),level0.data(),level0.size());SDL_UnmapGPUTransferBuffer(device,transfer.value);
-    Command command(device);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D texture copy pass failed");
+    Command command(device,gpu_pending);auto* copy=SDL_BeginGPUCopyPass(command.value);if(!copy)throw gpu_error("3D texture copy pass failed");
     SDL_GPUTextureTransferInfo from{};from.transfer_buffer=transfer.value;from.pixels_per_row=base_width;from.rows_per_layer=base_height;
     SDL_GPUTextureRegion to{};to.texture=result->texture;to.w=base_width;to.h=base_height;to.d=1;
     SDL_UploadToGPUTexture(copy,&from,&to,false);SDL_EndGPUCopyPass(copy);
@@ -1247,7 +1267,7 @@ struct Scene3DRenderer::Storage {
     graph.add_pass({"tonemap",{hdr_target},{color_target},{},"tonemap",target.hdr!=nullptr});
     std::vector<std::string> order;std::vector<engine::RenderGraphDiagnostic> diagnostics;
     if(!graph.compile(&order,&diagnostics))throw std::runtime_error("3D render graph compile failed: "+(diagnostics.empty()?std::string("unknown"):diagnostics.front().message));
-    Command command(device);
+    Command command(device,gpu_pending);
     const auto shadow_bytes=static_cast<Uint32>(shadow_transforms.size()*sizeof(ShadowCast));
     std::array<Uint32,4> spot_bytes{};
     Uint32 spot_bytes_total=0;
@@ -1583,7 +1603,7 @@ struct Scene3DRenderer::Storage {
       auto* dl=SDL_CreateGPUTransferBuffer(device,&info);
       if(!dl)throw gpu_error("3D probe download buffer creation failed");
       {
-        Command command(device);
+        Command command(device,gpu_pending);
         auto* pass=SDL_BeginGPUCopyPass(command.value);
         if(!pass)throw gpu_error("3D probe download copy pass failed");
         SDL_GPUTextureRegion src{};src.texture=hdr_face?face_target->hdr:face_target->color;src.w=static_cast<Uint32>(res);src.h=static_cast<Uint32>(res);src.d=1;
@@ -1671,6 +1691,26 @@ Scene3DRenderer::Scene3DRenderer(SDL_GPUDevice* device,SDL_Renderer* renderer):s
 Scene3DRenderer::~Scene3DRenderer()=default;
 void Scene3DRenderer::prepare(const DrawList& list){
   auto& s=*storage_;s.require_owner();s.views.clear();s.next_view=0;s.stats.draw_calls=s.stats.culled_instances=s.stats.shadow_casters=s.stats.spot_shadow_casters=s.stats.omni_shadow_casters=s.stats.draw_batches=s.stats.submitted_instances=s.stats.lod_instances=s.stats.lod_fades=s.stats.visible_fades=s.stats.lod_groups=0;s.stats.shadow_cascade_casters.fill(0);
+  // Poll GPU submit fences — queue depth plus submit→signal latency is the
+  // GPU-side lag signal SDL_GPU's fence-only API affords (no timestamp
+  // queries exist). Latency is an upper bound: a fence may have signaled
+  // earlier within the frame interval.
+  {
+    const auto now=std::chrono::steady_clock::now();
+    float max_latency=0.f;
+    while(!s.gpu_pending.empty()&&SDL_QueryGPUFence(s.device,s.gpu_pending.front().fence)){
+      const auto& front=s.gpu_pending.front();
+      max_latency=std::max(max_latency,
+          std::chrono::duration<float,std::milli>(now-front.submitted).count());
+      SDL_ReleaseGPUFence(s.device,front.fence);
+      s.gpu_pending.pop_front();
+      ++s.stats.gpu_signaled;
+    }
+    s.stats.gpu_signal_latency_ms=max_latency;
+    s.stats.gpu_pending_submits=s.gpu_pending.size();
+    s.stats.gpu_oldest_pending_ms=s.gpu_pending.empty()?0.f:
+        std::chrono::duration<float,std::milli>(now-s.gpu_pending.front().submitted).count();
+  }
   for(const auto& c:list.world)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   for(const auto& c:list.overlay)if(const auto* view=std::get_if<Scene3DView>(&c))s.views.push_back(view);
   if(s.views.size()>maximum_scene3d_views)throw std::length_error("3D frame exceeds its viewport budget.");

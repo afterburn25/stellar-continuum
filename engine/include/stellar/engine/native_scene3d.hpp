@@ -603,6 +603,20 @@ struct Scene3DStatistics {
   // Window::set_scene3d_texture_budget (quality tiers retune it). Zero on a
   // default instance; diagnostics must not read it before renderer_active.
   std::uint64_t texture_budget_bytes{};
+  // Command buffers submitted to the GPU that had not signaled at the last
+  // prepare() — queue depth is the GPU-side lag signal SDL_GPU's fence-only
+  // API affords (the backend exposes no timestamp queries).
+  std::uint64_t gpu_pending_submits{};
+  // Wall ms since the oldest still-pending submit was issued — 0 when the
+  // GPU had drained everything the renderer submitted.
+  float gpu_oldest_pending_ms{};
+  // Cumulative submits the GPU signaled complete — grows with every fence
+  // drained in prepare().
+  std::uint64_t gpu_signaled{};
+  // Max submit→poll latency among submits signaled at the last prepare() —
+  // an upper bound on GPU completion delay (a fence may signal earlier
+  // within the frame interval than when it is polled).
+  float gpu_signal_latency_ms{};
   // Captured environment probes baked since renderer creation — each
   // counts six face renders for one scene's environmentCapture.
   std::uint64_t probe_bakes{};

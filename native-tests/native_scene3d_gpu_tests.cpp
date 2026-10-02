@@ -62,6 +62,13 @@ int main(int argc,char** argv)try{
     check(tex->current_bytes==residency.texture_cache_bytes&&meshes->current_bytes==residency.mesh_cache_bytes&&targets->current_bytes==residency.target_bytes,"Attributed VRAM bytes do not match renderer residency");
     check(find("ui-image-cache")!=snapshot.subsystems.end()&&find("ui-text-cache")!=snapshot.subsystems.end(),"2D image/text caches are not attributed to MemoryTracker subsystems");
   }
+  { // Every GPU submit carries a completion fence drained at the next
+    // prepare() — signaled must grow, and pending stays bounded by the
+    // submits issued since the last poll.
+    const auto residency=window.scene3d_statistics();
+    check(residency.gpu_signaled>0,"GPU submits were not fence-tracked");
+    check(residency.gpu_pending_submits<64,"GPU pending-submit depth grew unboundedly");
+  }
   { // render_scale shrinks the offscreen target; composite() upscales the
     // same destination rect linearly, and target-byte accounting follows
     // the scaled extent.

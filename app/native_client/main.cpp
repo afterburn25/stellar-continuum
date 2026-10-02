@@ -1373,6 +1373,8 @@ class NativeCampaign final {
        <<" · lod "<<stats.lod_instances<<'+'<<stats.lod_fades<<'f'
        <<" · partial "<<stats.streamed_partial_binds
        <<" · fb "<<stats.streamed_fallbacks
+       <<" · gpuq "<<stats.gpu_pending_submits
+       <<" · lag "<<std::fixed<<std::setprecision(1)<<stats.gpu_oldest_pending_ms<<"ms"
        <<(stats.hdr?" · hdr":" · unorm");
     developer_diagnostics_.set_renderer_stats(out.str());
   }
@@ -11475,7 +11477,10 @@ int main(int argc,char **argv){
                  <<",\"lod_instances\":"<<gpu_residency.lod_instances
                  <<",\"mesh_uploads\":"<<gpu_residency.mesh_uploads
                  <<",\"texture_uploads\":"<<gpu_residency.texture_uploads
-                 <<",\"streamed_fallbacks\":"<<gpu_residency.streamed_fallbacks<<"}\n";
+                 <<",\"streamed_fallbacks\":"<<gpu_residency.streamed_fallbacks
+                 <<",\"gpu_pending_submits\":"<<gpu_residency.gpu_pending_submits
+                 <<",\"gpu_signaled\":"<<gpu_residency.gpu_signaled
+                 <<",\"gpu_oldest_pending_ms\":"<<gpu_residency.gpu_oldest_pending_ms<<"}\n";
         { // The client's bounded caches must be registered in the memory census.
           const auto census=stellar::engine::MemoryTracker::instance().snapshot();
           const auto tracked=[&](std::string_view name){
