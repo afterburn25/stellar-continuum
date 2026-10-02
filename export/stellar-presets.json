@@ -31,7 +31,7 @@
     },
     "windows-native-preview": {
       "configurePreset": "windows-native-preview",
-      "includeSymbols": false,
+      "includeSymbols": true,
       "mode": "native-galaxy-preview",
       "nativeClient": true
     }
