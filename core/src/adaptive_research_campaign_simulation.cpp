@@ -11,6 +11,7 @@
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/sovereign_currency.hpp>
 #include <stellar/core/surface_economy.hpp>
+#include <unordered_map>
 namespace stellar::core {
 namespace {
 constexpr std::string_view network_id = "construction:research_network",
@@ -100,16 +101,20 @@ void append(std::vector<AdaptiveResearchCampaignEvent> &out, int civ,
     if (e.node_id)
       out.push_back({civ, *e.node_id, e.message, false});
 }
-void surface_sync(FreshCampaignState &w, int id, AdaptiveResearchCampaignState &campaign,
+// `owned` carries only the civilization's colonies in world order — the
+// caller's per-advance bucket — so the filter+sort result is identical to
+// scanning the full colony span.
+void surface_sync(std::span<const Colony *const> owned, AdaptiveResearchCampaignState &campaign,
                   AdaptiveResearchCivilizationState &state) {
   struct Desired {
     std::string key, archetype, context;
   };
   std::vector<Desired> desired;
-  std::vector<const Colony *> colonies;
-  for (auto &c : w.colonies)
-    if (c.civilization_id == id)
-      colonies.push_back(&c);
+  // key -> position in `desired`: the duplicate guard and the obsolete
+  // membership test become hash lookups instead of pairwise string scans.
+  // Keys are copies because `desired` may reallocate while growing.
+  std::unordered_map<std::string, std::size_t> desired_index;
+  std::vector<const Colony *> colonies(owned.begin(), owned.end());
   std::stable_sort(colonies.begin(), colonies.end(), [](auto *a, auto *b) { return a->id < b->id; });
   for (auto *c : colonies) {
     auto output = surface_colony_output(*c);
@@ -132,28 +137,38 @@ void surface_sync(FreshCampaignState &w, int id, AdaptiveResearchCampaignState &
       Desired replacement{
           std::string(surface_prefix) + std::to_string(c->id) + ":" + std::to_string(b->id),
           std::move(archetype), "colony:" + std::to_string(c->id)};
-      auto existing = std::find_if(desired.begin(), desired.end(), [&](const Desired &value) {
-        return value.key == replacement.key;
-      });
-      if (existing == desired.end())
+      const auto found = desired_index.find(replacement.key);
+      if (found == desired_index.end()) {
+        const std::size_t position = desired.size();
         desired.push_back(std::move(replacement));
-      else
-        *existing = std::move(replacement);
+        desired_index.emplace(desired.back().key, position);
+      } else {
+        const std::size_t position = found->second;
+        desired_index.erase(found);
+        desired[position] = std::move(replacement);
+        desired_index.emplace(desired[position].key, position);
+      }
     }
   }
   std::vector<ResearchInstitutionRuntimeState> obsolete;
   for (auto &i : state.expertise().institutions())
     if (i.institution_instance_id.starts_with(surface_prefix) &&
-        std::none_of(desired.begin(), desired.end(),
-                     [&](auto &d) { return d.key == i.institution_instance_id; }))
+        desired_index.find(i.institution_instance_id) == desired_index.end())
       obsolete.push_back(i);
   for (auto &i : obsolete)
     campaign.runtime().authority().set_research_institution(
         state, i.institution_instance_id, i.institution_archetype_id, 0, 0,
         i.context_id ? std::optional<std::string_view>(*i.context_id) : std::nullopt);
+  // Post-obsolete snapshot keyed by instance id: institution ids are unique
+  // and each desired key is queried exactly once, so the snapshot answers
+  // the same record a per-key rescan would (the loop's own
+  // set_research_institution writes only touch the key being processed).
+  std::unordered_map<std::string, ResearchInstitutionRuntimeState> current;
+  for (auto &i : state.expertise().institutions())
+    current.emplace(i.institution_instance_id, i);
   for (auto &d : desired) {
-    auto *i = first(state.expertise().institutions(),
-                    [&](auto &v) { return v.institution_instance_id == d.key; });
+    const auto found = current.find(d.key);
+    const auto *i = found == current.end() ? nullptr : &found->second;
     if (i && i->institution_archetype_id == d.archetype && i->total_count == 1 &&
         i->active_count == 1 && i->context_id == std::optional<std::string>(d.context))
       continue;
@@ -161,13 +176,21 @@ void surface_sync(FreshCampaignState &w, int id, AdaptiveResearchCampaignState &
                                                             d.context);
   }
 }
-void facilities(FreshCampaignState &w, int id, AdaptiveResearchCampaignState &campaign,
+void facilities(const ConstructionState &construction,
+                std::span<const Colony *const> owned, AdaptiveResearchCampaignState &campaign,
                 AdaptiveResearchCivilizationState &state) {
-  auto *c = first(w.construction, [&](auto &v) { return v.civilization_id == id; });
-  if (!c)
-    throw AdaptiveResearchCampaignOperationError("Sequence contains no matching element");
-  bool complete = std::find(c->completed_project_ids.begin(), c->completed_project_ids.end(),
-                            "research_network") != c->completed_project_ids.end();
+  const auto *c = &construction;
+  // Two membership probes over a list nothing in this call mutates — one
+  // fused early-exit pass beats both linear scans.
+  bool complete = false, warp_facility = false;
+  for (const auto &project : c->completed_project_ids) {
+    if (project == "research_network")
+      complete = true;
+    else if (project == "warp_test_facility")
+      warp_facility = true;
+    if (complete && warp_facility)
+      break;
+  }
   auto *i = first(state.expertise().institutions(),
                   [](auto &v) { return v.institution_instance_id == network_id; });
   if (complete && (!i || i->institution_archetype_id != "general_research_laboratory" ||
@@ -178,9 +201,8 @@ void facilities(FreshCampaignState &w, int id, AdaptiveResearchCampaignState &ca
     campaign.runtime().authority().set_research_institution(
         state, network_id, i->institution_archetype_id, 0, 0,
         i->context_id ? std::optional<std::string_view>(*i->context_id) : std::nullopt);
-  surface_sync(w, id, campaign, state);
-  if (std::find(c->completed_project_ids.begin(), c->completed_project_ids.end(),
-                "warp_test_facility") != c->completed_project_ids.end())
+  surface_sync(owned, campaign, state);
+  if (warp_facility)
     for (auto cap : {"precision_measurement", "high_energy_experimentation",
                      "field_physics_experimentation", "large_scale_prototyping"})
       campaign.runtime().authority().kernel().add_facility_capability(state, cap);
@@ -227,6 +249,40 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     return {};
   double years = days / 365.25, current = 2050 + now / 365.25;
   std::vector<AdaptiveResearchCampaignEvent> out;
+  // Per-advance shared structures (ADR 0002 option a): the loop below never
+  // mutates w.fleets / w.construction / w.colonies / w.bodies, so the
+  // economic projections, the settlement body index, and the civ-keyed
+  // lookups are all loop-invariant. emplace keeps first match, preserving
+  // `first`/`find` semantics; missing-row throw sites are unchanged.
+  const auto economic_construction = economic_construction_projection(w.construction);
+  const auto economic_fleets = economic_fleet_projection(w.fleets);
+  const EconomyWorldView economy_view{w.civilizations, w.bodies,
+                                      economic_construction, economic_fleets};
+  const SettlementBodyIndex body_index(w.colonies, w.bodies);
+  std::unordered_map<int, std::vector<const Colony *>> colony_index;
+  for (const auto &colony : w.colonies)
+    colony_index[colony.civilization_id].push_back(&colony);
+  std::unordered_map<int, const ConstructionState *> construction_index;
+  for (const auto &entry : w.construction)
+    construction_index.emplace(entry.civilization_id, &entry);
+  std::unordered_map<int, CivilizationEconomy *> economy_index;
+  for (auto &entry : w.economies)
+    economy_index.emplace(entry.civilization_id, &entry);
+  std::unordered_map<int, const Civilization *> civ_index;
+  for (const auto &entry : w.civilizations)
+    civ_index.emplace(entry.id, &entry);
+  // Same predicate as campaign_civilization_uses_ai against the indexed
+  // first match instead of a per-call rescan of w.civilizations.
+  const auto uses_ai = [&](int id) {
+    const auto found = civ_index.find(id);
+    if (found == civ_index.end())
+      return false;
+    const auto *civ = found->second;
+    return !civ->is_player ||
+           (w.developer_provenance && w.developer_provenance->player_ai_control &&
+            id == w.player_civilization_id);
+  };
+  static const std::vector<const Colony *> empty_owned;
   std::vector<Civilization *> civs;
   for (auto &c : w.civilizations)
     if (!c.is_seeded_ancient)
@@ -234,20 +290,26 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
   std::stable_sort(civs.begin(), civs.end(), [](auto *a, auto *b) { return a->id < b->id; });
   for (auto *c : civs) {
     auto &state = detail::AdaptiveResearchCampaignStateAccess::get_civilization(campaign, c->id);
-    facilities(w, c->id, campaign, state);
+    const auto owned_bucket = colony_index.find(c->id);
+    const auto &owned = owned_bucket == colony_index.end() ? empty_owned : owned_bucket->second;
+    const auto construction_row = construction_index.find(c->id);
+    if (construction_row == construction_index.end())
+      throw AdaptiveResearchCampaignOperationError("Sequence contains no matching element");
+    facilities(*construction_row->second, owned, campaign, state);
     if (c->development_stage == CivilizationDevelopmentStage::PreWarp &&
         state.get_pressure("interstellar_distance") < 45) {
       auto events = campaign.runtime().authority().set_pressure(state, "interstellar_distance", 45);
       append(out, c->id, events);
     }
-    auto *economy = first(w.economies, [&](auto &e) { return e.civilization_id == c->id; });
+    const auto economy_row = economy_index.find(c->id);
+    auto *economy = economy_row == economy_index.end() ? nullptr : economy_row->second;
     if (!economy)
       throw AdaptiveResearchCampaignOperationError("Sequence contains no matching element");
     append(out,c->id,AdaptiveResearchCampaignCommands::start_queued_research(
         {w.civilizations,w.economies},campaign,c->id));
     bool allpaused = std::all_of(state.active_projects().begin(), state.active_projects().end(),
                                  [](auto &p) { return p.paused; });
-    if (campaign_civilization_uses_ai(w,c->id) && allpaused) {
+    if (uses_ai(c->id) && allpaused) {
       for (auto &candidate : campaign.runtime().agenda().build_visible_shortlist(state)) {
         if (!candidate.can_start)
           continue;
@@ -287,11 +349,10 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
     economy->credits = source_max(0., economy->credits - funded);
     economy->last_research_spending_per_day = days <= 0 ? 0 : funded / days;
     economy->last_research_funding_fraction = fraction;
-    auto ec = economic_construction_projection(w.construction);
-    auto ef = economic_fleet_projection(w.fleets);
-    EconomyWorldView ew{w.civilizations, w.bodies, ec, ef};
     economy->last_credits_per_second =
-        economy_credit_flow(ew, w.colonies, w.economies, c->id, false).net_credits_per_day -
+        economy_credit_flow(economy_view, std::span<const Colony *const>(owned), w.economies,
+                            c->id, false, 1.0, body_index)
+            .net_credits_per_day -
         economy->last_research_spending_per_day;
     if (!active.empty() && previous >= .999999 && fraction < .999999)
       for (auto &p : active)

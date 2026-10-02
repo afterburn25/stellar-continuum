@@ -212,11 +212,33 @@ The adoption frontier is not authority migration — it is:
    the cumulative phase work is within run-to-run noise of baseline
    while removing the O(civs × world) asymptotes; colonization sits at
    214 ms total. `finalStateHash` `b57c03d1…` is identical to every
-   pre- and post-audit run. The remaining core step cost is dominated
-   by `adaptive_research` (4,526 ms) and `combat` (2,517 ms) — outside
-   the 12 audited coordinator phases — plus autosave latency
-   (1,691 ms mean for 66.7 MB saves), which is the persistence debt
-   item rather than a phase problem.
+   pre- and post-audit run.
+
+   **Seventh deployment (landed):** adaptive-research campaign step (the
+   post-audit profile's largest
+   remaining core cost — 4,526 ms total, ~40% of the canonical step):
+   `AdaptiveResearchCampaignSimulation::advance` rebuilt the economic
+   construction/fleet projections, the `SettlementBodyIndex`, a full
+   colony filter, and three civ-keyed linear scans **per civilization
+   per tick**, and `surface_sync` ran pairwise string scans (duplicate
+   guard, obsolete membership, per-key institution rescan) over every
+   civ's colonies each tick. All per-advance invariant structures now
+   build once — `EconomyWorldView`, `SettlementBodyIndex`, colony
+   buckets, and civ/economy/construction indexes — `surface_sync`
+   gained a `desired_index` hash map plus a post-obsolete institution
+   snapshot keyed by instance id (the same fix landed in the sibling
+   repo's copy), and `facilities` fuses its two
+   `completed_project_ids` probes into one early-exit pass. A new
+   resolved-input `economy_credit_flow` overload accepts the owned
+   colony bucket + shared body index. Canonical measurement: the
+   `adaptive_research` phase fell **4,526 → 1,049 ms** (1.13 → 0.26
+   ms/tick) and step mean 2.75 → **1.82 ms** — 30% below the
+   pre-audit baseline. `finalStateHash` `b57c03d1…` identical; all 26
+   `adaptive_research_*` parity oracles plus economy/coordinator/frame
+   parity green. Remaining `adaptive_research` cost is genuine-drift
+   `surface_colony_output` recomputation and bounded per-civ
+   shortlist/funding evaluation; `combat` (2,408 ms) and autosave
+   latency (~1.7 s × 8) are the largest remaining step costs.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`

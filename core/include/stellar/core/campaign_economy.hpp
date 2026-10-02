@@ -1,5 +1,6 @@
 #pragma once
 #include <stellar/core/colony_biology.hpp>
+#include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/surface_economy.hpp>
 
 namespace stellar::core {
@@ -24,6 +25,14 @@ struct CreditFlowSnapshot {
 CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony> colonies,
     std::span<const CivilizationEconomy> economies, int civilization_id,
     bool include_research_operations = true, double power_interval_days = 1.0);
+// Resolved-input overload: `owned_colonies` carries only the civilization's
+// colonies in world order and `body_index` is the caller's shared index —
+// batch callers avoid rebuilding both per civilization.
+CreditFlowSnapshot economy_credit_flow(EconomyWorldView world,
+    std::span<const Colony* const> owned_colonies,
+    std::span<const CivilizationEconomy> economies, int civilization_id,
+    bool include_research_operations, double power_interval_days,
+    const SettlementBodyIndex& body_index);
 double colony_administration_cost(double population_millions);
 double habitat_support_cost(const ColonyHabitatSupportBurden& burden);
 double fleet_operating_cost(EconomyFleetRole role);

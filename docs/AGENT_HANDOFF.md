@@ -220,7 +220,21 @@ order. Audit conclusion on the rest: `promote`/`lock` are bounded
 promotion-time lookups, strategic AI is already cadence-gated
 (`next_review_tick_`), and combat already indexes fleets per advance
 (`index_fleets`/`build_targets`) — no remaining per-entity rescans in
-the coordinator's 12-phase loop.
+the coordinator's 12-phase loop. Seventh option-(a) deployment (landed
+2026-10-01): the post-audit profile's largest remaining core cost —
+`AdaptiveResearchCampaignSimulation::advance` rebuilt the economic
+projections, `SettlementBodyIndex`, colony filter and three civ-keyed
+scans **per civ per tick**; all now build once per advance (loop-body
+mutations verified absent) and `surface_sync`/`facilities` gained the
+same hash-index/fused-probe fixes the sibling repo landed. New public
+resolved-input overload `economy_credit_flow(world, span<const Colony*
+const> owned, economies, id, include_research, power_days, body_index)`.
+Canonical benchmark: `adaptive_research` 4,526 → 1,049 ms (−77%), step
+mean 2.75 → 1.82 ms (30% below the ~2.59 ms pre-audit baseline),
+identical `finalStateHash` `b57c03d1…`; 33/33 adaptive+economy+
+coordinator oracle slice green. Remaining large costs: `combat`
+(2,408 ms) and autosave latency (~1.7 s × 8 per run — the persistence
+debt item).
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

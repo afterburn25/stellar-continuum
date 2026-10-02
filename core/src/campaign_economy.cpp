@@ -123,6 +123,11 @@ CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const C
         if (colony.civilization_id == civilization_id) owned.push_back(&colony);
     return credit_flow(world, owned, economies, civilization_id, include_research, power_days, body_index);
 }
+CreditFlowSnapshot economy_credit_flow(EconomyWorldView world, std::span<const Colony* const> owned,
+    std::span<const CivilizationEconomy> economies, int civilization_id, bool include_research,
+    double power_days, const SettlementBodyIndex& body_index) {
+    return credit_flow(world, owned, economies, civilization_id, include_research, power_days, body_index);
+}
 namespace {
 // `owned` carries only the civilization's colonies in world order —
 // same accumulation as a filtered full-span scan.

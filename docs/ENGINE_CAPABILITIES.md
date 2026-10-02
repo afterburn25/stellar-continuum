@@ -235,7 +235,12 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   lazily-built AI opportunity maps preserving duplicate-key throw
   timing),
   `core/src/legacy_research.cpp` (civ-keyed technology/construction/
-  economy indexes in `advance_core`).
+  economy indexes in `advance_core`),
+  `core/src/adaptive_research_campaign_simulation.cpp` (per-advance
+  `EconomyWorldView`/`SettlementBodyIndex`/colony-bucket/civ-keyed index
+  hoists — all loop-invariant — plus `surface_sync` `desired_index` hash
+  map and post-obsolete institution snapshot keyed by instance id, and a
+  fused `completed_project_ids` probe in `facilities`).
 - **Public interface:** additive overloads only —
   `campaign_industry_weights(const CivilizationEconomy*)`,
   `civilization_operating_funding(const CivilizationEconomy*)`,
@@ -247,7 +252,10 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `construction_industry_demand(ConstructionReadView,
   const ConstructionState*, std::span<const Colony* const>, double)` and
   `shipbuilding_industry_demand(ShipbuildingReadView,
-  const ShipyardState*, double)`.
+  const ShipyardState*, double)` and
+  `economy_credit_flow(EconomyWorldView, std::span<const Colony* const>,
+  std::span<const CivilizationEconomy>, int, bool, double,
+  const SettlementBodyIndex&)`.
   All existing signatures unchanged; the span versions delegate and keep
   their throw ordering (the nullable `economy` preserves the lazy
   missing-row throw at the `budget > 0` spend gate).
@@ -261,12 +269,19 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   `shipbuilding_parity`, `shipyard_state_parity`,
   `construction_currency_parity`, `industry_allocation_parity`,
   `campaign_coordinator_parity`, `campaign_frame_parity`,
-  `shipbuilding_start_assessment`, `construction_order_assessment`, plus
-  the `native_*_controller`/`_workspace` consumers.
+  `shipbuilding_start_assessment`, `construction_order_assessment`, all
+  26 `adaptive_research_*` parity oracles (incl. `campaign_simulation`
+  and `integrated_adaptive_campaign`), plus the `native_*_controller`/
+  `_workspace` consumers.
 - **Save/performance impact:** indexes live for one call — nothing
   persists. Removes O(civs) linear lookups per civ per step
   (~5–8 scans/civ in `advance_construction` alone); each skipped
-  iteration was a cheap id compare, so the win is asymptotic.
+  iteration was a cheap id compare, so the win is asymptotic — except
+  the adaptive-research step, where the per-civ rebuild of world-scale
+  structures (fleet/construction projections, `SettlementBodyIndex`,
+  full-colony filter) was the dominant measured cost: canonical
+  benchmark `adaptive_research` 4,526 → 1,049 ms total (−77%), step
+  mean 2.75 → 1.82 ms, identical `finalStateHash`.
 - **Limitations:** `lock`/`promote`'s bounded promotion-time lookups
   and per-founding `count_if` naming scans in colonization are left
   as-is (bounded, rare); indexes are rebuilt per call with no
