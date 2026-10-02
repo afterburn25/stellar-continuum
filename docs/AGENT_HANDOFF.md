@@ -490,6 +490,13 @@ preserve:
 - `developer_qa_host` CTest timeout raised 120→240 s — passes solo in
   ~29 s but exceeded 120 s under the export's parallel load (scheduling
   tolerance, not a correctness gate).
+- Support bundles now attach the newest crash report: `export_support_bundle`
+  picks the newest `.txt` in `RuntimeDiagnostics::diagnostics_directory()`
+  by write time, bounded at 256 KiB via `read_diagnostic_file`, shipped as
+  `crash-report.txt`. Minidumps stay on disk (referenced by name in the
+  report). `native_support` covers attachment, bounds and no-report absence;
+  with no diagnostics session `diagnostics_directory()` is empty and nothing
+  is attached.
 
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being

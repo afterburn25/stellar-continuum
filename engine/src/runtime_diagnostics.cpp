@@ -345,6 +345,10 @@ RuntimeDiagnostics::RuntimeDiagnostics(std::string_view game,std::string_view en
 RuntimeDiagnostics::~RuntimeDiagnostics()=default;
 void RuntimeDiagnostics::fatal(std::string_view message)noexcept{if(impl_)impl_->fatal(message);}
 std::filesystem::path RuntimeDiagnostics::log_path()const{return impl_?impl_->path:std::filesystem::path{};}
+std::filesystem::path RuntimeDiagnostics::diagnostics_directory() noexcept {
+  const auto* p=Impl::active;
+  return p&&!p->path.empty()?p->path.parent_path():std::filesystem::path{};
+}
 std::string RuntimeDiagnostics::describe_address(const void* address) const noexcept {
 #ifdef _WIN32
   return impl_?impl_->describe_address(address):std::string{};

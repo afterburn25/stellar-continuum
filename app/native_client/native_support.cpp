@@ -1,4 +1,5 @@
 #include "native_support.hpp"
+#include <stellar/engine/runtime_diagnostics.hpp>
 #include <stdexcept>
 #include <system_error>
 #include <vector>
@@ -7,6 +8,22 @@ namespace {
 constexpr std::size_t maximum_text_bytes=256u*1024u;
 constexpr std::size_t maximum_save_bytes=64u*1024u*1024u;
 constexpr std::size_t maximum_bundle_input_bytes=65u*1024u*1024u;
+constexpr std::size_t maximum_crash_report_bytes=256u*1024u;
+// Newest crash report (.txt) from the diagnostics directory, so a support
+// export carries the fault_site/stack/hang evidence that motivated it.
+// Minidumps stay on disk — they are referenced by name, too large to bundle.
+std::string latest_crash_report_text() {
+  const auto directory=stellar::engine::RuntimeDiagnostics::diagnostics_directory();
+  if(directory.empty())return{};
+  std::error_code error;std::filesystem::path newest;std::filesystem::file_time_type stamp{};
+  for(const auto& entry:std::filesystem::directory_iterator(directory,error)){
+    if(!entry.is_regular_file(error)||entry.path().extension()!=".txt"||entry.file_size(error)==0)continue;
+    const auto written=entry.last_write_time(error);if(error)break;
+    if(written>stamp){stamp=written;newest=entry.path();}
+  }
+  if(newest.empty()||error)return{};
+  try{return stellar::engine::read_diagnostic_file(newest,maximum_crash_report_bytes);}catch(...){return{};}
+}
 }
 std::filesystem::path export_support_bundle(const SupportBundleRequest& request) {
   if (request.user_root.empty()) throw std::runtime_error("Support bundle user root is empty.");
@@ -30,6 +47,7 @@ std::filesystem::path export_support_bundle(const SupportBundleRequest& request)
     throw std::runtime_error("Support bundle exceeds its total size limit.");
   entries.push_back({"system.txt", system});
   if (save_included) entries.push_back({"campaign.player17.json", std::move(save_bytes)});
+  if (auto crash=latest_crash_report_text();!crash.empty())entries.push_back({"crash-report.txt",std::move(crash)});
   entries.insert(entries.end(),request.additional_entries.begin(),request.additional_entries.end());
   return stellar::engine::write_diagnostic_bundle(std::filesystem::absolute(request.user_root)/"support",
       request.archive_name,entries);

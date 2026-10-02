@@ -1,5 +1,6 @@
 #include "native_support.hpp"
 #include "diagnostic_zip_test_reader.hpp"
+#include <stellar/engine/runtime_diagnostics.hpp>
 
 #include <chrono>
 #include <cstdint>
@@ -66,6 +67,16 @@ void reusable_archive_guards(const fs::path &root){
   const auto contents=unzip(export_support_bundle(extended));
   require(contents.at("latest.dev17.json")=="checkpoint"&&!contents.contains("campaign.player17.json"),"Developer export mislabeled its checkpoint.");
 }
+void latest_crash_report_attached(const fs::path& root) {
+  const auto diag_dir = root / "diag"; fs::create_directories(diag_dir);
+  stellar::engine::RuntimeDiagnostics diagnostics("test", "test", diag_dir);
+  write(diag_dir / "stellar-continuum-1.2.3-old.txt", "fault_site=KERNELBASE.dll+0x10\nstack:\n#00 main\n");
+  const SupportBundleRequest request{root, {}, "OS=test", "session"};
+  const auto entries = unzip(export_support_bundle(request));
+  const auto crash = entries.find("crash-report.txt");
+  require(crash != entries.end() && crash->second.find("fault_site=") != std::string::npos, "newest crash report was not attached to the support bundle");
+}
+
 } // namespace
 
 int main() try {
@@ -73,6 +84,7 @@ int main() try {
   round_trip_and_unique_destinations(root);
   reusable_archive_guards(root);
   absent_invalid_and_bounded_inputs(root);
+  latest_crash_report_attached(root);
   fs::remove_all(root);
   return 0;
 } catch (const std::exception& error) {

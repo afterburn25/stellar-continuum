@@ -24,6 +24,10 @@ public:
   // to module+offset otherwise (and a raw pointer off-module). The fault
   // reporter emits this next to the raw exception address; safe to probe.
   [[nodiscard]] std::string describe_address(const void* address) const noexcept;
+  // Directory this session's log/report/dump trio lives in — empty when no
+  // diagnostics session is active. Support-bundle exporters use it to attach
+  // the newest crash report without hardcoding the log path.
+  [[nodiscard]] static std::filesystem::path diagnostics_directory() noexcept;
   [[nodiscard]] std::filesystem::path log_path() const;
 private:
   struct Impl;std::unique_ptr<Impl> impl_;
