@@ -12,6 +12,7 @@
 #include <stellar/core/fleet_composition.hpp>
 #include <stellar/core/fleet_reach.hpp>
 #include <stellar/core/industry_allocation.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 
 #include <algorithm>
@@ -222,6 +223,16 @@ NativeFleetMapView NativeFleetController::build(
   result.campaign_generation = campaign_generation;
   result.player_civilization_id = player.player_id;
   result.developer_inspection = developer;
+  const auto design_name = [&](std::string_view design_id,
+                               int civilization_id)
+      -> std::optional<std::string> {
+    if (const auto *design = find_ship_design(design_id))
+      return stellar::native_data::ship_design_name(locale_, *design);
+    if (const auto *authored = find_authored_ship_design(
+            player.world.authored_ship_designs, civilization_id, design_id))
+      return authored->name;
+    return std::nullopt;
+  };
   std::unordered_map<int, unsigned> counts;
   for (const auto& fleet : player.world.fleets) ++counts[fleet.id];
   for (const auto &fleet : player.world.fleets) {
@@ -248,9 +259,9 @@ NativeFleetMapView NativeFleetController::build(
         status != status_by_id.end())
       item.combat_status = status->second;
     if (fleet.design_id)
-      if (const auto *design = find_ship_design(*fleet.design_id))
-        item.design_name =
-            stellar::native_data::ship_design_name(locale_, *design);
+      if (auto name =
+              design_name(*fleet.design_id, fleet.civilization_id))
+        item.design_name = std::move(*name);
     item.cargo_materials = fleet.cargo_materials;
     item.cargo_material_capacity = fleet.cargo_material_capacity;
     item.embarked_population_millions = fleet.embarked_population_millions;
@@ -267,9 +278,9 @@ NativeFleetMapView NativeFleetController::build(
       row.vessel_id = member.vessel_id;
       row.name = member.name;
       if (member.design_id)
-        if (const auto *design = find_ship_design(*member.design_id))
-          row.design_name =
-              stellar::native_data::ship_design_name(locale_, *design);
+        if (auto name =
+                design_name(*member.design_id, fleet.civilization_id))
+          row.design_name = std::move(*name);
       row.is_flagship = member.is_flagship;
       row.is_carrier = member.is_carrier;
       row.is_interdictor = member.is_interdictor;

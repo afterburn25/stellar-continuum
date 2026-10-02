@@ -1,6 +1,7 @@
 #include <stellar/core/shipyard_persistence.hpp>
 
 #include <stellar/core/detail/legacy_number_format.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/species_environment.hpp>
 
@@ -55,8 +56,19 @@ bool blank(std::string_view value) {
   return true;
 }
 
-bool known_design(std::string_view id) {
-  return !blank(id) && find_ship_design(id) != nullptr;
+bool known_design(std::string_view id, int civilization_id,
+                  std::span<const AuthoredShipDesign> authored) {
+  if (blank(id)) return false;
+  if (find_ship_design(id)) return true;
+  return find_authored_ship_design(authored, civilization_id, id) != nullptr;
+}
+
+double design_industry_cost(std::string_view id, int civilization_id,
+                            std::span<const AuthoredShipDesign> authored) {
+  if (const auto *design = find_ship_design(id)) return design->industry_cost;
+  return resolve_authored_ship_design(
+             *find_authored_ship_design(authored, civilization_id, id))
+      .industry_cost;
 }
 
 bool known_species(std::string_view id) noexcept {
@@ -137,15 +149,19 @@ void validate_loaded_identity(const ShipyardState &state) {
                       identities);
 }
 
-void validate_queue_population_safety(const ShipyardState &state) {
+void validate_queue_population_safety(
+    const ShipyardState &state,
+    std::span<const AuthoredShipDesign> authored) {
   try {
-    validate_shipyard_population_persistence_safety(state);
+    validate_shipyard_population_persistence_safety(state, authored);
   } catch (const std::invalid_argument &error) {
     throw ShipyardPersistenceOperationError(error.what());
   }
 }
 
-void validate_for_capture(const ShipyardState &state) {
+void validate_for_capture(
+    const ShipyardState &state,
+    std::span<const AuthoredShipDesign> authored) {
   if (state.next_order_sequence <= 0 ||
       !std::isfinite(state.active_build_progress) ||
       state.active_build_progress < 0 ||
@@ -160,7 +176,8 @@ void validate_for_capture(const ShipyardState &state) {
         " has invalid order accounting and cannot be saved.");
 
   const auto active_known =
-      state.active_design_id && known_design(*state.active_design_id);
+      state.active_design_id &&
+      known_design(*state.active_design_id, state.civilization_id, authored);
   if (!state.active_design_id) {
     if (state.active_build_progress != 0 ||
         state.active_authorization_credits != 0 ||
@@ -181,7 +198,8 @@ void validate_for_capture(const ShipyardState &state) {
                   " would lose active refund metadata for an unknown design.");
   } else if (active_known &&
              state.active_build_progress >
-                 get_ship_design(*state.active_design_id).industry_cost +
+                 design_industry_cost(*state.active_design_id,
+                                      state.civilization_id, authored) +
                      .0001) {
     throw ShipyardPersistenceOperationError(
         "Shipyard " + std::to_string(state.civilization_id) +
@@ -190,7 +208,7 @@ void validate_for_capture(const ShipyardState &state) {
 
   // The source's QueuedBuilds getter runs its population-safety guard at the
   // first queue access in ValidateShipyardStateForSave.
-  validate_queue_population_safety(state);
+  validate_queue_population_safety(state, authored);
   const auto queue_capacity = std::max(
       0, maximum_pending_ship_builds - (active_known ? 1 : 0));
   std::vector<const ShipBuildOrderState *> persisted;
@@ -217,7 +235,7 @@ void validate_for_capture(const ShipyardState &state) {
             "population metadata.");
       continue;
     }
-    if (!known_design(order.design_id)) {
+    if (!known_design(order.design_id, state.civilization_id, authored)) {
       if (recoverable)
         throw ShipyardPersistenceOperationError(
             "Shipyard " + std::to_string(state.civilization_id) +
@@ -262,7 +280,8 @@ ShipyardPersistenceOperationError::ShipyardPersistenceOperationError(
 
 std::vector<ShipyardState> restore_shipyard_states(
     std::span<const ShipyardPersistenceDto> source,
-    std::span<const Civilization> civilizations, int save_format_version) {
+    std::span<const Civilization> civilizations, int save_format_version,
+    std::span<const AuthoredShipDesign> authored_designs) {
   std::vector<ShipyardState> result;
   result.reserve(source.size());
   for (const auto &dto : source) {
@@ -328,7 +347,8 @@ std::vector<ShipyardState> restore_shipyard_states(
         dto.active_design_id && !blank(*dto.active_design_id)
             ? dto.active_design_id
             : std::nullopt;
-    if (active_design && !known_design(*active_design)) {
+    if (active_design &&
+        !known_design(*active_design, dto.civilization_id, authored_designs)) {
       if (reserved_population > 0)
         throw ShipyardPersistenceDataError(
             "Shipyard " + std::to_string(dto.civilization_id) +
@@ -357,7 +377,9 @@ std::vector<ShipyardState> restore_shipyard_states(
           " has active accounting without a valid active design.");
     if (active_design &&
         dto.active_build_progress >
-            get_ship_design(*active_design).industry_cost + .0001)
+            design_industry_cost(*active_design, dto.civilization_id,
+                                 authored_designs) +
+                .0001)
       throw ShipyardPersistenceDataError(
           "Shipyard " + std::to_string(dto.civilization_id) +
           " exceeds its active vessel material requirement.");
@@ -391,7 +413,8 @@ std::vector<ShipyardState> restore_shipyard_states(
     for (const auto &queued : dto.queued_builds) {
       const auto population =
           std::max(0.0, queued.reserved_population_millions);
-      const auto design_known = known_design(queued.design_id);
+      const auto design_known =
+          known_design(queued.design_id, dto.civilization_id, authored_designs);
       if (!design_known) {
         if (population > 0)
           throw ShipyardPersistenceDataError(
@@ -452,11 +475,12 @@ std::vector<ShipyardState> restore_shipyard_states(
 }
 
 std::vector<ShipyardPersistenceDto>
-capture_shipyard_states(std::span<const ShipyardState> source) {
+capture_shipyard_states(std::span<const ShipyardState> source,
+                        std::span<const AuthoredShipDesign> authored_designs) {
   std::vector<ShipyardPersistenceDto> result;
   result.reserve(source.size());
   for (const auto &state : source) {
-    validate_for_capture(state);
+    validate_for_capture(state, authored_designs);
     ShipyardPersistenceDto dto;
     dto.civilization_id = state.civilization_id;
     dto.next_order_sequence = state.next_order_sequence;

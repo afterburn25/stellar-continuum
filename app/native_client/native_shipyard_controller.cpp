@@ -2,6 +2,7 @@
 #include "native_data_names.hpp"
 
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
@@ -91,7 +92,8 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
   const ShipbuildingReadView read{
       world.civilizations, world.systems, world.construction, world.shipyards,
       world.colonies,      world.economies, world.fleets,       {},
-      {},                  query,           {}};
+      {},                  query,           {},
+      world.authored_ship_designs};
 
   Projection result;
   auto &view = result.view;
@@ -154,7 +156,9 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
          .population_source_current_millions =
              readiness.population_source_current_millions});
     auto& projected=view.available_designs.back();
-    const auto& combat=get_combat_profile(design.combat_profile_id.value_or(std::string(default_combat_profile_id(design.role))));
+    const auto* authored=find_authored_ship_design(world.authored_ship_designs,player->id,design.id);
+    const auto combat=authored?resolve_authored_combat_profile(*authored)
+        :get_combat_profile(design.combat_profile_id.value_or(std::string(default_combat_profile_id(design.role))));
     projected.hull=combat.max_hull;projected.armor=combat.max_armor;projected.shields=combat.max_shields;projected.weapon_damage=combat.weapon_damage;projected.weapon_interval_days=combat.weapon_interval_days;
     projected.cargo_capacity=design.cargo_material_capacity;projected.crew=design.crew_complement_individuals;
     projected.batch_quotes=assess_ship_build_batches(read,player->id,design.id);
@@ -165,7 +169,8 @@ std::string resolved(const stellar::engine::LocalizationTable *locale,
                        double population,
                        std::optional<std::string> population_species,
                        std::optional<int> source) {
-    const auto *design = find_ship_design(design_id);
+    const auto design =
+        resolve_ship_design(read.designs(), player->id, design_id);
     const auto cancellation = assess_ship_build_cancellation(
         read, player->id, order_id);
     const auto industry_cost = design ? design->industry_cost : 0.;
@@ -373,7 +378,8 @@ NativeShipyardCommandOutcome NativeShipyardController::start(
       world.civilizations, world.systems, world.construction,
       world.shipyards,     world.colonies, world.economies,
       world.fleets,        {},             {},
-      query,               {}};
+      query,               {},             {},
+      world.authored_ship_designs};
   const auto result = start_ship_build_batch(
       command, current.view.player_civilization_id, design_id,quantity);
   if (result.accepted) {
@@ -416,7 +422,8 @@ NativeShipyardCommandOutcome NativeShipyardController::cancel(
       world.civilizations, world.systems, world.construction,
       world.shipyards,     world.colonies, world.economies,
       world.fleets,        {},             {},
-      query,               {}};
+      query,               {},             {},
+      world.authored_ship_designs};
   const auto result = cancel_ship_build(
       command, current.view.player_civilization_id, order_id);
   if (result.accepted) {
@@ -433,7 +440,7 @@ NativeShipyardCommandOutcome NativeShipyardController::reorder(CampaignFrame& fr
   if(current.view.player_civilization_id!=projected_view_->player_civilization_id||current.view.home_system_id!=projected_view_->home_system_id||
       !std::ranges::equal(current.view.orders,projected_view_->orders,{},&NativeShipyardOrder::order_id,&NativeShipyardOrder::order_id))return {false,tr("SHIPYARD_MSG_QUEUE_CHANGED","The queue changed; review it again.")};
   auto& world=frame.runtime().world().campaign();
-  ShipbuildingWorld command{world.civilizations,world.systems,world.construction,world.shipyards,world.colonies,world.economies,world.fleets,{},{},{},{}};
+  ShipbuildingWorld command{world.civilizations,world.systems,world.construction,world.shipyards,world.colonies,world.economies,world.fleets,{},{},{},{},{},world.authored_ship_designs};
   const auto result=move_queued_ship_build(command,current.view.player_civilization_id,id,direction);
   if(result.accepted){signature_.reset();projected_view_.reset();projected_player_species_id_.reset();}
   return {result.accepted,result.message};

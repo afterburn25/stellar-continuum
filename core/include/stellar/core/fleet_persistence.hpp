@@ -18,6 +18,8 @@ struct FleetCombatSaveDto {
   double retreat_progress_days{};
   bool retreat_started{}, is_disengaged{};
   std::optional<int> disengaged_system_id;
+  // Component-authored combat stats; absent on pre-authorship saves.
+  std::optional<CombatProfileDefinition> profile_override;
 };
 
 struct FleetSaveDto {
@@ -54,6 +56,8 @@ struct FleetSaveDto {
   std::optional<FleetCombatSaveDto> combat;
   std::optional<MassiveCombatLoadout> tactical_loadout;
   std::optional<MassiveVesselState> tactical_vessel;
+  // Standing combat doctrine; absent while the fleet runs defaults.
+  std::optional<FleetDoctrine> doctrine;
   std::vector<std::array<float,2>> stellar_transit_path;
 };
 

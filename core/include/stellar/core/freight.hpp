@@ -2,6 +2,7 @@
 
 #include <stellar/core/construction_state.hpp>
 #include <stellar/core/fleet_reach.hpp>
+#include <stellar/core/ship_designs.hpp>
 
 #include <functional>
 #include <span>
@@ -23,6 +24,7 @@ struct FreightWorldView {
   std::span<Colony> colonies;
   std::span<CivilizationEconomy> economies;
   InterstellarLaneNetwork &lanes;
+  std::span<const AuthoredShipDesign> authored_designs{};
 
   [[nodiscard]] OperationalReachWorldView reach() const {
     return {systems, colonies, lanes};
@@ -46,13 +48,17 @@ public:
   void advance(FreightWorldView world, double simulation_days = 1.0) const;
 
   [[nodiscard]] static double
-  cargo_transfer_rate_per_day(const FleetState &fleet);
+  cargo_transfer_rate_per_day(const FleetState &fleet,
+                              std::span<const AuthoredShipDesign>
+                                  authored_designs = {});
   static constexpr double basic_hub_transfer_capacity_per_day = 4.0;
   [[nodiscard]] static double
   port_transfer_capacity_per_day(const Colony &colony);
   [[nodiscard]] static double
   effective_transfer_rate_per_day(const FleetState &fleet,
-                                  const Colony &colony);
+                                  const Colony &colony,
+                                  std::span<const AuthoredShipDesign>
+                                      authored_designs = {});
 
 private:
   FreightReachAssessor reach_;

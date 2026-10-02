@@ -25,6 +25,7 @@
 #include <stellar/core/logistics.hpp>
 #include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/settlement_body_index.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipyard_state.hpp>
 #include <stellar/core/small_body_fields.hpp>
@@ -823,7 +824,11 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
       emit("shipyard","invalid_positive_value",y.civilization_id,"Next order sequence is non-positive.");
     if(y.reserved_population_source_colony_id&&*y.reserved_population_source_colony_id<0)
       emit("shipyard","invalid_nonnegative_value",y.civilization_id,"Reserved population colony is negative.");
-    const bool active_known=y.active_design_id&&find_ship_design(*y.active_design_id);
+    const ShipDesignReadView designs{{},{},{},w.authored_ship_designs};
+    const auto active_design=y.active_design_id
+        ?resolve_ship_design(designs,y.civilization_id,*y.active_design_id)
+        :std::optional<ShipDesignDefinition>{};
+    const bool active_known=active_design.has_value();
     if(!y.active_design_id){
       if(y.active_build_progress!=0.0||y.active_authorization_credits!=0.0||
           y.reserved_population_millions!=0.0||y.active_order_id)
@@ -834,7 +839,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
           (y.active_order_id&&y.active_order_id->find_first_not_of(" \t\n\r\f\v")!=std::string::npos))
         emit("shipyard","unknown_ship_design",y.civilization_id,"Active design is not in the ship catalog.");
     }else if(std::isfinite(y.active_build_progress)&&
-        y.active_build_progress>find_ship_design(*y.active_design_id)->industry_cost+.0001)
+        y.active_build_progress>active_design->industry_cost+.0001)
       emit("shipyard","out_of_range",y.civilization_id,"Build progress exceeds the design's industry cost.");
     // Order identities must be canonical, unique and behind the
     // sequence counter (mirrors validate_identities).
@@ -851,7 +856,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     if(!identities.empty()&&maximum_sequence>=y.next_order_sequence)
       emit("shipyard","inconsistent_sequence",y.civilization_id,"Order sequence does not follow existing identities.");
     // Reserved-population safety mirrors the capture validator.
-    try{validate_shipyard_population_persistence_safety(y);}
+    try{validate_shipyard_population_persistence_safety(y,w.authored_ship_designs);}
     catch(const std::exception&){
       emit("shipyard","invalid_reservation",y.civilization_id,"Reserved population fails its authoritative validation.");}
   }
@@ -925,7 +930,8 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_invariants(
     bounded(f.reconnaissance_days_completed,ExplorationSimulation::scout_reconnaissance_days,
             "Reconnaissance progress",f.id,"fleet");
     if(f.design_id){
-      const auto *design=find_ship_design(*f.design_id);
+      const ShipDesignReadView designs{{},{},{},w.authored_ship_designs};
+      const auto design=resolve_ship_design(designs,f.civilization_id,*f.design_id);
       if(!design)emit("fleet","unknown_ship_design",f.id,"Fleet references an unknown ship design.");
       else if(design->role!=f.role)
         emit("fleet","incompatible_design",f.id,"Fleet role does not match its ship design.");

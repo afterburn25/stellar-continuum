@@ -49,7 +49,8 @@ void validate_references(FreshCampaignState &galaxy) {
       {galaxy.systems, galaxy.bodies, galaxy.civilizations, galaxy.colonies,
        galaxy.economies, galaxy.fleets, galaxy.combat_intelligence,
        galaxy.active_combat_encounter ? &*galaxy.active_combat_encounter
-                                      : nullptr});
+                                      : nullptr,
+       galaxy.authored_ship_designs});
 }
 
 std::optional<GalacticCore>
@@ -130,7 +131,11 @@ capture_galaxy_payload_v16(FreshCampaignState &galaxy,
   result.economies = capture_economy_dtos(galaxy.economies);
   result.technologies = capture_technology_dtos(galaxy.technologies);
   result.construction_states = capture_construction_dtos(galaxy.construction);
-  result.shipyard_states = capture_shipyard_states(galaxy.shipyards);
+  result.shipyard_states = capture_shipyard_states(
+      galaxy.shipyards, galaxy.authored_ship_designs);
+  if (!galaxy.authored_ship_designs.empty())
+    result.authored_ship_designs =
+        capture_authored_ship_designs(galaxy.authored_ship_designs);
   result.player_civilization_id = galaxy.player_civilization_id;
   result.knowledge = capture_civilization_knowledge(galaxy.knowledge);
   if (galaxy.active_combat_encounter)
@@ -241,12 +246,16 @@ restore_galaxy_payload_v16(const GalaxyPayloadV16Dto &payload) {
       construction_dtos.empty()
           ? create_migrated_legacy_construction_states(galaxy.civilizations)
           : restore_construction_dtos(construction_dtos);
+  if (payload.authored_ship_designs)
+    galaxy.authored_ship_designs = restore_authored_ship_designs(
+        *payload.authored_ship_designs, galaxy.civilizations);
   const auto &shipyard_dtos = required(payload.shipyard_states);
   galaxy.shipyards =
       shipyard_dtos.empty()
           ? seed_shipyards(galaxy.civilizations)
           : restore_shipyard_states(shipyard_dtos, galaxy.civilizations,
-                                    payload.format_version);
+                                    payload.format_version,
+                                    galaxy.authored_ship_designs);
   for (auto &fleet : galaxy.fleets)
     ensure_fleet_combat_state(fleet);
 

@@ -797,6 +797,29 @@ QueuedShipBuildPersistenceDto decode_queued_ship(const Value &value,
   return result;
 }
 
+AuthoredShipDesignSaveDto decode_authored_ship_design(
+    const Value &value, const std::string &path) {
+  AuthoredShipDesignSaveDto result;
+  for (const auto &[name, member] : object(value, path)) {
+    const auto p = child(path, name);
+    if (name == "Id") result.id = string(member, p);
+    else if (name == "Name") result.name = string(member, p);
+    else if (name == "Description") result.description = string(member, p);
+    else if (name == "OwnerCivilizationId")
+      result.owner_civilization_id = integer<int>(member, p);
+    else if (name == "HullId") result.hull_id = string(member, p);
+    else if (name == "ComponentIds") {
+      result.component_ids.clear();
+      result.component_ids =
+          list<std::string>(member, p, [](const Value &item,
+                                        const std::string &item_path) {
+            return string(item, item_path);
+          });
+    }
+  }
+  return result;
+}
+
 ShipyardPersistenceDto decode_shipyard(const Value &value,
                                        const std::string &path) {
   ShipyardPersistenceDto result;
@@ -929,6 +952,33 @@ MassiveVesselState decode_vessel(const Value &value,
   return result;
 }
 
+CombatProfileDefinition decode_combat_profile(const Value &value,
+                                              const std::string &path) {
+  CombatProfileDefinition result;
+  for (const auto &[name, member] : object(value, path)) {
+    const auto p = child(path, name);
+    if (name == "Id") result.id = string(member, p);
+    else if (name == "MaxShields") result.max_shields = number(member, p);
+    else if (name == "MaxArmor") result.max_armor = number(member, p);
+    else if (name == "MaxHull") result.max_hull = number(member, p);
+    else if (name == "WeaponDamage") result.weapon_damage = number(member, p);
+    else if (name == "WeaponIntervalDays") result.weapon_interval_days = number(member, p);
+    else if (name == "RetreatDelayDays") result.retreat_delay_days = number(member, p);
+  }
+  return result;
+}
+
+FleetDoctrine decode_fleet_doctrine(const Value &value,
+                                    const std::string &path) {
+  FleetDoctrine result;
+  for (const auto &[name, member] : object(value, path)) {
+    const auto p = child(path, name);
+    if (name == "Posture") result.posture = enumeration<FleetDoctrinePosture>(member, p);
+    else if (name == "AutoRetreatHullFraction") result.auto_retreat_hull_fraction = number(member, p);
+  }
+  return result;
+}
+
 FleetCombatSaveDto decode_fleet_combat(const Value &value,
                                        const std::string &path) {
   FleetCombatSaveDto result;
@@ -946,6 +996,7 @@ FleetCombatSaveDto decode_fleet_combat(const Value &value,
     else if (name == "RetreatStarted") result.retreat_started = boolean(member, p);
     else if (name == "IsDisengaged") result.is_disengaged = boolean(member, p);
     else if (name == "DisengagedSystemId") result.disengaged_system_id = optional_value<int>(member, p, integer<int>);
+    else if (name == "ProfileOverride") result.profile_override = optional_value<CombatProfileDefinition>(member, p, decode_combat_profile);
   }
   return result;
 }
@@ -1000,6 +1051,7 @@ FleetSaveDto decode_fleet(const Value &value, const std::string &path) {
     else if (name == "Combat") result.combat = optional_value<FleetCombatSaveDto>(member, p, decode_fleet_combat);
     else if (name == "TacticalLoadout") result.tactical_loadout = optional_value<MassiveCombatLoadout>(member, p, decode_loadout);
     else if (name == "TacticalVessel") result.tactical_vessel = optional_value<MassiveVesselState>(member, p, decode_vessel);
+    else if (name == "Doctrine") result.doctrine = optional_value<FleetDoctrine>(member, p, decode_fleet_doctrine);
   }
   return result;
 }
@@ -1294,6 +1346,12 @@ void decode_galaxy(GalaxyPayloadV16Dto &result, const Value &value,
       else
         result.combat_intelligence =
             list<FleetPowerObservation>(member, p, decode_observation);
+    } else if (name == "AuthoredShipDesigns") {
+      if (is_null(member))
+        result.authored_ship_designs = std::nullopt;
+      else
+        result.authored_ship_designs = list<AuthoredShipDesignSaveDto>(
+            member, p, decode_authored_ship_design);
     }
     } catch (const GalaxyPayloadJsonError &error) {
       if (error.phase() != GalaxyPayloadJsonErrorPhase::Representability)
@@ -1325,6 +1383,8 @@ void replace_galaxy(GalaxyPayloadV16Dto &target,
   target.active_combat_encounter =
       std::move(replacement.active_combat_encounter);
   target.combat_intelligence = std::move(replacement.combat_intelligence);
+  target.authored_ship_designs =
+      std::move(replacement.authored_ship_designs);
 }
 
 GalaxyPayloadV16Dto decode_root(
@@ -1696,6 +1756,15 @@ Json encode_queued_ship(const QueuedShipBuildPersistenceDto &value) {
            optional_json(value.reserved_population_source_colony_id)}};
 }
 
+Json encode_authored_ship_design(const AuthoredShipDesignSaveDto &value) {
+  return {{"Id", value.id},
+          {"Name", value.name},
+          {"Description", value.description},
+          {"OwnerCivilizationId", value.owner_civilization_id},
+          {"HullId", value.hull_id},
+          {"ComponentIds", Json(value.component_ids)}};
+}
+
 Json encode_shipyard(const ShipyardPersistenceDto &value) {
   return {{"CivilizationId", value.civilization_id},
           {"NextOrderSequence", value.next_order_sequence},
@@ -1785,20 +1854,39 @@ Json encode_vessel(const MassiveVesselState &value) {
           {"Escaped", value.escaped}};
 }
 
+Json encode_combat_profile(const CombatProfileDefinition &value) {
+  return {{"Id", value.id},
+          {"MaxShields", value.max_shields},
+          {"MaxArmor", value.max_armor},
+          {"MaxHull", value.max_hull},
+          {"WeaponDamage", value.weapon_damage},
+          {"WeaponIntervalDays", value.weapon_interval_days},
+          {"RetreatDelayDays", value.retreat_delay_days}};
+}
+
 Json encode_fleet_combat(const FleetCombatSaveDto &value) {
-  return {{"ProfileId", value.profile_id},
-          {"Shields", value.shields},
-          {"Armor", value.armor},
-          {"Hull", value.hull},
-          {"WeaponCooldownRemainingDays",
-           value.weapon_cooldown_remaining_days},
-          {"Order", static_cast<int>(value.order)},
-          {"TargetFleetId", optional_json(value.target_fleet_id)},
-          {"DefendSystemId", optional_json(value.defend_system_id)},
-          {"RetreatProgressDays", value.retreat_progress_days},
-          {"RetreatStarted", value.retreat_started},
-          {"IsDisengaged", value.is_disengaged},
-          {"DisengagedSystemId", optional_json(value.disengaged_system_id)}};
+  Json result{{"ProfileId", value.profile_id},
+              {"Shields", value.shields},
+              {"Armor", value.armor},
+              {"Hull", value.hull},
+              {"WeaponCooldownRemainingDays",
+               value.weapon_cooldown_remaining_days},
+              {"Order", static_cast<int>(value.order)},
+              {"TargetFleetId", optional_json(value.target_fleet_id)},
+              {"DefendSystemId", optional_json(value.defend_system_id)},
+              {"RetreatProgressDays", value.retreat_progress_days},
+              {"RetreatStarted", value.retreat_started},
+              {"IsDisengaged", value.is_disengaged},
+              {"DisengagedSystemId",
+               optional_json(value.disengaged_system_id)}};
+  if (value.profile_override)
+    result["ProfileOverride"] = encode_combat_profile(*value.profile_override);
+  return result;
+}
+
+Json encode_fleet_doctrine(const FleetDoctrine &value) {
+  return {{"Posture", static_cast<int>(value.posture)},
+          {"AutoRetreatHullFraction", value.auto_retreat_hull_fraction}};
 }
 
 Json encode_fleet(const FleetSaveDto &value) {
@@ -1868,6 +1956,8 @@ Json encode_fleet(const FleetSaveDto &value) {
     result["TacticalLoadout"] = encode_loadout(*value.tactical_loadout);
   if (value.tactical_vessel)
     result["TacticalVessel"] = encode_vessel(*value.tactical_vessel);
+  if (value.doctrine)
+    result["Doctrine"] = encode_fleet_doctrine(*value.doctrine);
   return result;
 }
 
@@ -2075,6 +2165,9 @@ Json encode_galaxy(const GalaxyPayloadV16Dto &value) {
         encode_list(*value.combat_intelligence, encode_observation);
   validate_stellar_activity_clock(value.stellar_activity_day);
   if(value.stellar_activity_day)result["StellarActivityDay"]=*value.stellar_activity_day;
+  if (value.authored_ship_designs)
+    result["AuthoredShipDesigns"] = encode_list(
+        *value.authored_ship_designs, encode_authored_ship_design);
   return result;
 }
 
@@ -2183,6 +2276,7 @@ void detail::stream_galaxy_members(JsonStreamWriter& out,const GalaxyPayloadV16D
     if(v.combat_intelligence)list("CombatIntelligence",v.combat_intelligence,encode_observation);
     validate_stellar_activity_clock(v.stellar_activity_day);
     if(v.stellar_activity_day)field("StellarActivityDay",*v.stellar_activity_day);
+    if(v.authored_ship_designs)list("AuthoredShipDesigns",v.authored_ship_designs,encode_authored_ship_design);
     out.end_object();
   }catch(const nlohmann::json::exception& error){throw GalaxyPayloadJsonError(GalaxyPayloadJsonErrorPhase::Encode,error.what(),"$");}
 }

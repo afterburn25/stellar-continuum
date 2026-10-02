@@ -105,7 +105,7 @@ TargetPlan build_targets(FleetMap &active,
     if (targets.lookup.contains(d->id))
       continue;
     auto &ds = ensure_fleet_combat_state(*d);
-    const auto &dp = get_combat_profile(ds.profile_id);
+    const auto &dp = resolve_fleet_combat_profile(ds, d->role);
     if (ds.order == MilitaryOrderType::Retreat || ds.is_disengaged ||
         !dp.has_weapon())
       continue;
@@ -127,7 +127,7 @@ TargetPlan build_targets(FleetMap &active,
     if (targets.lookup.contains(id))
       continue;
     auto &s = ensure_fleet_combat_state(*d);
-    const auto &p = get_combat_profile(s.profile_id);
+    const auto &p = resolve_fleet_combat_profile(s, d->role);
     if (s.order != MilitaryOrderType::Defend || s.is_disengaged ||
         !p.has_weapon() || !s.defend_system_id ||
         d->current_system_id != s.defend_system_id)
@@ -138,6 +138,26 @@ TargetPlan build_targets(FleetMap &active,
     auto *h = active.at(threat->second);
     if (can_engage(*d, *h, hostility))
       targets.add(id, h->id);
+  }
+  // Standing doctrine: Hold fleets on EngageAtWill open fire on the lowest-id
+  // hostile co-located in their system.
+  for (auto [id, a] : active) {
+    if (targets.lookup.contains(id) ||
+        a->doctrine.posture != FleetDoctrinePosture::EngageAtWill ||
+        !a->current_system_id)
+      continue;
+    auto &s = ensure_fleet_combat_state(*a);
+    const auto &p = resolve_fleet_combat_profile(s, a->role);
+    if (s.order != MilitaryOrderType::Hold || s.is_disengaged ||
+        !p.has_weapon())
+      continue;
+    int best = -1;
+    for (auto [oid, o] : active)
+      if (oid != id && can_engage(*a, *o, hostility) &&
+          (best < 0 || oid < best))
+        best = oid;
+    if (best >= 0)
+      targets.add(id, best);
   }
   return targets;
 }
@@ -193,7 +213,7 @@ std::vector<Fire> build_fire(FleetMap &active, const TargetPlan &targets,
     auto &t = *active.at(tid);
     auto &ss = ensure_fleet_combat_state(s);
     auto &ts = ensure_fleet_combat_state(t);
-    const auto &p = get_combat_profile(ss.profile_id);
+    const auto &p = resolve_fleet_combat_profile(ss, s.role);
     engaged.insert(s.id);
     if (!p.has_weapon() || ss.order == MilitaryOrderType::Retreat ||
         ss.is_disengaged) {
@@ -203,7 +223,7 @@ std::vector<Fire> build_fire(FleetMap &active, const TargetPlan &targets,
     }
     auto delta = days;
     if (ts.order == MilitaryOrderType::Retreat) {
-      const auto &tp = get_combat_profile(ts.profile_id);
+      const auto &tp = resolve_fleet_combat_profile(ts, t.role);
       delta = source_min(delta, source_max(0, tp.retreat_delay_days -
                                                   ts.retreat_progress_days));
     }
@@ -322,6 +342,17 @@ void process_retreats(std::span<FleetState> fleets, const TargetPlan &targets,
             [](auto *a, auto *b) { return a->id < b->id; });
   for (auto *f : ordered) {
     auto &s = ensure_fleet_combat_state(*f);
+    // Standing doctrine: disengage automatically once hull drops to the
+    // configured fraction of max hull.
+    if (s.order != MilitaryOrderType::Retreat && !s.is_disengaged &&
+        f->doctrine.auto_retreat_hull_fraction > 0) {
+      const auto &profile = resolve_fleet_combat_profile(s, f->role);
+      if (profile.max_hull > epsilon &&
+          s.hull <=
+              profile.max_hull * f->doctrine.auto_retreat_hull_fraction +
+                  epsilon)
+        s.order = MilitaryOrderType::Retreat;
+    }
     if (s.order != MilitaryOrderType::Retreat)
       continue;
     if (!s.retreat_started) {
@@ -337,7 +368,7 @@ void process_retreats(std::span<FleetState> fleets, const TargetPlan &targets,
                         0,
                         f->name + " began tactical disengagement."});
     }
-    const auto &p = get_combat_profile(s.profile_id);
+    const auto &p = resolve_fleet_combat_profile(s, f->role);
     if (threatened.contains(f->id))
       s.retreat_progress_days += days;
     else
@@ -393,7 +424,7 @@ CombatOrderResult CombatSimulation::issue_order(CombatWorldView world,
     return {false,
             "No active fleet with that identity belongs to the civilization."};
   auto &s = ensure_fleet_combat_state(*it);
-  const auto &p = get_combat_profile(s.profile_id);
+  const auto &p = resolve_fleet_combat_profile(s, it->role);
   switch (order.type) {
   case MilitaryOrderType::Hold:
     set_hold(s, true);
@@ -539,7 +570,7 @@ CombatSimulation::get_own_military_force_summary(CombatWorldView world,
   for (auto &f : world.fleets)
     if (f.is_active && f.civilization_id == civilization_id) {
       auto &s = ensure_fleet_combat_state(f);
-      const auto &p = get_combat_profile(s.profile_id);
+      const auto &p = resolve_fleet_combat_profile(s, f.role);
       if (!p.has_weapon())
         continue;
       ++result.active_combat_vessels;

@@ -25,10 +25,20 @@ struct ShipbuildingCapabilities {
     int civilization_id{};
     std::vector<std::string> capability_ids;
 };
+// Persisted per-civilization authored design. Components are stored as ids in
+// install order; stat resolution is deterministic and derived on demand.
+struct AuthoredShipDesign {
+    std::string id, name, description;
+    int owner_civilization_id{};
+    std::string hull_id;
+    std::vector<std::string> component_ids;
+};
 struct ShipDesignReadView {
     std::span<const ConstructionState> construction;
     std::span<const ShipbuildingCapabilities> capabilities;
     std::function<bool(int, std::string_view)> capability_query;
+    // Player/civilization-authored component designs; resolved on demand.
+    std::span<const AuthoredShipDesign> authored_designs{};
 };
 struct ShipPropulsionPerformance {
     double strategic_speed{}, maximum_leg_range_light_years{}, fuel_endurance_light_years{};

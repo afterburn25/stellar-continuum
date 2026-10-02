@@ -11,6 +11,7 @@
 #include <stellar/core/legacy_technology.hpp>
 #include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/planetary_catalog.hpp>
+#include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipyard_state.hpp>
 
 #include <cstdint>
@@ -44,6 +45,9 @@ struct FreshCampaignState {
   // Stellar activity has its own persisted 1x clock (one hour per real second).
   // Absent in older saves; initialized at their saved epoch without rerolling.
   std::optional<double> stellar_activity_day;
+  // Player/civilization-authored componentized ship designs. Absent in
+  // pre-authorship saves; empty for campaigns that only use the fixed catalog.
+  std::vector<AuthoredShipDesign> authored_ship_designs;
 };
 
 FreshCampaignState

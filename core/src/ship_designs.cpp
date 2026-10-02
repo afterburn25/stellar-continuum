@@ -1,5 +1,6 @@
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/construction_projects.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <algorithm>
 #include <array>
 #include <stdexcept>
@@ -79,6 +80,12 @@ std::optional<std::string> ship_design_lock_reason(ShipDesignReadView world, int
 std::vector<ShipDesignDefinition> available_ship_designs(ShipDesignReadView world, int civilization_id) {
     std::vector<ShipDesignDefinition> available;
     for(const auto& design:designs) if(!ship_design_lock_reason(world,civilization_id,design)) available.push_back(design);
+    for(const auto& authored:world.authored_designs) {
+        if(authored.owner_civilization_id!=civilization_id) continue;
+        if(!find_ship_hull(authored.hull_id)) continue;
+        auto resolved=resolve_authored_ship_design(authored);
+        if(!ship_design_lock_reason(world,civilization_id,resolved)) available.push_back(std::move(resolved));
+    }
     return available;
 }
 ShipPropulsionPerformance effective_ship_propulsion(ShipDesignReadView world, int civilization_id, const ShipDesignDefinition& design) {

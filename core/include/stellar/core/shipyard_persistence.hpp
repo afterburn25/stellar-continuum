@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stellar/core/civilization_catalog.hpp>
+#include <stellar/core/ship_designs.hpp>
 #include <stellar/core/shipyard_state.hpp>
 
 #include <cstdint>
@@ -46,17 +47,23 @@ public:
   explicit ShipyardPersistenceOperationError(std::string message);
 };
 
+
+
 // Reconstructs owned runtime shipyards in DTO order. Formats before 8 resolve
 // reservation species from the authoritative civilization owner; format 8+
-// requires the species recorded on each population-bearing order.
+// requires the species recorded on each population-bearing order. Authored
+// designs are consulted for design-id recognition and resolved industry cost.
 [[nodiscard]] std::vector<ShipyardState> restore_shipyard_states(
     std::span<const ShipyardPersistenceDto> source,
     std::span<const Civilization> civilizations,
-    int save_format_version);
+    int save_format_version,
+    std::span<const AuthoredShipDesign> authored_designs = {});
 
 // Validates runtime save invariants before returning a detached, owned graph.
 // Subsequent runtime mutation cannot affect the returned DTOs.
 [[nodiscard]] std::vector<ShipyardPersistenceDto>
-capture_shipyard_states(std::span<const ShipyardState> source);
+capture_shipyard_states(std::span<const ShipyardState> source,
+                        std::span<const AuthoredShipDesign>
+                            authored_designs = {});
 
 } // namespace stellar::core

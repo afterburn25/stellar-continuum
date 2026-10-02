@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 namespace stellar::core {
+struct AuthoredShipDesign;
 inline constexpr int maximum_pending_ship_builds = 8,
                      maximum_shipyard_order_id_length = 128;
 struct ShipBuildOrderState {
@@ -35,6 +36,9 @@ bool is_valid_persisted_shipyard_order_id(
     std::optional<std::string_view> order_id);
 void validate_shipyard_population_persistence_safety(
     const ShipyardState &state);
+void validate_shipyard_population_persistence_safety(
+    const ShipyardState &state,
+    std::span<const AuthoredShipDesign> authored_designs);
 std::vector<ShipyardState>
 seed_shipyards(std::span<const Civilization> civilizations);
 } // namespace stellar::core

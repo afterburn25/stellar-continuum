@@ -4,6 +4,7 @@
 #include <stellar/core/colony_operations.hpp>
 #include <stellar/core/detail/legacy_number_format.hpp>
 #include <stellar/core/industry_allocation.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/surface_economy.hpp>
 
@@ -203,7 +204,9 @@ void FreightSimulation::advance(FreightWorldView world,
         port_capacity_cache.try_emplace(colony.id, 0.0);
     if (inserted)
       entry->second = port_transfer_capacity_per_day(colony);
-    return source_min(cargo_transfer_rate_per_day(vessel), entry->second);
+    return source_min(
+        cargo_transfer_rate_per_day(vessel, world.authored_designs),
+        entry->second);
   };
   std::optional<std::vector<EconomyConstructionState>> construction_cache;
   std::optional<std::vector<EconomyFleetState>> fleets_cache;
@@ -312,13 +315,23 @@ void FreightSimulation::advance(FreightWorldView world,
   }
 }
 
-double FreightSimulation::cargo_transfer_rate_per_day(const FleetState &fleet) {
-  const auto design =
-      fleet.design_id ? find_ship_design(*fleet.design_id) : nullptr;
-  return design && design->cargo_transfer_rate_per_day > 0.0
-             ? design->cargo_transfer_rate_per_day
-         : fleet.cargo_material_capacity > 0.0 ? 20.0
-                                               : 0.0;
+double FreightSimulation::cargo_transfer_rate_per_day(
+    const FleetState &fleet,
+    std::span<const AuthoredShipDesign> authored_designs) {
+  if (fleet.design_id) {
+    if (const auto *authored =
+            find_authored_ship_design(authored_designs,
+                                      fleet.civilization_id,
+                                      *fleet.design_id)) {
+      const auto rate =
+          resolve_authored_ship_design(*authored).cargo_transfer_rate_per_day;
+      if (rate > 0.0) return rate;
+    }
+    if (const auto *design = find_ship_design(*fleet.design_id))
+      if (design->cargo_transfer_rate_per_day > 0.0)
+        return design->cargo_transfer_rate_per_day;
+  }
+  return fleet.cargo_material_capacity > 0.0 ? 20.0 : 0.0;
 }
 
 double FreightSimulation::port_transfer_capacity_per_day(const Colony &colony) {
@@ -327,9 +340,10 @@ double FreightSimulation::port_transfer_capacity_per_day(const Colony &colony) {
 }
 
 double
-FreightSimulation::effective_transfer_rate_per_day(const FleetState &fleet,
-                                                   const Colony &colony) {
-  return source_min(cargo_transfer_rate_per_day(fleet),
+FreightSimulation::effective_transfer_rate_per_day(
+    const FleetState &fleet, const Colony &colony,
+    std::span<const AuthoredShipDesign> authored_designs) {
+  return source_min(cargo_transfer_rate_per_day(fleet, authored_designs),
                     port_transfer_capacity_per_day(colony));
 }
 

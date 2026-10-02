@@ -123,13 +123,22 @@ create_initial_fleet_combat_state(std::optional<std::string_view> id,
   return {profile->id, profile->max_shields, profile->max_armor,
           profile->max_hull};
 }
+const CombatProfileDefinition &
+resolve_fleet_combat_profile(const FleetCombatState &state, FleetRole role) {
+  if (state.profile_override)
+    return *state.profile_override;
+  if (const auto *profile = find_combat_profile(state.profile_id))
+    return *profile;
+  return get_combat_profile(default_combat_profile_id(role));
+}
 FleetCombatState &ensure_fleet_combat_state(FleetState &fleet) {
-  if (!fleet.combat || !find_combat_profile(fleet.combat->profile_id)) {
+  if (!fleet.combat || (!fleet.combat->profile_override &&
+                        !find_combat_profile(fleet.combat->profile_id))) {
     fleet.combat = create_initial_fleet_combat_state(std::nullopt, fleet.role);
     return *fleet.combat;
   }
   auto &state = *fleet.combat;
-  const auto &profile = get_combat_profile(state.profile_id);
+  const auto &profile = resolve_fleet_combat_profile(state, fleet.role);
   state.shields = std::clamp(state.shields, 0.0, profile.max_shields);
   state.armor = std::clamp(state.armor, 0.0, profile.max_armor);
   state.hull = std::clamp(state.hull, 0.0, profile.max_hull);
@@ -239,5 +248,16 @@ MassiveModuleState warp_interdictor(float range, float strength) {
           strength,
           85,
           1};
+}
+bool set_fleet_doctrine(FleetState &fleet, const FleetDoctrine &doctrine) {
+  if (static_cast<int>(doctrine.posture) < 0 ||
+      static_cast<int>(doctrine.posture) >
+          static_cast<int>(FleetDoctrinePosture::EngageAtWill) ||
+      !std::isfinite(doctrine.auto_retreat_hull_fraction) ||
+      doctrine.auto_retreat_hull_fraction < 0 ||
+      doctrine.auto_retreat_hull_fraction > 1)
+    return false;
+  fleet.doctrine = doctrine;
+  return true;
 }
 } // namespace stellar::core

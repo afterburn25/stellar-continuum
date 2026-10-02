@@ -10,6 +10,7 @@
 #include <stellar/core/legacy_technology.hpp>
 #include <stellar/core/logistics.hpp>
 #include <stellar/core/own_combat_fleet_status.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/strategic_input_support.hpp>
 
@@ -295,13 +296,19 @@ void NativeGameplayVoiceBridge::route_events(
     }
     for (const auto &event : step.core.shipbuilding_events) {
       if (event.civilization_id != player_id) continue;
-      const auto *design = core::find_ship_design(event.design_id);
+      std::string ship_class;
+      if (const auto *design = core::find_ship_design(event.design_id))
+        ship_class = design->name;
+      else if (const auto *authored = core::find_authored_ship_design(
+                   campaign.authored_ship_designs, event.civilization_id,
+                   event.design_id))
+        ship_class = authored->name;
       const auto ship_name = own_fleet_name(event.fleet_id);
-      if (!design || ship_name.empty()) continue;
+      if (ship_class.empty() || ship_name.empty()) continue;
       emit_owned(scope, "ship.completed", player_id, species,
                  "fleet:" + std::to_string(event.fleet_id) +
                      ":design:" + event.design_id,
-                 {{"ship_name", ship_name}, {"ship_class", design->name}});
+                 {{"ship_name", ship_name}, {"ship_class", ship_class}});
     }
     for (const auto &event : step.core.exploration_events) {
       if (event.civilization_id != player_id) continue;

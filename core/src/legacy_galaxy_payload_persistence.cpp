@@ -58,7 +58,8 @@ void validate_references(FreshCampaignState &galaxy) {
       {galaxy.systems, galaxy.bodies, galaxy.civilizations, galaxy.colonies,
        galaxy.economies, galaxy.fleets, galaxy.combat_intelligence,
        galaxy.active_combat_encounter ? &*galaxy.active_combat_encounter
-                                      : nullptr});
+                                      : nullptr,
+       galaxy.authored_ship_designs});
 }
 
 } // namespace

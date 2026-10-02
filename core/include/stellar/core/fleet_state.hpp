@@ -16,6 +16,13 @@ enum class FleetTransitPhase {
   InterstellarWarp,
   LocalArrival
 };
+enum class FleetDoctrinePosture { HoldFast = 0, EngageAtWill = 1 };
+struct FleetDoctrine {
+  FleetDoctrinePosture posture{FleetDoctrinePosture::HoldFast};
+  // When > 0, the fleet auto-retreats once hull drops to this fraction of max
+  // hull. 0 disables automatic disengagement.
+  double auto_retreat_hull_fraction{};
+};
 struct FleetState {
   int id{}, civilization_id{};
   std::string name;
@@ -52,6 +59,7 @@ struct FleetState {
   std::optional<FleetCombatState> combat;
   std::optional<MassiveCombatLoadout> tactical_loadout;
   std::optional<MassiveVesselState> tactical_vessel;
+  FleetDoctrine doctrine;
   // Persisted collision-free local path; absent on pre-stellar-physics saves.
   std::vector<std::array<float,2>> stellar_transit_path;
 };

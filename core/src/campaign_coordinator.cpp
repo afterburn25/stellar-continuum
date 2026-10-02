@@ -94,7 +94,8 @@ ShipbuildingWorld shipbuilding_world(
           std::span<const ShipbuildingCapabilities>{},
           std::span<const ShipbuildingStrategicPreference>{},
           std::move(query),
-          std::move(preference), campaign_civilization_control(campaign)};
+          std::move(preference), campaign_civilization_control(campaign),
+          campaign.authored_ship_designs};
 }
 
 StrategicInputWorldView strategic_input_world(FreshCampaignState &campaign,
@@ -722,7 +723,8 @@ void GalaxySimulationStepCoordinator::configure_phase_tasks() {
          subsystems_.freight.advance(
              {campaign.systems, campaign.civilizations, campaign.bodies,
               campaign.construction, campaign.fleets, campaign.colonies,
-              campaign.economies, step_.state->lanes()},
+              campaign.economies, step_.state->lanes(),
+              campaign.authored_ship_designs},
              phase_days);
          timing.finish(performance_[8]);
        },

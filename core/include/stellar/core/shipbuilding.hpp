@@ -39,8 +39,10 @@ struct ShipbuildingReadView {
   std::span<const ShipbuildingStrategicPreference> strategic_preferences;
   std::function<bool(int, std::string_view)> capability_query;
   std::function<ShipbuildingStrategicPreference(int)> preference_query;
+  // Civilization-authored component designs; resolved on demand.
+  std::span<const AuthoredShipDesign> authored_designs{};
   ShipDesignReadView designs() const {
-    return {construction, capabilities, capability_query};
+    return {construction, capabilities, capability_query, authored_designs};
   }
 };
 
@@ -57,11 +59,12 @@ struct ShipbuildingWorld {
   std::function<bool(int, std::string_view)> capability_query;
   std::function<ShipbuildingStrategicPreference(int)> preference_query;
   CivilizationControlQuery control;
+  std::span<const AuthoredShipDesign> authored_designs{};
   ShipbuildingReadView read() const {
     return {civilizations, systems,      construction,
             shipyards,     colonies,     economies,
             fleets,        capabilities, strategic_preferences,
-            capability_query, preference_query};
+            capability_query, preference_query, authored_designs};
   }
 };
 

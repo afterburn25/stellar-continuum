@@ -1,6 +1,7 @@
 #include <stellar/core/shipyard_state.hpp>
 
 #include <stellar/core/detail/legacy_number_format.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 
 #include <algorithm>
@@ -10,8 +11,11 @@
 
 namespace stellar::core {
 namespace {
-bool known_design(const std::optional<std::string> &id) {
-  return id && find_ship_design(*id) != nullptr;
+bool known_design(const std::optional<std::string> &id, int civilization_id,
+                  std::span<const AuthoredShipDesign> authored) {
+  return id && (find_ship_design(*id) != nullptr ||
+                find_authored_ship_design(authored, civilization_id, *id) !=
+                    nullptr);
 }
 
 bool numeric_whitespace(char character) {
@@ -85,6 +89,11 @@ bool is_valid_persisted_shipyard_order_id(
 
 void validate_shipyard_population_persistence_safety(
     const ShipyardState &state) {
+  validate_shipyard_population_persistence_safety(state, {});
+}
+void validate_shipyard_population_persistence_safety(
+    const ShipyardState &state,
+    std::span<const AuthoredShipDesign> authored_designs) {
   if (!std::isfinite(state.reserved_population_millions))
     throw std::invalid_argument(
         "Shipyard " + std::to_string(state.civilization_id) +
@@ -93,7 +102,8 @@ void validate_shipyard_population_persistence_safety(
 
   const auto active_population =
       std::max(0.0, state.reserved_population_millions);
-  const auto has_known_active_design = known_design(state.active_design_id);
+  const auto has_known_active_design = known_design(
+      state.active_design_id, state.civilization_id, authored_designs);
   if (active_population > 0 && !has_known_active_design)
     throw std::invalid_argument(
         "Shipyard " + std::to_string(state.civilization_id) + " has " +
@@ -125,7 +135,9 @@ void validate_shipyard_population_persistence_safety(
       continue;
     }
 
-    if (!find_ship_design(build.design_id)) {
+    if (find_ship_design(build.design_id) == nullptr &&
+        find_authored_ship_design(authored_designs, state.civilization_id,
+                                  build.design_id) == nullptr) {
       if (population > 0)
         throw std::invalid_argument(
             "Shipyard " + std::to_string(state.civilization_id) +

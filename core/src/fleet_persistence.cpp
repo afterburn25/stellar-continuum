@@ -47,18 +47,31 @@ double source_max_zero(double value) {
   return std::isnan(value) ? value : std::max(0.0, value);
 }
 FleetCombatState restore_combat(const FleetCombatSaveDto &value) {
-  return {value.profile_id,
-          value.shields,
-          value.armor,
-          value.hull,
-          value.weapon_cooldown_remaining_days,
-          value.order,
-          value.target_fleet_id,
-          value.defend_system_id,
-          value.retreat_progress_days,
-          value.retreat_started,
-          value.is_disengaged,
-          value.disengaged_system_id};
+  FleetCombatState state{value.profile_id,
+                         value.shields,
+                         value.armor,
+                         value.hull,
+                         value.weapon_cooldown_remaining_days,
+                         value.order,
+                         value.target_fleet_id,
+                         value.defend_system_id,
+                         value.retreat_progress_days,
+                         value.retreat_started,
+                         value.is_disengaged,
+                         value.disengaged_system_id,
+                         value.profile_override};
+  if (state.profile_override) {
+    auto &p = *state.profile_override;
+    p.max_shields = source_max_zero(p.max_shields);
+    p.max_armor = source_max_zero(p.max_armor);
+    p.max_hull = source_max_zero(p.max_hull);
+    p.weapon_damage = source_max_zero(p.weapon_damage);
+    p.weapon_interval_days = source_max_zero(p.weapon_interval_days);
+    p.retreat_delay_days = source_max_zero(p.retreat_delay_days);
+    if (p.id.empty())
+      p.id = "authored:restored";
+  }
+  return state;
 }
 FleetCombatSaveDto capture_combat(const FleetCombatState &value) {
   return {value.profile_id,
@@ -72,7 +85,8 @@ FleetCombatSaveDto capture_combat(const FleetCombatState &value) {
           value.retreat_progress_days,
           value.retreat_started,
           value.is_disengaged,
-          value.disengaged_system_id};
+          value.disengaged_system_id,
+          value.profile_override};
 }
 } // namespace
 
@@ -173,6 +187,18 @@ std::vector<FleetState> restore_fleet_dtos(
       fleet.combat = restore_combat(*dto.combat);
     fleet.tactical_loadout = dto.tactical_loadout;
     fleet.tactical_vessel = dto.tactical_vessel;
+    fleet.doctrine = dto.doctrine.value_or(FleetDoctrine{});
+    {
+      const auto posture = static_cast<int>(fleet.doctrine.posture);
+      if (posture < 0 ||
+          posture > static_cast<int>(FleetDoctrinePosture::EngageAtWill) ||
+          !std::isfinite(fleet.doctrine.auto_retreat_hull_fraction))
+        throw std::runtime_error(
+            "Fleet " + std::to_string(dto.id) +
+            " contains an invalid persisted doctrine.");
+      fleet.doctrine.auto_retreat_hull_fraction = std::clamp(
+          fleet.doctrine.auto_retreat_hull_fraction, 0.0, 1.0);
+    }
     if (!fleet.current_system_id && fleet.destination_system_id &&
         fleet.transit_phase == FleetTransitPhase::None) {
       fleet.transit_phase = FleetTransitPhase::InterstellarWarp;
@@ -249,6 +275,9 @@ std::vector<FleetSaveDto> capture_fleet_dtos(std::span<FleetState> fleets) {
     dto.combat = capture_combat(combat);
     dto.tactical_loadout = fleet.tactical_loadout;
     dto.tactical_vessel = fleet.tactical_vessel;
+    if (fleet.doctrine.posture != FleetDoctrinePosture::HoldFast ||
+        fleet.doctrine.auto_retreat_hull_fraction > 0)
+      dto.doctrine = fleet.doctrine;
     result.push_back(std::move(dto));
   }
   return result;

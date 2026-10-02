@@ -190,6 +190,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/industry_allocation.cpp core/src/strategic_intent.cpp core/src/strategic_planning.cpp core/src/strategic_input_support.cpp core/src/strategic_input_builder.cpp core/src/strategic_runtime.cpp core/src/logistics_routing.cpp core/src/logistics_views.cpp
   core/src/sovereign_currency.cpp core/src/construction_state.cpp core/src/surface_construction.cpp
   core/src/construction_projects.cpp core/src/ship_designs.cpp
+  core/src/ship_components.cpp
   core/src/fleet_state.cpp core/src/fleet_composition.cpp core/src/combat_state.cpp core/src/shipyard_state.cpp
   core/src/fleet_seeding.cpp core/src/shipbuilding.cpp core/src/fleet_transit.cpp
   core/src/lane_network.cpp core/src/fleet_reach.cpp core/src/knowledge.cpp core/src/legacy_technology.cpp core/src/fresh_campaign.cpp core/src/persistable_fresh_campaign.cpp core/src/legacy_research.cpp core/src/freight.cpp core/src/settlement_knowledge.cpp core/src/settlement_planning.cpp
@@ -668,6 +669,10 @@ if(BUILD_TESTING)
   add_test(NAME ship_designs_parity COMMAND stellar_ship_designs_tests
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/ship-designs.json")
   set_tests_properties(ship_designs_parity PROPERTIES TIMEOUT 60)
+  add_executable(stellar_ship_components_tests native-tests/ship_components_tests.cpp)
+  target_link_libraries(stellar_ship_components_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME ship_components COMMAND stellar_ship_components_tests)
+  set_tests_properties(ship_components PROPERTIES TIMEOUT 60)
   add_executable(stellar_construction_projects_tests native-tests/construction_projects_tests.cpp)
   target_link_libraries(stellar_construction_projects_tests PRIVATE stellar_core stellar_json)
   add_test(NAME construction_projects_parity COMMAND stellar_construction_projects_tests

@@ -11,6 +11,7 @@
 
 namespace stellar::core {
 struct FleetState;
+struct FleetDoctrine;
 enum class MilitaryOrderType { Hold, Defend, Attack, Retreat };
 enum class MassiveWeaponKind {
   Beam,
@@ -44,6 +45,9 @@ struct FleetCombatState {
   double retreat_progress_days{};
   bool retreat_started{}, is_disengaged{};
   std::optional<int> disengaged_system_id;
+  // Component-authored combat stats; when present the sim resolves this
+  // instead of the named catalog profile.
+  std::optional<CombatProfileDefinition> profile_override;
 };
 struct MassiveWeaponGroup {
   std::string id;
@@ -92,7 +96,15 @@ std::string_view default_combat_profile_id(FleetRole role);
 FleetCombatState
 create_initial_fleet_combat_state(std::optional<std::string_view> profile_id,
                                   FleetRole role);
+// Resolves the stats an authoritative fleet actually fights with: the
+// authored component profile when overridden, else the named catalog profile
+// (falling back to the role default for unknown ids).
+const CombatProfileDefinition &
+resolve_fleet_combat_profile(const FleetCombatState &state, FleetRole role);
 FleetCombatState &ensure_fleet_combat_state(FleetState &fleet);
+// Validates and applies a fleet doctrine; rejects non-finite or
+// out-of-range thresholds without mutating the fleet.
+bool set_fleet_doctrine(FleetState &fleet, const FleetDoctrine &doctrine);
 MassiveCombatLoadout
 massive_loadout_from_legacy(const CombatProfileDefinition &profile);
 MassiveModuleState warp_interdictor(float range = 900, float strength = 72);

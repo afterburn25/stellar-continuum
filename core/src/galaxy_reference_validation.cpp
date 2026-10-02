@@ -3,6 +3,7 @@
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/colony_operations.hpp>
 #include <stellar/core/exploration_advance.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/surface_construction.hpp>
 #include <stellar/core/surface_economy.hpp>
@@ -248,8 +249,14 @@ void validate_galaxy_references(GalaxyReferenceValidationView world) {
       data_error("Fleet " + std::to_string(fleet.id) +
                  " has tactical state for a different vessel identity.");
     if (fleet.design_id) {
-      const auto *design = find_ship_design(*fleet.design_id);
-      if (!design || design->role != fleet.role)
+      std::optional<FleetRole> role;
+      if (const auto *design = find_ship_design(*fleet.design_id))
+        role = design->role;
+      else if (const auto *authored = find_authored_ship_design(
+                   world.authored_designs, fleet.civilization_id,
+                   *fleet.design_id))
+        role = resolve_authored_ship_design(*authored).role;
+      if (!role || *role != fleet.role)
         data_error("Fleet " + std::to_string(fleet.id) +
                    " references an unknown or role-incompatible ship design.");
     }

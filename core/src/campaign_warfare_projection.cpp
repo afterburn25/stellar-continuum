@@ -28,10 +28,8 @@ const StellarSystem *find_system(std::span<const StellarSystem> systems,
 // state first, then the design's declared profile, then the role
 // default — the same precedence Core uses when minting combat state.
 const CombatProfileDefinition &profile_for(const FleetState &fleet) {
-  if (fleet.combat && !fleet.combat->profile_id.empty())
-    if (const auto *profile =
-            find_combat_profile(fleet.combat->profile_id))
-      return *profile;
+  if (fleet.combat)
+    return resolve_fleet_combat_profile(*fleet.combat, fleet.role);
   const auto &design = resolve_fleet_ship_design(
       fleet.design_id ? std::optional<std::string_view>(*fleet.design_id)
                       : std::nullopt,

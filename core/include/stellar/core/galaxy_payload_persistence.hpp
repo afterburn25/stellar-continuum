@@ -8,6 +8,7 @@
 #include <stellar/core/knowledge_persistence.hpp>
 #include <stellar/core/massive_combat_persistence.hpp>
 #include <stellar/core/planetary_body_persistence.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/shipyard_persistence.hpp>
 
 #include <cstdint>
@@ -75,6 +76,9 @@ struct GalaxyPayloadV16Dto {
   std::optional<CampaignMassiveEncounter> active_combat_encounter;
   std::optional<std::vector<FleetPowerObservation>> combat_intelligence;
   std::optional<double> stellar_activity_day;
+  // Civilization-authored component ship designs; absent on pre-authorship
+  // saves and on campaigns that only reference the fixed catalog.
+  std::optional<std::vector<AuthoredShipDesignSaveDto>> authored_ship_designs;
 };
 
 struct GalaxyPayloadCaptureOptions {

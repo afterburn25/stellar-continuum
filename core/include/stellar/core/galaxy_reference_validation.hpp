@@ -4,6 +4,7 @@
 #include <stellar/core/fleet_power_observation.hpp>
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/massive_combat_persistence.hpp>
+#include <stellar/core/ship_designs.hpp>
 
 #include <span>
 #include <stdexcept>
@@ -48,6 +49,7 @@ struct GalaxyReferenceValidationView {
   std::span<const FleetState> fleets;
   std::span<const FleetPowerObservation> combat_intelligence;
   CampaignMassiveEncounter *active_encounter{};
+  std::span<const AuthoredShipDesign> authored_designs{};
 };
 
 // Borrows the world for this call. The optional encounter is mutable because

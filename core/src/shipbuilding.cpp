@@ -1,4 +1,5 @@
 #include <stellar/core/combat_state.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/shipbuilding.hpp>
 #include <stellar/core/sovereign_currency.hpp>
 #include <stellar/core/species_environment.hpp>
@@ -105,11 +106,14 @@ ShipbuildingStrategicPreference preference_for(ShipbuildingReadView world,
              ? ShipbuildingStrategicPreference{}
              : *item;
 }
-std::optional<std::string> prepare_order_id(const ShipyardState &state) {
+std::optional<std::string> prepare_order_id(
+    const ShipyardState &state,
+    std::span<const AuthoredShipDesign> authored) {
   if (state.next_order_sequence <= 0 ||
       state.next_order_sequence == std::numeric_limits<std::int64_t>::max())
     return std::nullopt;
-  validate_shipyard_population_persistence_safety(state); // QueuedBuilds getter
+  validate_shipyard_population_persistence_safety(
+      state, authored); // QueuedBuilds getter
   std::vector<std::string> identities;
   identities.reserve(state.queued_builds.size() + 1);
   for (const auto &order : state.queued_builds)
@@ -129,7 +133,8 @@ std::optional<std::string> prepare_order_id(const ShipyardState &state) {
   }
   auto candidate = format_shipyard_order_id(state.civilization_id,
                                             state.next_order_sequence);
-  validate_shipyard_population_persistence_safety(state); // QueuedBuilds.Any
+  validate_shipyard_population_persistence_safety(
+      state, authored); // QueuedBuilds.Any
   if ((state.active_order_id && *state.active_order_id == candidate) ||
       std::any_of(
           state.queued_builds.begin(), state.queued_builds.end(),
@@ -163,7 +168,8 @@ PreparedShipBuild prepare_ship_build(ShipbuildingReadView world,
     return prepared;
   }
 
-  const auto *design = find_ship_design(design_id);
+  const auto design =
+      resolve_ship_design(world.designs(), civilization_id, design_id);
   if (!design) {
     result.blocker = "Unknown ship design.";
     return prepared;
@@ -199,7 +205,8 @@ PreparedShipBuild prepare_ship_build(ShipbuildingReadView world,
   }
 
   try {
-    result.prepared_order_id = prepare_order_id(state);
+    result.prepared_order_id =
+        prepare_order_id(state, world.authored_designs);
   } catch (const std::invalid_argument &error) {
     const std::string_view kind = error.what();
     if (kind == "invalid-identities")
@@ -257,8 +264,10 @@ PreparedShipBuild prepare_ship_build(ShipbuildingReadView world,
   result.can_start = true;
   return prepared;
 }
-bool can_promote(const ShipBuildOrderState &order, std::string &reason) {
-  if (!find_ship_design(order.design_id)) {
+bool can_promote(ShipbuildingReadView world, int civilization_id,
+                 const ShipBuildOrderState &order, std::string &reason) {
+  if (!resolve_ship_design(world.designs(), civilization_id,
+                           order.design_id)) {
     reason = "The next queued vessel references an unknown design and cannot "
              "be promoted.";
     return false;
@@ -274,15 +283,17 @@ bool can_promote(const ShipBuildOrderState &order, std::string &reason) {
   }
   return true;
 }
-void promote(ShipyardState &state) {
+void promote(ShipyardState &state,
+             std::span<const AuthoredShipDesign> authored) {
   validate_shipyard_population_persistence_safety(
-      state); // QueuedBuilds.Count getter
+      state, authored); // QueuedBuilds.Count getter
   if (state.queued_builds.empty())
     return;
-  validate_shipyard_population_persistence_safety(state); // QueuedBuilds[0]
+  validate_shipyard_population_persistence_safety(
+      state, authored); // QueuedBuilds[0]
   const auto next = state.queued_builds.front();
   validate_shipyard_population_persistence_safety(
-      state); // QueuedBuilds.RemoveAt
+      state, authored); // QueuedBuilds.RemoveAt
   state.queued_builds.erase(state.queued_builds.begin());
   state.active_design_id = next.design_id;
   state.active_order_id = next.order_id;
@@ -352,11 +363,12 @@ double resolve_budget(
                    [=](const auto &b) { return b.civilization_id == id; });
   return resolve_budget(item == budgets->end() ? nullptr : &*item, available);
 }
-const ShipDesignDefinition *select_ai_design(ShipbuildingReadView world,
-                                             const Civilization &civilization) {
+std::optional<ShipDesignDefinition>
+select_ai_design(ShipbuildingReadView world,
+                 const Civilization &civilization) {
   auto available = available_ship_designs(world.designs(), civilization.id);
   if (available.empty())
-    return nullptr;
+    return std::nullopt;
   const auto pref = preference_for(world, civilization.id);
   // One pass over world.fleets — the any_of scans per (role, populated)
   // query it replaces were also pure reads, so precomputed flags are
@@ -401,22 +413,22 @@ const ShipDesignDefinition *select_ai_design(ShipbuildingReadView world,
   if (need)
     for (const auto &d : available)
       if (d.role == *pref.preferred_new_fleet_role)
-        return find_ship_design(d.id);
+        return d;
   if (!active(FleetRole::Scout))
     for (const auto &d : available)
       if (d.role == FleetRole::Scout)
-        return find_ship_design(d.id);
+        return d;
   if (civilization.traits.scientific_curiosity >= .60 &&
       !active(FleetRole::Science))
     for (const auto &d : available)
       if (d.role == FleetRole::Science)
-        return find_ship_design(d.id);
+        return d;
   if (!pref.defer_new_colonization && civilization.expansion_allowed &&
       !active(FleetRole::Colony, true))
     for (const auto &d : available)
       if (d.role == FleetRole::Colony)
-        return find_ship_design(d.id);
-  return nullptr;
+        return d;
+  return std::nullopt;
 }
 FleetState create_fleet(ShipbuildingReadView world,
                         const Civilization &civilization,
@@ -503,6 +515,16 @@ FleetState create_fleet(ShipbuildingReadView world,
           ? std::optional<std::string_view>(*design.combat_profile_id)
           : std::nullopt,
       design.role);
+  if (const auto *authored =
+          find_authored_ship_design(world.designs().authored_designs,
+                                    civilization.id, design.id)) {
+    fleet.combat->profile_override =
+        resolve_authored_combat_profile(*authored);
+    fleet.combat->shields = fleet.combat->profile_override->max_shields;
+    fleet.combat->armor = fleet.combat->profile_override->max_armor;
+    fleet.combat->hull = fleet.combat->profile_override->max_hull;
+    fleet.tactical_loadout = massive_loadout_from_authored(*authored);
+  }
   if(home.stellar_object)begin_fleet_local_transit(fleet,FleetTransitPhase::None,{}, {},&*home.stellar_object);
   return fleet;
 }
@@ -533,7 +555,11 @@ advance_core(ShipbuildingWorld world,
     auto &state = *shipyard->second;
     if (!state.active_design_id)
       continue;
-    const auto &design = get_ship_design(*state.active_design_id);
+    const auto resolved_design = resolve_ship_design(
+        world.read().designs(), civilization.id, *state.active_design_id);
+    if (!resolved_design)
+      throw std::out_of_range("Sequence contains no matching element");
+    const auto &design = *resolved_design;
     const auto found_economy = economies.find(civilization.id);
     if (found_economy == economies.end())
       throw std::out_of_range("Sequence contains no matching element");
@@ -568,7 +594,7 @@ advance_core(ShipbuildingWorld world,
     state.reserved_population_millions = 0;
     state.reserved_population_species_id.reset();
     state.reserved_population_source_colony_id.reset();
-    promote(state);
+    promote(state, world.authored_designs);
     events.push_back({civilization.id, fleet.id, design.id,
                       civilization.name + " completed " + fleet.name + "."});
   }
@@ -611,7 +637,7 @@ ShipbuildingOrderResult start_ship_build(ShipbuildingWorld world,
                       prepared.authorization_display + "."};
   }
   validate_shipyard_population_persistence_safety(
-      state); // QueuedBuilds.Add getter
+      state, world.authored_designs); // QueuedBuilds.Add getter
   state.queued_builds.push_back(
       {*assessment.prepared_order_id, *assessment.design_id,
        assessment.credit_cost, assessment.population_cost_millions,
@@ -645,7 +671,8 @@ struct StagedShipbuilding {
   ShipbuildingWorld view() {
     return {source.civilizations, source.systems, source.construction,
         yards, colonies, economies, fleets, source.capabilities,
-        source.strategic_preferences, source.capability_query, source.preference_query};
+        source.strategic_preferences, source.capability_query,
+        source.preference_query, {}, source.authored_designs};
   }
   void commit(ShipbuildingWorld destination) {
     std::move(yards.begin(), yards.end(), destination.shipyards.begin());
@@ -725,7 +752,7 @@ assess_ship_build_cancellation(ShipbuildingReadView world, int civilization_id,
                       *state->active_order_id == order_id &&
                       state->active_design_id.has_value();
   validate_shipyard_population_persistence_safety(
-      *state); // QueuedBuilds getter
+      *state, world.authored_designs); // QueuedBuilds getter
   std::vector<const ShipBuildOrderState *> queued;
   for (const auto &q : state->queued_builds)
     if (q.order_id == order_id)
@@ -739,7 +766,8 @@ assess_ship_build_cancellation(ShipbuildingReadView world, int civilization_id,
             "cancelling."};
   const std::string design_id =
       active ? *state->active_design_id : queued[0]->design_id;
-  const auto *design = find_ship_design(design_id);
+  const auto design =
+      resolve_ship_design(world.designs(), civilization_id, design_id);
   if (!design)
     return {false, active, design_id, 0,
             "The shipyard order references an unknown design."};
@@ -775,10 +803,12 @@ assess_ship_build_cancellation(ShipbuildingReadView world, int civilization_id,
     return {false, active, design_id, 0,
             "The refund cannot be represented in the civilization treasury."};
   validate_shipyard_population_persistence_safety(
-      *state); // QueuedBuilds.Count getter
+      *state, world.authored_designs); // QueuedBuilds.Count getter
   if (active && !state->queued_builds.empty()) {
-    validate_shipyard_population_persistence_safety(*state); // QueuedBuilds[0]
-    if (!can_promote(state->queued_builds.front(), reason))
+    validate_shipyard_population_persistence_safety(
+        *state, world.authored_designs); // QueuedBuilds[0]
+    if (!can_promote(world, civilization_id, state->queued_builds.front(),
+                     reason))
       return {false, true, design_id, 0, reason};
   }
   return {true, active, design_id, refund, std::nullopt};
@@ -797,7 +827,10 @@ ShipbuildingCancellationResult cancel_ship_build(ShipbuildingWorld world,
   auto &economy = single(world.economies, [=](const auto &e) {
     return e.civilization_id == civilization_id;
   });
-  const auto &design = get_ship_design(*assessment.design_id);
+  const auto design =
+      resolve_ship_design(world.read().designs(), civilization_id,
+                          *assessment.design_id);
+  const auto &design_name = design ? design->name : *assessment.design_id;
   const auto currency =
       sovereign_currency_for_civilization(world.civilizations, civilization_id);
   if (assessment.is_active) {
@@ -819,19 +852,20 @@ ShipbuildingCancellationResult cancel_ship_build(ShipbuildingWorld world,
     state.reserved_population_millions = 0;
     state.reserved_population_species_id.reset();
     state.reserved_population_source_colony_id.reset();
-    promote(state);
+    promote(state, world.authored_designs);
     return {true,
-            "Cancelled " + design.name + "; refunded " +
+            "Cancelled " + design_name + "; refunded " +
                 currency.format(assessment.refund_credits) +
                 ". Consumed materials are not refunded.",
             assessment.refund_credits};
   }
   validate_shipyard_population_persistence_safety(
-      state); // QueuedBuilds.FindIndex getter
+      state, world.authored_designs); // QueuedBuilds.FindIndex getter
   auto item =
       std::find_if(state.queued_builds.begin(), state.queued_builds.end(),
                    [&](const auto &q) { return q.order_id == order_id; });
-  validate_shipyard_population_persistence_safety(state); // QueuedBuilds[index]
+  validate_shipyard_population_persistence_safety(
+      state, world.authored_designs); // QueuedBuilds[index]
   auto queued = *item;
   const Colony *found{};
   std::string reason;
@@ -844,25 +878,29 @@ ShipbuildingCancellationResult cancel_ship_build(ShipbuildingWorld world,
       return &c == found;
     }).population_millions += queued.reserved_population_millions;
   validate_shipyard_population_persistence_safety(
-      state); // QueuedBuilds.RemoveAt
+      state, world.authored_designs); // QueuedBuilds.RemoveAt
   state.queued_builds.erase(item);
   economy.credits += assessment.refund_credits;
   return {true,
-          "Cancelled queued " + design.name + "; refunded " +
+          "Cancelled queued " + design_name + "; refunded " +
               currency.format(assessment.refund_credits) + ".",
           assessment.refund_credits};
 }
 
-double shipbuilding_industry_demand(ShipbuildingReadView,
+double shipbuilding_industry_demand(ShipbuildingReadView world,
                                     const ShipyardState *state,
                                     double days) {
   if (!state)
     throw std::out_of_range("Sequence contains no matching element");
   if (!state->active_design_id)
     return 0;
-  const auto &design = get_ship_design(*state->active_design_id);
+  const auto design =
+      resolve_ship_design(world.designs(), state->civilization_id,
+                          *state->active_design_id);
+  if (!design)
+    return 0;
   return math_min(
-      math_max(0, design.industry_cost - state->active_build_progress),
+      math_max(0, design->industry_cost - state->active_build_progress),
       shipbuilding_industry_per_day * math_max(0, days));
 }
 double shipbuilding_industry_demand(ShipbuildingReadView world,
@@ -883,7 +921,7 @@ void ensure_automatic_ship_orders(ShipbuildingWorld world) {
     auto &state = *found->second;
     if (state.active_design_id)
       continue;
-    if (const auto *design = select_ai_design(world.read(), civilization))
+    if (const auto design = select_ai_design(world.read(), civilization))
       (void)start_ship_build(world, civilization.id, design->id);
   }
 }

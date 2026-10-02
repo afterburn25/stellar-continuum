@@ -6,14 +6,14 @@
 namespace stellar::core {
 namespace {
 const CombatProfileDefinition &read_profile(const FleetState &fleet) {
-  if (fleet.combat && !fleet.combat->profile_id.empty())
-    if (const auto *profile = find_combat_profile(fleet.combat->profile_id))
-      return *profile;
+  if (fleet.combat)
+    return resolve_fleet_combat_profile(*fleet.combat, fleet.role);
   return get_combat_profile(default_combat_profile_id(fleet.role));
 }
 
 bool disengaged_here(const FleetState &fleet, int system_id) {
-  if (!fleet.combat || !find_combat_profile(fleet.combat->profile_id))
+  if (!fleet.combat || (!fleet.combat->profile_override &&
+                        !find_combat_profile(fleet.combat->profile_id)))
     return false;
   return fleet.combat->is_disengaged &&
          fleet.combat->disengaged_system_id == system_id;

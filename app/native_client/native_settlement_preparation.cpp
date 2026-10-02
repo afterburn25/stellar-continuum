@@ -5,6 +5,7 @@
 #include <stellar/core/adaptive_research_capability_adapters.hpp>
 #include <stellar/core/colonization_runtime.hpp>
 #include <stellar/core/shipbuilding.hpp>
+#include <stellar/core/ship_components.hpp>
 #include <stellar/core/ship_designs.hpp>
 #include <stellar/core/species_environment.hpp>
 
@@ -29,7 +30,8 @@ Option build_option(const ShipbuildingReadView &read,
                     const double expedition_cost,
                     const double establishment_days,
                     const stellar::engine::LocalizationTable *locale) {
-  const auto *design = find_ship_design(design_id);
+  const auto design =
+      resolve_ship_design(read.designs(), civilization_id, design_id);
   const auto assessment = assess_start_ship_build(read, civilization_id, design_id);
   Option option;
   option.design_id = std::string(design_id);
@@ -89,7 +91,8 @@ std::optional<View> build_settlement_preparation(CampaignFrame &frame,
   const ShipbuildingReadView read{world.civilizations, world.systems,
                                   world.construction, world.shipyards,
                                   world.colonies, world.economies, world.fleets,
-                                  {}, {}, capability_query, {}};
+                                  {}, {}, capability_query, {},
+                                  world.authored_ship_designs};
 
   View result;
   result.campaign_generation = generation;
