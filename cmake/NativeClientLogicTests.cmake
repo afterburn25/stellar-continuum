@@ -6,11 +6,13 @@ if(MSVC)
   target_compile_options(stellar_native_calendar_tests PRIVATE /W4 /WX)
 endif()
 
-add_executable(stellar_native_economy_tests native-tests/native_economy_tests.cpp app/native_client/native_economy.cpp)
+add_executable(stellar_native_economy_tests native-tests/native_economy_tests.cpp)
+target_link_libraries(stellar_native_economy_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_economy_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_economy_tests PRIVATE stellar_core)
 add_test(NAME native_economy COMMAND stellar_native_economy_tests "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
-add_executable(stellar_native_economy_workspace_tests native-tests/native_economy_workspace_tests.cpp app/native_client/native_economy_workspace.cpp)
+add_executable(stellar_native_economy_workspace_tests native-tests/native_economy_workspace_tests.cpp)
+target_link_libraries(stellar_native_economy_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_economy_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_economy_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_economy_workspace COMMAND stellar_native_economy_workspace_tests)
@@ -19,11 +21,13 @@ if(MSVC)
   target_compile_options(stellar_native_economy_workspace_tests PRIVATE /W4 /WX)
 endif()
 
-add_executable(stellar_native_logistics_tests native-tests/native_logistics_tests.cpp app/native_client/native_logistics.cpp)
+add_executable(stellar_native_logistics_tests native-tests/native_logistics_tests.cpp)
+target_link_libraries(stellar_native_logistics_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_logistics_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_logistics_tests PRIVATE stellar_core)
 add_test(NAME native_logistics COMMAND stellar_native_logistics_tests)
-add_executable(stellar_native_logistics_workspace_tests native-tests/native_logistics_workspace_tests.cpp app/native_client/native_logistics_workspace.cpp)
+add_executable(stellar_native_logistics_workspace_tests native-tests/native_logistics_workspace_tests.cpp)
+target_link_libraries(stellar_native_logistics_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_logistics_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_logistics_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_logistics_workspace COMMAND stellar_native_logistics_workspace_tests)
@@ -34,7 +38,8 @@ endif()
 
 # Pure client logic remains testable on headless CI without SDL, a font or a GPU.
 add_executable(stellar_native_inspection_tests
-  native-tests/native_inspection_tests.cpp app/native_client/native_inspection.cpp)
+  native-tests/native_inspection_tests.cpp)
+target_link_libraries(stellar_native_inspection_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_inspection_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_inspection_tests PRIVATE stellar_core)
 add_test(NAME native_inspection COMMAND stellar_native_inspection_tests)
@@ -43,8 +48,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_battle_workspace_tests
-  native-tests/native_battle_workspace_tests.cpp
-  app/native_client/native_battle_workspace.cpp)
+  native-tests/native_battle_workspace_tests.cpp)
+target_link_libraries(stellar_battle_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_battle_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_battle_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_battle_workspace COMMAND stellar_battle_workspace_tests)
@@ -53,8 +58,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_battle_art_tests
-  native-tests/native_battle_art_tests.cpp
-  app/native_client/native_battle_art.cpp)
+  native-tests/native_battle_art_tests.cpp)
+target_link_libraries(stellar_native_battle_art_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_battle_art_tests PRIVATE
   app/native_client engine/include)
 target_link_libraries(stellar_native_battle_art_tests PRIVATE stellar_core)
@@ -65,13 +70,14 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_support_tests
-  native-tests/native_support_tests.cpp app/native_client/native_support.cpp)
+  native-tests/native_support_tests.cpp)
+target_link_libraries(stellar_native_support_tests PRIVATE stellar_native_client_logic)
 target_link_libraries(stellar_native_support_tests PRIVATE stellar_engine)
 target_include_directories(stellar_native_support_tests PRIVATE app/native_client)
 add_test(NAME native_support COMMAND stellar_native_support_tests)
 add_executable(stellar_native_support_service_tests
-  native-tests/native_support_service_tests.cpp
-  app/native_client/native_support.cpp app/native_client/native_support_service.cpp)
+  native-tests/native_support_service_tests.cpp)
+target_link_libraries(stellar_native_support_service_tests PRIVATE stellar_native_client_logic)
 target_link_libraries(stellar_native_support_service_tests PRIVATE stellar_engine)
 target_include_directories(stellar_native_support_service_tests PRIVATE app/native_client)
 add_test(NAME native_support_service COMMAND stellar_native_support_service_tests)
@@ -81,20 +87,20 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_notification_tests
-  native-tests/native_notification_tests.cpp app/native_client/native_notifications.cpp)
+  native-tests/native_notification_tests.cpp)
+target_link_libraries(stellar_native_notification_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_notification_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_notification_tests PRIVATE stellar_engine)
 add_test(NAME native_notifications COMMAND stellar_native_notification_tests)
 add_executable(stellar_native_notification_events_tests
-  native-tests/native_notification_events_tests.cpp
-  app/native_client/native_notifications.cpp app/native_client/native_notification_events.cpp
-  app/native_client/native_chronicle.cpp)
+  native-tests/native_notification_events_tests.cpp)
+target_link_libraries(stellar_native_notification_events_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_notification_events_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_notification_events_tests PRIVATE stellar_core stellar_native_campaign_feedback)
 add_test(NAME native_notification_events COMMAND stellar_native_notification_events_tests)
 add_executable(stellar_native_chronicle_tests
-  native-tests/native_chronicle_tests.cpp
-  app/native_client/native_notifications.cpp app/native_client/native_chronicle.cpp)
+  native-tests/native_chronicle_tests.cpp)
+target_link_libraries(stellar_native_chronicle_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_chronicle_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_chronicle_tests PRIVATE stellar_core)
 target_compile_definitions(stellar_native_chronicle_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
@@ -105,8 +111,8 @@ if(MSVC)
   target_compile_options(stellar_native_chronicle_tests PRIVATE /W4 /WX)
 endif()
 add_executable(stellar_native_system_travel_tests
-  native-tests/native_system_travel_tests.cpp
-  app/native_client/native_system_travel.cpp app/native_client/native_system_view.cpp)
+  native-tests/native_system_travel_tests.cpp)
+target_link_libraries(stellar_native_system_travel_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_system_travel_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_system_travel_tests PRIVATE stellar_core)
 add_test(NAME native_system_travel COMMAND stellar_native_system_travel_tests
@@ -118,9 +124,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_system_workspace_tests
-  native-tests/native_system_workspace_tests.cpp
-  app/native_client/native_system_workspace.cpp app/native_client/native_system_view.cpp
-  app/native_client/native_system_travel.cpp app/native_client/native_fleet_controller.cpp)
+  native-tests/native_system_workspace_tests.cpp)
+target_link_libraries(stellar_native_system_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_system_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_system_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_system_workspace COMMAND stellar_native_system_workspace_tests
@@ -132,8 +137,10 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_system_view_tests
-  native-tests/native_system_view_tests.cpp app/native_client/native_system_view.cpp)
-add_executable(stellar_native_small_body_renderer_tests native-tests/native_small_body_renderer_tests.cpp app/native_client/native_small_body_renderer.cpp app/native_client/native_system_view.cpp)
+  native-tests/native_system_view_tests.cpp)
+target_link_libraries(stellar_native_system_view_tests PRIVATE stellar_native_client_logic)
+add_executable(stellar_native_small_body_renderer_tests native-tests/native_small_body_renderer_tests.cpp)
+target_link_libraries(stellar_native_small_body_renderer_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_small_body_renderer_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_small_body_renderer_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_small_body_renderer COMMAND stellar_native_small_body_renderer_tests)
@@ -148,7 +155,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_research_controller_tests
-  native-tests/native_research_controller_tests.cpp app/native_client/native_research_controller.cpp)
+  native-tests/native_research_controller_tests.cpp)
+target_link_libraries(stellar_native_research_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_research_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_research_controller_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_research_controller COMMAND stellar_native_research_controller_tests
@@ -159,7 +167,8 @@ add_test(NAME native_research_controller COMMAND stellar_native_research_control
 set_tests_properties(native_research_controller PROPERTIES TIMEOUT 90)
 
 add_executable(stellar_native_research_workspace_tests
-  native-tests/native_research_workspace_tests.cpp app/native_client/native_research_workspace.cpp)
+  native-tests/native_research_workspace_tests.cpp)
+target_link_libraries(stellar_native_research_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_research_workspace_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_research_workspace_tests PRIVATE stellar_core stellar_native_image stellar_json)
 add_test(NAME native_research_workspace COMMAND stellar_native_research_workspace_tests)
@@ -180,7 +189,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_fleet_controller_tests
-  native-tests/native_fleet_controller_tests.cpp app/native_client/native_fleet_controller.cpp)
+  native-tests/native_fleet_controller_tests.cpp)
+target_link_libraries(stellar_native_fleet_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_fleet_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_fleet_controller_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_fleet_controller COMMAND stellar_native_fleet_controller_tests
@@ -190,14 +200,15 @@ add_test(NAME native_fleet_controller COMMAND stellar_native_fleet_controller_te
   "${CMAKE_BINARY_DIR}/native-fleet-cases")
 set_tests_properties(native_fleet_controller PROPERTIES TIMEOUT 90)
 add_executable(stellar_native_fleet_workspace_tests
-  native-tests/native_fleet_workspace_tests.cpp app/native_client/native_fleet_workspace.cpp
-  app/native_client/native_overview.cpp app/native_client/native_ship_art_assets.cpp)
+  native-tests/native_fleet_workspace_tests.cpp)
+target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_fleet_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_fleet_workspace_tests PRIVATE stellar_core stellar_native_image)
 target_compile_definitions(stellar_native_fleet_workspace_tests PRIVATE STELLAR_LOCALE_DIR="${CMAKE_SOURCE_DIR}/data/locale")
 add_test(NAME native_fleet_workspace COMMAND stellar_native_fleet_workspace_tests)
 add_executable(stellar_native_fleet_presentation_tests
-  native-tests/native_fleet_presentation_tests.cpp app/native_client/native_fleet_presentation.cpp)
+  native-tests/native_fleet_presentation_tests.cpp)
+target_link_libraries(stellar_native_fleet_presentation_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_fleet_presentation_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_fleet_presentation_tests PRIVATE stellar_core)
 add_test(NAME native_fleet_presentation COMMAND stellar_native_fleet_presentation_tests)
@@ -209,7 +220,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_shipyard_controller_tests
-  native-tests/native_shipyard_controller_tests.cpp app/native_client/native_shipyard_controller.cpp)
+  native-tests/native_shipyard_controller_tests.cpp)
+target_link_libraries(stellar_native_shipyard_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_shipyard_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_shipyard_controller_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_shipyard_controller COMMAND stellar_native_shipyard_controller_tests
@@ -223,8 +235,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_shipyard_workspace_tests
-  native-tests/native_shipyard_workspace_tests.cpp app/native_client/native_shipyard_workspace.cpp
-  app/native_client/native_ship_art_assets.cpp)
+  native-tests/native_shipyard_workspace_tests.cpp)
+target_link_libraries(stellar_native_shipyard_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_shipyard_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_shipyard_workspace_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_shipyard_workspace COMMAND stellar_native_shipyard_workspace_tests)
@@ -233,7 +245,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_construction_controller_tests
-  native-tests/native_construction_controller_tests.cpp app/native_client/native_construction_controller.cpp)
+  native-tests/native_construction_controller_tests.cpp)
+target_link_libraries(stellar_native_construction_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_construction_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_construction_controller_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_construction_controller COMMAND stellar_native_construction_controller_tests
@@ -243,7 +256,8 @@ add_test(NAME native_construction_controller COMMAND stellar_native_construction
   "${CMAKE_BINARY_DIR}/native-construction-cases")
 set_tests_properties(native_construction_controller PROPERTIES TIMEOUT 90)
 add_executable(stellar_native_construction_workspace_tests
-  native-tests/native_construction_workspace_tests.cpp app/native_client/native_construction_workspace.cpp)
+  native-tests/native_construction_workspace_tests.cpp)
+target_link_libraries(stellar_native_construction_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_construction_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_construction_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_construction_workspace COMMAND stellar_native_construction_workspace_tests)
@@ -253,8 +267,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_diplomacy_controller_tests
-  native-tests/native_diplomacy_controller_tests.cpp
-  app/native_client/native_diplomacy_controller.cpp)
+  native-tests/native_diplomacy_controller_tests.cpp)
+target_link_libraries(stellar_native_diplomacy_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_diplomacy_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_diplomacy_controller_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_diplomacy_controller COMMAND stellar_native_diplomacy_controller_tests
@@ -262,9 +276,8 @@ add_test(NAME native_diplomacy_controller COMMAND stellar_native_diplomacy_contr
   "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
 set_tests_properties(native_diplomacy_controller PROPERTIES TIMEOUT 90)
 add_executable(stellar_native_diplomacy_workspace_tests
-  native-tests/native_diplomacy_workspace_tests.cpp
-  app/native_client/native_diplomacy_workspace.cpp
-  app/native_client/native_diplomacy_controller.cpp)
+  native-tests/native_diplomacy_workspace_tests.cpp)
+target_link_libraries(stellar_native_diplomacy_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_diplomacy_workspace_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_diplomacy_workspace_tests PRIVATE stellar_core)
 add_test(NAME native_diplomacy_workspace COMMAND stellar_native_diplomacy_workspace_tests)
@@ -274,8 +287,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_quick_find_tests
-  native-tests/native_quick_find_tests.cpp
-  app/native_client/native_quick_find.cpp)
+  native-tests/native_quick_find_tests.cpp)
+target_link_libraries(stellar_native_quick_find_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_quick_find_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_quick_find_tests PRIVATE stellar_core)
 add_test(NAME native_quick_find COMMAND stellar_native_quick_find_tests)
@@ -284,11 +297,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_fresh_progression_tests
-  native-tests/native_fresh_progression_tests.cpp
-  app/native_client/native_research_controller.cpp
-  app/native_client/native_construction_controller.cpp
-  app/native_client/native_shipyard_controller.cpp
-  app/native_client/native_fleet_controller.cpp)
+  native-tests/native_fresh_progression_tests.cpp)
+target_link_libraries(stellar_native_fresh_progression_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_fresh_progression_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_fresh_progression_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_fresh_progression COMMAND stellar_native_fresh_progression_tests
@@ -302,10 +312,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_colony_controller_tests
-  native-tests/native_colony_controller_tests.cpp
-  app/native_client/native_colony_controller.cpp
-  app/native_client/native_settlement_mission_controller.cpp
-  app/native_client/native_system_view.cpp)
+  native-tests/native_colony_controller_tests.cpp)
+target_link_libraries(stellar_native_colony_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_colony_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_colony_controller_tests PRIVATE stellar_core)
 add_test(NAME native_colony_controller COMMAND stellar_native_colony_controller_tests
@@ -317,10 +325,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_surface_ui_tests
-  native-tests/native_surface_construction_controller_tests.cpp
-  app/native_client/native_surface_construction_controller.cpp
-  app/native_client/native_colony_controller.cpp
-  app/native_client/native_system_view.cpp)
+  native-tests/native_surface_construction_controller_tests.cpp)
+target_link_libraries(stellar_surface_ui_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_surface_ui_tests PRIVATE app/native_client)
 target_link_libraries(stellar_surface_ui_tests PRIVATE stellar_core)
 add_test(NAME native_surface_construction_controller COMMAND stellar_surface_ui_tests
@@ -332,9 +338,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_colony_workspace_tests
-  native-tests/native_colony_workspace_tests.cpp
-  app/native_client/native_body_inspection.cpp
-  app/native_client/native_colony_workspace.cpp)
+  native-tests/native_colony_workspace_tests.cpp)
+target_link_libraries(stellar_native_colony_workspace_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_colony_workspace_tests PRIVATE
   app/native_client
   engine/include)
@@ -342,11 +347,8 @@ target_link_libraries(stellar_native_colony_workspace_tests PRIVATE stellar_core
 add_test(NAME native_colony_workspace COMMAND stellar_native_colony_workspace_tests)
 
 add_executable(stellar_native_system_colony_entry_tests
-  native-tests/native_system_colony_entry_tests.cpp
-  app/native_client/native_system_view.cpp
-  app/native_client/native_system_travel.cpp
-  app/native_client/native_system_workspace.cpp
-  app/native_client/native_fleet_controller.cpp)
+  native-tests/native_system_colony_entry_tests.cpp)
+target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_system_colony_entry_tests PRIVATE
   app/native_client
   engine/include)
@@ -359,8 +361,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_settle_target_tests
-  native-tests/native_settlement_targeting_tests.cpp
-  app/native_client/native_settlement_mission_controller.cpp)
+  native-tests/native_settlement_targeting_tests.cpp)
+target_link_libraries(stellar_settle_target_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_settle_target_tests PRIVATE app/native_client)
 target_link_libraries(stellar_settle_target_tests PRIVATE stellar_core)
 add_test(NAME native_settlement_targeting COMMAND stellar_settle_target_tests
@@ -372,8 +374,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_settlement_preparation_tests
-  native-tests/native_settlement_preparation_tests.cpp
-  app/native_client/native_settlement_preparation.cpp)
+  native-tests/native_settlement_preparation_tests.cpp)
+target_link_libraries(stellar_native_settlement_preparation_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_settlement_preparation_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_settlement_preparation_tests PRIVATE stellar_core)
 add_test(NAME native_settlement_preparation COMMAND stellar_native_settlement_preparation_tests
@@ -385,11 +387,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_earned_settlement_tests
-  native-tests/native_earned_settlement_tests.cpp
-  app/native_client/native_fleet_controller.cpp
-  app/native_client/native_shipyard_controller.cpp
-  app/native_client/native_settlement_mission_controller.cpp
-  app/native_client/native_settlement_preparation.cpp)
+  native-tests/native_earned_settlement_tests.cpp)
+target_link_libraries(stellar_native_earned_settlement_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_earned_settlement_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_earned_settlement_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_earned_settlement COMMAND stellar_native_earned_settlement_tests
@@ -401,11 +400,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_settle_ui_tests
-  native-tests/native_settlement_workspace_tests.cpp
-  app/native_client/native_settlement_workspace.cpp
-  app/native_client/native_system_workspace.cpp
-  app/native_client/native_system_view.cpp
-  app/native_client/native_system_travel.cpp)
+  native-tests/native_settlement_workspace_tests.cpp)
+target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_settle_ui_tests PRIVATE
   app/native_client
   engine/include)
@@ -416,8 +412,8 @@ endif()
 add_test(NAME native_settlement_workspace COMMAND stellar_settle_ui_tests)
 
 add_executable(stellar_native_outpost_freight_controller_tests
-  native-tests/native_outpost_freight_controller_tests.cpp
-  app/native_client/native_outpost_freight_controller.cpp)
+  native-tests/native_outpost_freight_controller_tests.cpp)
+target_link_libraries(stellar_native_outpost_freight_controller_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_outpost_freight_controller_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_outpost_freight_controller_tests PRIVATE stellar_core)
 add_test(NAME native_outpost_freight_controller COMMAND stellar_native_outpost_freight_controller_tests
@@ -445,16 +441,15 @@ add_test(NAME developer_fixed_simulation COMMAND stellar_developer_simulation_te
 
 
 add_executable(stellar_new_setup_tests
-  app/native_client/native_new_campaign_setup.cpp
   native-tests/native_new_campaign_setup_tests.cpp)
+target_link_libraries(stellar_new_setup_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_new_setup_tests PRIVATE third_party)
 add_executable(stellar_new_generation_tests
-  app/native_client/native_new_campaign_setup.cpp
-  app/native_client/native_new_campaign_generation.cpp
   native-tests/native_new_campaign_generation_tests.cpp)
+target_link_libraries(stellar_new_generation_tests PRIVATE stellar_native_client_logic)
 add_executable(stellar_new_ui_tests
-  app/native_client/native_new_game_workspace.cpp
   native-tests/native_new_game_workspace_tests.cpp)
+target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_client_logic)
 foreach(STELLAR_SETUP_TEST IN ITEMS stellar_new_setup_tests stellar_new_generation_tests stellar_new_ui_tests)
   target_include_directories(${STELLAR_SETUP_TEST} PRIVATE app/native_client engine/include)
   target_link_libraries(${STELLAR_SETUP_TEST} PRIVATE stellar_core)
@@ -481,12 +476,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_startup_tests
-  app/native_client/native_new_campaign_setup.cpp
-  app/native_client/native_new_campaign_generation.cpp
-  app/native_client/native_campaign_session.cpp
-  app/native_client/native_notifications.cpp
-  app/native_client/native_startup_session.cpp
   native-tests/native_startup_session_tests.cpp)
+target_link_libraries(stellar_startup_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_startup_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_startup_tests PRIVATE stellar_core stellar_engine stellar_json Shell32 Ole32)
 if(MSVC)
@@ -499,9 +490,8 @@ add_test(NAME native_startup_session COMMAND stellar_startup_tests
 set_tests_properties(native_startup_session PROPERTIES TIMEOUT 240)
 
 add_executable(stellar_startup_ui_tests
-  app/native_client/native_new_game_workspace.cpp
-  app/native_client/native_startup_workspace.cpp
   native-tests/native_startup_workspace_tests.cpp)
+target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_startup_ui_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_core)
 if(MSVC)
@@ -511,18 +501,16 @@ add_test(NAME native_startup_workspace COMMAND stellar_startup_ui_tests)
 
 # Approved menu/loading artwork and its responsive player controls.
 add_executable(stellar_art_tests
-  app/native_client/native_startup_artwork.cpp
-  app/native_client/native_new_game_workspace.cpp
-  app/native_client/native_startup_workspace.cpp
   native-tests/native_startup_artwork_tests.cpp)
+target_link_libraries(stellar_art_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_art_tests PRIVATE app/native_client)
 target_link_libraries(stellar_art_tests PRIVATE stellar_core stellar_engine stellar_native_image)
 if(MSVC)
   target_compile_options(stellar_art_tests PRIVATE /W4 /WX /permissive-)
 endif()
 add_test(NAME native_startup_artwork COMMAND stellar_art_tests "${CMAKE_SOURCE_DIR}")
-target_sources(stellar_new_ui_tests PRIVATE app/native_client/native_startup_artwork.cpp)
-target_sources(stellar_startup_ui_tests PRIVATE app/native_client/native_startup_artwork.cpp)
+target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_client_logic)
+target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_client_logic)
 target_link_libraries(stellar_new_ui_tests PRIVATE stellar_native_image)
 target_link_libraries(stellar_startup_ui_tests PRIVATE stellar_native_image)
 
@@ -533,23 +521,17 @@ if(BUILD_TESTING)
   add_test(NAME native_image_preparation COMMAND stellar_native_image_preparation_tests)
   set_tests_properties(native_image_preparation PROPERTIES TIMEOUT 30)
   add_executable(stellar_celestial_tests
-    native-tests/native_celestial_appearance_tests.cpp
-    app/native_client/native_celestial_appearance.cpp)
+    native-tests/native_celestial_appearance_tests.cpp)
+target_link_libraries(stellar_celestial_tests PRIVATE stellar_native_client_logic)
   target_include_directories(stellar_celestial_tests PRIVATE
     app/native_client engine/include core/include)
   target_link_libraries(stellar_celestial_tests PRIVATE
     stellar_native_image)
   add_test(NAME native_celestial_appearance
     COMMAND stellar_celestial_tests)
-  target_sources(stellar_native_system_workspace_tests PRIVATE
-    app/native_client/native_celestial_appearance.cpp
-    app/native_client/native_orbital_structure.cpp)
-  target_sources(stellar_native_system_colony_entry_tests PRIVATE
-    app/native_client/native_celestial_appearance.cpp
-    app/native_client/native_orbital_structure.cpp)
-  target_sources(stellar_settle_ui_tests PRIVATE
-    app/native_client/native_celestial_appearance.cpp
-    app/native_client/native_orbital_structure.cpp)
+target_link_libraries(stellar_native_system_workspace_tests PRIVATE stellar_native_client_logic)
+target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE stellar_native_client_logic)
+target_link_libraries(stellar_settle_ui_tests PRIVATE stellar_native_client_logic)
   target_link_libraries(stellar_native_system_workspace_tests PRIVATE
     stellar_native_image)
   target_link_libraries(stellar_native_system_colony_entry_tests PRIVATE
@@ -562,20 +544,16 @@ if(BUILD_TESTING)
 endif()
 
 
-add_executable(stellar_galaxy_backdrop_tests
-  app/native_client/native_galaxy_backdrop.cpp native-tests/native_galaxy_backdrop_tests.cpp)
+add_executable(stellar_galaxy_backdrop_tests native-tests/native_galaxy_backdrop_tests.cpp)
+target_link_libraries(stellar_galaxy_backdrop_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_galaxy_backdrop_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_backdrop_tests PRIVATE stellar_native_image stellar_core)
 add_test(NAME native_galaxy_backdrop COMMAND stellar_galaxy_backdrop_tests "${CMAKE_SOURCE_DIR}")
 set_tests_properties(native_galaxy_backdrop PROPERTIES TIMEOUT 45)
 
 add_executable(stellar_ship_art_tests
-  native-tests/native_ship_art_tests.cpp
-  app/native_client/native_ship_art_assets.cpp
-  app/native_client/native_fleet_route_effects.cpp
-  app/native_client/native_fleet_workspace.cpp
-  app/native_client/native_overview.cpp
-  app/native_client/native_shipyard_workspace.cpp)
+  native-tests/native_ship_art_tests.cpp)
+target_link_libraries(stellar_ship_art_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_ship_art_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_ship_art_tests PRIVATE stellar_native_image stellar_core)
 add_test(NAME native_ship_art COMMAND stellar_ship_art_tests "${CMAKE_SOURCE_DIR}")
@@ -584,22 +562,21 @@ if(MSVC)
   target_compile_options(stellar_ship_art_tests PRIVATE /W4 /WX /permissive-)
 endif()
 
-add_executable(stellar_galaxy_marker_tests
-  app/native_client/native_galaxy_star_markers.cpp native-tests/native_galaxy_star_markers_tests.cpp)
+add_executable(stellar_galaxy_marker_tests native-tests/native_galaxy_star_markers_tests.cpp)
+target_link_libraries(stellar_galaxy_marker_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_galaxy_marker_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_marker_tests PRIVATE stellar_native_image)
 add_test(NAME native_galaxy_star_markers COMMAND stellar_galaxy_marker_tests)
 
 add_executable(stellar_galaxy_label_tests
-  app/native_client/native_galaxy_labels.cpp
   native-tests/native_galaxy_labels_tests.cpp)
+target_link_libraries(stellar_galaxy_label_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_galaxy_label_tests PRIVATE
   app/native_client engine/include)
 add_test(NAME native_galaxy_labels COMMAND stellar_galaxy_label_tests)
 add_executable(stellar_territory_tests
-  app/native_client/native_territory_projection.cpp
-  app/native_client/native_territory_overlay.cpp
   native-tests/native_territory_projection_tests.cpp)
+target_link_libraries(stellar_territory_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_territory_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_territory_tests PRIVATE stellar_native_image stellar_core)
 add_test(NAME native_territory_projection COMMAND stellar_territory_tests)
@@ -609,8 +586,8 @@ target_include_directories(stellar_spatial_point_index_tests PRIVATE engine/incl
 add_test(NAME engine_spatial_point_index COMMAND stellar_spatial_point_index_tests)
 
 add_executable(stellar_orbital_structure_tests
-  app/native_client/native_orbital_structure.cpp
   native-tests/native_orbital_structure_tests.cpp)
+target_link_libraries(stellar_orbital_structure_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_orbital_structure_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_orbital_structure_tests PRIVATE stellar_native_image)
 add_test(NAME native_orbital_structure COMMAND stellar_orbital_structure_tests)
@@ -619,8 +596,8 @@ if(MSVC)
   target_compile_options(stellar_orbital_structure_tests PRIVATE /W4 /WX /permissive-)
 endif()
 add_executable(stellar_surface_scene_tests
-  app/native_client/native_surface_scene.cpp
   native-tests/native_surface_scene_tests.cpp)
+target_link_libraries(stellar_surface_scene_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_surface_scene_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_surface_scene_tests PRIVATE stellar_native_image)
 add_test(NAME native_surface_scene COMMAND stellar_surface_scene_tests)
@@ -630,8 +607,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_surface_relief_tests
-  app/native_client/native_surface_relief.cpp
   native-tests/native_surface_relief_tests.cpp)
+target_link_libraries(stellar_surface_relief_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_surface_relief_tests PRIVATE
   app/native_client
   engine/include)
@@ -650,17 +627,18 @@ endif()
 
 
 # Survey-gated physical facts and measured inspector layout remain headless-testable.
-add_executable(stellar_native_body_inspection_tests native-tests/native_body_inspection_tests.cpp app/native_client/native_body_inspection.cpp)
+add_executable(stellar_native_body_inspection_tests native-tests/native_body_inspection_tests.cpp)
+target_link_libraries(stellar_native_body_inspection_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_body_inspection_tests PRIVATE app/native_client)
 target_link_libraries(stellar_native_body_inspection_tests PRIVATE stellar_core)
 add_test(NAME native_body_inspection COMMAND stellar_native_body_inspection_tests)
-add_executable(stellar_native_body_inspection_panel_tests native-tests/native_body_inspection_panel_tests.cpp app/native_client/native_body_inspection_panel.cpp)
+add_executable(stellar_native_body_inspection_panel_tests native-tests/native_body_inspection_panel_tests.cpp)
+target_link_libraries(stellar_native_body_inspection_panel_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_body_inspection_panel_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_body_inspection_panel_tests PRIVATE stellar_core)
 add_test(NAME native_body_inspection_panel COMMAND stellar_native_body_inspection_panel_tests)
 foreach(target stellar_native_system_workspace_tests stellar_native_system_colony_entry_tests stellar_settle_ui_tests)
-  target_sources(${target} PRIVATE app/native_client/native_small_body_renderer.cpp app/native_client/native_small_body_panel.cpp)
-  target_sources(${target} PRIVATE app/native_client/native_body_inspection.cpp app/native_client/native_body_inspection_panel.cpp)
+  target_link_libraries(${target} PRIVATE stellar_native_client_logic)
 endforeach()
 if(MSVC)
   target_compile_options(stellar_native_body_inspection_tests PRIVATE /W4 /WX)
@@ -668,8 +646,8 @@ if(MSVC)
 endif()
 
 add_executable(stellar_native_colony_roster_tests
-  native-tests/native_colony_roster_tests.cpp
-  app/native_client/native_colony_roster.cpp)
+  native-tests/native_colony_roster_tests.cpp)
+target_link_libraries(stellar_native_colony_roster_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_colony_roster_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_colony_roster_tests PRIVATE stellar_core stellar_engine)
 if(MSVC)
@@ -678,8 +656,8 @@ endif()
 add_test(NAME native_colony_roster COMMAND stellar_native_colony_roster_tests)
 
 add_executable(stellar_native_planetary_screen_tests
-  native-tests/native_planetary_screen_tests.cpp
-  app/native_client/native_body_inspection.cpp)
+  native-tests/native_planetary_screen_tests.cpp)
+target_link_libraries(stellar_native_planetary_screen_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_planetary_screen_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_planetary_screen_tests PRIVATE stellar_core stellar_native_image)
 add_test(NAME native_planetary_screen COMMAND stellar_native_planetary_screen_tests "${CMAKE_SOURCE_DIR}/assets/visual/sol")
@@ -687,7 +665,8 @@ if(MSVC)
   target_compile_options(stellar_native_planetary_screen_tests PRIVATE /WX)
 endif()
 
-add_executable(stellar_native_controlled_assets_tests native-tests/native_controlled_assets_tests.cpp app/native_client/native_controlled_assets.cpp)
+add_executable(stellar_native_controlled_assets_tests native-tests/native_controlled_assets_tests.cpp)
+target_link_libraries(stellar_native_controlled_assets_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_controlled_assets_tests PRIVATE app/native_client engine/include)
 target_link_libraries(stellar_native_controlled_assets_tests PRIVATE stellar_core)
 add_test(NAME native_controlled_assets COMMAND stellar_native_controlled_assets_tests)
@@ -705,7 +684,8 @@ endforeach()
 target_link_libraries(stellar_galaxy_configuration_tests PRIVATE stellar_core stellar_json)
 add_test(NAME galaxy_configuration COMMAND stellar_galaxy_configuration_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")
 set_tests_properties(galaxy_configuration PROPERTIES TIMEOUT 180)
-add_executable(stellar_galaxy_phenomena_tests native-tests/galaxy_phenomena_tests.cpp app/native_client/native_phenomena.cpp)
+add_executable(stellar_galaxy_phenomena_tests native-tests/galaxy_phenomena_tests.cpp)
+target_link_libraries(stellar_galaxy_phenomena_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_galaxy_phenomena_tests PRIVATE app/native_client)
 target_link_libraries(stellar_galaxy_phenomena_tests PRIVATE stellar_core stellar_native_image stellar_json)
 add_test(NAME galaxy_phenomena COMMAND stellar_galaxy_phenomena_tests "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json")

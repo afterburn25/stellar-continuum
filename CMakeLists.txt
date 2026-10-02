@@ -306,8 +306,8 @@ target_include_directories(stellar_developer_report_tests PRIVATE app)
 target_link_libraries(stellar_developer_report_tests PRIVATE stellar_core stellar_json)
 add_test(NAME developer_diagnostic_report COMMAND stellar_developer_report_tests
   "${CMAKE_SOURCE_DIR}/data/astronomy/hyg-nearby-500-v1.json" "${CMAKE_SOURCE_DIR}/data/research/v1" "${CMAKE_BINARY_DIR}/diagnostic-report-tests")
-add_executable(stellar_native_developer_fault_tests native-tests/native_developer_fault_tests.cpp
-  app/native_client/native_support.cpp app/native_client/native_support_service.cpp)
+add_executable(stellar_native_developer_fault_tests native-tests/native_developer_fault_tests.cpp)
+target_link_libraries(stellar_native_developer_fault_tests PRIVATE stellar_native_client_logic)
 target_include_directories(stellar_native_developer_fault_tests PRIVATE app app/native_client)
 target_link_libraries(stellar_native_developer_fault_tests PRIVATE stellar_core stellar_json)
 add_test(NAME native_developer_fault_capture COMMAND stellar_native_developer_fault_tests

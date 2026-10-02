@@ -256,6 +256,18 @@ run; deterministic across `--repeat`). Spacefaring civs pair first —
 most seeded civs start PreWarp, so use `--ancients >= 2` for immediate
 combat.
 
+Build topology (`stellar_native_client_logic`): ~76 test executables
+previously recompiled shared `app/native_client` logic sources (~150
+duplicate object compiles per clean build). A single static library now
+holds every shared client-logic TU — test targets link it, and the game
+exe keeps only `main.cpp` + generated resources on the target. Sources
+already owning dedicated libs (audio/voice/general/video settings,
+campaign feedback, navigation/research art) keep them; tests strip the
+matching source and link that lib instead. Preserve isolation: never
+place a target-specific compile definition on the shared lib, and test
+sources must not `#include` a client `.cpp` (would double-define
+against the lib).
+
 Allocator census extension: `AudioClip` now maintains a live decoded-PCM
 counter (`audio::decoded_pcm_live_bytes()`, atomic lifecycle accounting
 so shared_ptr-distributed clips are counted once). The client reports it
