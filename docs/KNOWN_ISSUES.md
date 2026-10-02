@@ -247,12 +247,15 @@ all save/fixture differences harmless without inspecting their semantics.**
   combat engagements, founding-level colony counts, uniform squadron
   composition) are in the audit's combined-scenario section.
 - **Status:** MEASURED on `work/foundation-1-30-codex-integration` —
-  certification-grade evidence for the covered workload; organic
-  massive-combat engagement and heterogeneous fleet stress remain open
-  measurement limits rather than known defects. Re-run on
+  certification-grade evidence for the covered workload. Re-run on
   `game/ui-visual-overhaul` tip `422f2519` (same scenario/seed): step
-  mean 2.59 ms, p95 3.63 ms, deterministic repeat — same conclusion,
-  recorded in the audit's combined-scenario section.
+  mean 2.59 ms, p95 3.63 ms, deterministic repeat. Updated 2026-10-01:
+  the organic massive-combat gap is now covered — `--stress-combat N`
+  seeds identified-contact wars through shipped commands and produced
+  243,300 combat events / 237,723 diplomacy events on the canonical
+  2,500-system run (deterministic); ADR 0002's post-audit clean-machine
+  step mean is 1.42 ms. Heterogeneous fleet composition remains the
+  documented measurement limit.
 
 ## SYNC-010 — stellar engulfment invariant fails at 1,000 systems
 
