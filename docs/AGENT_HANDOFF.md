@@ -1182,7 +1182,10 @@ strict `voice_check` parser proves it. Note the routed leg —
 isn't streamed the check queues `NativeAudioDirector::speak` directly
 after the channel drains; the packaged WAV then proves streaming on the
 real path. `played` is therefore 1 (pipeline disarmed — the routed cue
-itself streams) or 2 (armed — SAPI leg + direct cue leg).
+itself streams) or 2 (armed — SAPI leg + direct cue leg). The
+authoritative export runs this check: `stellar.py` passes
+`voice_check=True` to the system-travel validator, so packaged-cue
+streaming is proven inside every `windows-native-preview` run.
 Roster search (row-24 Table filtering UI): `RosterWorkspace` gained a
 pointer-focused search field driving `TableModel::refilter` — the
 shared model's first filtering consumer. Case-insensitive contains runs

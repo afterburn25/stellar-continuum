@@ -532,7 +532,7 @@ def export(preset_name):
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
             smoke.update(validate_native_system_travel_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json",
-                replay_check=True))
+                voice_check=True, replay_check=True))
             smoke.update(validate_native_galaxy_export(output, env))
             smoke.update(validate_native_ship_art_export(output, env,
                 ROOT / "native-tests/fixtures/player-campaign-json.json"))
