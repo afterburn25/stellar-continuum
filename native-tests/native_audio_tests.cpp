@@ -265,7 +265,9 @@ int main(int argc, char** argv) {
     check(!voice_stopped.voice_active && voice_stopped.queued_voice_bytes == 0 &&
               std::abs(voice_stopped.applied_music_gain - 0.2f) < 0.0001f && maximum_voice.use_count() == 1,
           "stop_voice did not clear voice state, release its clip, and restore music gain");
-    check(rejects([&] { output.play_voice(nullptr); }), "null voice was accepted");
+    check(rejects([&] { output.play_voice(std::shared_ptr<const AudioClip>{}); }), "null voice was accepted");
+    check(rejects([&] { output.play_voice(std::shared_ptr<AudioStreamDecoder>{}); }),
+          "null voice stream was accepted");
 
     std::vector<float> finite_voice_samples(static_cast<std::size_t>(audio_sample_rate) * audio_channels / 4u, 0.1f);
     const auto finite_voice = AudioClip::create(std::move(finite_voice_samples));
@@ -280,6 +282,36 @@ int main(int argc, char** argv) {
               finite_finished.queued_voice_bytes == 0 &&
               std::abs(finite_finished.applied_music_gain - 0.2f) < 0.0001f,
           "finite flushed voice did not drain, retire, and restore music before the deadline");
+
+    // Streamed voice feeds the same bounded queue through the pull
+    // decoder — one-shot, no retained clip, released once drained.
+    output.play_voice(open_audio_stream(wav));
+    const auto streamed_voice = output.diagnostics();
+    check(streamed_voice.voice_active && streamed_voice.voice_streaming &&
+              streamed_voice.voice_play_count == 3 &&
+              std::abs(streamed_voice.applied_music_gain - 0.11f) < 0.0001f,
+          "streamed voice did not start through the bounded dedicated queue while ducking music");
+    output.service();
+    check(output.diagnostics().voice_streaming,
+          "streamed voice released its decoder before the queue drained");
+    const auto streamed_voice_retired = wait_until([&] {
+      output.service();
+      return !output.diagnostics().voice_active;
+    });
+    const auto streamed_voice_done = output.diagnostics();
+    check(streamed_voice_retired && !streamed_voice_done.voice_streaming &&
+              streamed_voice_done.queued_voice_bytes == 0 &&
+              std::abs(streamed_voice_done.applied_music_gain - 0.2f) < 0.0001f,
+          "streamed voice did not drain, release its decoder, and restore music before the deadline");
+
+    // stop_voice mid-stream releases the decoder immediately.
+    output.play_voice(open_audio_stream(wav));
+    output.service();
+    output.stop_voice();
+    const auto streamed_voice_stopped = output.diagnostics();
+    check(!streamed_voice_stopped.voice_active && !streamed_voice_stopped.voice_streaming &&
+              streamed_voice_stopped.queued_voice_bytes == 0,
+          "stop_voice did not release a mid-stream voice decoder");
 
     for (int voice = 0; voice < 8; ++voice) output.play_effect(short_loop);
     const auto eight = output.diagnostics();

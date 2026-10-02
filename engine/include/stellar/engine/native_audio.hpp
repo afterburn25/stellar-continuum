@@ -99,6 +99,7 @@ struct AudioDiagnostics final {
   bool music_started{};
   bool music_streaming{};
   bool voice_active{};
+  bool voice_streaming{};
   std::size_t queued_voice_bytes{};
   std::size_t available_voice_bytes{};
   std::size_t voice_queue_limit_bytes{};
@@ -132,6 +133,11 @@ class AudioOutput final {
   void play_effect(std::shared_ptr<const AudioClip> clip, float pan);
   void play_effect(std::shared_ptr<const AudioClip> clip, float pan, float gain);
   void play_voice(std::shared_ptr<const AudioClip> clip);
+  // Streamed variant: pulls decoded PCM on demand under the same bounded
+  // queue, so cues cost constant memory instead of a retained whole-file
+  // decode. One-shot — the decoder rewinds to the head on admission and is
+  // released when the queue drains; it does not loop.
+  void play_voice(std::shared_ptr<AudioStreamDecoder> decoder);
   void stop_voice();
   void set_volumes(float master, float music, float effects);
   void set_voice_gain(float voice);

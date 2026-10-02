@@ -41,6 +41,9 @@ struct NativeAudioStats final {
   bool stopped{};
   bool voice_available{};
   bool voice_active{};
+  // The active cue is being pull-decoded rather than played from a
+  // retained whole-file clip.
+  bool voice_streaming{};
   std::uint64_t voice_play_count{};
   std::uint64_t voice_event_count{};
   std::size_t queued_voice_bytes{};

@@ -311,7 +311,10 @@ std::size_t AudioStreamDecoder::read(std::span<float> out) {
     auto &s = *storage_;
     s.bind();
   std::size_t written = 0;
-  while (written < out.size() && !s.finished) {
+  // The EOS flag can arrive alongside the final sample; a tail that
+  // overran `out` still has to drain from pending on later calls.
+  while (written < out.size() &&
+         !(s.finished && s.pending_offset >= s.pending.size())) {
     if (s.pending_offset < s.pending.size()) {
       const auto count =
           std::min(out.size() - written, s.pending.size() - s.pending_offset);
@@ -417,6 +420,7 @@ struct AudioOutput::Storage {
   std::shared_ptr<const AudioClip> music_clip;
   std::shared_ptr<AudioStreamDecoder> music_decoder;
   std::shared_ptr<const AudioClip> voice_clip;
+  std::shared_ptr<AudioStreamDecoder> voice_decoder;
   std::size_t music_offset{};
   std::size_t voice_offset{};
   std::uint64_t next_age{};
@@ -463,6 +467,7 @@ void AudioOutput::cleanup_unchecked() noexcept {
     if (voice.stream) { SDL_ClearAudioStream(voice.stream); SDL_DestroyAudioStream(voice.stream); voice.stream = nullptr; }
   }
   storage_->voice_clip.reset();
+  storage_->voice_decoder.reset();
   if (storage_->voice_stream) { SDL_ClearAudioStream(storage_->voice_stream); SDL_DestroyAudioStream(storage_->voice_stream); storage_->voice_stream = nullptr; }
   storage_->music_clip.reset();
   storage_->music_decoder.reset();
@@ -487,7 +492,8 @@ void AudioOutput::set_voice_gain(float voice) {
 }
 
 void AudioOutput::apply_gains() {
-  const auto music_duck = storage_->voice_clip ? voice_music_duck : 1.0f;
+  const auto music_duck =
+      (storage_->voice_clip || storage_->voice_decoder) ? voice_music_duck : 1.0f;
   require_sdl(SDL_SetAudioStreamGain(storage_->music_stream, storage_->master * storage_->music * music_duck),
               "SDL music gain setup failed");
   require_sdl(SDL_SetAudioStreamGain(storage_->voice_stream, storage_->master * storage_->voice_gain),
@@ -581,6 +587,23 @@ void AudioOutput::play_voice(std::shared_ptr<const AudioClip> clip) {
   }
   require_sdl(SDL_ClearAudioStream(storage_->voice_stream), "SDL voice queue clear failed");
   storage_->voice_clip = std::move(clip);
+  storage_->voice_decoder.reset();
+  storage_->voice_offset = 0;
+  storage_->voice_flushed = false;
+  ++storage_->voice_play_count;
+  apply_gains();
+  service();
+}
+
+void AudioOutput::play_voice(std::shared_ptr<AudioStreamDecoder> decoder) {
+  require_owner();
+  if (!decoder) throw std::invalid_argument("Voice playback requires an audio stream decoder.");
+  require_sdl(SDL_ClearAudioStream(storage_->voice_stream), "SDL voice queue clear failed");
+  storage_->voice_clip.reset();
+  // Voice is one-shot, so a replay always starts at the head — the caller
+  // may hand back a decoder left mid-stream by an earlier stop_voice.
+  decoder->rewind();
+  storage_->voice_decoder = std::move(decoder);
   storage_->voice_offset = 0;
   storage_->voice_flushed = false;
   ++storage_->voice_play_count;
@@ -592,6 +615,7 @@ void AudioOutput::stop_voice() {
   require_owner();
   require_sdl(SDL_ClearAudioStream(storage_->voice_stream), "SDL voice queue clear failed");
   storage_->voice_clip.reset();
+  storage_->voice_decoder.reset();
   storage_->voice_offset = 0;
   storage_->voice_flushed = false;
   apply_gains();
@@ -605,23 +629,43 @@ void AudioOutput::service() {
     if (queued < 0 || available < 0) throw sdl_error("SDL effect queue inspection failed");
     if (queued == 0 && available == 0) voice.clip.reset();
   }
-  if (storage_->voice_clip) {
+  if (storage_->voice_clip || storage_->voice_decoder) {
     auto queued = SDL_GetAudioStreamQueued(storage_->voice_stream);
     auto available = SDL_GetAudioStreamAvailable(storage_->voice_stream);
     if (queued < 0 || available < 0) throw sdl_error("SDL voice queue inspection failed");
-    const auto clip_bytes = storage_->voice_clip->byte_size();
-    const auto* clip_data = reinterpret_cast<const std::byte*>(storage_->voice_clip->samples().data());
     while (!storage_->voice_flushed && static_cast<std::size_t>(queued) < voice_queue_limit) {
-      const auto remaining = clip_bytes - storage_->voice_offset;
-      const auto amount = std::min({voice_queue_limit - static_cast<std::size_t>(queued),
-                                    music_chunk_bytes, remaining});
+      const auto amount = std::min(voice_queue_limit - static_cast<std::size_t>(queued),
+                                   music_chunk_bytes);
       if (amount == 0 || amount % bytes_per_frame != 0) {
         throw std::logic_error("Audio voice clip has invalid frame alignment.");
       }
+      if (storage_->voice_decoder) {
+        auto& decoder = *storage_->voice_decoder;
+        auto* scratch = reinterpret_cast<float*>(storage_->music_scratch.data());
+        const auto written = decoder.read(
+            std::span<float>(scratch, (amount / bytes_per_frame) * audio_channels));
+        if (written > 0) {
+          require_sdl(SDL_PutAudioStreamData(storage_->voice_stream, scratch,
+                                             static_cast<int>(written * sizeof(float))),
+                      "SDL voice queue failed");
+          queued += static_cast<int>(written * sizeof(float));
+        }
+        // No rewind — voice cues are one-shot. A source that finishes
+        // mid-fill simply ends the cue early.
+        if (decoder.finished()) {
+          require_sdl(SDL_FlushAudioStream(storage_->voice_stream), "SDL voice queue flush failed");
+          storage_->voice_flushed = true;
+          break;
+        }
+        continue;
+      }
+      const auto clip_bytes = storage_->voice_clip->byte_size();
+      const auto* clip_data = reinterpret_cast<const std::byte*>(storage_->voice_clip->samples().data());
+      const auto segment = std::min(amount, clip_bytes - storage_->voice_offset);
       require_sdl(SDL_PutAudioStreamData(storage_->voice_stream, clip_data + storage_->voice_offset,
-                                         static_cast<int>(amount)), "SDL voice queue failed");
-      storage_->voice_offset += amount;
-      queued += static_cast<int>(amount);
+                                         static_cast<int>(segment)), "SDL voice queue failed");
+      storage_->voice_offset += segment;
+      queued += static_cast<int>(segment);
       if (storage_->voice_offset == clip_bytes) {
         require_sdl(SDL_FlushAudioStream(storage_->voice_stream), "SDL voice queue flush failed");
         storage_->voice_flushed = true;
@@ -632,6 +676,7 @@ void AudioOutput::service() {
     if (queued < 0 || available < 0) throw sdl_error("SDL voice queue inspection failed");
     if (storage_->voice_flushed && queued == 0 && available == 0) {
       storage_->voice_clip.reset();
+      storage_->voice_decoder.reset();
       storage_->voice_offset = 0;
       storage_->voice_flushed = false;
       apply_gains();
@@ -711,7 +756,8 @@ AudioDiagnostics AudioOutput::diagnostics() const {
   if (queued_voice < 0 || available_voice < 0) throw sdl_error("SDL voice queue inspection failed");
   return {static_cast<std::size_t>(queued), music_queue_limit, active, storage_->effect_play_count,
           storage_->music_started, storage_->music_decoder != nullptr,
-          storage_->voice_clip != nullptr,
+          storage_->voice_clip != nullptr || storage_->voice_decoder != nullptr,
+          storage_->voice_decoder != nullptr,
           static_cast<std::size_t>(queued_voice), static_cast<std::size_t>(available_voice),
           voice_queue_limit, storage_->voice_play_count, SDL_GetAudioStreamGain(storage_->music_stream),
           SDL_GetAudioStreamGain(storage_->voice_stream)};

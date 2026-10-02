@@ -1138,6 +1138,27 @@ screen x — the first engine-side consumer of positional effects.
 the other agent's diagnostics/replay lane — the earlier
 `campaign_diagnostics`/`native_developer_diagnostics` failures resolved
 once that lane committed.
+
+Streamed voice cues (2026-10-01): `AudioOutput::play_voice` gained an
+`AudioStreamDecoder` overload — one-shot pull decode through the same
+bounded SDL voice queue, rewind-to-head on admission, decoder released
+when the queue drains (`AudioDiagnostics::voice_streaming` /
+`NativeAudioStats::voice_streaming`). The director now stores per-cue
+decoders instead of decoded clips: the ≤16 MiB resident voice PCM set
+and the load-time whole-file decodes are gone (the `audio-decoded-pcm`
+census shows the drop). Only the opt-in communication-filter path still
+decodes whole PCM — `communication_clip` transforms a full buffer — so
+that path decodes per-cue at play (≤8 MiB transient) and caches at the
+active filter step. `play_dialogue_pcm` (runtime-synthesized PCM) stays
+clip-based. Also fixed a `AudioStreamDecoder::read` edge: an EOS flag
+arriving with an overrunning final sample stranded its `pending` tail
+forever — pending now drains even after EOS, trimming a sub-chunk
+artifact at stream end. Coverage: engine streamed-voice start/drain/
+stop lifecycle + null/oversized rejection; the director suite's queued
+scientist-cue tests now exercise the streamed path end-to-end; 3/3
+audio suites green. Remaining: effects stay whole-clip (latency-
+critical, ≤1 MiB each); spatial buses and a decoded-PCM budget are
+still open.
 Roster search (row-24 Table filtering UI): `RosterWorkspace` gained a
 pointer-focused search field driving `TableModel::refilter` — the
 shared model's first filtering consumer. Case-insensitive contains runs

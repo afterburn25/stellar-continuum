@@ -22,7 +22,6 @@ namespace {
 using Clip = std::shared_ptr<const stellar::engine::audio::AudioClip>;
 constexpr std::size_t maximum_total_decoded_bytes = 104u * 1024u * 1024u;
 constexpr std::size_t maximum_voice_clip_bytes = 8u * 1024u * 1024u;
-constexpr std::size_t maximum_total_voice_bytes = 16u * 1024u * 1024u;
 constexpr auto debounce_interval = std::chrono::milliseconds{60};
 // Device-level failures (unplugged/default device errors) retry at this
 // cadence instead of permanently disabling audio for the session.
@@ -52,7 +51,10 @@ struct NativeAudioDirector::Clips final {
   // Music pulls decoded PCM on demand — the only long program in the
   // set, so it never occupies a whole-file decode in memory.
   std::shared_ptr<stellar::engine::audio::AudioStreamDecoder> music_stream;
-  Clip reconnaissance_required, research_report, survey_complete;
+  // Voice cues pull decoded PCM on demand through per-cue stream
+  // decoders — the 16 MiB whole-file resident set is gone. Only the
+  // communication-filter path still needs whole PCM, decoded at play.
+  std::array<std::shared_ptr<stellar::engine::audio::AudioStreamDecoder>,3> voice_streams;
   std::array<Clip,3> filtered;
   std::array<int,3> filter_steps{-1,-1,-1};
 };
@@ -121,23 +123,20 @@ void NativeAudioDirector::start_decode_job() {
             stellar::engine::audio::open_audio_stream(root / music_path.relative);
         std::string voice_failure;
         try {
-          std::size_t voice_total{};
-          auto decode_voice = [&](const std::filesystem::path& relative) -> Clip {
+          // Streamed, not decoded: bounds memory and skips the per-cue
+          // whole-file decode at load. The Media Foundation reader binds
+          // lazily on the first read, on the output owner thread.
+          auto open_voice = [&](const std::filesystem::path& relative) {
             const auto path = root / relative;
             if (!stellar::engine::resource_exists(path))
               throw std::runtime_error("voice asset is missing: " + path.string());
-            auto clip = stellar::engine::audio::decode_audio_clip(path);
-            if (!clip) throw std::runtime_error("voice decoder returned no clip: " + path.string());
-            if (clip->byte_size() > maximum_voice_clip_bytes)
-              throw std::runtime_error("decoded voice clip exceeds 8 MiB limit: " + path.string());
-            if (voice_total > maximum_total_voice_bytes - clip->byte_size())
-              throw std::runtime_error("decoded voice set exceeds 16 MiB limit: " + path.string());
-            voice_total += clip->byte_size();
-            return clip;
+            auto stream = stellar::engine::audio::open_audio_stream(path);
+            if (!stream) throw std::runtime_error("voice stream decoder returned no stream: " + path.string());
+            return stream;
           };
-          loaded->reconnaissance_required = decode_voice(voice_paths[0].relative);
-          loaded->research_report = decode_voice(voice_paths[1].relative);
-          loaded->survey_complete = decode_voice(voice_paths[2].relative);
+          loaded->voice_streams[0] = open_voice(voice_paths[0].relative);
+          loaded->voice_streams[1] = open_voice(voice_paths[1].relative);
+          loaded->voice_streams[2] = open_voice(voice_paths[2].relative);
         } catch (const std::exception& error) {
           voice_failure = error.what();
         }
@@ -271,6 +270,7 @@ void NativeAudioDirector::service() {
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
     stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
     stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
+    stats_.voice_streaming = diagnostics.voice_streaming;
     service_voice();
   } catch (const stellar::engine::audio::AudioStreamError& error) {
     fail(std::string{"audio stream failure: "} + error.what());
@@ -305,31 +305,36 @@ void NativeAudioDirector::service_voice() {
   if (!may_play_voice() || !voice_preferences_.enabled || stats_.voice_active || voice_queue_.empty()) return;
   const auto cue = voice_queue_.front();
   voice_queue_.pop_front();
-  Clip clip;
-  switch (cue) {
-    case VoiceCue::ReconnaissanceRequired: clip = clips_->reconnaissance_required; break;
-    case VoiceCue::ResearchReport: clip = clips_->research_report; break;
-    case VoiceCue::SurveyComplete: clip = clips_->survey_complete; break;
-  }
   try {
     const auto index = voice_index(cue);
     const int step = static_cast<int>(std::lround(voice_preferences_.communication_filter*20.f));
     if (step>0) {
+      // The radio filter transforms whole PCM — only this opt-in path
+      // still decodes a clip, cached per cue at the active filter step.
       if (clips_->filter_steps[index]!=step) {
         clips_->filtered[index].reset();
-        clips_->filtered[index]=communication_clip(clip,step/20.f);
+        const auto path = asset_root_ / voice_paths[index].relative;
+        auto clip = stellar::engine::audio::decode_audio_clip(path);
+        if (!clip) throw std::runtime_error("voice decoder returned no clip: " + path.string());
+        if (clip->byte_size() > maximum_voice_clip_bytes)
+          throw std::runtime_error("decoded voice clip exceeds 8 MiB limit: " + path.string());
+        clips_->filtered[index]=communication_clip(std::move(clip),step/20.f);
         clips_->filter_steps[index]=step;
       }
-      clip=clips_->filtered[index];
+      output_->play_voice(clips_->filtered[index]);
+    } else {
+      output_->play_voice(clips_->voice_streams[index]);
     }
-    output_->play_voice(std::move(clip));
     show_caption(cue);
     const auto diagnostics = output_->diagnostics();
     stats_.voice_active = diagnostics.voice_active;
+    stats_.voice_streaming = diagnostics.voice_streaming;
     stats_.voice_play_count = diagnostics.voice_play_count;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
     stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
     stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
+  } catch (const stellar::engine::audio::AudioStreamError& error) {
+    fail(std::string{"audio voice stream failed: "} + error.what());
   } catch (const std::exception& error) {
     fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }
@@ -431,6 +436,7 @@ void NativeAudioDirector::play_dialogue_pcm(
         std::vector<float>(pcm->frames)));
     const auto diagnostics = output_->diagnostics();
     stats_.voice_active = diagnostics.voice_active;
+    stats_.voice_streaming = diagnostics.voice_streaming;
     stats_.voice_play_count = diagnostics.voice_play_count;
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
     stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
