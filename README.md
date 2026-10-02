@@ -7,7 +7,7 @@ feature work lands through `game/**` pull requests. Godot/C# is the
 deprecated predecessor, not the current runtime.
 
 **Start with [the agent handoff](docs/AGENT_HANDOFF.md).** This is an unfinished
-Windows x64 development build. See [current build/test results](docs/validation/2026-09-20-development-sync.md)
+Windows x64 development build. See [current build/test results](docs/validation/2026-10-02-tip-export.md)
 before treating it as a release baseline.
 
 ## Build and run
