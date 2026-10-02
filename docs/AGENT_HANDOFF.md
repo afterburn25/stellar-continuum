@@ -246,6 +246,15 @@ hash. Autosave measurement corrected (`a363ac72`): the benchmark now
 exercises the shipped streaming path — capture ~27–30 ms on-thread,
 stream+write ~1.11 s absorbed by the background save job in-game;
 ~66.7 MB output byte-identical (pinned by `engine_scale3d_tests`).
+Organic combat evidence (`6e6bc510`): `--stress-combat N` seeds N war
+pairs via `process_contact_opportunity` + `declare_war` and re-issues
+`issue_engage_hostiles_order` through the coordinator every 10 ticks
+for warring civs' unengaged military fleets — real engagements, fire,
+damage, retreats and combat→diplomacy feedback on the shipped path
+(1,361 combat events / 909 diplomacy events in a 500-tick 500-system
+run; deterministic across `--repeat`). Spacefaring civs pair first —
+most seeded civs start PreWarp, so use `--ancients >= 2` for immediate
+combat.
 
 Hardening contracts added late in the workstream that future changes must
 preserve:

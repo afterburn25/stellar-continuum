@@ -320,7 +320,39 @@ Status meanings are defined in [DEVELOPMENT_WORKFLOW.md](DEVELOPMENT_WORKFLOW.md
   original full path; `process_retreats` still sorts all active fleets
   for event ordering; per-call maps remain (no cross-tick reuse).
 
-## Starfield-quality live propagation + streamer budget (2026-09-29)
+## Benchmark organic-combat coverage (`--stress-combat`) (2026-10-01)
+
+- **Purpose:** the canonical adaptive-campaign benchmark produced zero
+  combat engagements — combat phase timing measured only bookkeeping
+  and the documented "no organic combat engagements" late-game evidence
+  gap stood open.
+- **Modules:** `app/adaptive_campaign_host.cpp` (`seed_stress_wars`,
+  engage cadence in the tick loop), `app/galaxy_main.cpp` and
+  `app/headless_main.cpp` (flag plumbing and help).
+- **Public interface:** `--stress-combat N` on
+  `--simulate-adaptive-campaign` (0..32 war pairs, default off);
+  reports `stressCombatWarPairs`, `engageHostilesOrdersIssued`,
+  `engageHostilesOrdersAccepted`.
+- **Consumers:** benchmark runs only — seeding goes through
+  `DiplomacySimulation::process_contact_opportunity` +
+  `declare_war`; orders go through the coordinator's
+  `issue_engage_hostiles_order`, so the whole engagement path
+  (hostility view → command validation → attack orders → fire,
+  damage, retreats → `CombatDiplomacyBridge` relationship feedback)
+  is production code.
+- **Tests:** no new automated coverage — verified by deterministic
+  `finalStateHash` across `--repeat 2` and nonzero combat/diplomacy
+  event counts (1,361/909 in a 500-tick 500-system run).
+- **Save/performance impact:** benchmark-only; canonical run unchanged
+  (flag defaults off). Spacefaring civilizations pair first — most
+  seeded civs begin `PreWarp`, so `--ancients >= 2` is needed for
+  combat from tick ~1.
+- **Limitations:** uniform squadron composition remains; orders are
+  issued on a fixed 10-tick cadence rather than by AI doctrine; only
+  the coordinator's `CombatCommandRuntime` path is exercised (matched
+  tactical `CampaignMassiveCombat` encounters are still UI-driven).
+- **Future reuse:** the war-pair seeding shape generalizes to other
+  benchmark scenario knobs (e.g. blockades, alliances).
 
 - **Purpose:** the STARFIELD QUALITY video setting was wired to the
   3D renderers in name only — `NativeCampaign` pushed
