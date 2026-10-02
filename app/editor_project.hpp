@@ -7,9 +7,11 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace stellar::editor {
 
@@ -79,5 +81,22 @@ EditorProject parse_project(std::string_view text);
 // anything else collapses to single dashes, edges are trimmed. Returns ""
 // when nothing usable remains (caller falls back to a default filename).
 std::string sanitize_project_name(std::string_view name);
+
+// Recent-projects MRU document: {"schemaVersion":1,"recent":[<path>,...]}.
+// Entries serialize as UTF-8 strings, most-recent first; callers decide
+// which filesystem path form they record (project dir vs flat file).
+std::string serialize_recent_projects(std::span<const std::string> paths);
+
+// Throws std::runtime_error on malformed JSON, missing/unsupported
+// schemaVersion, a non-array "recent", or non-string/empty entries.
+std::vector<std::string> parse_recent_projects(std::string_view text);
+
+// Orders a picker listing: every `recent` entry first (order preserved,
+// deduped case-insensitively), then `scanned` entries not already listed.
+// Recent entries absent from `scanned` are kept — recents may live
+// outside the scanned projects directory. Returns the merged list and the
+// size of its recent prefix.
+std::pair<std::vector<std::string>, std::size_t> merge_recent_projects(
+    std::span<const std::string> scanned, std::span<const std::string> recent);
 
 } // namespace stellar::editor

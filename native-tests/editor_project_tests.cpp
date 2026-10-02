@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 using namespace stellar::editor;
 
@@ -201,6 +202,58 @@ int main() {
     require(sanitize_project_name("Alpha  Centauri   Prime!") ==
                 "alpha-centauri-prime",
             "whitespace runs must collapse to single dashes");
+
+    // Recent-projects MRU: round-trip preserves order and UTF-8 paths.
+    {
+      const std::vector<std::string> recent{
+          "C:/work/projects/survey-run.json", "C:/work/projects/kestrel",
+          "D:/espa\xc3\xb1ol/anotaci\xc3\xb3n.json"};
+      const auto restored_recent =
+          parse_recent_projects(serialize_recent_projects(recent));
+      require(restored_recent == recent,
+              "recent-projects document did not round-trip");
+      require(parse_recent_projects(serialize_recent_projects({})).empty(),
+              "empty recent-projects document must parse empty");
+    }
+    {
+      const auto rejects_recent = [](std::string_view text,
+                                     const char *message) {
+        try {
+          (void)parse_recent_projects(text);
+        } catch (const std::runtime_error &) {
+          return;
+        }
+        throw std::runtime_error(message);
+      };
+      rejects_recent("not json", "non-JSON recent list was accepted");
+      rejects_recent(R"({"schemaVersion":2,"recent":[]})",
+                     "unsupported recent schema version was accepted");
+      rejects_recent(R"({"recent":[]})",
+                     "recent list missing schemaVersion was accepted");
+      rejects_recent(R"({"schemaVersion":1})",
+                     "recent list missing the array was accepted");
+      rejects_recent(R"({"schemaVersion":1,"recent":"x"})",
+                     "non-array recent list was accepted");
+      rejects_recent(R"({"schemaVersion":1,"recent":[5]})",
+                     "non-string recent entry was accepted");
+      rejects_recent(R"({"schemaVersion":1,"recent":[""]})",
+                     "empty recent entry was accepted");
+    }
+
+    // Picker merge: recents lead (order + case-insensitive dedupe), then
+    // the remaining scan; out-of-scan recents are kept and counted.
+    {
+      const std::vector<std::string> scanned{"p/a.json", "p/b.json",
+                                             "p/c.json"};
+      const std::vector<std::string> recent{"P/B.JSON", "q/outside.json",
+                                            "p/b.json", "p/a.json"};
+      const auto [merged, recent_count] =
+          merge_recent_projects(scanned, recent);
+      require(recent_count == 3, "recent prefix count is wrong");
+      const std::vector<std::string> expected{
+          "P/B.JSON", "q/outside.json", "p/a.json", "p/c.json"};
+      require(merged == expected, "recent-first merge order is wrong");
+    }
 
     std::cout << "Editor project document checks passed.\n";
     return 0;

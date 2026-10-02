@@ -267,7 +267,10 @@ struct Editor {
   std::shared_ptr<const RgbaImage> asset_preview;
   std::string asset_preview_name;
   // Project open picker: *.json files under projects_dir, modal overlay.
+  // Recently used paths list first; the first picker_recent_count rows
+  // carry the "recent" tag and may point outside projects_dir.
   std::vector<std::filesystem::path> project_files;
+  std::size_t picker_recent_count{};
   engine::VirtualizedList picker_list;
   bool picker_open{};
   bool bookmark_only{}; // systems list filters to bookmarked targets
@@ -1375,6 +1378,9 @@ void render_picker(DrawList &out, Editor &ed, float s, float w, float h) {
          ed.project_files[i] == ed.project_path.parent_path()))
       out.overlay.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
                               "current", accent, font - 2, 0, rows});
+    else if (i < ed.picker_recent_count)
+      out.overlay.push_back(Text{{row.x + row.width - 66 * s, ry + 5 * s},
+                              "recent", muted, font - 2, 0, rows});
   }
   if (ed.project_files.empty())
     out.overlay.push_back(Text{{rows.x + 8 * s, rows.y + 8 * s},
@@ -1415,6 +1421,85 @@ void refresh_embedded_assets(Editor &ed) {
   }
 }
 
+// Recent-projects MRU document lives inside projects_dir under a name the
+// picker scan excludes, so the list never offers itself as a project.
+constexpr std::string_view recent_file_name = "recent-projects.json";
+constexpr std::size_t recent_limit = 8;
+
+std::filesystem::path recent_file(const Editor &ed) {
+  return ed.projects_dir / std::string{recent_file_name};
+}
+
+// UTF-8 path string for MRU serialization/comparison.
+std::string path_key(const std::filesystem::path &path) {
+  const auto u8 = path.lexically_normal().u8string();
+  return {u8.begin(), u8.end()};
+}
+
+std::filesystem::path path_from_key(const std::string &text) {
+  return std::filesystem::path{
+      std::u8string{reinterpret_cast<const char8_t *>(text.data()),
+                    text.size()}};
+}
+
+// A path is openable when it is a *.json file or a project directory.
+bool openable_project_path(const std::filesystem::path &path) {
+  std::error_code ec;
+  if (std::filesystem::is_regular_file(path, ec))
+    return path.extension() == ".json";
+  return std::filesystem::is_directory(path, ec) &&
+         std::filesystem::is_regular_file(path / "project.json", ec);
+}
+
+// Recorded MRU paths still resolvable on disk, most-recent first. A
+// missing or corrupt document degrades to an empty recents section.
+std::vector<std::filesystem::path> load_recent(const Editor &ed) {
+  std::vector<std::filesystem::path> out;
+  std::error_code ec;
+  if (!std::filesystem::is_regular_file(recent_file(ed), ec)) return out;
+  try {
+    std::ifstream in(recent_file(ed), std::ios::binary);
+    const std::string text{std::istreambuf_iterator<char>(in),
+                           std::istreambuf_iterator<char>()};
+    for (const auto &entry : edproj::parse_recent_projects(text)) {
+      const auto path = path_from_key(entry).lexically_normal();
+      if (openable_project_path(path)) out.push_back(path);
+      if (out.size() >= recent_limit) break;
+    }
+  } catch (const std::exception &) {
+  }
+  return out;
+}
+
+// Moves the active project to the front of the MRU document. Failure to
+// read the stored list starts it fresh rather than losing the entry.
+void update_recent(Editor &ed) {
+  const auto key =
+      ed.project_dir_form ? ed.project_path.parent_path() : ed.project_path;
+  std::vector<std::string> previous;
+  std::error_code ec;
+  if (std::filesystem::is_regular_file(recent_file(ed), ec)) {
+    try {
+      std::ifstream in(recent_file(ed), std::ios::binary);
+      const std::string text{std::istreambuf_iterator<char>(in),
+                             std::istreambuf_iterator<char>()};
+      previous = edproj::parse_recent_projects(text);
+    } catch (const std::exception &) {
+    }
+  }
+  const std::string head{path_key(key)};
+  auto merged = edproj::merge_recent_projects(previous, {&head, std::size_t{1}})
+                    .first;
+  merged.resize(std::min(merged.size(), recent_limit));
+  try {
+    const std::string text = edproj::serialize_recent_projects(merged);
+    engine::write_file_atomically(recent_file(ed),
+                                  std::as_bytes(std::span(text)));
+  } catch (const std::exception &error) {
+    ed.status = std::string("recent list save failed: ") + error.what();
+  }
+}
+
 void save_project(Editor &ed) {
   try {
     // Save-As by name: the document name drives the filename inside the
@@ -1446,6 +1531,7 @@ void save_project(Editor &ed) {
       std::filesystem::remove(stale, ec);
     }
     refresh_embedded_assets(ed);
+    update_recent(ed);
     ed.status = "saved " + ed.project_path.filename().string() + " - " +
                 std::to_string(ed.edits.size() + ed.body_edits.size()) +
                 " annotations" +
@@ -1479,6 +1565,7 @@ void load_project(Editor &ed, const std::filesystem::path &path) {
     ed.project_path = file;
     ed.project_dir_form = dir_form;
     if (!project.name.empty()) ed.project_name = std::move(project.name);
+    update_recent(ed);
     refresh_embedded_assets(ed);
     rebuild_filter(ed);
     rebuild_detail_rows(ed);
@@ -1494,14 +1581,17 @@ void load_project(Editor &ed, const std::filesystem::path &path) {
   }
 }
 
-// Refreshes and opens the project picker over the projects directory.
+// Refreshes and opens the project picker: recorded recents list first
+// (they may live outside projects_dir), then the directory scan.
 void open_picker(Editor &ed) {
   ed.project_files.clear();
+  ed.picker_recent_count = 0;
   std::error_code ec;
   if (std::filesystem::exists(ed.projects_dir, ec))
     for (const auto &entry :
          std::filesystem::directory_iterator(ed.projects_dir, ec)) {
-      if (entry.is_regular_file() && entry.path().extension() == ".json")
+      if (entry.is_regular_file() && entry.path().extension() == ".json" &&
+          entry.path().filename() != recent_file_name)
         ed.project_files.push_back(entry.path());
       else if (entry.is_directory() &&
                std::filesystem::is_regular_file(entry.path() / "project.json",
@@ -1509,6 +1599,19 @@ void open_picker(Editor &ed) {
         ed.project_files.push_back(entry.path());
     }
   std::sort(ed.project_files.begin(), ed.project_files.end());
+  const auto recent = load_recent(ed);
+  std::vector<std::string> scanned, recent_keys;
+  scanned.reserve(ed.project_files.size());
+  recent_keys.reserve(recent.size());
+  for (const auto &path : ed.project_files) scanned.push_back(path_key(path));
+  for (const auto &path : recent) recent_keys.push_back(path_key(path));
+  auto [merged, recent_count] =
+      edproj::merge_recent_projects(scanned, recent_keys);
+  ed.project_files.clear();
+  ed.project_files.reserve(merged.size());
+  for (const auto &entry : merged)
+    ed.project_files.push_back(path_from_key(entry).lexically_normal());
+  ed.picker_recent_count = recent_count;
   ed.picker_list.set_row_count(ed.project_files.size());
   ed.picker_list.scroll_to(0);
   ed.picker_open = true;

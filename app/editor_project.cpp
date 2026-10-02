@@ -5,6 +5,7 @@
 #include <cctype>
 #include <cmath>
 #include <stdexcept>
+#include <unordered_set>
 
 namespace stellar::editor {
 
@@ -150,6 +151,62 @@ std::string sanitize_project_name(std::string_view name) {
   }
   while (!out.empty() && out.back() == '-') out.pop_back();
   return out;
+}
+
+std::string serialize_recent_projects(std::span<const std::string> paths) {
+  auto rows = nlohmann::json::array();
+  for (const auto &path : paths) rows.push_back(path);
+  return nlohmann::json{{"schemaVersion", 1}, {"recent", std::move(rows)}}
+      .dump(2);
+}
+
+std::vector<std::string> parse_recent_projects(std::string_view text) {
+  nlohmann::json document;
+  try {
+    document = nlohmann::json::parse(text);
+  } catch (const std::exception &error) {
+    throw std::runtime_error(std::string("malformed recent-projects: ") +
+                             error.what());
+  }
+  try {
+    if (document.at("schemaVersion").get<int>() != 1)
+      throw std::runtime_error("unsupported recent-projects version");
+    const auto &rows = document.at("recent");
+    if (!rows.is_array())
+      throw std::runtime_error("recent-projects list is not an array");
+    std::vector<std::string> paths;
+    for (const auto &row : rows) {
+      auto path = row.get<std::string>();
+      if (path.empty())
+        throw std::runtime_error("recent-projects entry is empty");
+      paths.push_back(std::move(path));
+    }
+    return paths;
+  } catch (const nlohmann::json::exception &error) {
+    throw std::runtime_error(std::string("malformed recent-projects: ") +
+                             error.what());
+  }
+}
+
+std::pair<std::vector<std::string>, std::size_t> merge_recent_projects(
+    std::span<const std::string> scanned, std::span<const std::string> recent) {
+  // Windows paths compare case-insensitively; ASCII fold is sufficient for
+  // deduping picker rows that originate from the same filesystem scan.
+  const auto key = [](std::string_view path) {
+    std::string out;
+    out.reserve(path.size());
+    for (const unsigned char c : path) out += static_cast<char>(std::tolower(c));
+    return out;
+  };
+  std::unordered_set<std::string> seen;
+  std::vector<std::string> merged;
+  merged.reserve(recent.size() + scanned.size());
+  for (const auto &path : recent)
+    if (seen.insert(key(path)).second) merged.push_back(path);
+  const auto recent_count = merged.size();
+  for (const auto &path : scanned)
+    if (seen.insert(key(path)).second) merged.push_back(path);
+  return {std::move(merged), recent_count};
 }
 
 } // namespace stellar::editor
