@@ -15,7 +15,7 @@ int main(int argc,char** argv)try{
     if(std::string_view(argv[2])=="hang")SetEnvironmentVariableW(L"STELLAR_WATCHDOG_MS",L"600");
     stellar::engine::RuntimeDiagnostics log("0.1.14.2-dev","0.1.64",root);
     stellar::engine::RuntimeDiagnostics::context("view=star-map selected=42 map_zoom=256");std::cerr<<"Worker image preparation evidence\n";
-    if(std::string_view(argv[2])=="hang"){stellar::engine::RuntimeDiagnostics::heartbeat();Sleep(5000);return 0;}
+    if(std::string_view(argv[2])=="hang"){std::thread extra([]{Sleep(10000);});extra.detach();stellar::engine::RuntimeDiagnostics::heartbeat();Sleep(5000);return 0;}
     if(std::string_view(argv[2])=="fault"){RaiseException(EXCEPTION_ACCESS_VIOLATION,EXCEPTION_NONCONTINUABLE,0,nullptr);return 9;}
     std::thread worker([]{throw std::runtime_error("Unhandled worker failure fixture");});worker.join();return 8;
   }
@@ -39,7 +39,7 @@ int main(int argc,char** argv)try{
       const auto wait=WaitForSingleObject(process.hProcess,30000);if(wait!=WAIT_OBJECT_0)TerminateProcess(process.hProcess,99);
       DWORD code{};GetExitCodeProcess(process.hProcess,&code);CloseHandle(process.hProcess);CloseHandle(process.hThread);check(wait==WAIT_OBJECT_0&&(mode==std::string("hang")?code==0:code!=0),"Fault fixture did not exit");
       report=dump=false;for(const auto& e:fs::directory_iterator(dir)){
-        if(e.path().extension()==".txt"){const auto text=read(e.path());const auto expected=mode==std::string("fault")?"WINDOWS FAULT":mode==std::string("hang")?"HANG DETECTED":"Unhandled worker failure";report=text.find("map_zoom=256")!=std::string::npos&&text.find(expected)!=std::string::npos&&text.find("stack:\n  #00 ")!=std::string::npos&&(mode==std::string("terminate")||(text.find("site=")!=std::string::npos));}
+        if(e.path().extension()==".txt"){const auto text=read(e.path());const auto expected=mode==std::string("fault")?"WINDOWS FAULT":mode==std::string("hang")?"HANG DETECTED":"Unhandled worker failure";report=text.find("map_zoom=256")!=std::string::npos&&text.find(expected)!=std::string::npos&&text.find("stack:\n  #00 ")!=std::string::npos&&(mode==std::string("terminate")||(text.find("site=")!=std::string::npos))&&(mode!=std::string("hang")||text.find(" thread ")!=std::string::npos);}
         if(e.path().extension()==".dmp"){const auto text=read(e.path());dump=text.starts_with("MDMP");}
       }
     }

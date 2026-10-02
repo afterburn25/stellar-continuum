@@ -18,6 +18,7 @@
 #include <windows.h>
 #include <dbghelp.h>
 #include <shlobj.h>
+#include <tlhelp32.h>
 #endif
 namespace stellar::engine {
 namespace {
@@ -90,6 +91,7 @@ struct RuntimeDiagnostics::Impl {
   // best-effort part — the process is already unresponsive by definition.
   HANDLE watch_thread{};
   HANDLE main_thread{};
+  DWORD main_tid{};
   std::atomic<bool> watch_stop{};
   std::atomic<bool> hang_reported{};
   std::atomic<long long> last_beat{-1};
@@ -118,6 +120,30 @@ struct RuntimeDiagnostics::Impl {
           trace(&ctx);
         }
         ResumeThread(main_thread);
+      }
+      // Deadlock attribution needs every thread, not just the loop thread.
+      // Suspend → snapshot CONTEXT → resume → walk offline: holding a
+      // suspended thread through dbghelp allocation could wedge the
+      // reporter itself if that thread owns a heap/CRT lock.
+      if(stack_walk&&sym_ready){
+        const HANDLE snap=CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,0);
+        if(snap!=INVALID_HANDLE_VALUE){
+          THREADENTRY32 entry{sizeof(entry)};
+          for(auto ok=Thread32First(snap,&entry);ok;ok=Thread32Next(snap,&entry)){
+            if(entry.th32OwnerProcessID!=GetCurrentProcessId()||entry.th32ThreadID==GetCurrentThreadId()||entry.th32ThreadID==main_tid)continue;
+            const HANDLE th=OpenThread(THREAD_SUSPEND_RESUME|THREAD_GET_CONTEXT|THREAD_QUERY_INFORMATION,FALSE,entry.th32ThreadID);
+            if(!th)continue;
+            CONTEXT ctx{};
+            if(SuspendThread(th)!=static_cast<DWORD>(-1)){ctx.ContextFlags=CONTEXT_FULL;if(!GetThreadContext(th,&ctx))ctx.ContextFlags=0;ResumeThread(th);}
+            if(ctx.ContextFlags){
+              char head[64]{};const int m=std::snprintf(head,sizeof(head)," thread %lu:\n",entry.th32ThreadID);
+              if(m>0)emergency(head,static_cast<std::size_t>(std::min(m,static_cast<int>(sizeof(head))-1)));
+              trace_thread(th,&ctx);
+            }
+            CloseHandle(th);
+          }
+          CloseHandle(snap);
+        }
       }
       minidump(nullptr);return;
     }
@@ -158,20 +184,28 @@ struct RuntimeDiagnostics::Impl {
   // minidump. StackWalk64 mutates the context — callers pass a private copy.
   // trace_active guards re-entry: a fault inside the walk re-enters the
   // filter and must not recurse back in here.
-  void trace(CONTEXT* context) noexcept {
-    if(!stack_walk||!sym_ready||trace_active.exchange(true))return;
-    struct TraceGuard{std::atomic<bool>& flag;~TraceGuard(){flag.store(false);}} guard{trace_active};
-    emergency("\n stack:\n",9);
+  void trace_frames(HANDLE thread,CONTEXT* context) noexcept {
     STACKFRAME64 frame{};
     frame.AddrPC.Offset=context->Rip;frame.AddrPC.Mode=AddrModeFlat;
     frame.AddrFrame.Offset=context->Rbp;frame.AddrFrame.Mode=AddrModeFlat;
     frame.AddrStack.Offset=context->Rsp;frame.AddrStack.Mode=AddrModeFlat;
     for(int i=0;i<32;++i){
-      if(!stack_walk(IMAGE_FILE_MACHINE_AMD64,GetCurrentProcess(),GetCurrentThread(),&frame,context,nullptr,nullptr,nullptr,nullptr)||frame.AddrPC.Offset==0)break;
+      if(!stack_walk(IMAGE_FILE_MACHINE_AMD64,GetCurrentProcess(),thread?thread:GetCurrentThread(),&frame,context,nullptr,nullptr,nullptr,nullptr)||frame.AddrPC.Offset==0)break;
       const auto site=describe_address(reinterpret_cast<const void*>(static_cast<uintptr_t>(frame.AddrPC.Offset)));
       char line[560]{};const int m=std::snprintf(line,sizeof(line),"  #%02d %s\n",i,site.empty()?"?":site.c_str());
       if(m>0)emergency(line,static_cast<std::size_t>(std::min(m,static_cast<int>(sizeof(line))-1)));
     }
+  }
+  void trace(CONTEXT* context) noexcept {
+    if(!stack_walk||!sym_ready||trace_active.exchange(true))return;
+    struct TraceGuard{std::atomic<bool>& flag;~TraceGuard(){flag.store(false);}} guard{trace_active};
+    emergency("\n stack:\n",9);
+    trace_frames(nullptr,context);
+  }
+  void trace_thread(HANDLE thread,CONTEXT* context) noexcept {
+    if(!stack_walk||!sym_ready||trace_active.exchange(true))return;
+    struct TraceGuard{std::atomic<bool>& flag;~TraceGuard(){flag.store(false);}} guard{trace_active};
+    trace_frames(thread,context);
   }
   void emergency(const char* text,std::size_t length) noexcept {if(crash_file!=INVALID_HANDLE_VALUE){DWORD written{};WriteFile(crash_file,text,static_cast<DWORD>(length),&written,nullptr);FlushFileBuffers(crash_file);}}
   void minidump(EXCEPTION_POINTERS* pointers) noexcept {
@@ -279,8 +313,11 @@ struct RuntimeDiagnostics::Impl {
     unsigned threshold=30000;
     if(wchar_t env[16]{};GetEnvironmentVariableW(L"STELLAR_WATCHDOG_MS",env,16)!=0){try{threshold=std::stoul(env);}catch(...){}}
     watch_ms=threshold;
-    if(watch_ms>0&&DuplicateHandle(GetCurrentProcess(),GetCurrentThread(),GetCurrentProcess(),&main_thread,0,FALSE,DUPLICATE_SAME_ACCESS))
-      watch_thread=CreateThread(nullptr,0,[](void* p)->DWORD{static_cast<Impl*>(p)->watch();return 0;},this,0,nullptr);
+    if(watch_ms>0){
+      main_tid=GetCurrentThreadId();
+      if(DuplicateHandle(GetCurrentProcess(),GetCurrentThread(),GetCurrentProcess(),&main_thread,0,FALSE,DUPLICATE_SAME_ACCESS))
+        watch_thread=CreateThread(nullptr,0,[](void* p)->DWORD{static_cast<Impl*>(p)->watch();return 0;},this,0,nullptr);
+    }
 #endif
     out.owner=err.owner=clog.owner=this;out.original=std::cout.rdbuf();err.original=std::cerr.rdbuf();clog.original=std::clog.rdbuf();
     std::cout.rdbuf(&out);std::cerr.rdbuf(&err);std::clog.rdbuf(&clog);active=this;

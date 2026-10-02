@@ -467,7 +467,12 @@ preserve:
   `GetThreadContext` → `hang_site=` + `stack:` + `minidump(nullptr)`,
   then resumes. `last_beat=-1` means unarmed — hosts that never beat
   get no watchdog. The hang child test sets `STELLAR_WATCHDOG_MS=600`
-  on itself before constructing the diagnostics.
+  on itself before constructing the diagnostics. The report then
+  enumerates every process thread via Toolhelp — suspend → snapshot
+  CONTEXT → **resume** → walk offline (` thread <tid>:` sections) for
+  deadlock attribution; holding a suspended thread through dbghelp
+  allocation could wedge the reporter if that thread owns a heap/CRT
+  lock, so frames may be stale but stay attributed.
 - `windows-native-preview` now ships PDBs (`includeSymbols: true`) —
   shipped crash reports resolve file+line only with PDBs beside the
   exe; module+offset was the remaining gap. Both exes' PDBs land via
