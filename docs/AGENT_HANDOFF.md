@@ -438,6 +438,24 @@ preserve:
   `draw={}`/render. Copy `->at`/rects before re-rendering (the
   `native_planetary_screen` chip-click flake + parallel SEGFAULT was a
   test-side UAF of exactly this shape, `d910cd6b`).
+- Crash-report symbolization: `RuntimeDiagnostics::describe_address`
+  resolves a code address to `module.exe+0xOFF func+0xD file(line)` —
+  module attribution via `GetModuleHandleEx`/`GetModuleFileName`
+  (HMODULE is the base; no Psapi), symbol+line via the already-loaded
+  dbghelp (`SymInitialize` searching PDBs beside the exe,
+  `SYMOPT_DEFERRED_LOADS|LOAD_LINES`, a one-shot
+  `SymRefreshModuleList` retry for post-init loads). **SymInitialize
+  must invade (`fInvadeProcess=TRUE`)** — with FALSE the handler never
+  enumerates loaded modules and `SymFromAddr` fails ERROR_MOD_NOT_FOUND;
+  deferred loads defer PDB parsing, not module discovery. The fault
+  filter emits `fault_site=` before the minidump via a stack-buffered
+  snprintf (no allocation in the noexcept filter); graceful degradation
+  chain is symbol → module+offset → raw pointer. Fault child asserts
+  `fault_site=` lands in the report (`fault_site=KERNELBASE.dll+0xC41CA
+  RaiseException+0x8A` — system-DLL exports resolve without PDBs).
+- `developer_qa_host` CTest timeout raised 120→240 s — passes solo in
+  ~29 s but exceeded 120 s under the export's parallel load (scheduling
+  tolerance, not a correctness gate).
 
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being

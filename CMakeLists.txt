@@ -373,7 +373,7 @@ if(WIN32)
   target_link_libraries(stellar_developer_qa_tests PRIVATE Psapi)
 endif()
 add_test(NAME developer_qa_host COMMAND stellar_developer_qa_tests "${CMAKE_BINARY_DIR}" "${CMAKE_BINARY_DIR}/qa-host-tests")
-set_tests_properties(developer_qa_host PROPERTIES TIMEOUT 120)
+set_tests_properties(developer_qa_host PROPERTIES TIMEOUT 240)
 set(STELLAR_RESEARCH_RUNTIME_DECLARATION
   "${CMAKE_SOURCE_DIR}/export/research-runtime-files.json")
 file(READ "${STELLAR_RESEARCH_RUNTIME_DECLARATION}"
