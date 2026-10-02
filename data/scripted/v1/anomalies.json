@@ -129,6 +129,8 @@
       "effects": [
         {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
          "args": {"amount": "90"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.mine_forensics"}},
         {"do": "chronicle_record",
          "args": {"category": "scripted.anomaly.live_mine.origin_trace",
                   "summary": "Forensics on the recovered mine fragments trace its manufacture to no catalogued civilization.",
@@ -153,6 +155,528 @@
          "args": {"category": "scripted.anomaly.terraforming_cache",
                   "summary": "Abandoned atmospheric processors still hold usable catalysts — a gift to colonial engineering.",
                   "significance": "0.5"}}
+      ]
+    },
+    {
+      "id": "anomaly.precursor_vault",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 1,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.precursor_vault",
+                  "summary": "A sealed precursor vault hangs beneath the surface. Breaching it will have consequences.",
+                  "significance": "0.9"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.precursor_vault.guardian", "delay_days": 5, "weight": 2},
+        {"id": "anomaly.precursor_vault.archive", "delay_days": 5, "weight": 3}
+      ]
+    },
+    {
+      "id": "anomaly.precursor_vault.guardian",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-300"}},
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-40"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.precursor_vault.guardian",
+                  "summary": "The vault's guardian construct wakes. The breach team escapes, but the recovery operation is costly.",
+                  "significance": "0.9"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.precursor_vault.aftermath", "delay_days": 40, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.precursor_vault.aftermath",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "150"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.precursor_vault.aftermath",
+                  "summary": "Debriefs and wreckage analysis from the guardian encounter yield hard-won tactical and materials data.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.precursor_vault.archive",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "350"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_archive"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.precursor_vault.archive",
+                  "summary": "The vault opens to a navigable archive — star-charts, energy budgets and engineering treatises await study.",
+                  "significance": "0.9"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.precursor_vault.deeper", "delay_days": 60, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.precursor_vault.deeper",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "200"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_deeper_vault"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.precursor_vault.deeper",
+                  "summary": "A second, deeper vault level opens — the archive's innermost catalog references a world that should not exist.",
+                  "significance": "1.0"}}
+      ]
+    },
+    {
+      "id": "anomaly.frozen_ark",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 3,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "70"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.frozen_ark",
+                  "summary": "A derelict ark ship drifts in the shadow zone — thousands of sleeper pods still hold power.",
+                  "significance": "0.7"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.frozen_ark.revived", "delay_days": 20, "weight": 3},
+        {"id": "anomaly.frozen_ark.decayed", "delay_days": 20, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.frozen_ark.revived",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "80"}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "40"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.frozen_ark.revived",
+                  "summary": "The sleepers revive — grateful survivors bring lost-world skills and settle into colonial industry.",
+                  "significance": "0.8"}}
+      ]
+    },
+    {
+      "id": "anomaly.frozen_ark.decayed",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "20"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.frozen_ark.decayed",
+                  "summary": "The sleepers are long past saving. The ark is catalogued, memorialized, and left to drift.",
+                  "significance": "0.5"}}
+      ]
+    },
+    {
+      "id": "anomaly.derelict_fleet",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 2,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "100"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.derelict_fleet",
+                  "summary": "A graveyard of unfamiliar warships orbits the body — a battle no record remembers.",
+                  "significance": "0.8"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.derelict_fleet.salvage", "delay_days": 15, "weight": 3},
+        {"id": "anomaly.derelict_fleet.sentry", "delay_days": 15, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.derelict_fleet.salvage",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "150"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.derelict_fleet.salvage",
+                  "summary": "The graveyard yields intact hull plating and drive cores — a windfall for the shipyards.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.derelict_fleet.sentry",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-250"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.sentry_signature"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.derelict_fleet.sentry",
+                  "summary": "One hull was not dead. A dormant sentry construct cripples the salvage tug before going silent again.",
+                  "significance": "0.8"}}
+      ]
+    },
+    {
+      "id": "anomaly.plague_ship",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 2,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "80"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.plague_ship",
+                  "summary": "A quarantine hulk broadcasts an ancient biohazard warning in an untranslated tongue.",
+                  "significance": "0.7"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.plague_ship.contained", "delay_days": 18, "weight": 3},
+        {"id": "anomaly.plague_ship.leak", "delay_days": 18, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.plague_ship.contained",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "60"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.biosecurity"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.plague_ship.contained",
+                  "summary": "The hulk is sterilized in place. Its sealed samples vault becomes a biosecurity treasure.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.plague_ship.leak",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-60"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.plague_ship.leak",
+                  "summary": "A containment lapse on the plague ship sends the expedition into emergency quarantine.",
+                  "significance": "0.7"}}
+      ]
+    },
+    {
+      "id": "anomaly.quantum_telescope",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 4,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "150"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.deep_field_array"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.quantum_telescope",
+                  "summary": "A still-aligned precursor interferometry array. Its deep-field survey is copied wholesale.",
+                  "significance": "0.7"}}
+      ]
+    },
+    {
+      "id": "anomaly.stellar_lifeform",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 1,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "200"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.stellar_biology"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.stellar_lifeform",
+                  "summary": "The anomaly is alive: a magnetospheric organism grazing on the star's charged outflow.",
+                  "significance": "0.9"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.stellar_lifeform.migration", "delay_days": 90, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.stellar_lifeform.migration",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "100"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.stellar_lifeform.migration",
+                  "summary": "The stellar organism departs on a feeding migration — its path hints at more of its kind.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.wormhole_stub",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 2,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "120"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.wormhole_survey"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.wormhole_stub",
+                  "summary": "A collapsed wormhole mouth: dead, but its throat geometry is a textbook waiting to be read.",
+                  "significance": "0.8"}}
+      ]
+    },
+    {
+      "id": "anomaly.orbital_ring_ruin",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 4,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "120"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.megastructure_fragment"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.orbital_ring_ruin",
+                  "summary": "Fragments of an orbital ring: materials science beyond anything the shipyards have attempted.",
+                  "significance": "0.7"}}
+      ]
+    },
+    {
+      "id": "anomaly.pirate_cache",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 4,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "180"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.pirate_cache",
+                  "summary": "A smuggler's dead-drop: untraceable bullion and fenced cargo, yours for the taking.",
+                  "significance": "0.4"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.pirate_cache.clean", "delay_days": 10, "weight": 3},
+        {"id": "anomaly.pirate_cache.trap", "delay_days": 10, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.pirate_cache.clean",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "60"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.pirate_cache.clean",
+                  "summary": "The drop was clean — the dead-drop's former owners never came looking.",
+                  "significance": "0.3"}}
+      ]
+    },
+    {
+      "id": "anomaly.pirate_cache.trap",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-250"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.pirate_cache.trap",
+                  "summary": "The cache was bait. A hunter-killer buoy tags the survey ship and the ransom costs more than the haul.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.ancient_shrine",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 3,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "90"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.ancient_shrine",
+                  "summary": "A devotional site of breathtaking age — offerings arranged around a view of the galactic core.",
+                  "significance": "0.6"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.ancient_shrine.pilgrims", "delay_days": 45, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.ancient_shrine.pilgrims",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "120"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.ancient_shrine.pilgrims",
+                  "summary": "Word of the shrine spreads; a trickle of pilgrim traffic pays tolls to visit the site.",
+                  "significance": "0.4"}}
+      ]
+    },
+    {
+      "id": "anomaly.infectious_code",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 2,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-100"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.infectious_code",
+                  "summary": "The anomaly is software: a dormant infiltrator that probes the survey ship's systems on contact.",
+                  "significance": "0.7"}}
+      ],
+      "follow_ups": [
+        {"id": "anomaly.infectious_code.countered", "delay_days": 12, "weight": 3},
+        {"id": "anomaly.infectious_code.persists", "delay_days": 12, "weight": 1}
+      ]
+    },
+    {
+      "id": "anomaly.infectious_code.countered",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "100"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.counter_intrusion"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.infectious_code.countered",
+                  "summary": "The infiltrator is isolated and dissected — its intrusion tradecraft is now ours.",
+                  "significance": "0.6"}}
+      ]
+    },
+    {
+      "id": "anomaly.infectious_code.persists",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-150"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.infectious_code.persists",
+                  "summary": "The infiltrator keeps surfacing in edge systems; the cleanup drags on.",
+                  "significance": "0.5"}}
+      ]
+    },
+    {
+      "id": "anomaly.dark_matter_eddy",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 4,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "80"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.dark_matter_chart"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.dark_matter_eddy",
+                  "summary": "A persistent dark-matter eddy, mapped at last — a landmark for gravitational research.",
+                  "significance": "0.5"}}
+      ]
+    },
+    {
+      "id": "anomaly.battle_memorial",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 4,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "30"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.battle_memorial",
+                  "summary": "A memorial beacon for a forgotten battle, still broadcasting the names of the dead.",
+                  "significance": "0.4"}}
+      ]
+    },
+    {
+      "id": "anomaly.mining_rig_graveyard",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 5,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "70"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.mining_rig_graveyard",
+                  "summary": "Stripped mining rigs, picked clean decades ago — but their patterned reserves ledger is intact.",
+                  "significance": "0.4"}}
+      ]
+    },
+    {
+      "id": "anomaly.time_dilation_wreck",
+      "on": "exploration.anomaly_surveyed",
+      "scope": {"kind": "body", "id": -1},
+      "weight": 2,
+      "once_per_scope": true,
+      "trigger": {"check": "body_has_anomaly",
+                  "scope": {"kind": "body", "id": -1}},
+      "effects": [
+        {"do": "resolve_anomaly", "scope": {"kind": "body", "id": -1}},
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "110"}},
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "50"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.anomaly.time_dilation_wreck",
+                  "summary": "A wreck suspended in a relativistic shear — its crew logs span three subjective centuries.",
+                  "significance": "0.7"}}
       ]
     }
   ]

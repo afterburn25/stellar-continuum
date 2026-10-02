@@ -121,6 +121,84 @@
                   "summary": "A sabotage scare locks down an orbital elevator; inspections cost the colony's sponsors dearly.",
                   "significance": "0.4"}}
       ]
+    },
+    {
+      "id": "colony.mineral_strike",
+      "poll_days": 70,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 120,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "2"}},
+        {"check": "random_chance", "args": {"probability": "0.25"}}
+      ]},
+      "effects": [
+        {"do": "grant_industry", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "80"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.mineral_strike",
+                  "summary": "Surveyors confirm a rich ore seam under a colony's southern plateau.",
+                  "significance": "0.3"}}
+      ]
+    },
+    {
+      "id": "colony.unrest",
+      "poll_days": 55,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 100,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "8"}},
+        {"check": "random_chance", "args": {"probability": "0.15"}}
+      ]},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "-40"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.unrest",
+                  "summary": "Labor unrest idles a colony's port ring; arbitration funds quiet the strike.",
+                  "significance": "0.4"}}
+      ]
+    },
+    {
+      "id": "colony.cultural_renaissance",
+      "poll_days": 150,
+      "scope": {"kind": "colony", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "12"}},
+        {"check": "random_chance", "args": {"probability": "0.3"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "50"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.cultural_awakening"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.cultural_renaissance",
+                  "summary": "A colony's artistic renaissance reframes its frontier hardship into cultural gravity.",
+                  "significance": "0.5"}}
+      ]
+    },
+    {
+      "id": "colony.water_reclamation",
+      "poll_days": 90,
+      "scope": {"kind": "colony", "id": -1},
+      "cooldown_days": 140,
+      "trigger": {"all": [
+        {"check": "population_at_least",
+         "scope": {"kind": "colony", "id": -1}, "args": {"millions": "1"}},
+        {"check": "random_chance", "args": {"probability": "0.25"}}
+      ]},
+      "effects": [
+        {"do": "grant_credits", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "40"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.colony.water_reclamation",
+                  "summary": "A colony's reclamation retrofit frees export capacity in its water budget.",
+                  "significance": "0.25"}}
+      ]
     }
   ]
 }

@@ -510,6 +510,23 @@ preserve:
   backend-native timestamp path). The shell Profiler tool's MIN button
   cycles 0/1us/10us/100us; `profiler` covers threshold filtering and
   aggregate retention.
+- Gameplay scripting platform M4 (seed pack v1): `data/scripted/v1` now
+  ships 67 definitions in 4 documents. anomalies.json: 20 anomaly
+  triggers on `exploration.anomaly_surveyed` (once_per_scope, weighted),
+  including chained outcomes — `precursor_vault` goes 3 deep
+  (guardian danger branch → aftermath, archive → deeper),
+  `derelict_fleet`, `plague_ship`, `infectious_code`, `pirate_cache`,
+  `frozen_ark`, `data_vault`, `ancient_beacon`, `live_mine`,
+  `stellar_lifeform`, `ancient_shrine`. colonies.json: 9 cadence events
+  (epidemic outcome chain, renaissance, unrest...). diplomacy.json: 8
+  events incl. trade_envoy, border_tension, detente, border_grievance
+  (war escalation, not-at-war gated). research.json: 8 capability-gated
+  follow-throughs — anomaly `grant_capability` calls (e.g.
+  `scripted.precursor_archive`, `scripted.precursor_coordinates`,
+  `scripted.mine_forensics`) unlock research polls across documents, so
+  danger/precursor discoveries pay off long after the survey. The
+  campaign test asserts all 67 ids load error-free through the directory
+  loader.
 - Gameplay scripting platform M3 (developer inspector): the developer
   diagnostics panel (`native_developer_diagnostics.hpp`) gained a SCRIPTED
   view — a read-only roster of loaded definitions with live state per row

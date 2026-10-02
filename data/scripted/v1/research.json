@@ -1,0 +1,173 @@
+{
+  "schema": "stellar_scripted_events_v1",
+  "scripted_events": [
+    {
+      "id": "research.precursor_decoding",
+      "poll_days": 60,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "has_capability",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_archive"}},
+        {"check": "random_chance", "args": {"probability": "0.6"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "150"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_insights"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.precursor_decoding",
+                  "summary": "A dedicated program begins decoding the precursor vault archive.",
+                  "significance": "0.7",
+                  "visible_to": "player"}}
+      ],
+      "follow_ups": [
+        {"id": "research.precursor_mastery", "delay_days": 90, "weight": 1}
+      ]
+    },
+    {
+      "id": "research.precursor_mastery",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "300"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_mastery"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.precursor_mastery",
+                  "summary": "The precursor archive is mastered — its engineering axioms fold into our own science.",
+                  "significance": "0.9",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "research.anomaly_synthesis",
+      "poll_days": 120,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "has_capability",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_coordinates"}},
+        {"check": "random_chance", "args": {"probability": "0.5"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "200"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.anomaly_synthesis",
+                  "summary": "Cartographers correlate the beacon's coordinate cypher with deep surveys — the precursor signal map resolves.",
+                  "significance": "0.7",
+                  "visible_to": "player"}}
+      ],
+      "follow_ups": [
+        {"id": "research.anomaly_synthesis.site", "delay_days": 60, "weight": 1}
+      ]
+    },
+    {
+      "id": "research.anomaly_synthesis.site",
+      "scope": {"kind": "civilization", "id": -1},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "150"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.precursor_site"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.anomaly_synthesis.site",
+                  "summary": "The signal map converges on a candidate precursor site — coordinates filed for an expedition.",
+                  "significance": "0.8",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "research.deep_field",
+      "poll_days": 100,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 200,
+      "trigger": {"all": [
+        {"check": "has_capability",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.deep_field_array"}},
+        {"check": "random_chance", "args": {"probability": "0.4"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "120"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.deep_field",
+                  "summary": "The recovered deep-field array continues paying out survey correlations.",
+                  "significance": "0.4",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "research.stellar_husbandry",
+      "poll_days": 140,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "has_capability",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.stellar_biology"}},
+        {"check": "random_chance", "args": {"probability": "0.4"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "150"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.stellar_husbandry"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.stellar_husbandry",
+                  "summary": "Xenobiologists complete the stellar organism's feeding model — a first step toward husbandry.",
+                  "significance": "0.7",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "research.counter_intrusion",
+      "poll_days": 45,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "has_capability",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.counter_intrusion"}},
+        {"check": "random_chance", "args": {"probability": "0.5"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "60"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.counter_intrusion",
+                  "summary": "The dissected infiltrator's tradecraft hardens our own information warfare doctrine.",
+                  "significance": "0.4",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "research.mine_network",
+      "poll_days": 90,
+      "scope": {"kind": "civilization", "id": -1},
+      "once_per_scope": true,
+      "trigger": {"all": [
+        {"check": "has_capability",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.mine_forensics"}},
+        {"check": "random_chance", "args": {"probability": "0.5"}}
+      ]},
+      "effects": [
+        {"do": "grant_science", "scope": {"kind": "civilization", "id": -1},
+         "args": {"amount": "140"}},
+        {"do": "grant_capability", "scope": {"kind": "civilization", "id": -1},
+         "args": {"capability": "scripted.mine_signature"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.research.mine_network",
+                  "summary": "The mine fragment's drive signature resolves — analysts can now chart the whole seeded network.",
+                  "significance": "0.6",
+                  "visible_to": "player"}}
+      ]
+    }
+  ]
+}

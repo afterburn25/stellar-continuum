@@ -126,6 +126,96 @@
                   "significance": "0.9",
                   "visible_to": "player"}}
       ]
+    },
+    {
+      "id": "diplomacy.trade_envoy",
+      "poll_days": 75,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 150,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"not": {"check": "at_war",
+                 "scope": {"kind": "civilization", "id": -1},
+                 "args": {"civilization": "player"}}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "trust", "value": "25"}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "cooperation",
+                  "value": "10"}},
+        {"check": "random_chance", "args": {"probability": "0.35"}}
+      ]},
+      "effects": [
+        {"do": "modify_relationship",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "cooperation": "6", "trust": "3",
+                  "reason": "scripted trade envoy"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.trade_envoy",
+                  "summary": "A trade envoy arrives with draft agreements; commerce deepens mutual trust.",
+                  "significance": "0.5",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "diplomacy.border_tension",
+      "poll_days": 80,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 160,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"not": {"check": "at_war",
+                 "scope": {"kind": "civilization", "id": -1},
+                 "args": {"civilization": "player"}}},
+        {"check": "relationship_at_least",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "axis": "hostility",
+                  "value": "45"}},
+        {"check": "random_chance", "args": {"probability": "0.3"}}
+      ]},
+      "effects": [
+        {"do": "modify_relationship",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "hostility": "6", "fear": "2",
+                  "reason": "scripted border tension"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.border_tension",
+                  "summary": "Patrol incidents along a shared frontier harden a rival's posture.",
+                  "significance": "0.5",
+                  "visible_to": "player"}}
+      ]
+    },
+    {
+      "id": "diplomacy.detente",
+      "poll_days": 60,
+      "scope": {"kind": "civilization", "id": -1},
+      "cooldown_days": 120,
+      "trigger": {"all": [
+        {"not": {"check": "civilization_is_player",
+                 "scope": {"kind": "civilization", "id": -1}}},
+        {"check": "at_war",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player"}},
+        {"not": {"check": "relationship_at_least",
+                 "scope": {"kind": "civilization", "id": -1},
+                 "args": {"civilization": "player", "axis": "hostility",
+                          "value": "40"}}},
+        {"check": "random_chance", "args": {"probability": "0.25"}}
+      ]},
+      "effects": [
+        {"do": "modify_relationship",
+         "scope": {"kind": "civilization", "id": -1},
+         "args": {"civilization": "player", "trust": "5", "respect": "5",
+                  "reason": "scripted detente"}},
+        {"do": "chronicle_record",
+         "args": {"category": "scripted.diplomacy.detente",
+                  "summary": "Back-channel talks during the war produce the first signs of detente.",
+                  "significance": "0.7",
+                  "visible_to": "player"}}
+      ]
     }
   ]
 }
