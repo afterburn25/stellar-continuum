@@ -1979,6 +1979,14 @@ the normal save then the pending action, aborting if the document is
 still dirty (save failed); DISCARD proceeds; CANCEL/Esc/outside-click
 aborts. Also fixed: Ctrl+O ran menu item 3 (SAVE TO FOLDER) after the
 menu grew — it now opens the picker (item 4).
+Follow-on: the engine tools host (`stellar-engine.exe`) shares the
+same lifecycle — `unsaved_docs` aggregates `scene_modified` /
+`scene3_modified`; window close, Esc-quit, project OPEN and project
+CLOSE gate behind a topmost SAVE ALL / DISCARD / CANCEL overlay
+(`resolve_discard` saves each dirty document via `save_scene` /
+`save_scene3`, aborts the action if anything stays modified); the
+status line reports "unsaved scene+scene3d". The inline scene3d save
+block was extracted into `save_scene3` for reuse.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

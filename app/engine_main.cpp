@@ -521,6 +521,23 @@ struct Shell {
     std::vector<Traveller> travellers;
   } gal;
   UiRect hit_gal_step{}, hit_gal_run{}, hit_gal_reset{}, hit_gal_map{};
+
+  // Document lifecycle: scene/scene3d `*_modified` flags mark unsaved
+  // document state; quitting or switching/closing a project gates behind
+  // the confirm overlay (SAVE ALL / DISCARD / CANCEL).
+  enum class PendingDiscard : std::uint8_t {
+    None,
+    Quit,
+    CloseProject,
+    OpenProject,
+  };
+  PendingDiscard pending_discard{PendingDiscard::None};
+  std::filesystem::path pending_open_root;
+  // Set when the confirm approves a quit; the frame loop honours it.
+  bool quit_confirmed{};
+  UiRect confirm_rect{}, confirm_save{}, confirm_discard{},
+      confirm_cancel{};
+
   std::string status{"ready"};
 };
 
@@ -1646,10 +1663,101 @@ void load_scene3(Shell &shell) {
     shell.status = "scene3d load failed: " + error;
 }
 
+void save_scene3(Shell &shell) {
+  if (!shell.project) return;
+  try {
+    std::filesystem::create_directories(scene3_path(shell).parent_path());
+    shell.scene3_doc.save(scene3_path(shell));
+    shell.scene3_modified = false;
+    shell.status = "scene3d saved - " +
+                   scene3_path(shell).filename().string();
+  } catch (const std::exception &error) {
+    shell.status = std::string("scene3d save failed: ") + error.what();
+  }
+}
+
 engine::Scene3dEntity *selected_scene3_entity(Shell &shell) {
   if (shell.scene3_sel >= shell.scene3_doc.entities.size())
     return nullptr;
   return &shell.scene3_doc.entities[shell.scene3_sel];
+}
+
+// ---- Document lifecycle: unsaved-work confirm -------------------------
+//
+// Both authored documents track `*_modified`. Any action that would drop
+// them (window close, project open/close) gates behind a topmost confirm
+// overlay — SAVE ALL writes every dirty document first, aborting the
+// action if a save fails; DISCARD proceeds; CANCEL keeps the documents.
+
+bool unsaved_docs(const Shell &shell) {
+  return shell.scene_modified || shell.scene3_modified;
+}
+
+void resolve_discard(Shell &shell, int choice) {
+  const auto pending = shell.pending_discard;
+  shell.pending_discard = Shell::PendingDiscard::None;
+  if (choice == 2 || pending == Shell::PendingDiscard::None) return;
+  if (choice == 0) {
+    if (shell.scene_modified) save_scene(shell);
+    if (shell.scene3_modified) save_scene3(shell);
+    if (unsaved_docs(shell)) return; // a save failed — abort the action
+  }
+  switch (pending) {
+  case Shell::PendingDiscard::Quit:
+    shell.quit_confirmed = true;
+    break;
+  case Shell::PendingDiscard::CloseProject:
+    close_project(shell);
+    break;
+  case Shell::PendingDiscard::OpenProject:
+    open_project(shell, shell.pending_open_root);
+    break;
+  case Shell::PendingDiscard::None:
+    break;
+  }
+}
+
+// Modal unsaved-changes overlay drawn topmost each frame.
+void render_discard_confirm(DrawList &out, Shell &shell, float s, float w,
+                            float h) {
+  shell.confirm_rect = shell.confirm_save = shell.confirm_discard =
+      shell.confirm_cancel = {};
+  if (shell.pending_discard == Shell::PendingDiscard::None) return;
+  const int font = static_cast<int>(13 * s);
+  const float pw = std::min(460 * s, w - 60 * s);
+  const float ph = 132 * s;
+  const UiRect r{(w - pw) * .5f, (h - ph) * .5f, pw, ph};
+  shell.confirm_rect = r;
+  out.overlay.push_back(FilledRectangle{r, {8, 20, 32, 250}});
+  out.overlay.push_back(StrokedRectangle{r, accent});
+  out.overlay.push_back(Text{{r.x + 14 * s, r.y + 10 * s}, "UNSAVED CHANGES",
+                             accent, font + 1, 0, std::nullopt,
+                             TextAlign::Left, FontFace::Heading});
+  std::string which =
+      shell.scene_modified && shell.scene3_modified ? "scene and scene3d"
+      : shell.scene_modified                        ? "scene"
+                                                    : "scene3d";
+  const char *action =
+      shell.pending_discard == Shell::PendingDiscard::Quit
+          ? "quit"
+      : shell.pending_discard == Shell::PendingDiscard::CloseProject
+          ? "close the project"
+          : "open another project";
+  out.overlay.push_back(
+      Text{{r.x + 14 * s, r.y + 16 * s + font},
+           "Save " + which + " before you " + action + "?", ink, font});
+  const float bw = (r.width - 40 * s) / 3.f;
+  const float by = r.y + r.height - 46 * s;
+  shell.confirm_save = {r.x + 14 * s, by, bw, 32 * s};
+  shell.confirm_discard = {r.x + 20 * s + bw, by, bw, 32 * s};
+  shell.confirm_cancel = {r.x + 26 * s + bw * 2.f, by, bw, 32 * s};
+  const Point pointer{shell.pointer_x, shell.pointer_y};
+  for (const auto &[rect, label] :
+       {std::pair{shell.confirm_save, "SAVE ALL"},
+        std::pair{shell.confirm_discard, "DISCARD"},
+        std::pair{shell.confirm_cancel, "CANCEL"}}) {
+    shell_button(out, rect, label, rect.contains(pointer), font, s);
+  }
 }
 
 std::shared_ptr<const Mesh3D> scene3_mesh(Shell &shell,
@@ -6494,16 +6602,40 @@ int main(int argc, char **argv) {
     for (;;) {
       if (frame_limit > 0 && frames_rendered >= frame_limit) break;
       const auto snapshot = window.poll();
-      if (snapshot.quit_requested) break;
+      if (snapshot.quit_requested) {
+        if (unsaved_docs(shell))
+          shell.pending_discard = Shell::PendingDiscard::Quit;
+        else
+          break;
+      }
       shell.pointer_x = snapshot.pointer.x;
       shell.pointer_y = snapshot.pointer.y;
       for (const auto &event : snapshot.events) {
+        // The unsaved-changes overlay owns input while open.
+        if (shell.pending_discard != Shell::PendingDiscard::None) {
+          if (event.type == InputEventType::EscapePressed)
+            resolve_discard(shell, 2);
+          else if (event.type == InputEventType::LeftPressed) {
+            if (shell.confirm_save.contains(event.position))
+              resolve_discard(shell, 0);
+            else if (shell.confirm_discard.contains(event.position))
+              resolve_discard(shell, 1);
+            else if (shell.confirm_cancel.contains(event.position) ||
+                     !shell.confirm_rect.contains(event.position))
+              resolve_discard(shell, 2);
+          }
+          continue;
+        }
         if (event.type == InputEventType::EscapePressed) {
           if (shell.editing_project_name || shell.editing_import ||
               shell.editing_package || shell.editing_scene) {
             shell.editing_project_name = shell.editing_import =
                 shell.editing_package = shell.editing_scene = false;
             window.set_text_input(false);
+            continue;
+          }
+          if (unsaved_docs(shell)) {
+            shell.pending_discard = Shell::PendingDiscard::Quit;
             continue;
           }
           return 0;
@@ -6755,10 +6887,22 @@ int main(int argc, char **argv) {
             else if (shell.hit_project_create.contains(event.position))
               create_project_from_field(shell);
             else if (shell.hit_project_open.contains(event.position) &&
-                     shell.selected_project < shell.projects.size())
-              open_project(shell, shell.projects[shell.selected_project]);
-            else if (shell.hit_project_close.contains(event.position))
-              close_project(shell);
+                     shell.selected_project < shell.projects.size()) {
+              if (unsaved_docs(shell)) {
+                shell.pending_open_root =
+                    shell.projects[shell.selected_project];
+                shell.pending_discard =
+                    Shell::PendingDiscard::OpenProject;
+              } else {
+                open_project(shell, shell.projects[shell.selected_project]);
+              }
+            } else if (shell.hit_project_close.contains(event.position)) {
+              if (unsaved_docs(shell))
+                shell.pending_discard =
+                    Shell::PendingDiscard::CloseProject;
+              else
+                close_project(shell);
+            }
             else if (shell.hit_project_cook.contains(event.position))
               start_cook(shell, jobs);
             else if (shell.hit_project_build.contains(event.position))
@@ -7126,12 +7270,7 @@ int main(int argc, char **argv) {
               shell.scene3_modified = true;
             } else if (shell.hit3_save.contains(event.position) &&
                        shell.scene3_modified) {
-              std::filesystem::create_directories(
-                  scene3_path(shell).parent_path());
-              doc.save(scene3_path(shell));
-              shell.scene3_modified = false;
-              shell.status = "scene3d saved - " +
-                             scene3_path(shell).filename().string();
+              save_scene3(shell);
             } else if (shell.hit3_undo.contains(event.position)) {
               if (auto d = shell.scene3_history.undo(doc)) {
                 doc = std::move(*d);
@@ -7628,12 +7767,24 @@ int main(int argc, char **argv) {
         break;
       }
 
-      draw.overlay.push_back(Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
-                               shell.status + "  |  ESC to quit - F12 screenshots", muted,
-                               static_cast<int>(11 * s)});
+      draw.overlay.push_back(
+          Text{{body.x + 6 * s, panel.y + panel.height - 26 * s},
+               shell.status +
+                   (unsaved_docs(shell)
+                        ? "  |  unsaved " +
+                              std::string(shell.scene_modified &&
+                                                  shell.scene3_modified
+                                              ? "scene+scene3d"
+                                          : shell.scene_modified ? "scene"
+                                                                 : "scene3d")
+                        : "") +
+                   "  |  ESC to quit - F12 screenshots",
+               muted, static_cast<int>(11 * s)});
 
       // Deferred input handling that needs this frame's list geometry.
       for (const auto &event : snapshot.events) {
+        if (shell.pending_discard != Shell::PendingDiscard::None)
+          continue; // the confirm overlay owns input while open
         if (shell.tool == Tool::Assets) {
           if (event.type == InputEventType::LeftReleased &&
               shell.hit_cooked_toggle.contains(event.position)) {
@@ -8245,6 +8396,9 @@ int main(int argc, char **argv) {
           }
         }
       }
+
+      render_discard_confirm(draw, shell, s, w, h); // topmost overlay
+      if (shell.quit_confirmed) break;
 
       FrameTiming timing;
       window.draw(draw, std::nullopt, &timing);
