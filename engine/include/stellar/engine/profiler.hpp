@@ -109,6 +109,17 @@ public:
     [[nodiscard]] std::size_t retained_frames() const noexcept { return retained_frames_; }
     void set_retained_frames(std::size_t frames) noexcept { retained_frames_ = frames; }
 
+    // Lower-perturbation retention: spans shorter than `nanoseconds` still
+    // count in call aggregates but are not retained in the frame ring or
+    // exports — the sub-microsecond noise that dominates span volume costs
+    // nothing beyond its aggregate update. 0 (default) retains every span.
+    void set_span_retention_threshold(std::uint64_t nanoseconds) noexcept {
+        span_retention_ns_.store(nanoseconds, std::memory_order_relaxed);
+    }
+    [[nodiscard]] std::uint64_t span_retention_threshold() const noexcept {
+        return span_retention_ns_.load(std::memory_order_relaxed);
+    }
+
     [[nodiscard]] std::vector<ProfileAggregate> aggregates() const;
     void reset_aggregates();
 
@@ -155,6 +166,7 @@ private:
     std::vector<ThreadSpans*> thread_buffers_;
     std::chrono::steady_clock::time_point frame_start_{};
     std::uint64_t next_frame_index_{};
+    std::atomic<std::uint64_t> span_retention_ns_{0};
     bool frame_open_{};
 };
 

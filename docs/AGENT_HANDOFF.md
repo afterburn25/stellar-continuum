@@ -497,6 +497,13 @@ preserve:
   report). `native_support` covers attachment, bounds and no-report absence;
   with no diagnostics session `diagnostics_directory()` is empty and nothing
   is attached.
+- Profiler span-retention threshold: `set_span_retention_threshold(ns)`
+  keeps sub-threshold spans out of the frame ring and `export_json`
+  captures while they still count in call aggregates — the lower-
+  perturbation half of roadmap row 19 (GPU timeline still needs a
+  backend-native timestamp path). The shell Profiler tool's MIN button
+  cycles 0/1us/10us/100us; `profiler` covers threshold filtering and
+  aggregate retention.
 
 **Space-strategy specialization (branch
 `engine/space-strategy-simulation-specialization`):** Stellar Engine is being

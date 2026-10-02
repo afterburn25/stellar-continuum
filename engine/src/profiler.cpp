@@ -203,7 +203,9 @@ void Profiler::record_span(ProfileSpan span) {
     ++aggregate.calls;
     aggregate.total_nanoseconds += span.duration_nanoseconds;
     aggregate.max_nanoseconds = std::max(aggregate.max_nanoseconds, span.duration_nanoseconds);
-    storage.spans.push_back(std::move(span));
+    if (span.duration_nanoseconds >=
+        span_retention_ns_.load(std::memory_order_relaxed))
+        storage.spans.push_back(std::move(span));
 }
 
 void Profiler::register_once(ThreadSpans& storage) {

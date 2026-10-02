@@ -109,6 +109,25 @@ int main() {
   check(worker_aggregate != merged.end() && worker_aggregate->calls == 200,
         "threaded aggregates merged");
 
+  // Retention threshold: sub-threshold spans still aggregate but skip the
+  // frame ring — lower-perturbation mode for chatty sub-microsecond spans.
+  profiler.set_span_retention_threshold(1000);
+  profiler.begin_frame();
+  profiler.record_span({"short", "sim", 0, 0, 500});
+  profiler.record_span({"long", "sim", 0, 0, 5000});
+  const auto filtered = profiler.end_frame();
+  check(filtered.spans.size() == 1 && filtered.spans[0].name == "long",
+        "sub-threshold span skipped the frame ring");
+  profiler.set_span_retention_threshold(0);
+  const auto thresholded = profiler.aggregates();
+  const auto short_aggregate =
+      std::find_if(thresholded.begin(), thresholded.end(),
+                   [](const ProfileAggregate &a) { return a.name == "short"; });
+  check(short_aggregate != thresholded.end() &&
+            short_aggregate->calls == 1 &&
+            short_aggregate->total_nanoseconds == 500,
+        "filtered span still counted in aggregates");
+
   if (failures == 0)
     std::cout << "Profiler tests passed\n";
   return failures == 0 ? 0 : 1;

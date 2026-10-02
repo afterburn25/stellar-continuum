@@ -193,7 +193,8 @@ struct Shell {
   std::optional<engine::ProfileCapture> prof_capture_a, prof_capture_b;
   std::string prof_status;
   UiRect hit_prof_cap_a{}, hit_prof_cap_b{}, hit_prof_save_a{},
-      hit_prof_save_b{}, hit_prof_load_a{}, hit_prof_load_b{};
+      hit_prof_save_b{}, hit_prof_load_a{}, hit_prof_load_b{},
+      hit_prof_min{};
   // New-project name field and panel hit regions.
   bool editing_project_name{}, editing_import{}, editing_package{};
   std::string project_name_buffer, import_buffer, package_buffer;
@@ -4270,12 +4271,21 @@ void render_profiler(DrawList &out, Shell &shell, UiRect body, float s,
   shell.hit_prof_load_a = {x + (bw + gap) * 3, y, bw, bh};
   shell.hit_prof_save_b = {x + (bw + gap) * 4, y, bw, bh};
   shell.hit_prof_load_b = {x + (bw + gap) * 5, y, bw, bh};
+  shell.hit_prof_min = {x + (bw + gap) * 6, y, bw, bh};
   shell_button(out, shell.hit_prof_cap_a, "CAPTURE A", false, font, s);
   shell_button(out, shell.hit_prof_cap_b, "CAPTURE B", false, font, s);
   shell_button(out, shell.hit_prof_save_a, "SAVE A", false, font, s);
   shell_button(out, shell.hit_prof_load_a, "LOAD A", false, font, s);
   shell_button(out, shell.hit_prof_save_b, "SAVE B", false, font, s);
   shell_button(out, shell.hit_prof_load_b, "LOAD B", false, font, s);
+  {
+    const auto threshold = profiler.span_retention_threshold();
+    const std::string label = threshold == 0
+        ? "MIN ALL"
+        : "MIN " + std::to_string(threshold / 1000) + "us";
+    shell_button(out, shell.hit_prof_min, label.c_str(),
+                 threshold != 0, font, s);
+  }
   y += bh + 8 * s;
   if (!shell.prof_status.empty())
     line(out, x, y, "status", shell.prof_status, font);
@@ -7882,6 +7892,20 @@ int main(int argc, char **argv) {
             load_slot(0);
           else if (shell.hit_prof_load_b.contains(event.position))
             load_slot(1);
+          else if (shell.hit_prof_min.contains(event.position)) {
+            // Cycle 0 (retain every span) -> 1us -> 10us -> 100us ->
+            // back to 0: sub-threshold spans still aggregate but skip
+            // the frame ring and captures.
+            const auto current = profiler.span_retention_threshold();
+            const std::uint64_t next =
+                current == 0 ? 1000 : current == 1000 ? 10000
+                : current == 10000                  ? 100000
+                                                    : 0;
+            profiler.set_span_retention_threshold(next);
+            shell.prof_status = next == 0
+                ? "retaining all spans"
+                : "retaining spans >= " + std::to_string(next / 1000) + "us";
+          }
         }
         if (shell.tool == Tool::Simulation &&
             event.type == InputEventType::LeftReleased) {
