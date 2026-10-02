@@ -134,6 +134,27 @@ int main(int argc, char** argv) {
     check(decoded_pcm_live_bytes() == pcm_before,
           "decoded PCM census did not release destroyed clips");
 
+    // Decoded-PCM budget: reservations reject over-budget clips without
+    // touching the census, and a zero budget disables enforcement.
+    {
+      const auto saved_budget = decoded_pcm_budget_bytes();
+      const auto saved_rejections = decoded_pcm_budget_rejections();
+      set_decoded_pcm_budget(pcm_before + 16);
+      {
+        const auto first = AudioClip::create({0.f, 0.f, 0.f, 0.f});
+        check(rejects([] { (void)AudioClip::create({0.f, 0.f}); }),
+              "over-budget clip was accepted");
+        check(decoded_pcm_budget_rejections() == saved_rejections + 1,
+              "decoded PCM budget rejection was not counted");
+      }
+      check(decoded_pcm_live_bytes() == pcm_before,
+            "budget-limited clips were not released on destruction");
+      set_decoded_pcm_budget(0);
+      check(AudioClip::create({0.f, 0.f}) != nullptr,
+            "disabled decoded PCM budget still rejected clips");
+      set_decoded_pcm_budget(saved_budget);
+    }
+
     // Streaming decode parity: pull-decoding the same files in small
     // chunks produces byte-identical canonical PCM, reports
     // end-of-stream, and rewinds cleanly for looping.

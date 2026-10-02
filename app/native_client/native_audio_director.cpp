@@ -342,6 +342,10 @@ void NativeAudioDirector::service_voice() {
     // Corrupt/undecodable cue media retires voice, not the audio device.
     try { output_->stop_voice(); } catch (...) {}
     disable_voice(std::string{"audio voice stream failed: "} + error.what());
+  } catch (const std::length_error& error) {
+    // A decoded-PCM budget denial rejects this clip only — retire voice.
+    try { output_->stop_voice(); } catch (...) {}
+    disable_voice(std::string{"audio voice memory budget exceeded: "} + error.what());
   } catch (const std::exception& error) {
     fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }
@@ -448,6 +452,11 @@ void NativeAudioDirector::play_dialogue_pcm(
     stats_.queued_voice_bytes = diagnostics.queued_voice_bytes;
     stats_.music_queue_limit_bytes = diagnostics.music_queue_limit_bytes;
     stats_.voice_queue_limit_bytes = diagnostics.voice_queue_limit_bytes;
+  } catch (const std::length_error& error) {
+    // Synthesized dialogue denied by the decoded-PCM budget retires
+    // voice only — music/effects are unaffected.
+    try { output_->stop_voice(); } catch (...) {}
+    disable_voice(std::string{"audio dialogue memory budget exceeded: "} + error.what());
   } catch (const std::exception& error) {
     fail(std::string{"audio voice playback failed: "} + error.what(), true);
   }

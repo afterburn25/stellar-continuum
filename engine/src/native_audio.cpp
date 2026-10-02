@@ -132,12 +132,26 @@ namespace {
 // Namespace-scope so teardown never matters: constant-initialized and
 // trivially destructible even if a static-lifetime clip outlives exit.
 std::atomic<std::uint64_t> decoded_pcm_live_counter{0};
+std::atomic<std::uint64_t> decoded_pcm_budget{maximum_decoded_audio_bytes};
+std::atomic<std::uint64_t> decoded_pcm_rejections{0};
+
+// Reserves `bytes` in the live counter unless that would exceed the budget
+// (0 = unbounded). The CAS loop makes concurrent creation on different
+// threads unable to overshoot the cap.
+bool reserve_decoded_pcm(std::uint64_t bytes) {
+  const auto budget = decoded_pcm_budget.load(std::memory_order_relaxed);
+  auto live = decoded_pcm_live_counter.load(std::memory_order_relaxed);
+  for (;;) {
+    if (budget != 0 && live + bytes > budget) return false;
+    if (decoded_pcm_live_counter.compare_exchange_weak(
+            live, live + bytes, std::memory_order_relaxed))
+      return true;
+  }
+}
 
 } // namespace
 
-AudioClip::AudioClip(std::vector<float> samples) noexcept : samples_(std::move(samples)) {
-  decoded_pcm_live_counter.fetch_add(byte_size(), std::memory_order_relaxed);
-}
+AudioClip::AudioClip(std::vector<float> samples) noexcept : samples_(std::move(samples)) {}
 
 AudioClip::~AudioClip() noexcept {
   decoded_pcm_live_counter.fetch_sub(byte_size(), std::memory_order_relaxed);
@@ -145,11 +159,33 @@ AudioClip::~AudioClip() noexcept {
 
 std::shared_ptr<const AudioClip> AudioClip::create(std::vector<float> samples) {
   validate_samples(samples);
-  return std::shared_ptr<const AudioClip>(new AudioClip(std::move(samples)));
+  const auto bytes = static_cast<std::uint64_t>(samples.size() * sizeof(float));
+  if (!reserve_decoded_pcm(bytes)) {
+    decoded_pcm_rejections.fetch_add(1, std::memory_order_relaxed);
+    throw std::length_error("Audio clip exceeds the decoded PCM budget.");
+  }
+  try {
+    return std::shared_ptr<const AudioClip>(new AudioClip(std::move(samples)));
+  } catch (...) {
+    decoded_pcm_live_counter.fetch_sub(bytes, std::memory_order_relaxed);
+    throw;
+  }
 }
 
 std::uint64_t decoded_pcm_live_bytes() noexcept {
   return decoded_pcm_live_counter.load(std::memory_order_relaxed);
+}
+
+void set_decoded_pcm_budget(std::uint64_t bytes) noexcept {
+  decoded_pcm_budget.store(bytes, std::memory_order_relaxed);
+}
+
+std::uint64_t decoded_pcm_budget_bytes() noexcept {
+  return decoded_pcm_budget.load(std::memory_order_relaxed);
+}
+
+std::uint64_t decoded_pcm_budget_rejections() noexcept {
+  return decoded_pcm_rejections.load(std::memory_order_relaxed);
 }
 
 std::span<const float> AudioClip::samples() const noexcept { return samples_; }

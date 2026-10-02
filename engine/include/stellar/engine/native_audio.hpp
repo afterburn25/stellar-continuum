@@ -38,6 +38,18 @@ class AudioClip final {
 // pull buffers, not whole-file PCM).
 [[nodiscard]] std::uint64_t decoded_pcm_live_bytes() noexcept;
 
+// Decoded-PCM budget policy enforced by AudioClip::create — the resident
+// census above turned into a cap, so pathological accumulation (leaks,
+// oversized filtered-voice caches, runaway synthesized PCM) fails the
+// allocation instead of growing unboundedly. Defaults to the 96 MiB
+// per-clip ceiling, comfortably above the shipped resident set (bounded
+// effect clips + transient filtered-voice/dialogue PCM); 0 disables
+// enforcement. Reservations are atomic — clip creation on the load job and
+// the output owner thread cannot overshoot the cap.
+void set_decoded_pcm_budget(std::uint64_t bytes) noexcept;
+[[nodiscard]] std::uint64_t decoded_pcm_budget_bytes() noexcept;
+[[nodiscard]] std::uint64_t decoded_pcm_budget_rejections() noexcept;
+
 // Decodes supported Windows Media Foundation audio formats (including WAV and MP3).
 // The caller is expected to invoke this off the owner/UI thread.
 [[nodiscard]] std::shared_ptr<const AudioClip> decode_audio_clip(const std::filesystem::path& path);

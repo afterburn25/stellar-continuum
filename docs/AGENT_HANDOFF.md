@@ -1164,8 +1164,17 @@ the same way. Coverage: engine streamed-voice start/drain/stop
 lifecycle, null/oversized rejection, undecodable-source faulting; the
 director suite's queued scientist-cue tests now exercise the streamed
 path end-to-end; 3/3 audio suites green. Remaining: effects stay
-whole-clip (latency-critical, ≤1 MiB each); spatial buses and a
-decoded-PCM budget are still open.
+whole-clip (latency-critical, ≤1 MiB each); spatial buses are still
+open.
+Decoded-PCM budget (follow-on): the census is now enforced —
+`AudioClip::create` reserves bytes in a CAS loop against
+`decoded_pcm_budget` (default `maximum_decoded_audio_bytes` = 96 MiB,
+0 disables) before constructing, so concurrent creation on the load
+job and owner thread cannot overshoot; over-budget clips throw
+`std::length_error` and bump `decoded_pcm_budget_rejections`, and the
+`audio-decoded-pcm` MemoryTracker report now carries the budget as its
+limit. Counters live at namespace scope (constant-initialized,
+teardown-safe) like the live counter.
 Shipped-path smoke: `--voice-check` now reports `streamed:true` and the
 strict `voice_check` parser proves it. Note the routed leg —
 `scientist_voice` prefers the armed gameplay voice pipeline (SAPI →

@@ -11069,7 +11069,8 @@ int main(int argc,char **argv){
       if(audio_pcm_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
         audio_pcm_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("audio-decoded-pcm");
       stellar::engine::MemoryTracker::instance().report(audio_pcm_memory_,
-          stellar::engine::audio::decoded_pcm_live_bytes(),0);
+          stellar::engine::audio::decoded_pcm_live_bytes(),
+          stellar::engine::audio::decoded_pcm_budget_bytes());
       service_general();
       audio_settings.set_device_status(audio.failure_message());
       if(options.voice_check){
