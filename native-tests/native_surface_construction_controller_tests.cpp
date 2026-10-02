@@ -213,8 +213,11 @@ void quote_and_progress_tests(const fs::path &research_root,
   }
 
   selected = select_home(frame, 1, systems, colonies);
+  // The localization block placed another building on the same colony —
+  // surface_buildings may have reallocated, so `progressed` dangles here;
+  // the copied site id is the stable handle.
   const auto removal = controller.preview_removal(
-      frame, 1, selected.colony, progressed->id);
+      frame, 1, selected.colony, site_id);
   require(removal.accepted && removal.cancellation &&
               removal.refund_budget_units > 0.,
           "incomplete site did not produce a cancellation/refund quote");
