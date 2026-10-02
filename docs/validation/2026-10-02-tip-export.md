@@ -2,9 +2,9 @@
 
 **The authoritative packaged export is green on the delivered tip.** This
 records the `windows-native-preview` export run whose artifact is stamped
-`1874f39d`, superseding the earlier same-day runs recorded below (which
-verified `4990223d` and `d6da0498`) and the `217918b7` record in
-`2026-09-30-tip-export.md`. It is a development-state handoff, not a
+`6b349fe7`, superseding the earlier same-day runs recorded below (which
+verified `1874f39d`, `4990223d` and `d6da0498`) and the `217918b7` record
+in `2026-09-30-tip-export.md`. It is a development-state handoff, not a
 release certification; separate clean-machine/VM certification remains
 required.
 
@@ -13,24 +13,29 @@ required.
 Repository `afterburn25/stellar-continuum`, branch
 `game/ui-visual-overhaul` (PR #338, merged 2026-10-01, targeting
 `engine/space-strategy-simulation-specialization`; work continues on the
-same branch). Artifact stamp: `1874f39d`.
+same branch). Artifact stamp: `6b349fe7`.
 
-Scope since the `4990223d` run: the shipbuilding→construction executor
-dependency fix (`6c285d9e`), crash-report fault-site symbolization
-(`ac2241e8` — `describe_address` resolves `module+0xOFF func+0xD
-file(line)`), the bounded symbolized `stack:` mini-trace in fault and
-terminate reports (`adb97a26`), the `developer_qa_host` 120→240 s load
-tolerance (`281fb74a`), PDB shipping in the preview package
-(`69b87c83`), the heartbeat-armed hang watchdog with `hang_site=` +
-loop-thread trace + minidump (`810a4243`), and per-thread stacks for
-deadlock attribution in hang reports (`1874f39d`), plus documentation.
+Scope since the `1874f39d` run: support bundles attach the newest
+completed crash report as a bounded `crash-report.txt` entry
+(`5f84cc7a`, fixed in `6b349fe7` to exclude the live session's
+header-only report and to accept the optional entry in the export
+validator), and the profiler span-retention threshold
+(`b74433b1` — `set_span_retention_threshold` + shell MIN button).
 
-An earlier attempt in this window died at 1613/1917 inside the build
-step: the preview tree linked `stellar_runtime_diagnostics_tests.exe`
-after its source had compiled with `heartbeat()` but before
-`stellar_engine` recompiled with the definition — mid-run source edits
-produced inconsistent objects. This run started after all diagnostics
-commits landed, so the tree built uniformly.
+The first attempt at this tip (`b74433b1`) failed the packaged support
+validator for exactly the live-report bug `6b349fe7` fixes — the
+validator caught the regression end-to-end, which is the intended
+contract. This run's packaged `support-first.zip`/`support-second.zip`
+carry a genuine `crash-report.txt` — a FATAL report written by the
+voice-fault injection smoke earlier in the same flow — proving packaged
+attachment of real crash evidence.
+
+A note on the archive step: the export process was killed mid-`make_archive`
+(the runner shell was reaped after validation completed); the directory,
+`validation.json` and all evidence were already written and verified, so
+the archive was rebuilt from the verified directory with the same
+`shutil.make_archive` + `file_digest` code path and its SHA-256 recorded
+below.
 
 ## Run
 
@@ -39,32 +44,45 @@ python tools\stellar-export\stellar.py export windows-native-preview
 ```
 
 Artifact:
-`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-1874f39d-20261002T114350593508Z`
+`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-6b349fe7-20261002T143649814916Z`
 
 ## Results
 
-- Fresh configure + full build (1923→1917 actions), green.
-- CTest: **331/331 first pass** — `developer_qa_host` now carries the
-  240 s timeout and passed under parallel load (no solo retry needed).
-- Every `tools/stellar-export/test_*.py` module green.
+- Fresh configure + full build (1921→1917 actions), green.
+- CTest: 329/331 on the parallel pass; `engine_scale3d_25000` (240 s) and
+  `native_stellar_eruptions` (180 s) hit their timeouts under parallel
+  load and both passed green on the pipeline's solo retry (64 s and
+  63 s) — same environmental-load pattern as the earlier
+  `developer_qa_host` flake; no correctness failure.
+- Every `tools/stellar-export/test_*.py` module green, including the
+  extended `test_native_support_runtime` covering the optional
+  `crash-report.txt` entry and empty/binary report rejection.
 - Dependency audit, manifest packaging, restricted-PATH relocated smoke,
   and the full validator battery green — new-game/settings/audio/voice/
   controls round-trips, galaxy/system/travel/fleet/research/shipyard/
   support/developer captures all produced.
-- `voice_check` inside the export reports
-  `{"available":true,"played":2,"streamed":true,"unknown_denied":true,"overlap_prevented":true,"queue_bounded":true,"stopped":true}`.
+- **Support bundles ship real crash evidence**: the packaged
+  `support-first.zip` contains `session.log`, `system.txt`,
+  `campaign.player17.json` and `crash-report.txt` — the newest completed
+  report, while the live session's header-only report is correctly
+  excluded.
+- `voice_check` inside the export reports the same all-true scorecard.
 - **PDBs ship in the package**: `stellar-continuum-native.pdb` and
-  `stellar-continuum.pdb` sit beside their executables — packaged crash
-  reports resolve `fault_site=`/`stack:`/`hang_site=` frames to
-  file+line on the shipped binary, not just module+offset.
+  `stellar-continuum.pdb` sit beside their executables.
 - ZIP + SHA-256:
-  `75122bc7197b32e4f4e43593d30124e4e4301c62f220be3867dd0768dc81fd5d`
-  (3.75 GB — the two PDBs account for the ~1.4 GB growth vs the prior
-  symbol-free artifact).
+  `194b9a197032c93a6b9ea8f9daf007506f32eed21da03ccad75e3944c22aa5d7`
+  (1.44 GB — evidence set differs from the prior run; PDBs remain
+  staged beside both executables).
 - `validation.json`: 107 top-level booleans, only `graphicalParity`
   false (intentional — same scorecard shape as prior runs).
 
 ## Prior same-day runs (superseded)
+
+The `1874f39d` run (artifact
+`StellarContinuum-0.1.14.2-dev-windows-native-preview-1874f39d-20261002T114350593508Z`,
+SHA-256 `75122bc7197b32e4f4e43593d30124e4e4301c62f220be3867dd0768dc81fd5d`)
+verified the diagnostics arc (symbolization, mini-trace, watchdog,
+per-thread stacks) and PDB staging at 331/331.
 
 The `4990223d` run (artifact
 `StellarContinuum-0.1.14.2-dev-windows-native-preview-4990223d-20261002T100412139541Z`,
