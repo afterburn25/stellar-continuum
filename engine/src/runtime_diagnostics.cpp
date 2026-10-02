@@ -69,13 +69,16 @@ struct RuntimeDiagnostics::Impl {
   using SymLineFunction=BOOL(WINAPI*)(HANDLE,DWORD64,PDWORD,PIMAGEHLP_LINE64);
   using SymCleanupFunction=BOOL(WINAPI*)(HANDLE);
   using SymRefreshFunction=BOOL(WINAPI*)(HANDLE);
+  using StackWalkFunction=BOOL(WINAPI*)(DWORD,HANDLE,HANDLE,LPSTACKFRAME64,PVOID,PREAD_PROCESS_MEMORY_ROUTINE64,PFUNCTION_TABLE_ACCESS_ROUTINE64,PGET_MODULE_BASE_ROUTINE64,PTRANSLATE_ADDRESS_ROUTINE64);
   SymInitializeFunction sym_init{};
   SymSetOptionsFunction sym_options{};
   SymFromAddrFunction sym_from_addr{};
   SymLineFunction sym_line{};
   SymCleanupFunction sym_cleanup{};
   SymRefreshFunction sym_refresh{};
+  StackWalkFunction stack_walk{};
   bool sym_ready{};
+  bool trace_attempted{};
   mutable bool sym_refreshed{};
   std::string describe_address(const void* address) const noexcept {
     try{
@@ -109,6 +112,24 @@ struct RuntimeDiagnostics::Impl {
       return text;
     }catch(...){return{};}
   }
+  // Bounded mini-trace (<=32 frames) written to the crash report beside the
+  // minidump. StackWalk64 mutates the context — callers pass a private copy.
+  // trace_attempted guards re-entry: a fault inside the walk re-enters the
+  // filter and must not recurse back in here.
+  void trace(CONTEXT* context) noexcept {
+    if(!stack_walk||!sym_ready||trace_attempted)return;trace_attempted=true;
+    emergency("\n stack:\n",9);
+    STACKFRAME64 frame{};
+    frame.AddrPC.Offset=context->Rip;frame.AddrPC.Mode=AddrModeFlat;
+    frame.AddrFrame.Offset=context->Rbp;frame.AddrFrame.Mode=AddrModeFlat;
+    frame.AddrStack.Offset=context->Rsp;frame.AddrStack.Mode=AddrModeFlat;
+    for(int i=0;i<32;++i){
+      if(!stack_walk(IMAGE_FILE_MACHINE_AMD64,GetCurrentProcess(),GetCurrentThread(),&frame,context,nullptr,nullptr,nullptr,nullptr)||frame.AddrPC.Offset==0)break;
+      const auto site=describe_address(reinterpret_cast<const void*>(static_cast<uintptr_t>(frame.AddrPC.Offset)));
+      char line[560]{};const int m=std::snprintf(line,sizeof(line),"  #%02d %s\n",i,site.empty()?"?":site.c_str());
+      if(m>0)emergency(line,static_cast<std::size_t>(std::min(m,static_cast<int>(sizeof(line))-1)));
+    }
+  }
   void emergency(const char* text,std::size_t length) noexcept {if(crash_file!=INVALID_HANDLE_VALUE){DWORD written{};WriteFile(crash_file,text,static_cast<DWORD>(length),&written,nullptr);FlushFileBuffers(crash_file);}}
   void minidump(EXCEPTION_POINTERS* pointers) noexcept {
     if(!write_dump)return;
@@ -125,6 +146,7 @@ struct RuntimeDiagnostics::Impl {
     if(const auto site=self->describe_address(pointers->ExceptionRecord->ExceptionAddress);!site.empty()){
       char site_line[512]{};const int m=std::snprintf(site_line,sizeof(site_line)," fault_site=%s\n",site.c_str());
       if(m>0)self->emergency(site_line,static_cast<std::size_t>(std::min(m,static_cast<int>(sizeof(site_line))-1)));}
+    CONTEXT context=*pointers->ContextRecord;self->trace(&context);
     // try_lock prevents a fault inside stream logging from deadlocking reporting.
     if(self->mutex.try_lock()){self->emergency(self->last_context.data(),strnlen_s(self->last_context.data(),self->last_context.size()));self->mutex.unlock();}
     self->minidump(pointers);return EXCEPTION_EXECUTE_HANDLER;
@@ -168,6 +190,7 @@ struct RuntimeDiagnostics::Impl {
       try{if(auto error=std::current_exception())std::rethrow_exception(error);}catch(const std::exception& e){report(e.what());message=nullptr;}catch(...){}
       if(message)report(message);
 #ifdef _WIN32
+      CONTEXT context{};RtlCaptureContext(&context);active->trace(&context);
       active->minidump(nullptr);TerminateProcess(GetCurrentProcess(),3);
 #endif
     }
@@ -199,6 +222,7 @@ struct RuntimeDiagnostics::Impl {
       sym_line=reinterpret_cast<SymLineFunction>(GetProcAddress(dbghelp,"SymGetLineFromAddr64"));
       sym_cleanup=reinterpret_cast<SymCleanupFunction>(GetProcAddress(dbghelp,"SymCleanup"));
       sym_refresh=reinterpret_cast<SymRefreshFunction>(GetProcAddress(dbghelp,"SymRefreshModuleList"));
+      stack_walk=reinterpret_cast<StackWalkFunction>(GetProcAddress(dbghelp,"StackWalk64"));
       if(sym_init&&sym_options){
         sym_options(SYMOPT_UNDNAME|SYMOPT_DEFERRED_LOADS|SYMOPT_LOAD_LINES|SYMOPT_FAIL_CRITICAL_ERRORS);
         // Search beside the executable so shipped PDBs resolve without

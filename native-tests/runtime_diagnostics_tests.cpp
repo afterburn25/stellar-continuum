@@ -36,7 +36,7 @@ int main(int argc,char** argv)try{
       const auto wait=WaitForSingleObject(process.hProcess,30000);if(wait!=WAIT_OBJECT_0)TerminateProcess(process.hProcess,99);
       DWORD code{};GetExitCodeProcess(process.hProcess,&code);CloseHandle(process.hProcess);CloseHandle(process.hThread);check(wait==WAIT_OBJECT_0&&code!=0,"Fault fixture did not exit");
       report=dump=false;for(const auto& e:fs::directory_iterator(dir)){
-        if(e.path().extension()==".txt"){const auto text=read(e.path());report=text.find("map_zoom=256")!=std::string::npos&&text.find(mode==std::string("fault")?"WINDOWS FAULT":"Unhandled worker failure")!=std::string::npos&&(mode!=std::string("fault")||text.find("fault_site=")!=std::string::npos);}
+        if(e.path().extension()==".txt"){const auto text=read(e.path());report=text.find("map_zoom=256")!=std::string::npos&&text.find(mode==std::string("fault")?"WINDOWS FAULT":"Unhandled worker failure")!=std::string::npos&&text.find("stack:\n  #00 ")!=std::string::npos&&(mode!=std::string("fault")||text.find("fault_site=")!=std::string::npos);}
         if(e.path().extension()==".dmp"){const auto text=read(e.path());dump=text.starts_with("MDMP");}
       }
     }

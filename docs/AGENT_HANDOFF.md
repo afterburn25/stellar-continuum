@@ -453,6 +453,12 @@ preserve:
   chain is symbol → module+offset → raw pointer. Fault child asserts
   `fault_site=` lands in the report (`fault_site=KERNELBASE.dll+0xC41CA
   RaiseException+0x8A` — system-DLL exports resolve without PDBs).
+  A bounded ≤32-frame `stack:` mini-trace (`StackWalk64` over the
+  faulting `CONTEXT` copy; `RtlCaptureContext` on the terminate path)
+  follows the fault site — `trace_attempted` guards filter re-entry so
+  a fault inside the walk cannot recurse. Both children assert
+  `stack:#00` frames in their reports (e.g. `main+0x189
+  runtime_diagnostics_tests.cpp(16)` — file+line under dev PDBs).
 - `developer_qa_host` CTest timeout raised 120→240 s — passes solo in
   ~29 s but exceeded 120 s under the export's parallel load (scheduling
   tolerance, not a correctness gate).
