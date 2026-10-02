@@ -61,6 +61,54 @@ struct RuntimeDiagnostics::Impl {
   HMODULE dbghelp{};
   using DumpFunction=BOOL(WINAPI*)(HANDLE,DWORD,HANDLE,MINIDUMP_TYPE,PMINIDUMP_EXCEPTION_INFORMATION,PMINIDUMP_USER_STREAM_INFORMATION,PMINIDUMP_CALLBACK_INFORMATION);
   DumpFunction write_dump{};
+  // Symbolization for the fault report — deferred loads keep SymInitialize
+  // cheap and resolve PDBs only when an address is queried.
+  using SymInitializeFunction=BOOL(WINAPI*)(HANDLE,PCSTR,BOOL);
+  using SymSetOptionsFunction=DWORD(WINAPI*)(DWORD);
+  using SymFromAddrFunction=BOOL(WINAPI*)(HANDLE,DWORD64,PDWORD64,PSYMBOL_INFO);
+  using SymLineFunction=BOOL(WINAPI*)(HANDLE,DWORD64,PDWORD,PIMAGEHLP_LINE64);
+  using SymCleanupFunction=BOOL(WINAPI*)(HANDLE);
+  using SymRefreshFunction=BOOL(WINAPI*)(HANDLE);
+  SymInitializeFunction sym_init{};
+  SymSetOptionsFunction sym_options{};
+  SymFromAddrFunction sym_from_addr{};
+  SymLineFunction sym_line{};
+  SymCleanupFunction sym_cleanup{};
+  SymRefreshFunction sym_refresh{};
+  bool sym_ready{};
+  mutable bool sym_refreshed{};
+  std::string describe_address(const void* address) const noexcept {
+    try{
+      const auto a=reinterpret_cast<DWORD64>(address);
+      std::string text;
+      HMODULE module{};
+      wchar_t name[MAX_PATH]{};
+      // HMODULE is the module base on Windows — no Psapi lookup needed.
+      if(GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS|GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,reinterpret_cast<LPCWSTR>(address),&module)&&GetModuleFileNameW(module,name,MAX_PATH)){
+        const auto file_name=std::filesystem::path(name).filename().u8string();
+        text.append(file_name.begin(),file_name.end());
+        char off[32]{};std::snprintf(off,sizeof(off),"+0x%llX",static_cast<unsigned long long>(a-reinterpret_cast<DWORD64>(module)));text+=off;
+      }else{char raw[24]{};std::snprintf(raw,sizeof(raw),"%p",address);text=raw;}
+      if(sym_ready){
+        char buffer[sizeof(SYMBOL_INFO)+256]{};auto* sym=reinterpret_cast<PSYMBOL_INFO>(buffer);
+        sym->SizeOfStruct=sizeof(SYMBOL_INFO);sym->MaxNameLen=255;
+        DWORD64 displacement{};bool resolved=false;
+        if(sym_from_addr)resolved=sym_from_addr(GetCurrentProcess(),a,&displacement,sym)!=FALSE;
+        // Modules loaded after initialization need one list refresh before
+        // the handler can attribute their addresses.
+        if(!resolved&&!sym_refreshed&&sym_refresh&&sym_from_addr){sym_refreshed=true;
+          if(sym_refresh(GetCurrentProcess()))resolved=sym_from_addr(GetCurrentProcess(),a,&displacement,sym)!=FALSE;}
+        if(resolved){
+          text+=" ";text+=sym->Name;
+          char d[24]{};std::snprintf(d,sizeof(d),"+0x%llX",static_cast<unsigned long long>(displacement));text+=d;}
+        if(sym_line){IMAGEHLP_LINE64 line{sizeof(line)};DWORD line_disp{};
+          if(sym_line(GetCurrentProcess(),a,&line_disp,&line)){
+            const auto source_file=std::filesystem::path(line.FileName).filename().u8string();
+            text+=" ";text.append(source_file.begin(),source_file.end());text+="("+std::to_string(line.LineNumber)+")";}}
+      }
+      return text;
+    }catch(...){return{};}
+  }
   void emergency(const char* text,std::size_t length) noexcept {if(crash_file!=INVALID_HANDLE_VALUE){DWORD written{};WriteFile(crash_file,text,static_cast<DWORD>(length),&written,nullptr);FlushFileBuffers(crash_file);}}
   void minidump(EXCEPTION_POINTERS* pointers) noexcept {
     if(!write_dump)return;
@@ -74,6 +122,9 @@ struct RuntimeDiagnostics::Impl {
     auto* self=active;if(!self)return EXCEPTION_EXECUTE_HANDLER;self->failed=true;
     char text[160]{};const int n=std::snprintf(text,sizeof(text),"\nUNHANDLED WINDOWS FAULT code=0x%08lX address=%p thread=%lu\n",pointers->ExceptionRecord->ExceptionCode,pointers->ExceptionRecord->ExceptionAddress,GetCurrentThreadId());
     if(n>0)self->emergency(text,static_cast<std::size_t>(n));
+    if(const auto site=self->describe_address(pointers->ExceptionRecord->ExceptionAddress);!site.empty()){
+      char site_line[512]{};const int m=std::snprintf(site_line,sizeof(site_line)," fault_site=%s\n",site.c_str());
+      if(m>0)self->emergency(site_line,static_cast<std::size_t>(std::min(m,static_cast<int>(sizeof(site_line))-1)));}
     // try_lock prevents a fault inside stream logging from deadlocking reporting.
     if(self->mutex.try_lock()){self->emergency(self->last_context.data(),strnlen_s(self->last_context.data(),self->last_context.size()));self->mutex.unlock();}
     self->minidump(pointers);return EXCEPTION_EXECUTE_HANDLER;
@@ -140,7 +191,24 @@ struct RuntimeDiagnostics::Impl {
     crash_file=CreateFileW(report.c_str(),GENERIC_WRITE,FILE_SHARE_READ,nullptr,CREATE_NEW,FILE_ATTRIBUTE_NORMAL,nullptr);
     emergency(header.data(),header.size());
     dbghelp=LoadLibraryExW(L"dbghelp.dll",nullptr,LOAD_LIBRARY_SEARCH_SYSTEM32);
-    if(dbghelp)write_dump=reinterpret_cast<DumpFunction>(GetProcAddress(dbghelp,"MiniDumpWriteDump"));
+    if(dbghelp){
+      write_dump=reinterpret_cast<DumpFunction>(GetProcAddress(dbghelp,"MiniDumpWriteDump"));
+      sym_init=reinterpret_cast<SymInitializeFunction>(GetProcAddress(dbghelp,"SymInitialize"));
+      sym_options=reinterpret_cast<SymSetOptionsFunction>(GetProcAddress(dbghelp,"SymSetOptions"));
+      sym_from_addr=reinterpret_cast<SymFromAddrFunction>(GetProcAddress(dbghelp,"SymFromAddr"));
+      sym_line=reinterpret_cast<SymLineFunction>(GetProcAddress(dbghelp,"SymGetLineFromAddr64"));
+      sym_cleanup=reinterpret_cast<SymCleanupFunction>(GetProcAddress(dbghelp,"SymCleanup"));
+      sym_refresh=reinterpret_cast<SymRefreshFunction>(GetProcAddress(dbghelp,"SymRefreshModuleList"));
+      if(sym_init&&sym_options){
+        sym_options(SYMOPT_UNDNAME|SYMOPT_DEFERRED_LOADS|SYMOPT_LOAD_LINES|SYMOPT_FAIL_CRITICAL_ERRORS);
+        // Search beside the executable so shipped PDBs resolve without
+        // _NT_SYMBOL_PATH. Invading enumerates loaded modules once at init —
+        // deferred loads keep PDB parsing lazy until an address is queried.
+        const auto dir=executable_path().parent_path().u8string();
+        const std::string search(dir.begin(),dir.end());
+        sym_ready=sym_init(GetCurrentProcess(),search.empty()?nullptr:search.c_str(),TRUE)!=FALSE;
+      }
+    }
 #endif
     out.owner=err.owner=clog.owner=this;out.original=std::cout.rdbuf();err.original=std::cerr.rdbuf();clog.original=std::clog.rdbuf();
     std::cout.rdbuf(&out);std::cerr.rdbuf(&err);std::clog.rdbuf(&clog);active=this;
@@ -154,7 +222,7 @@ struct RuntimeDiagnostics::Impl {
     std::cout.rdbuf(out.original);std::cerr.rdbuf(err.original);std::clog.rdbuf(clog.original);
     active=nullptr;std::set_terminate(old_terminate);std::signal(SIGABRT,old_abort);
 #ifdef _WIN32
-    SetUnhandledExceptionFilter(old_filter);if(crash_file!=INVALID_HANDLE_VALUE)CloseHandle(crash_file);if(dbghelp)FreeLibrary(dbghelp);
+    SetUnhandledExceptionFilter(old_filter);if(crash_file!=INVALID_HANDLE_VALUE)CloseHandle(crash_file);if(sym_ready&&sym_cleanup)sym_cleanup(GetCurrentProcess());if(dbghelp)FreeLibrary(dbghelp);
 #endif
     if(!failed){file<<"\nClean exit "<<utc()<<'\n';std::error_code ec;std::filesystem::remove(report,ec);}file.flush();
   }
@@ -163,6 +231,13 @@ RuntimeDiagnostics::RuntimeDiagnostics(std::string_view game,std::string_view en
 RuntimeDiagnostics::~RuntimeDiagnostics()=default;
 void RuntimeDiagnostics::fatal(std::string_view message)noexcept{if(impl_)impl_->fatal(message);}
 std::filesystem::path RuntimeDiagnostics::log_path()const{return impl_?impl_->path:std::filesystem::path{};}
+std::string RuntimeDiagnostics::describe_address(const void* address) const noexcept {
+#ifdef _WIN32
+  return impl_?impl_->describe_address(address):std::string{};
+#else
+  (void)address;return{};
+#endif
+}
 void RuntimeDiagnostics::context(std::string_view text)noexcept{
   auto* p=Impl::active;if(!p)return;
   try{std::lock_guard lock(p->mutex);const auto n=std::min(text.size(),p->last_context.size()-1);std::copy_n(text.data(),n,p->last_context.data());p->last_context[n]=0;

@@ -19,7 +19,9 @@ int main(int argc,char** argv)try{
   fs::create_directories(root);fs::path logged;
   {stellar::engine::RuntimeDiagnostics log("0.1.14.2-dev","0.1.64",root/"caught");logged=log.log_path();check(!logged.empty(),"No persistent log");
     std::cout<<"ordinary message\n";std::cerr<<"error evidence\n";
-    stellar::engine::RuntimeDiagnostics::context("view=star-map map_zoom=128");log.fatal("Caught image budget fixture");}
+    stellar::engine::RuntimeDiagnostics::context("view=star-map map_zoom=128");log.fatal("Caught image budget fixture");
+    const auto site=log.describe_address(reinterpret_cast<const void*>(&check));check(site.find(".exe+0x")!=std::string::npos,"Address not attributed to a module");
+    check(!log.describe_address(nullptr).empty(),"Null address not described");}
   auto content=read(logged);check(content.find("ordinary message")!=std::string::npos&&content.find("error evidence")!=std::string::npos&&content.find("map_zoom=128")!=std::string::npos&&content.find("Caught image budget fixture")!=std::string::npos,"Caught failure evidence missing");
   logged.replace_extension(".txt");check(fs::file_size(logged)>0,"No caught error report");
   for(int i=0;i<12;++i){stellar::engine::RuntimeDiagnostics log("test","test",root/"rotation");std::cout<<"rotation fixture\n";}
@@ -34,7 +36,7 @@ int main(int argc,char** argv)try{
       const auto wait=WaitForSingleObject(process.hProcess,30000);if(wait!=WAIT_OBJECT_0)TerminateProcess(process.hProcess,99);
       DWORD code{};GetExitCodeProcess(process.hProcess,&code);CloseHandle(process.hProcess);CloseHandle(process.hThread);check(wait==WAIT_OBJECT_0&&code!=0,"Fault fixture did not exit");
       report=dump=false;for(const auto& e:fs::directory_iterator(dir)){
-        if(e.path().extension()==".txt"){const auto text=read(e.path());report=text.find("map_zoom=256")!=std::string::npos&&text.find(mode==std::string("fault")?"WINDOWS FAULT":"Unhandled worker failure")!=std::string::npos;}
+        if(e.path().extension()==".txt"){const auto text=read(e.path());report=text.find("map_zoom=256")!=std::string::npos&&text.find(mode==std::string("fault")?"WINDOWS FAULT":"Unhandled worker failure")!=std::string::npos&&(mode!=std::string("fault")||text.find("fault_site=")!=std::string::npos);}
         if(e.path().extension()==".dmp"){const auto text=read(e.path());dump=text.starts_with("MDMP");}
       }
     }
