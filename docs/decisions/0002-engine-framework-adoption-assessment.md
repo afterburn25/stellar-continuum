@@ -207,6 +207,16 @@ The adoption frontier is not authority migration — it is:
    missing-row throw order. Seeded-oracle gate: colonization,
    settlement, shipbuilding, industry-allocation, construction,
    legacy/adaptive research and coordinator/frame parity — unchanged.
+   **Audit closeout measurement** (quiet machine, canonical scenario):
+   step mean 2.75 ms / p95 4.01 ms vs the ~2.59 ms pre-audit baseline —
+   the cumulative phase work is within run-to-run noise of baseline
+   while removing the O(civs × world) asymptotes; colonization sits at
+   214 ms total. `finalStateHash` `b57c03d1…` is identical to every
+   pre- and post-audit run. The remaining core step cost is dominated
+   by `adaptive_research` (4,526 ms) and `combat` (2,517 ms) — outside
+   the 12 audited coordinator phases — plus autosave latency
+   (1,691 ms mean for 66.7 MB saves), which is the persistence debt
+   item rather than a phase problem.
 2. **Consumer depth on existing projections** where it buys diagnostics:
    the colony projection already surfaced a finding class no check covered
    (`degraded_structures`). **Status (landed):** `campaign_diagnostics`
