@@ -1955,15 +1955,20 @@ quote") was a use-after-free in the test, not a sim flake — the
 localization block's `confirm_placement` reallocating `push_back`, so
 `preview_removal` saw a heap-dependent building id. The assertion now
 uses the `site_id` copy captured before the mutation.
-Follow-on: the galaxy map has its first transform gizmo — pressing on a
-star marker (same 14 px pick radius as the click) grabs it instead of
-panning; PointerMove writes `positionX`/`positionY` overrides through
-absolute cursor→world mapping (mid-drag wheel zoom stays glued) with
-the grab offset preserved, and LeftReleased commits the pre-drag
-document snapshot as one undo step (moved ≥ 6 px) or restores the
-grabbed edit row untouched and selects (a click). Esc cancels
-in-flight without touching history. Orbit/body-view gizmos remain
-open.
+Follow-on: all three editor views have transform gizmos over one shared
+`DragKind` state — galaxy-map stars move via `positionX`/`positionY`
+(grab offset preserved), system-view star-orbiting bodies radially
+drag `orbitAu` (cursor distance from the resolved `planetary_stellar_host`
+position, correct under multi-star/barycentric hosts), and body-view
+moons radially drag `satelliteOrbitKm` from the focus body. PointerMove
+writes through absolute cursor→world mapping (mid-drag zoom stays
+glued); LeftReleased commits the pre-drag snapshot as one undo step
+(moved ≥ 6 px) or restores the grabbed row untouched and selects (a
+click); Esc cancels in-flight without touching history. The grabbed
+catalog id is recorded at press so a mid-drag regeneration cannot
+retarget release/cancel. Also fixed: the system-view click-pick used
+`stellar_planet_position` (generated orbit) while markers render via
+`body_position` (override-aware) — it now matches the renderer.
 Do not change the default branch or merge
 this integration branch to main without explicit integration intent.
 

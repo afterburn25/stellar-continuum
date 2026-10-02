@@ -202,18 +202,23 @@ struct Editor {
   Point drag_origin{};
   Point camera_origin{};
   bool dragging{};
-  // Galaxy-view transform drag: a press landing on a system marker grabs
-  // it instead of panning. `drag_edit_restore`/`drag_edit_present` hold
-  // the grabbed system's edit row so a sub-threshold release (a click)
-  // restores it untouched; `drag_snapshot` holds the pre-drag document so
-  // a real drag commits exactly one undo step.
-  std::optional<std::size_t> drag_system;
-  // The grabbed system's catalog id — recorded at press so a background
-  // regeneration swapping `systems` can't point release/cancel at the
-  // wrong record.
-  int drag_system_id{};
-  // Marker world position minus the cursor's world position at grab, so
-  // the marker tracks the pointer without snapping its center to it.
+  // Transform drag (one at a time): a press landing on a marker grabs it
+  // instead of panning; the kind picks the override written and the edit
+  // map it lands in — galaxy drags move a star (positionX/Y), system-view
+  // drags resize a body's stellar orbit (orbitAu), body-view drags resize
+  // a moon's satellite orbit (satelliteOrbitKm). `drag_edit_restore`/
+  // `drag_edit_present` hold the grabbed row so a sub-threshold release
+  // (a click) restores it untouched; `drag_snapshot` holds the pre-drag
+  // document so a real drag commits exactly one undo step.
+  enum class DragKind : std::uint8_t { GalaxySystem, SystemBody, BodyMoon };
+  std::optional<DragKind> drag_target;
+  // Index into `systems` (GalaxySystem) or `bodies` (the orbit kinds).
+  std::size_t drag_index{};
+  // Catalog id recorded at press so a background regeneration swapping
+  // `systems`/`bodies` cannot retarget release/cancel.
+  int drag_target_id{};
+  // Marker world position minus the cursor's world position at grab
+  // (GalaxySystem only), so the marker tracks without center-snapping.
   Point drag_grab_offset{};
   std::optional<edproj::SystemEdit> drag_edit_restore;
   bool drag_edit_present{};
@@ -504,6 +509,14 @@ std::optional<std::pair<int, bool>> annotation_target(const Editor &ed) {
 std::unordered_map<int, edproj::SystemEdit> &annotation_map(Editor &ed,
                                                           bool body) {
   return body ? ed.body_edits : ed.edits;
+}
+
+// The edit map a transform drag writes: galaxy drags move systems, the
+// two orbit kinds write body rows.
+std::unordered_map<int, edproj::SystemEdit> &drag_map(Editor &ed) {
+  return (!ed.drag_target || *ed.drag_target == Editor::DragKind::GalaxySystem)
+             ? ed.edits
+             : ed.body_edits;
 }
 
 // Effective galactic position axes: the annotation layer wins per axis over
@@ -1818,8 +1831,9 @@ void render_viewport(DrawList &out, const Editor &ed, float s) {
                       std::clamp(ed.pixels_per_unit * .25f, .5f, 3.f),
                color});
   }
-  if (ed.drag_system && *ed.drag_system < ed.systems.size()) {
-    const auto &sys = ed.systems[*ed.drag_system];
+  if (ed.drag_target == Editor::DragKind::GalaxySystem &&
+      ed.drag_index < ed.systems.size()) {
+    const auto &sys = ed.systems[ed.drag_index];
     const auto p = world_to_screen(ed, system_position_x(ed, sys),
                                    system_position_y(ed, sys));
     out.overlay.push_back(StrokedRectangle{
@@ -2006,6 +2020,9 @@ void render_system_view(DrawList &out, Editor &ed, float s) {
         if (!v.contains(p)) continue;
         const bool in_hz =
             body.stellar_exposure && body.stellar_exposure->in_habitable_zone;
+        if (ed.drag_target == Editor::DragKind::SystemBody &&
+            body_index == ed.drag_index)
+          out.world.push_back(Circle{p, 10.f, {240, 200, 90, 255}});
         if (body_index == ed.selected_body)
           out.world.push_back(Circle{p, 9.f, accent});
         if (const auto it = ed.body_edits.find(body.id);
@@ -2155,6 +2172,8 @@ void render_body_view(DrawList &out, Editor &ed, float s) {
       const float moon_px = std::clamp(
           static_cast<float>(body_radius_earth(ed, moon) * 6371.0 * ed.body_ppa),
           2.5f, 10.f);
+      if (ed.drag_target == Editor::DragKind::BodyMoon && mi == ed.drag_index)
+        out.world.push_back(Circle{p, moon_px + 7.f, {240, 200, 90, 255}});
       if (mi == ed.selected_body)
         out.world.push_back(Circle{p, moon_px + 5.f, accent});
       if (const auto it = ed.body_edits.find(moon.id);
@@ -2342,15 +2361,15 @@ int main(int argc, char **argv) {
             ed.picker_open = false;
           } else if (ed.menu_open) {
             ed.menu_open = false;
-          } else if (ed.drag_system) {
+          } else if (ed.drag_target) {
             // Cancel an in-flight transform drag: restore the row and drop
             // the snapshot without touching history.
-            const auto sys_id = ed.drag_system_id;
+            auto &map = drag_map(ed);
             if (ed.drag_edit_present)
-              ed.edits[sys_id] = *ed.drag_edit_restore;
+              map[ed.drag_target_id] = *ed.drag_edit_restore;
             else
-              ed.edits.erase(sys_id);
-            ed.drag_system.reset();
+              map.erase(ed.drag_target_id);
+            ed.drag_target.reset();
             ed.drag_edit_restore.reset();
             ed.drag_edit_present = false;
             ed.drag_snapshot.reset();
@@ -2720,26 +2739,80 @@ int main(int argc, char **argv) {
                                              p.y - event.position.y);
                   if (d < best) {
                     best = d;
-                    ed.drag_system = i;
+                    ed.drag_index = i;
+                    ed.drag_target = Editor::DragKind::GalaxySystem;
                   }
                 }
+              } else if (ed.view == WorkspaceView::System &&
+                         ed.selected < ed.systems.size()) {
+                // Orbit-radius drag on a star-orbiting body marker (same
+                // bounded pick radius as the click); moons drag in the
+                // body view where their parent is the origin.
+                const auto &sys = ed.systems[ed.selected];
+                float best = 12.f;
+                if (const auto it = ed.bodies_by_system.find(sys.id);
+                    it != ed.bodies_by_system.end())
+                  for (const auto body_index : it->second) {
+                    if (ed.bodies[body_index].parent_body_id) continue;
+                    try {
+                      const auto bp =
+                          body_position(ed, sys, ed.bodies[body_index]);
+                      const auto p = system_to_screen(ed, bp[0], bp[1]);
+                      const float d = std::hypot(p.x - event.position.x,
+                                                 p.y - event.position.y);
+                      if (d < best) {
+                        best = d;
+                        ed.drag_index = body_index;
+                        ed.drag_target = Editor::DragKind::SystemBody;
+                      }
+                    } catch (const std::exception &) {
+                    }
+                  }
+              } else if (ed.view == WorkspaceView::Body &&
+                         ed.focus_body < ed.bodies.size()) {
+                // Moon orbit-radius drag: markers sit at their analytic
+                // satellite positions relative to the focus body.
+                const auto &parent = ed.bodies[ed.focus_body];
+                float best = 14.f;
+                for (const auto mi : moon_indices(ed, ed.focus_body))
+                  try {
+                    const auto rel = core::satellite_relative_position(
+                        moon_orbit(ed, parent, ed.bodies[mi]),
+                        ed.system_days);
+                    const auto p = body_to_screen(ed, rel[0], rel[1]);
+                    const float d = std::hypot(p.x - event.position.x,
+                                               p.y - event.position.y);
+                    if (d < best) {
+                      best = d;
+                      ed.drag_index = mi;
+                      ed.drag_target = Editor::DragKind::BodyMoon;
+                    }
+                  } catch (const std::exception &) {
+                  }
               }
-              if (ed.drag_system) {
-                const auto &sys = ed.systems[*ed.drag_system];
-                ed.drag_system_id = sys.id;
-                const float cursor_x =
-                    ed.camera.x + (event.position.x - ed.viewport.x -
-                                   ed.viewport.width * .5f) /
-                                      ed.pixels_per_unit;
-                const float cursor_y =
-                    ed.camera.y + (event.position.y - ed.viewport.y -
-                                   ed.viewport.height * .5f) /
-                                      ed.pixels_per_unit;
-                ed.drag_grab_offset = {
-                    system_position_x(ed, sys) - cursor_x,
-                    system_position_y(ed, sys) - cursor_y};
-                const auto prev = ed.edits.find(sys.id);
-                ed.drag_edit_present = prev != ed.edits.end();
+              if (ed.drag_target) {
+                const bool body_target =
+                    *ed.drag_target != Editor::DragKind::GalaxySystem;
+                ed.drag_target_id =
+                    body_target ? ed.bodies[ed.drag_index].id
+                                : ed.systems[ed.drag_index].id;
+                if (*ed.drag_target == Editor::DragKind::GalaxySystem) {
+                  const auto &sys = ed.systems[ed.drag_index];
+                  const float cursor_x =
+                      ed.camera.x + (event.position.x - ed.viewport.x -
+                                     ed.viewport.width * .5f) /
+                                        ed.pixels_per_unit;
+                  const float cursor_y =
+                      ed.camera.y + (event.position.y - ed.viewport.y -
+                                     ed.viewport.height * .5f) /
+                                        ed.pixels_per_unit;
+                  ed.drag_grab_offset = {
+                      system_position_x(ed, sys) - cursor_x,
+                      system_position_y(ed, sys) - cursor_y};
+                }
+                auto &map = drag_map(ed);
+                const auto prev = map.find(ed.drag_target_id);
+                ed.drag_edit_present = prev != map.end();
                 ed.drag_edit_restore =
                     ed.drag_edit_present
                         ? std::optional<edproj::SystemEdit>{prev->second}
@@ -2821,8 +2894,11 @@ int main(int argc, char **argv) {
                   it != ed.bodies_by_system.end())
                 for (const auto body_index : it->second) {
                   try {
-                    const auto bp = core::stellar_planet_position(
-                        sys, ed.bodies[body_index], ed.system_days);
+                    // body_position applies orbit overrides, matching the
+                    // rendered markers — stellar_planet_position would pick
+                    // at stale generated positions for overridden orbits.
+                    const auto bp = body_position(
+                        ed, sys, ed.bodies[body_index]);
                     const auto p = system_to_screen(ed, bp[0], bp[1]);
                     const float d = std::hypot(p.x - event.position.x,
                                                p.y - event.position.y);
@@ -2838,12 +2914,17 @@ int main(int argc, char **argv) {
             }
           }
         }
-        if (event.type == InputEventType::LeftReleased && ed.drag_system) {
-          const auto sys_id = ed.drag_system_id;
-          const auto index = *ed.drag_system;
-          // A regeneration that landed mid-drag swaps `systems`; the edit
-          // key stays valid but the index may not.
-          const bool valid_index = index < ed.systems.size();
+        if (event.type == InputEventType::LeftReleased && ed.drag_target) {
+          const bool body_target =
+              *ed.drag_target != Editor::DragKind::GalaxySystem;
+          auto &map = drag_map(ed);
+          const auto id = ed.drag_target_id;
+          const auto index = ed.drag_index;
+          // A regeneration that landed mid-drag swaps the vectors; the
+          // edit key stays valid but the index may not.
+          const bool valid_index =
+              body_target ? index < ed.bodies.size()
+                          : index < ed.systems.size();
           const float moved =
               std::abs(event.position.x - ed.drag_origin.x) +
               std::abs(event.position.y - ed.drag_origin.y);
@@ -2851,11 +2932,14 @@ int main(int argc, char **argv) {
             // A click: move events may already have written sub-pixel
             // overrides — restore the row exactly as it was.
             if (ed.drag_edit_present)
-              ed.edits[sys_id] = *ed.drag_edit_restore;
+              map[id] = *ed.drag_edit_restore;
             else
-              ed.edits.erase(sys_id);
+              map.erase(id);
             if (ed.viewport.contains(event.position) && valid_index) {
-              ed.selected = index;
+              if (body_target)
+                ed.selected_body = index;
+              else
+                ed.selected = index;
               rebuild_detail_rows(ed);
             }
           } else {
@@ -2864,12 +2948,18 @@ int main(int argc, char **argv) {
             if (ed.drag_snapshot)
               ed.history.commit(*ed.drag_snapshot);
             if (valid_index) {
-              ed.selected = index;
-              ed.status = "moved " + display_name(ed, ed.systems[index]);
+              if (body_target) {
+                ed.selected_body = index;
+                ed.status = "orbit set on " +
+                            display_name(ed, ed.bodies[index]);
+              } else {
+                ed.selected = index;
+                ed.status = "moved " + display_name(ed, ed.systems[index]);
+              }
             }
             rebuild_detail_rows(ed);
           }
-          ed.drag_system.reset();
+          ed.drag_target.reset();
           ed.drag_edit_restore.reset();
           ed.drag_edit_present = false;
           ed.drag_snapshot.reset();
@@ -2993,19 +3083,61 @@ int main(int argc, char **argv) {
           else
             ed.body_camera = target;
         }
-        if (event.type == InputEventType::PointerMove && ed.drag_system) {
-          // Absolute cursor→world mapping keeps the marker glued to the
-          // pointer even if a wheel event rescales the map mid-drag.
+        if (event.type == InputEventType::PointerMove && ed.drag_target) {
+          // Absolute cursor→world mapping keeps the drag glued to the
+          // pointer even if a wheel event rescales the view mid-drag.
           const auto &v = ed.viewport;
-          auto &row = ed.edits[ed.drag_system_id];
-          row.position_x =
-              ed.camera.x + (event.position.x - v.x - v.width * .5f) /
-                                ed.pixels_per_unit +
-              ed.drag_grab_offset.x;
-          row.position_y =
-              ed.camera.y + (event.position.y - v.y - v.height * .5f) /
-                                ed.pixels_per_unit +
-              ed.drag_grab_offset.y;
+          if (*ed.drag_target == Editor::DragKind::GalaxySystem) {
+            auto &row = ed.edits[ed.drag_target_id];
+            row.position_x =
+                ed.camera.x + (event.position.x - v.x - v.width * .5f) /
+                                  ed.pixels_per_unit +
+                ed.drag_grab_offset.x;
+            row.position_y =
+                ed.camera.y + (event.position.y - v.y - v.height * .5f) /
+                                  ed.pixels_per_unit +
+                ed.drag_grab_offset.y;
+          } else if (*ed.drag_target == Editor::DragKind::SystemBody &&
+                     ed.selected < ed.systems.size() &&
+                     ed.drag_index < ed.bodies.size()) {
+            // Cursor distance from the host star becomes the orbitAu
+            // override (semi-major axis); the body's phase on the ring
+            // stays, so the marker tracks the cursor radially.
+            const auto &sys = ed.systems[ed.selected];
+            const auto &body = ed.bodies[ed.drag_index];
+            if (!body.parent_body_id) {
+              try {
+                const int host = core::planetary_stellar_host(sys, body.id);
+                const auto hc =
+                    core::stellar_positions(sys, ed.system_days)
+                        [static_cast<std::size_t>(std::clamp(host, 0, 3))];
+                const double wx =
+                    ed.sys_camera.x + (event.position.x - v.x -
+                                       v.width * .5f) /
+                                          ed.sys_ppa;
+                const double wy =
+                    ed.sys_camera.y + (event.position.y - v.y -
+                                       v.height * .5f) /
+                                          ed.sys_ppa;
+                ed.body_edits[ed.drag_target_id].orbit_au = std::max(
+                    0.01, std::hypot(wx - hc[0], wy - hc[1]));
+              } catch (const std::exception &) {
+              }
+            }
+          } else if (*ed.drag_target == Editor::DragKind::BodyMoon) {
+            // Kilometre distance from the focus body becomes the
+            // satelliteOrbitKm override.
+            const double rx =
+                ed.body_camera.x + (event.position.x - v.x -
+                                    v.width * .5f) /
+                                       ed.body_ppa;
+            const double ry =
+                ed.body_camera.y + (event.position.y - v.y -
+                                    v.height * .5f) /
+                                       ed.body_ppa;
+            ed.body_edits[ed.drag_target_id].satellite_orbit_km =
+                std::max(1., std::hypot(rx, ry));
+          }
         }
         if (event.type == InputEventType::Wheel &&
             ed.viewport.contains(event.position)) {
