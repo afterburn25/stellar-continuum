@@ -1,11 +1,11 @@
-# Current project state — 2026-09-20
+# Current project state — 2026-09-20 (status fields refreshed 2026-10-02)
 
 | Field | Verified state |
 | --- | --- |
 | Project | Stellar Continuum |
 | Engine | Custom Stellar Engine |
 | Language | C++23 engine and game |
-| Branch | `engine/space-strategy-simulation-specialization` (workstream: `game/ui-visual-overhaul`, PR #338) |
+| Branch | `engine/space-strategy-simulation-specialization` (workstream: `game/ui-visual-overhaul`; PR #338 merged 2026-10-01, work continues on the same branch) |
 | Game / engine version | `0.1.14.2-dev` / `0.1.64` from `export/runtime-config.json` |
 | Platform | Windows x64, MSVC 2022, SDL3/Vulkan native presentation |
 | Milestone | Native playable development integration with celestial content, cooking and Windows maintenance; validation/release reliability remains open |
@@ -101,15 +101,20 @@ masters) after the SYNC-003 fixture repair and the SYNC-004 assertion fix. The
 branch produced a validated changed-files update from `0.1.14.1-dev` to
 `0.1.14.2-dev-8afd6d0fd95b9d2a`. Full evidence:
 [foundation-merge receipt](validation/2026-09-20-foundation-merge.md).
-The branch is awaiting PR integration, not merged yet.
+The branch was awaiting PR integration when this snapshot was written; PR #338
+merged 2026-10-01 and the workstream continues on `game/ui-visual-overhaul`.
 
 ## Next action
 
-Begin with native validation/release reliability: reconcile the generation
-baseline and save/clock differences, repair exporter tests, investigate the broad graphical smoke and
-restore CI's current target/branch contract. Then take the dependency-ordered
-[roadmap](ROADMAP.md). Preserve [architecture constraints](AGENT_HANDOFF.md),
-canonical content/save identities and existing user artwork.
+The validation/reliability work described below is done — the native suite is
+331/331 green and the packaged export passes end-to-end (see the latest
+[validation receipt](validation/2026-10-02-tip-export.md) and
+[handoff](AGENT_HANDOFF.md)). Take the dependency-ordered
+[roadmap](ROADMAP.md) frontier: per-phase demotion adoption against the parity
+oracle, profiler GPU timeline, allocator-tag census, mixer buses/world-units
+spatialization, and further editor property coverage. Preserve
+[architecture constraints](AGENT_HANDOFF.md), canonical content/save
+identities and existing user artwork.
 
 Major debt: [TECHNICAL_DEBT.md](TECHNICAL_DEBT.md). Large-save latency, fixed GPU
 budgets and combined late-game simulation load remain performance risks.
