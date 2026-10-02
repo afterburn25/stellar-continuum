@@ -15,6 +15,10 @@ public:
   RuntimeDiagnostics& operator=(const RuntimeDiagnostics&)=delete;
   void fatal(std::string_view message) noexcept;
   static void context(std::string_view text) noexcept;
+  // Called once per frame by the host's UI loop. The first beat arms the hang
+  // watchdog (STELLAR_WATCHDOG_MS, default 30 s, 0 disables): a stalled loop
+  // gets a one-shot HANG report + thread stack + minidump, then rearms.
+  static void heartbeat() noexcept;
   // Best-effort "module.exe+0xOFF function+0xD file(line)" description of a
   // code address: dbghelp symbols when PDBs sit beside the binary, degrading
   // to module+offset otherwise (and a raw pointer off-module). The fault

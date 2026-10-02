@@ -455,10 +455,23 @@ preserve:
   RaiseException+0x8A` — system-DLL exports resolve without PDBs).
   A bounded ≤32-frame `stack:` mini-trace (`StackWalk64` over the
   faulting `CONTEXT` copy; `RtlCaptureContext` on the terminate path)
-  follows the fault site — `trace_attempted` guards filter re-entry so
-  a fault inside the walk cannot recurse. Both children assert
-  `stack:#00` frames in their reports (e.g. `main+0x189
+  follows the fault site — `trace_active` is an in-progress guard (not
+  one-shot) so a fault inside the walk skips the nested trace but a
+  completed trace leaves later episodes free to trace. Both children
+  assert `stack:#00` frames in their reports (e.g. `main+0x189
   runtime_diagnostics_tests.cpp(16)` — file+line under dev PDBs).
+  Hang watchdog: `RuntimeDiagnostics::heartbeat()` (wired into the
+  client/editor/tools-shell loops) arms a watchdog thread on first
+  beat — `STELLAR_WATCHDOG_MS` (default 30 s, 0 disables), one-shot
+  per stall: suspends the duplicated main-thread handle,
+  `GetThreadContext` → `hang_site=` + `stack:` + `minidump(nullptr)`,
+  then resumes. `last_beat=-1` means unarmed — hosts that never beat
+  get no watchdog. The hang child test sets `STELLAR_WATCHDOG_MS=600`
+  on itself before constructing the diagnostics.
+- `windows-native-preview` now ships PDBs (`includeSymbols: true`) —
+  shipped crash reports resolve file+line only with PDBs beside the
+  exe; module+offset was the remaining gap. Both exes' PDBs land via
+  the `stellar-continuum*.pdb` glob (~460 MB raw).
 - `developer_qa_host` CTest timeout raised 120→240 s — passes solo in
   ~29 s but exceeded 120 s under the export's parallel load (scheduling
   tolerance, not a correctness gate).

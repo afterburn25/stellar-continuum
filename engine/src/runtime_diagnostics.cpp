@@ -2,6 +2,7 @@
 #include <stellar/engine/runtime_paths.hpp>
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
@@ -78,8 +79,49 @@ struct RuntimeDiagnostics::Impl {
   SymRefreshFunction sym_refresh{};
   StackWalkFunction stack_walk{};
   bool sym_ready{};
-  bool trace_attempted{};
+  // In-progress guard (not one-shot): a fault inside an active walk skips the
+  // nested trace but still emits fault_site/minidump; a completed trace leaves
+  // the next episode free to trace again.
+  std::atomic<bool> trace_active{};
   mutable bool sym_refreshed{};
+  // Hang watchdog: armed on the first heartbeat() (sentinel -1), fires once
+  // when the UI/main thread stalls past STELLAR_WATCHDOG_MS (default 30 s,
+  // 0 disables). Suspending the loop thread to snapshot its CONTEXT is the
+  // best-effort part — the process is already unresponsive by definition.
+  HANDLE watch_thread{};
+  HANDLE main_thread{};
+  std::atomic<bool> watch_stop{};
+  std::atomic<bool> hang_reported{};
+  std::atomic<long long> last_beat{-1};
+  unsigned watch_ms{};
+  static long long steady_ms() noexcept {
+    return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
+  }
+  void heartbeat() noexcept {last_beat.store(steady_ms(),std::memory_order_relaxed);}
+  void watch() noexcept {
+    while(!watch_stop.load(std::memory_order_relaxed)){
+      Sleep(200);
+      if(watch_stop.load(std::memory_order_relaxed))break;
+      const auto last=last_beat.load(std::memory_order_relaxed);
+      if(last<0||steady_ms()-last<=static_cast<long long>(watch_ms))continue;
+      if(hang_reported.exchange(true))break;
+      failed=true;
+      const char* notice="\nHANG DETECTED: main thread heartbeat stalled\n";
+      emergency(notice,std::char_traits<char>::length(notice));append(notice,std::char_traits<char>::length(notice));
+      if(mutex.try_lock()){emergency(last_context.data(),strnlen_s(last_context.data(),last_context.size()));mutex.unlock();}
+      if(main_thread&&SuspendThread(main_thread)!=static_cast<DWORD>(-1)){
+        CONTEXT ctx{};ctx.ContextFlags=CONTEXT_FULL;
+        if(GetThreadContext(main_thread,&ctx)){
+          if(const auto site=describe_address(reinterpret_cast<const void*>(static_cast<uintptr_t>(ctx.Rip)));!site.empty()){
+            char line[512]{};const int m=std::snprintf(line,sizeof(line)," hang_site=%s\n",site.c_str());
+            if(m>0)emergency(line,static_cast<std::size_t>(std::min(m,static_cast<int>(sizeof(line))-1)));}
+          trace(&ctx);
+        }
+        ResumeThread(main_thread);
+      }
+      minidump(nullptr);return;
+    }
+  }
   std::string describe_address(const void* address) const noexcept {
     try{
       const auto a=reinterpret_cast<DWORD64>(address);
@@ -114,10 +156,11 @@ struct RuntimeDiagnostics::Impl {
   }
   // Bounded mini-trace (<=32 frames) written to the crash report beside the
   // minidump. StackWalk64 mutates the context — callers pass a private copy.
-  // trace_attempted guards re-entry: a fault inside the walk re-enters the
+  // trace_active guards re-entry: a fault inside the walk re-enters the
   // filter and must not recurse back in here.
   void trace(CONTEXT* context) noexcept {
-    if(!stack_walk||!sym_ready||trace_attempted)return;trace_attempted=true;
+    if(!stack_walk||!sym_ready||trace_active.exchange(true))return;
+    struct TraceGuard{std::atomic<bool>& flag;~TraceGuard(){flag.store(false);}} guard{trace_active};
     emergency("\n stack:\n",9);
     STACKFRAME64 frame{};
     frame.AddrPC.Offset=context->Rip;frame.AddrPC.Mode=AddrModeFlat;
@@ -233,6 +276,11 @@ struct RuntimeDiagnostics::Impl {
         sym_ready=sym_init(GetCurrentProcess(),search.empty()?nullptr:search.c_str(),TRUE)!=FALSE;
       }
     }
+    unsigned threshold=30000;
+    if(wchar_t env[16]{};GetEnvironmentVariableW(L"STELLAR_WATCHDOG_MS",env,16)!=0){try{threshold=std::stoul(env);}catch(...){}}
+    watch_ms=threshold;
+    if(watch_ms>0&&DuplicateHandle(GetCurrentProcess(),GetCurrentThread(),GetCurrentProcess(),&main_thread,0,FALSE,DUPLICATE_SAME_ACCESS))
+      watch_thread=CreateThread(nullptr,0,[](void* p)->DWORD{static_cast<Impl*>(p)->watch();return 0;},this,0,nullptr);
 #endif
     out.owner=err.owner=clog.owner=this;out.original=std::cout.rdbuf();err.original=std::cerr.rdbuf();clog.original=std::clog.rdbuf();
     std::cout.rdbuf(&out);std::cerr.rdbuf(&err);std::clog.rdbuf(&clog);active=this;
@@ -246,7 +294,12 @@ struct RuntimeDiagnostics::Impl {
     std::cout.rdbuf(out.original);std::cerr.rdbuf(err.original);std::clog.rdbuf(clog.original);
     active=nullptr;std::set_terminate(old_terminate);std::signal(SIGABRT,old_abort);
 #ifdef _WIN32
-    SetUnhandledExceptionFilter(old_filter);if(crash_file!=INVALID_HANDLE_VALUE)CloseHandle(crash_file);if(sym_ready&&sym_cleanup)sym_cleanup(GetCurrentProcess());if(dbghelp)FreeLibrary(dbghelp);
+    SetUnhandledExceptionFilter(old_filter);
+    // Stop the watchdog before closing the crash file — a mid-flight hang
+    // report must not write into a closed (possibly reused) handle.
+    watch_stop.store(true);if(watch_thread){if(WaitForSingleObject(watch_thread,2000)==WAIT_TIMEOUT)TerminateThread(watch_thread,0);CloseHandle(watch_thread);}if(main_thread)CloseHandle(main_thread);
+    if(crash_file!=INVALID_HANDLE_VALUE)CloseHandle(crash_file);
+    if(sym_ready&&sym_cleanup)sym_cleanup(GetCurrentProcess());if(dbghelp)FreeLibrary(dbghelp);
 #endif
     if(!failed){file<<"\nClean exit "<<utc()<<'\n';std::error_code ec;std::filesystem::remove(report,ec);}file.flush();
   }
@@ -260,6 +313,11 @@ std::string RuntimeDiagnostics::describe_address(const void* address) const noex
   return impl_?impl_->describe_address(address):std::string{};
 #else
   (void)address;return{};
+#endif
+}
+void RuntimeDiagnostics::heartbeat() noexcept {
+#ifdef _WIN32
+  if(auto* p=Impl::active)p->heartbeat();
 #endif
 }
 void RuntimeDiagnostics::context(std::string_view text)noexcept{

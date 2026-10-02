@@ -1454,6 +1454,7 @@ int RuntimeHost::run() {
                                              : static_cast<float>(options.height);
   RuntimeDiagnostics::context("runtime:loop");
   for (;;) {
+    RuntimeDiagnostics::heartbeat();
     // Headless polls a synthetic snapshot: no events, always renderable,
     // drawable fixed at the configured size. The run ends via --frames,
     // a recorded/injected Escape or quit_requested (e.g. --replay-exit).

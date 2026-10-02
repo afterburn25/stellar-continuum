@@ -6600,6 +6600,7 @@ int main(int argc, char **argv) {
 
     int frames_rendered = 0;
     for (;;) {
+      engine::RuntimeDiagnostics::heartbeat();
       if (frame_limit > 0 && frames_rendered >= frame_limit) break;
       const auto snapshot = window.poll();
       if (snapshot.quit_requested) {

@@ -2428,6 +2428,7 @@ int main(int argc, char **argv) {
     submit_generate();
 
     for (;;) {
+      engine::RuntimeDiagnostics::heartbeat();
       const auto snapshot = window.poll();
       if (snapshot.quit_requested) {
         if (ed.dirty)
