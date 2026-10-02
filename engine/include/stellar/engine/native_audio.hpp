@@ -22,6 +22,7 @@ inline constexpr int audio_channels = 2;
 class AudioClip final {
  public:
   [[nodiscard]] static std::shared_ptr<const AudioClip> create(std::vector<float> samples);
+  ~AudioClip() noexcept;
   [[nodiscard]] std::span<const float> samples() const noexcept;
   [[nodiscard]] std::size_t byte_size() const noexcept;
   [[nodiscard]] std::uint64_t sample_frames() const noexcept;
@@ -30,6 +31,12 @@ class AudioClip final {
   explicit AudioClip(std::vector<float> samples) noexcept;
   std::vector<float> samples_;
 };
+
+// Total decoded PCM retained by all live AudioClip instances — the resident
+// decoded-audio census shared_ptr ownership makes otherwise invisible to
+// per-owner accounting. Stream decoders are excluded by design (bounded
+// pull buffers, not whole-file PCM).
+[[nodiscard]] std::uint64_t decoded_pcm_live_bytes() noexcept;
 
 // Decodes supported Windows Media Foundation audio formats (including WAV and MP3).
 // The caller is expected to invoke this off the owner/UI thread.

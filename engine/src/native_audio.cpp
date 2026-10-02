@@ -17,6 +17,7 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -126,11 +127,29 @@ void validate_samples(const std::vector<float>& samples) {
 
 } // namespace
 
-AudioClip::AudioClip(std::vector<float> samples) noexcept : samples_(std::move(samples)) {}
+namespace {
+
+// Namespace-scope so teardown never matters: constant-initialized and
+// trivially destructible even if a static-lifetime clip outlives exit.
+std::atomic<std::uint64_t> decoded_pcm_live_counter{0};
+
+} // namespace
+
+AudioClip::AudioClip(std::vector<float> samples) noexcept : samples_(std::move(samples)) {
+  decoded_pcm_live_counter.fetch_add(byte_size(), std::memory_order_relaxed);
+}
+
+AudioClip::~AudioClip() noexcept {
+  decoded_pcm_live_counter.fetch_sub(byte_size(), std::memory_order_relaxed);
+}
 
 std::shared_ptr<const AudioClip> AudioClip::create(std::vector<float> samples) {
   validate_samples(samples);
   return std::shared_ptr<const AudioClip>(new AudioClip(std::move(samples)));
+}
+
+std::uint64_t decoded_pcm_live_bytes() noexcept {
+  return decoded_pcm_live_counter.load(std::memory_order_relaxed);
 }
 
 std::span<const float> AudioClip::samples() const noexcept { return samples_; }

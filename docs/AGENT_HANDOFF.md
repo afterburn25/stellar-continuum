@@ -256,6 +256,14 @@ run; deterministic across `--repeat`). Spacefaring civs pair first —
 most seeded civs start PreWarp, so use `--ancients >= 2` for immediate
 combat.
 
+Allocator census extension: `AudioClip` now maintains a live decoded-PCM
+counter (`audio::decoded_pcm_live_bytes()`, atomic lifecycle accounting
+so shared_ptr-distributed clips are counted once). The client reports it
+as the `audio-decoded-pcm` MemoryTracker subsystem next to `audio-queues`
+— whole-file decode retention (the "Full audio decode" debt row) is now
+measurable against future budgets instead of invisible. Stream decoders
+are excluded by design (bounded pull buffers).
+
 Hardening contracts added late in the workstream that future changes must
 preserve:
 

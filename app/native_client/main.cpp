@@ -126,6 +126,7 @@
 #include <stellar/engine/input_actions.hpp>
 #include <stellar/engine/localization.hpp>
 #include <stellar/engine/memory_tracker.hpp>
+#include <stellar/engine/native_audio.hpp>
 #include <stellar/engine/platform_services.hpp>
 #include <stellar/engine/profiler.hpp>
 #include <stellar/engine/replay.hpp>
@@ -10684,6 +10685,8 @@ int main(int argc,char **argv){
     // voice queues report their current fill against their combined limit.
     stellar::engine::MemoryTracker::SubsystemId audio_queue_memory_{
         stellar::engine::MemoryTracker::invalid_subsystem};
+    stellar::engine::MemoryTracker::SubsystemId audio_pcm_memory_{
+        stellar::engine::MemoryTracker::invalid_subsystem};
     stellar::native_audio::NativeAudioSettings audio_settings(settings_path,
       [&audio](const stellar::native_audio::AudioPreferences& value){audio.set_volumes(value.muted?0.f:value.master,value.music,value.effects);},
       [&audio]{audio.confirm();});
@@ -11061,6 +11064,10 @@ int main(int argc,char **argv){
         stellar::engine::MemoryTracker::instance().report(audio_queue_memory_,
             audio_stats.queued_music_bytes+audio_stats.queued_voice_bytes,
             audio_stats.music_queue_limit_bytes+audio_stats.voice_queue_limit_bytes);
+      if(audio_pcm_memory_==stellar::engine::MemoryTracker::invalid_subsystem)
+        audio_pcm_memory_=stellar::engine::MemoryTracker::instance().register_subsystem("audio-decoded-pcm");
+      stellar::engine::MemoryTracker::instance().report(audio_pcm_memory_,
+          stellar::engine::audio::decoded_pcm_live_bytes(),0);
       service_general();
       audio_settings.set_device_status(audio.failure_message());
       if(options.voice_check){
@@ -11474,7 +11481,7 @@ int main(int argc,char **argv){
           const auto tracked=[&](std::string_view name){
             return std::find_if(census.subsystems.begin(),census.subsystems.end(),
                 [&](const auto& s){return s.name==name;})!=census.subsystems.end();};
-          if(!tracked("planet-materials")||!tracked("territory-overlay")||!tracked("image-preparation"))
+          if(!tracked("planet-materials")||!tracked("territory-overlay")||!tracked("image-preparation")||!tracked("audio-decoded-pcm"))
             throw std::runtime_error("Memory census is missing the client's bounded cache subsystems.");
         }
         std::cout<<std::fixed<<std::setprecision(3)

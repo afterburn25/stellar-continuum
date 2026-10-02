@@ -125,6 +125,15 @@ int main(int argc, char** argv) {
           "non-finite generated clip was accepted");
     check(rejects([] { (void)AudioClip::create({1.1f, 0.f}); }), "out-of-range generated clip was accepted");
 
+    const auto pcm_before = decoded_pcm_live_bytes();
+    {
+      const auto census_clip = AudioClip::create({0.f, 0.f, 0.f, 0.f});
+      check(decoded_pcm_live_bytes() == pcm_before + census_clip->byte_size(),
+            "decoded PCM census did not track clip creation");
+    }
+    check(decoded_pcm_live_bytes() == pcm_before,
+          "decoded PCM census did not release destroyed clips");
+
     // Streaming decode parity: pull-decoding the same files in small
     // chunks produces byte-identical canonical PCM, reports
     // end-of-stream, and rewinds cleanly for looping.
