@@ -400,9 +400,19 @@ preserve:
   `--new-game-restart-smoke`; `--smoke-full-exploration` requires
   developer mode.
 - Authoritative `stellar.py export windows-native-preview` verified
-  end-to-end at `4990223d`
-  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-4990223d-20261002T100412139541Z`,
-  receipt `docs/validation/2026-10-02-tip-export.md`):
+  end-to-end at `1874f39d`
+  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-1874f39d-20261002T114350593508Z`,
+  receipt `docs/validation/2026-10-02-tip-export.md`): 331/331 CTest
+  first pass (the 240 s `developer_qa_host` timeout held under load),
+  every validator module, relocated smoke, PDBs shipped beside both
+  exes (packaged crash reports resolve file+line), ZIP SHA-256
+  `75122bc7197b32e4f4e43593d30124e4e4301c62f220be3867dd0768dc81fd5d`.
+  A prior attempt in this window died mid-build — editing source while
+  an export builds produces inconsistent objects (link of a test obj
+  compiled with `heartbeat()` against a pre-change `stellar_engine`
+  lib); freeze source edits for the duration. Superseded same-day run
+  at `4990223d`
+  (`Builds/Windows/StellarContinuum-0.1.14.2-dev-windows-native-preview-4990223d-20261002T100412139541Z`):
   fresh configure+build (1917 actions), 330/331 CTest on the parallel
   pass + `developer_qa_host` green on solo retry after a load timeout
   (effective 331/331), every `tools/stellar-export/test_*.py` module,
