@@ -70,11 +70,12 @@ void reusable_archive_guards(const fs::path &root){
 void latest_crash_report_attached(const fs::path& root) {
   const auto diag_dir = root / "diag"; fs::create_directories(diag_dir);
   stellar::engine::RuntimeDiagnostics diagnostics("test", "test", diag_dir);
-  write(diag_dir / "stellar-continuum-1.2.3-old.txt", "fault_site=KERNELBASE.dll+0x10\nstack:\n#00 main\n");
+  const std::string planted{"fault_site=KERNELBASE.dll+0x10\nstack:\n#00 main\n"};
+  write(diag_dir / "stellar-continuum-1.2.3-old.txt", planted);
   const SupportBundleRequest request{root, {}, "OS=test", "session"};
   const auto entries = unzip(export_support_bundle(request));
   const auto crash = entries.find("crash-report.txt");
-  require(crash != entries.end() && crash->second.find("fault_site=") != std::string::npos, "newest crash report was not attached to the support bundle");
+  require(crash != entries.end() && crash->second == planted, "newest crash report was not attached to the support bundle");
 }
 
 } // namespace

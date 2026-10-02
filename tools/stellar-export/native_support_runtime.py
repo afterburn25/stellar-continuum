@@ -91,9 +91,10 @@ def _validate_bundle(path: Path, saved_bytes: bytes, width: int, height: int) ->
         with zipfile.ZipFile(path) as archive:
             infos = archive.infolist()
             names = [entry.filename for entry in infos]
-            if names != ["session.log", "system.txt", "campaign.player17.json"]:
+            expected = ["session.log", "system.txt", "campaign.player17.json"]
+            if names != expected and names != expected + ["crash-report.txt"]:
                 raise RuntimeError("Native support bundle does not have the fixed diagnostic entries")
-            if len({entry.filename for entry in infos}) != 3:
+            if len({entry.filename for entry in infos}) != len(infos):
                 raise RuntimeError("Native support bundle has duplicate entries")
             if any(entry.file_size > (64 * 1024 * 1024 if entry.filename == "campaign.player17.json"
                                       else 256 * 1024) for entry in infos):
@@ -103,6 +104,13 @@ def _validate_bundle(path: Path, saved_bytes: bytes, width: int, height: int) ->
         raise RuntimeError("Native support bundle ZIP or CRC validation failed") from error
     if content["campaign.player17.json"] != saved_bytes:
         raise RuntimeError("Native support bundle save differs from the final save")
+    if "crash-report.txt" in content:
+        try:
+            crash_report = content["crash-report.txt"].decode("utf-8", errors="strict")
+        except UnicodeDecodeError as error:
+            raise RuntimeError("Native support bundle crash report is not text") from error
+        if not crash_report.strip():
+            raise RuntimeError("Native support bundle crash report is empty")
     metadata = content["system.txt"].decode("utf-8", errors="strict").splitlines()
     required = ("SaveIncluded=yes", "Runtime=native-c++23", "RendererBackend=vulkan",
                 f"Viewport={width}x{height}")

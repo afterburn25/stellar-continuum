@@ -16,12 +16,13 @@ def proof(**changes):
     return "support=" + json.dumps(value, separators=(",", ":"))
 
 
-def bundle(path: Path, save=b"{}", names=None, corrupt=False):
+def bundle(path: Path, save=b"{}", names=None, corrupt=False, crash_report=None):
     names = names or ["session.log", "system.txt", "campaign.player17.json"]
     with zipfile.ZipFile(path, "w", zipfile.ZIP_STORED) as archive:
         for name in names:
             content = (b"[support] 2026-09-15T00:00:00Z Local diagnostic export requested." if name == "session.log" else
-                       b"Runtime=native-c++23\nRendererBackend=vulkan\nViewport=1280x720\nSaveIncluded=yes\n" if name == "system.txt" else save)
+                       b"Runtime=native-c++23\nRendererBackend=vulkan\nViewport=1280x720\nSaveIncluded=yes\n" if name == "system.txt" else
+                       crash_report if name == "crash-report.txt" and crash_report is not None else save)
             archive.writestr(name, content)
     if corrupt:
         data = bytearray(path.read_bytes())
@@ -60,6 +61,19 @@ class SupportBundleValidationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "support.zip"; bundle(path, b"saved")
             runtime._validate_bundle(path, b"saved", 1280, 720)
+
+    def test_crash_report_entry_is_accepted_and_validated(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            names = ["session.log", "system.txt", "campaign.player17.json", "crash-report.txt"]
+            path = root / "support.zip"; bundle(path, b"saved", names)
+            runtime._validate_bundle(path, b"saved", 1280, 720)
+            for label, crash_report in (("empty", b"  "), ("binary", b"\xff\xfe")):
+                with self.subTest(label=label):
+                    path = root / (label + ".zip")
+                    bundle(path, b"{}", names, crash_report=crash_report)
+                    with self.assertRaises(RuntimeError):
+                        runtime._validate_bundle(path, b"{}", 1280, 720)
 
     def test_corruption_entry_and_save_mismatch_are_rejected(self):
         with tempfile.TemporaryDirectory() as temporary:

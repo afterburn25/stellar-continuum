@@ -349,6 +349,10 @@ std::filesystem::path RuntimeDiagnostics::diagnostics_directory() noexcept {
   const auto* p=Impl::active;
   return p&&!p->path.empty()?p->path.parent_path():std::filesystem::path{};
 }
+std::filesystem::path RuntimeDiagnostics::active_report_path() noexcept {
+  const auto* p=Impl::active;
+  return p?p->report:std::filesystem::path{};
+}
 std::string RuntimeDiagnostics::describe_address(const void* address) const noexcept {
 #ifdef _WIN32
   return impl_?impl_->describe_address(address):std::string{};

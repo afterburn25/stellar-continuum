@@ -15,9 +15,13 @@ constexpr std::size_t maximum_crash_report_bytes=256u*1024u;
 std::string latest_crash_report_text() {
   const auto directory=stellar::engine::RuntimeDiagnostics::diagnostics_directory();
   if(directory.empty())return{};
+  // The live session's report is header-only until a fault writes it — only
+  // completed reports from crashed/hung sessions carry evidence.
+  const auto active_report=stellar::engine::RuntimeDiagnostics::active_report_path();
   std::error_code error;std::filesystem::path newest;std::filesystem::file_time_type stamp{};
   for(const auto& entry:std::filesystem::directory_iterator(directory,error)){
     if(!entry.is_regular_file(error)||entry.path().extension()!=".txt"||entry.file_size(error)==0)continue;
+    if(!active_report.empty()&&entry.path()==active_report)continue;
     const auto written=entry.last_write_time(error);if(error)break;
     if(written>stamp){stamp=written;newest=entry.path();}
   }

@@ -28,6 +28,10 @@ public:
   // diagnostics session is active. Support-bundle exporters use it to attach
   // the newest crash report without hardcoding the log path.
   [[nodiscard]] static std::filesystem::path diagnostics_directory() noexcept;
+  // The live session's own report path — non-empty and header-only from
+  // construction until a fault writes it (removed on clean exit). Bundle
+  // exporters must exclude it: it carries no crash evidence.
+  [[nodiscard]] static std::filesystem::path active_report_path() noexcept;
   [[nodiscard]] std::filesystem::path log_path() const;
 private:
   struct Impl;std::unique_ptr<Impl> impl_;

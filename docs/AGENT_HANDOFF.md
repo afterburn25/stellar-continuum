@@ -496,7 +496,13 @@ preserve:
   `crash-report.txt`. Minidumps stay on disk (referenced by name in the
   report). `native_support` covers attachment, bounds and no-report absence;
   with no diagnostics session `diagnostics_directory()` is empty and nothing
-  is attached.
+  is attached. Two corrections after the first packaged export attempt:
+  the live session's `.txt` is header-only but **non-empty** (ctor writes
+  the session header through `emergency()`), so the picker excludes
+  `RuntimeDiagnostics::active_report_path()` — an mtime or size filter
+  alone cannot distinguish it — and the export validator
+  `native_support_runtime._validate_bundle` accepts the optional
+  `crash-report.txt` entry (non-empty UTF-8 required).
 - Profiler span-retention threshold: `set_span_retention_threshold(ns)`
   keeps sub-threshold spans out of the frame ring and `export_json`
   captures while they still count in call aggregates — the lower-
