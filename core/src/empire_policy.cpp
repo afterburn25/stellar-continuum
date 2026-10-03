@@ -114,7 +114,13 @@ EmpirePolicyCommandResult set_empire_policy(FreshCampaignState &campaign,
   if (state == campaign.empire_policies.end()) {
     campaign.empire_policies.push_back(
         EmpirePolicyState{civilization_id, {}});
-    state = std::prev(campaign.empire_policies.end());
+    // Restore sorts by civilization id; keeping the same canonical order
+    // at mutation time makes captures byte-stable regardless of the
+    // order domains were changed in.
+    std::ranges::sort(campaign.empire_policies, {},
+                      &EmpirePolicyState::civilization_id);
+    state = std::ranges::find(campaign.empire_policies, civilization_id,
+                              &EmpirePolicyState::civilization_id);
   }
   auto assignment = std::ranges::find(state->assignments, policy->domain,
                                       &EmpirePolicyAssignment::domain);
@@ -131,6 +137,8 @@ EmpirePolicyCommandResult set_empire_policy(FreshCampaignState &campaign,
   } else {
     state->assignments.push_back(
         {policy->domain, std::string(policy->id), tick});
+    std::ranges::sort(state->assignments, {},
+                      &EmpirePolicyAssignment::domain);
   }
   return {true,
           "Policy set: " + std::string(policy->display_name) + "."};

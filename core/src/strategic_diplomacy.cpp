@@ -1,5 +1,7 @@
 #include <stellar/core/strategic_diplomacy.hpp>
 
+#include <stellar/core/diplomacy_lifecycle.hpp>
+
 #include <algorithm>
 #include <stdexcept>
 #include <string>
@@ -85,6 +87,12 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
     throw std::out_of_range(
         "Specified argument was out of the range of valid values. (Parameter "
         "'nowTick')");
+  // The strategic review clock ticks once per campaign day while the
+  // diplomacy simulation stamps campaign milli-days (1000/day); every
+  // authoritative command must be stamped on the diplomacy clock so
+  // AI actions order and age identically to player-issued ones.
+  const auto diplomacy_tick = DiplomacyCampaignClock::from_simulation_days(
+      static_cast<double>(now_tick));
   Result result;
 
   int active_wars = 0;
@@ -136,7 +144,7 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
           {WarGoalKind::secure_claims, std::nullopt}};
       if (try_diplomatic_action([&] {
             simulation.declare_war(
-                civilization, target, now_tick,
+                civilization, target, diplomacy_tick,
                 contested ? std::span<const WarGoalSpec>(claims_goal)
                           : std::span<const WarGoalSpec>{});
           })) {
@@ -170,7 +178,7 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
             if (try_diplomatic_action([&] {
                   (void)simulation.send_proposal(
                       civilization, target,
-                      DiplomaticProposalKind::peace_offer, now_tick,
+                      DiplomaticProposalKind::peace_offer, diplomacy_tick,
                       "We seek an end to this ruinous war.");
                 })) {
               ++result.proposals_sent;
@@ -181,7 +189,7 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
             if (try_diplomatic_action([&] {
                   (void)simulation.send_proposal(
                       civilization, target,
-                      DiplomaticProposalKind::ceasefire_offer, now_tick,
+                      DiplomaticProposalKind::ceasefire_offer, diplomacy_tick,
                       "We propose an immediate ceasefire.");
                 })) {
               ++result.proposals_sent;
@@ -228,7 +236,7 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
           try_diplomatic_action([&] {
             (void)simulation.send_proposal(
                 civilization, target, DiplomaticProposalKind::agreement,
-                now_tick,
+                diplomacy_tick,
                 "We propose a lasting accord between our peoples.", type);
           }))
         ++result.proposals_sent;
@@ -330,7 +338,8 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
     }
     if (try_diplomatic_action([&] {
           simulation.respond_to_proposal(proposal.proposal_id,
-                                         civilization, accept, now_tick);
+                                         civilization, accept,
+                                         diplomacy_tick);
         })) {
       ++result.responses_given;
       ++responses;
@@ -378,7 +387,7 @@ StrategicDiplomacyExecutor::Result StrategicDiplomacyExecutor::execute(
     if (try_diplomatic_action([&] {
           simulation.respond_to_territorial_claim(claim.claim_id,
                                                 civilization, response,
-                                                now_tick);
+                                                diplomacy_tick);
         })) {
       ++result.claims_answered;
       ++answered;

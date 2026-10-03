@@ -1,3 +1,4 @@
+#include <stellar/core/diplomacy_lifecycle.hpp>
 #include <stellar/core/diplomacy_runtime.hpp>
 #include <stellar/core/diplomacy_simulation.hpp>
 #include <stellar/core/strategic_diplomacy.hpp>
@@ -103,6 +104,9 @@ void declares_war_on_recommendation() {
         "the AI civilization is recorded as aggressor");
   check(war && war->goals.front().kind == WarGoalKind::secure_claims,
         "contested claims produce a secure-claims goal");
+  check(war && war->declared_at_tick ==
+                   DiplomacyCampaignClock::from_simulation_days(60),
+        "AI actions are stamped on the campaign diplomacy clock");
 
   const auto second = StrategicDiplomacyExecutor{}.execute(
       simulation, 1, traits(), review(1000), knowledge,

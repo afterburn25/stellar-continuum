@@ -224,7 +224,7 @@ int run(const fs::path &fixture_path, const fs::path &source_root,
         const fs::path &research_root) {
   const auto fixture_bytes = bytes(fixture_path);
   check(sha256(fixture_bytes) ==
-            "5471AD98B38E5801F598B32BE5EFE7CCCD509B8E0BA55100C33D7291CB45ACF1",
+            "6777AB5922EFE13724C05BB6C91E089E38D328D7F5B4896D20A5A33251E46EB2",
         "fixture fingerprint");
   const auto fixture = Json::parse(fixture_bytes);
   check(fixture.at("RowCount") == 17 && fixture.at("SourceOnlyRows") == 0,

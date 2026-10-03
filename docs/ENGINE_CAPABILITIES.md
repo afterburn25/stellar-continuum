@@ -5458,9 +5458,8 @@ empire-policy layer on top of the existing diplomacy core, with native UI.
 - War goals are status-tracked but do not yet drive territorial transfer or
   tribute on resolution; `conquer_system` achievement signals intent without
   executing annexation.
-- Policy effects are flat signed factors; there is no per-policy cost,
-  cooldown stagger beyond the shared 30-day window, or AI-driven policy
-  selection for non-player civilizations.
+- Policy effects are flat signed factors; there is no per-policy cost or
+  cooldown stagger beyond the shared 30-day window.
 - The war ledger shows one card per war with no filtering beyond the contact
   filter; there is no dedicated war-detail view or exhaustion forecast.
 
@@ -5620,6 +5619,64 @@ empire-policy layer on top of the existing diplomacy core, with native UI.
   helpers generalize to remaining response surfaces (trespass disputes,
   trade-route offers, AI-driven counter-proposals instead of bare
   yes/no answers).
+
+## AI empire-policy selection (2026-10-03)
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Purpose** — close the P3 gap where only the player could change
+  empire policies: AI civilizations now adapt their four policy domains
+  to their own strategic reviews, using the same bounded-per-review
+  action channel as AI diplomacy.
+- **Modules** — new
+  `core/include/stellar/core/strategic_policies.hpp` +
+  `core/src/strategic_policies.cpp` (`StrategicPolicyExecutor`);
+  `core/src/integrated_adaptive_campaign.cpp` (runs after the diplomacy
+  executor inside the same review sink).
+- **Public interfaces** —
+  `StrategicPolicyExecutor::execute(campaign, civilization, traits,
+  review, knowledge, view, tick)` issues at most one
+  `set_empire_policy` change per call, choosing the highest-urgency
+  divergent domain. Desired stances: military mobilizes at war or under
+  a defense-led plan and demilitarizes only when exhausted and not
+  `honor_bound`; frontier fortifies under war/threat and charters when
+  a colonization opportunity is legitimately known and not deferred;
+  economy focuses industry under supply/industry primaries and turns
+  mercantile on real known trade dependence; research directs under an
+  `ExpandResearch` primary or high `scientific_curiosity` with
+  available research. Divergence below the urgency floor or an already-
+  matching domain is a no-op, and a rejected change (cooldown, unknown
+  id) is simply retried by the next review.
+- **Consumers** — the existing policy consumers (economy factors,
+  shipbuilding throughput, war-exhaustion accrual) now also reflect AI
+  stances; assignments persist through the existing `EmpirePolicies`
+  save tail.
+- **Tests** — new `strategic_policies` CTest: wartime mobilization,
+  exhaustion-driven demilitarization blocked by `honor_bound`, frontier
+  chartering, economy/research plan mapping, mercantile trade
+  dependence, one-domain-per-review boundedness, cooldown rejection,
+  and the default-preserving no-op path. The `strategic_diplomacy`
+  clock-domain check is extended to assert AI commands land on the
+  campaign diplomacy clock.
+- **Save/performance** — no new persisted fields; changes reuse the
+  additive `EmpirePolicies` tail. Per-review cost is O(domains +
+  priorities + known civs) — trivial.
+- **Clock-domain fix** — the executor (and `StrategicDiplomacyExecutor`)
+  now stamp authoritative commands on `DiplomacyCampaignClock`
+  (1000 ticks/day) instead of passing the strategic whole-day tick
+  through verbatim; knowledge staleness comparisons keep the day-domain
+  tick they were built against.
+- **Limitations** — at most one domain changes per review, so a
+  civilization under compounding pressure converges over several review
+  cadences; `applied_industry` is never selected (industry pressure is
+  expressed through the economy domain); selection is threshold-based,
+  not a utility comparison between catalog entries; AI changes are
+  silent — no notification or chronicle entry beyond the policy state
+  itself.
+- **Future reuse** — the desired-stance map is the seam for per-empire
+  policy personalities (trait-weighted catalogs), war-goal-aware
+  mobilization, and a UI surface showing observed foreign policy
+  stances once an observer-legitimate intel field exists for them.
 
 ## Notes
 

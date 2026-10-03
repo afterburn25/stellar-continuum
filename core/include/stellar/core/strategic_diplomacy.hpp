@@ -32,6 +32,9 @@ public:
   // `now_tick`; the review supplies own military strength and the plan
   // that gates diplomatic outreach. All decisions key off what the
   // civilization legitimately knows — estimates, not true fleet power.
+  // `now_tick` is the strategic review clock (whole campaign days);
+  // knowledge comparisons use it directly while every diplomacy command
+  // is stamped on the campaign diplomacy clock (1000 ticks/day).
   [[nodiscard]] Result execute(DiplomacySimulation &simulation,
                                int civilization,
                                const CivilizationTraits &traits,

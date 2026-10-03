@@ -48,6 +48,8 @@ Diplomatic action follows the same boundary: `StrategicDiplomacyExecutor` turns 
 
 The same executor answers inbound diplomacy on the same evidence: pending proposals get accept/reject answers gated on the authoritative war ledger, per-type trust thresholds, and estimated threat; communicated foreign claims get recognized or disputed against the acting civilization's own claims, wars, trust, and estimates. Every command runs through the simulation's own validation inside a narrow error guard, so a stale view (e.g. lapsed identification) drops that action rather than aborting the strategic phase.
 
+Empire policy follows the same review seam: `StrategicPolicyExecutor` changes at most one policy domain per review — war/demilitarization posture from the observer-visible war ledger, frontier chartering or fortification from colonization/defense priorities, economic focus from supply pressure or known trade dependence, and directed research from the plan and traits. All changes go through `set_empire_policy` on the campaign diplomacy clock, so AI and player changes share one cooldown domain.
+
 ## Difficulty
 
 Higher AI difficulty should primarily improve planning, coordination, resource allocation, threat assessment, and reaction quality. Economic or production bonuses, if offered at all, belong only to explicitly selected challenge modes and must not masquerade as intelligence.

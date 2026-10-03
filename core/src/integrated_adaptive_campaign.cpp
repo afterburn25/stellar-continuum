@@ -4,6 +4,7 @@
 #include <stellar/core/campaign_scripted_content.hpp>
 #include <stellar/core/empire_policy.hpp>
 #include <stellar/core/strategic_diplomacy.hpp>
+#include <stellar/core/strategic_policies.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -68,14 +69,17 @@ CivilizationStrategicRuntimeCoordinator strategic_runtime(
   // diplomacy simulation: bounded declarations, overtures and proposals
   // decided strictly from observer-legitimate knowledge.
   StrategicReviewSink actions =
-      [diplomacy](int civilization, const CivilizationTraits &traits,
-                  const CivilizationStrategicReview &review,
-                  const StrategicKnowledgeSnapshot &snapshot,
-                  std::int64_t tick) {
+      [diplomacy, world](int civilization, const CivilizationTraits &traits,
+                         const CivilizationStrategicReview &review,
+                         const StrategicKnowledgeSnapshot &snapshot,
+                         std::int64_t tick) {
         DiplomacySimulation simulation(*diplomacy);
+        const auto view = diplomacy->build_view_for(civilization);
         (void)StrategicDiplomacyExecutor{}.execute(
-            simulation, civilization, traits, review, snapshot,
-            diplomacy->build_view_for(civilization), tick);
+            simulation, civilization, traits, review, snapshot, view, tick);
+        (void)StrategicPolicyExecutor{}.execute(
+            world->campaign(), civilization, traits, review, snapshot, view,
+            tick);
       };
   return CivilizationStrategicRuntimeCoordinator(std::move(director),
                                                    std::move(knowledge),
