@@ -46,6 +46,8 @@ Strategic priorities must not be created from authoritative rival fleets, econom
 
 Diplomatic action follows the same boundary: `StrategicDiplomacyExecutor` turns AI reviews into bounded authoritative commands (war declarations, ceasefire/peace overtures, agreement proposals) using only the acting civilization's observer-scoped view and knowledge snapshot. Existing wars and pending proposals are always read from the authoritative `DiplomaticStateView`, so repeated reviews can never duplicate a declaration or an overture.
 
+The same executor answers inbound diplomacy on the same evidence: pending proposals get accept/reject answers gated on the authoritative war ledger, per-type trust thresholds, and estimated threat; communicated foreign claims get recognized or disputed against the acting civilization's own claims, wars, trust, and estimates. Every command runs through the simulation's own validation inside a narrow error guard, so a stale view (e.g. lapsed identification) drops that action rather than aborting the strategic phase.
+
 ## Difficulty
 
 Higher AI difficulty should primarily improve planning, coordination, resource allocation, threat assessment, and reaction quality. Economic or production bonuses, if offered at all, belong only to explicitly selected challenge modes and must not masquerade as intelligence.

@@ -5561,14 +5561,65 @@ empire-policy layer on top of the existing diplomacy core, with native UI.
   `conquer_system` targeting); declarations never bundle multiple targets;
   peace overtures are exhaustion/score heuristics without goal-progress
   awareness; outreach picks the single best partner and ignores traits
-  beyond `honor_bound`/`survival_priority`; response evaluation to the
-  *player's* proposals still uses the proposal pipeline's defaults — AI
-  civilizations do not yet accept/decline inbound proposals strategically.
+  beyond `honor_bound`/`survival_priority`.
 - **Future reuse** — the sink is the general action seam: fleet posture
   changes, claim disputes, trespass responses, claim responses to the
   player's claims, and proposal responses are natural next consumers; the
   executor's bounded-per-review pattern scales to additional action types
   without changing the coordinator.
+
+## AI diplomatic response channel (2026-10-03)
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Purpose** — let AI civilizations *answer* diplomacy, not just initiate
+  it: pending proposals addressed to them (peace, ceasefire, agreements,
+  demands, access, trade) and foreign territorial claims they have been
+  shown no longer stall unresolved for want of a responder.
+- **Modules** — same `StrategicDiplomacyExecutor`
+  (`core/include/stellar/core/strategic_diplomacy.hpp` +
+  `core/src/strategic_diplomacy.cpp`); the inbound pass runs inside the
+  existing `execute` call after the outbound pass, so no new wiring or
+  coordinator hooks were needed.
+- **Public interfaces** — `execute` additionally issues up to two
+  `respond_to_proposal` answers and two `respond_to_territorial_claim`
+  responses per call, counted on `Result::responses_given` /
+  `Result::claims_answered`. Acceptance rules read only the observer view
+  and knowledge snapshot: peace/ceasefire are weighed against the
+  authoritative war ledger's own exhaustion and score; agreement types
+  have per-type trust thresholds (and `scientific_curiosity` for research
+  exchange); agreements are refused outright while at war, which also
+  keeps `respond_to_proposal`'s non-aggression-during-war validation
+  unreachable; demands yield only to overwhelming *estimated* force;
+  contested claims are disputed unless hopelessly outmatched and not
+  `honor_bound`, war claims always disputed, trusted claimants
+  recognized, and irrelevant claims left silent. Every call is wrapped in
+  a narrow guard that swallows `DiplomacyOperationError` /
+  `DiplomacyArgumentError`, so an identification lapse or state change
+  between view construction and execution drops one action instead of
+  aborting the review wave.
+- **Consumers** — the same integrated-campaign route; answers land in the
+  diplomacy journal and update proposal/claim state, so the player sees
+  AI acceptances and refusals through the normal notifications and
+  diplomacy workspace.
+- **Tests** — `strategic_diplomacy` extended: accepting peace while
+  losing settles the war, declining while winning keeps it running,
+  trust-tiered agreement accept/reject, contested-vs-trusted claim
+  responses, and repeat-execution idempotency (answered claims stay
+  answered).
+- **Save/performance** — no new persisted fields; same O(view size) bound
+  per review with two small caps on top.
+- **Limitations** — response thresholds are flat heuristics (no
+  personality memory of past betrayals, no consideration of ongoing
+  negotiations with third parties); demand evaluation trusts the
+  estimate's midpoint, so inflated intel can extort; the two-per-review
+  cap can leave genuinely unanswered proposals pending for a cadence if
+  many arrive at once; war-goal progress still does not modulate peace
+  acceptance.
+- **Future reuse** — the guarded-action pattern and the trust/threat
+  helpers generalize to remaining response surfaces (trespass disputes,
+  trade-route offers, AI-driven counter-proposals instead of bare
+  yes/no answers).
 
 ## Notes
 

@@ -14,7 +14,8 @@ namespace stellar::core {
 // observer-legitimate strategic knowledge into authoritative diplomacy
 // commands through the simulation — never through privileged state.
 // At most one war declaration, one peace overture, and one agreement
-// proposal are issued per call; every action is validated by the
+// proposal are issued per call, plus up to two inbound-proposal
+// responses and two claim responses; every action is validated by the
 // simulation's own rules, so hidden civilizations, duplicate wars and
 // invalid goals can never be produced.
 class StrategicDiplomacyExecutor {
@@ -22,6 +23,8 @@ public:
   struct Result {
     int wars_declared{};
     int proposals_sent{};
+    int responses_given{};
+    int claims_answered{};
   };
 
   // `view` must be the acting civilization's own observer-scoped
