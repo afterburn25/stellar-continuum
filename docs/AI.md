@@ -44,6 +44,8 @@ The campaign/Core lifecycle owns a persisted diplomacy runtime, and `DiplomacySt
 
 Strategic priorities must not be created from authoritative rival fleets, economies, IDs, or other hidden state. Do not derive exact enemy strength directly from `GalaxyState`/`FreshCampaignState` as a shortcut; the provider's military estimate is deliberately a confidence-weighted low/high range, not the true fleet power.
 
+Diplomatic action follows the same boundary: `StrategicDiplomacyExecutor` turns AI reviews into bounded authoritative commands (war declarations, ceasefire/peace overtures, agreement proposals) using only the acting civilization's observer-scoped view and knowledge snapshot. Existing wars and pending proposals are always read from the authoritative `DiplomaticStateView`, so repeated reviews can never duplicate a declaration or an overture.
+
 ## Difficulty
 
 Higher AI difficulty should primarily improve planning, coordination, resource allocation, threat assessment, and reaction quality. Economic or production bonuses, if offered at all, belong only to explicitly selected challenge modes and must not masquerade as intelligence.

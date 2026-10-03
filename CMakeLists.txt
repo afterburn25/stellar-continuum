@@ -187,7 +187,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/species_environment.cpp core/src/species_homeworlds.cpp core/src/nearby_habitable.cpp
   core/src/civilization_catalog.cpp core/src/founding_catalog.cpp core/src/colony_economy.cpp core/src/colony_biology.cpp
   core/src/surface_economy.cpp core/src/colony_operations.cpp core/src/campaign_economy.cpp
-  core/src/industry_allocation.cpp core/src/strategic_intent.cpp core/src/strategic_planning.cpp core/src/strategic_input_support.cpp core/src/strategic_input_builder.cpp core/src/strategic_runtime.cpp core/src/logistics_routing.cpp core/src/logistics_views.cpp
+  core/src/industry_allocation.cpp core/src/strategic_intent.cpp core/src/strategic_planning.cpp core/src/strategic_input_support.cpp core/src/strategic_input_builder.cpp core/src/strategic_runtime.cpp core/src/strategic_diplomacy.cpp core/src/logistics_routing.cpp core/src/logistics_views.cpp
   core/src/sovereign_currency.cpp core/src/construction_state.cpp core/src/surface_construction.cpp
   core/src/construction_projects.cpp core/src/ship_designs.cpp
   core/src/ship_components.cpp
@@ -1163,6 +1163,10 @@ if(BUILD_TESTING)
   target_link_libraries(stellar_strategic_knowledge_intel_tests PRIVATE stellar_core stellar_json)
   add_test(NAME strategic_knowledge_intel COMMAND stellar_strategic_knowledge_intel_tests)
   set_tests_properties(strategic_knowledge_intel PROPERTIES TIMEOUT 180)
+  add_executable(stellar_strategic_diplomacy_tests native-tests/strategic_diplomacy_tests.cpp)
+  target_link_libraries(stellar_strategic_diplomacy_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME strategic_diplomacy COMMAND stellar_strategic_diplomacy_tests)
+  set_tests_properties(strategic_diplomacy PROPERTIES TIMEOUT 180)
   add_executable(stellar_fleet_combat_intelligence_tests native-tests/fleet_combat_intelligence_tests.cpp)
   target_link_libraries(stellar_fleet_combat_intelligence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fleet_combat_intelligence_parity COMMAND stellar_fleet_combat_intelligence_tests

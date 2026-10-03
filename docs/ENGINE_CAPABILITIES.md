@@ -5516,6 +5516,60 @@ empire-policy layer on top of the existing diplomacy core, with native UI.
   fleet) and for the AI action channel (diplomacy proposals, war
   declarations, fleet posture) that consumes these fields.
 
+## AI diplomatic action channel (2026-10-02)
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Purpose** — let AI civilizations act on their strategic reviews
+  diplomatically: declare wars the evaluator recommends, sue for peace when
+  losing or exhausted, and send agreement proposals when the plan
+  prioritizes relations. Actions are bounded, deterministic, and issued
+  strictly through authoritative diplomacy commands.
+- **Modules** — `core/include/stellar/core/strategic_diplomacy.hpp` +
+  `core/src/strategic_diplomacy.cpp` (`StrategicDiplomacyExecutor`);
+  `core/include/stellar/core/strategic_runtime.hpp` +
+  `core/src/strategic_runtime.cpp` (`StrategicReviewSink` hook);
+  `core/src/integrated_adaptive_campaign.cpp` (production wiring).
+- **Public interfaces** — `StrategicReviewSink` is an optional coordinator
+  callback invoked per fresh review while the review and its knowledge
+  snapshot are still in scope; the coordinator defaults to no sink.
+  `StrategicDiplomacyExecutor::execute(simulation, civilization, traits,
+  review, knowledge, view, tick)` issues at most one war declaration
+  (`secure_claims` when claims are contested, otherwise generic
+  `humiliate`), one ceasefire/peace overture (gated by the authoritative
+  war ledger's own exhaustion and score, never by stale knowledge flags),
+  and one agreement proposal (escalating non-aggression → trade →
+  research exchange → cooperation only when the plan's primary priority is
+  `ImproveRelations` and no proposal is pending) per call.
+- **Consumers** — the integrated campaign routes AI reviews through the
+  executor against the live `DiplomacyState`; every action lands in the
+  diplomacy journal, war ledger, and pending-proposal queues, so the
+  chronicle, notifications, war UI, and observer commands see them like
+  any player's commands.
+- **Tests** — new `strategic_diplomacy` CTest: recommendation-driven
+  declarations with contested-claim goals, treaty/superiority refusal,
+  authoritative-view dedup (repeat calls never re-declare or re-propose),
+  ceasefire vs. full-peace escalation by exhaustion/score, and
+  plan-gated outreach targeting the best partner. All parity oracles,
+  `integrated_adaptive_campaign_parity`, and
+  `developer_fixed_simulation` stay green — the executor fires only on
+  legitimately known state and never for player-controlled civs.
+- **Save/performance** — no new persisted fields; actions flow through the
+  existing diplomacy persistence. Per-review cost is O(wars + proposals +
+  agreements + claims + known civs) — trivial beside the review itself.
+- **Limitations** — war goals stop at `secure_claims`/`humiliate` (no
+  `conquer_system` targeting); declarations never bundle multiple targets;
+  peace overtures are exhaustion/score heuristics without goal-progress
+  awareness; outreach picks the single best partner and ignores traits
+  beyond `honor_bound`/`survival_priority`; response evaluation to the
+  *player's* proposals still uses the proposal pipeline's defaults — AI
+  civilizations do not yet accept/decline inbound proposals strategically.
+- **Future reuse** — the sink is the general action seam: fleet posture
+  changes, claim disputes, trespass responses, claim responses to the
+  player's claims, and proposal responses are natural next consumers; the
+  executor's bounded-per-review pattern scales to additional action types
+  without changing the coordinator.
+
 ## Notes
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,

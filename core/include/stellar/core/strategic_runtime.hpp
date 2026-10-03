@@ -15,6 +15,13 @@ namespace stellar::core {
 using StrategicKnowledgeQuery =
     std::function<StrategicKnowledgeSnapshot(int, std::int64_t)>;
 
+// Optional per-review sink invoked while a fresh review and its knowledge
+// snapshot are still in scope — the action channel for AI diplomacy.
+using StrategicReviewSink = std::function<void(
+    int civilization_id, const CivilizationTraits &traits,
+    const CivilizationStrategicReview &review,
+    const StrategicKnowledgeSnapshot &knowledge, std::int64_t now_tick)>;
+
 class CivilizationStrategicDirector {
 public:
   explicit CivilizationStrategicDirector(
@@ -55,7 +62,8 @@ class CivilizationStrategicRuntimeCoordinator {
 public:
   explicit CivilizationStrategicRuntimeCoordinator(
       CivilizationStrategicDirector director = CivilizationStrategicDirector{},
-      StrategicKnowledgeQuery knowledge = {});
+      StrategicKnowledgeQuery knowledge = {},
+      StrategicReviewSink review_sink = {});
 
   [[nodiscard]] std::vector<CivilizationStrategicReview>
   advance(StrategicRuntimeWorldView world, double simulation_days);
@@ -79,6 +87,7 @@ private:
   StrategicIndustryPriorityProvider industry_;
   StrategicShipbuildingPreferenceProvider shipbuilding_;
   StrategicKnowledgeQuery knowledge_;
+  StrategicReviewSink review_sink_;
   std::unordered_map<int, std::int64_t> next_review_tick_;
   std::optional<std::int64_t> campaign_seed_;
   double strategic_days_{};

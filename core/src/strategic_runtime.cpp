@@ -38,8 +38,10 @@ std::vector<CivilizationStrategicPlan> CivilizationStrategicDirector::snapshot()
 void CivilizationStrategicDirector::restore(std::span<const CivilizationStrategicPlan> plans){planner_.restore(plans);}
 
 CivilizationStrategicRuntimeCoordinator::CivilizationStrategicRuntimeCoordinator(
-    CivilizationStrategicDirector director, StrategicKnowledgeQuery knowledge)
-    : director_(std::move(director)), knowledge_(std::move(knowledge)) {
+    CivilizationStrategicDirector director, StrategicKnowledgeQuery knowledge,
+    StrategicReviewSink review_sink)
+    : director_(std::move(director)), knowledge_(std::move(knowledge)),
+      review_sink_(std::move(review_sink)) {
   if (!knowledge_) knowledge_ = [](int, std::int64_t now_tick) {
     if (now_tick < 0) throw std::out_of_range("Specified argument was out of the range of valid values. (Parameter 'nowTick')");
     return StrategicKnowledgeSnapshot{now_tick, {}};
@@ -80,6 +82,12 @@ CivilizationStrategicRuntimeCoordinator::advance(StrategicRuntimeWorldView world
                                    civilization->traits, knowledge, now_tick);
     industry_.publish(review);
     shipbuilding_.publish(review);
+    // The review sink runs after intent publication while the review and
+    // its knowledge snapshot are still in scope; it may issue authoritative
+    // commands (AI diplomacy) before the plan is stored.
+    if (review_sink_)
+      review_sink_(civilization->id, civilization->traits, review, knowledge,
+                   now_tick);
     next_review_tick_[civilization->id] = review.plan.review_after_tick;
     reviews.push_back(std::move(review));
   }
