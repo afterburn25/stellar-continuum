@@ -4,6 +4,7 @@
 #include <stellar/core/campaign_scripted_content.hpp>
 #include <stellar/core/empire_policy.hpp>
 #include <stellar/core/strategic_diplomacy.hpp>
+#include <stellar/core/strategic_fleet_posture.hpp>
 #include <stellar/core/strategic_policies.hpp>
 
 #include <algorithm>
@@ -80,6 +81,8 @@ CivilizationStrategicRuntimeCoordinator strategic_runtime(
         (void)StrategicPolicyExecutor{}.execute(
             world->campaign(), civilization, traits, review, snapshot, view,
             tick);
+        (void)StrategicFleetPostureExecutor{}.execute(
+            world->campaign(), civilization, traits, review, view, tick);
       };
   return CivilizationStrategicRuntimeCoordinator(std::move(director),
                                                    std::move(knowledge),

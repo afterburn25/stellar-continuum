@@ -50,6 +50,8 @@ The same executor answers inbound diplomacy on the same evidence: pending propos
 
 Empire policy follows the same review seam: `StrategicPolicyExecutor` changes at most one policy domain per review — war/demilitarization posture from the observer-visible war ledger, frontier chartering or fortification from colonization/defense priorities, economic focus from supply pressure or known trade dependence, and directed research from the plan and traits. All changes go through `set_empire_policy` on the campaign diplomacy clock, so AI and player changes share one cooldown domain.
 
+Fleet doctrine follows the same boundary: `StrategicFleetPostureExecutor` sets standing orders on the acting civilization's own military fleets — weapons free during its own wars or defense-led plans, hold-fast otherwise — through the validated `set_fleet_doctrine` path, with `honor_bound` fleets refusing automatic retreat. War state comes only from the civilization's own diplomatic view.
+
 ## Difficulty
 
 Higher AI difficulty should primarily improve planning, coordination, resource allocation, threat assessment, and reaction quality. Economic or production bonuses, if offered at all, belong only to explicitly selected challenge modes and must not masquerade as intelligence.

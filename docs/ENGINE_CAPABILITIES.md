@@ -5678,6 +5678,54 @@ empire-policy layer on top of the existing diplomacy core, with native UI.
   mobilization, and a UI surface showing observed foreign policy
   stances once an observer-legitimate intel field exists for them.
 
+## AI fleet posture (2026-10-03)
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Purpose** — give AI civilizations a standing-orders channel on their
+  own military fleets: the `FleetDoctrine` contract (`EngageAtWill`,
+  `HoldFast`, `auto_retreat_hull_fraction`) existed in combat and
+  persistence but had no production writer, so AI fleets previously sat
+  on the factory HoldFast default even while at war.
+- **Modules** — new
+  `core/include/stellar/core/strategic_fleet_posture.hpp` +
+  `core/src/strategic_fleet_posture.cpp`
+  (`StrategicFleetPostureExecutor`);
+  `core/src/integrated_adaptive_campaign.cpp` (runs inside the same
+  strategic review sink after diplomacy and policy).
+- **Public interfaces** —
+  `StrategicFleetPostureExecutor::execute(campaign, civilization,
+  traits, review, view, tick)` recomputes the desired doctrine for every
+  active own `FleetRole::Military` fleet and applies it through the
+  validated `set_fleet_doctrine` path. Fleets go `EngageAtWill` while a
+  war is active on their own view ledger or when `Defend` is the plan's
+  primary priority, and return to `HoldFast` when the war resolves;
+  `auto_retreat_hull_fraction` rises with `survival_priority` (0.10–0.50)
+  and stays at zero for `honor_bound` civilizations. Doctrines carry no
+  timestamp, so a converged review is a strict no-op.
+- **Consumers** — `CombatSimulation` reads doctrine each battle tick:
+  `EngageAtWill` fleets open fire on the lowest-id co-located hostile,
+  and the retreat fraction drives automatic disengagement — so AI
+  posture changes feed combat directly. Fleet persistence already
+  round-trips doctrine through the `Doctrine` payload field.
+- **Tests** — new `strategic_fleet_posture` CTest (5 scenarios): wartime
+  engagement with trait-scaled retreat, `honor_bound` fight-to-the-last,
+  defense-priority posture without war, peacetime no-op idempotency,
+  and posture tracking war declaration then peace settlement — with
+  civilian, foreign and inactive fleets verified untouched.
+- **Save/performance** — no new persisted fields (doctrine was already
+  in the fleet payload); per-review cost is O(military fleets).
+- **Limitations** — posture is uniform across a civilization's military
+  fleets (no per-fleet or per-front differentiation); no standing order
+  movement (fleets are not repositioned by the review); the doctrine
+  still has no player-facing control surface, so the player cannot
+  issue the equivalent command — an asymmetry until a doctrine control
+  lands.
+- **Future reuse** — the executor's desired-doctrine map is the seam for
+  fleet-level orders (border staging, home-defense concentration),
+  per-fleet posture overrides, and a fleet panel doctrine picker for
+  the player.
+
 ## Notes
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,
