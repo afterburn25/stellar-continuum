@@ -5464,6 +5464,58 @@ empire-policy layer on top of the existing diplomacy core, with native UI.
 - The war ledger shows one card per war with no filtering beyond the contact
   filter; there is no dedicated war-detail view or exhaustion forecast.
 
+## Strategic knowledge depth for AI planning (2026-10-02)
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **Purpose** — populate the full `KnownCivilization` contract for the
+  strategic planner from observer-legitimate evidence instead of leaving
+  estimate/border/trade/treaty fields stubbed at zero. The strategic
+  evaluator's war assessment, threat weighting, and diplomacy priorities now
+  see real knowledge.
+- **Modules** — `core/include/stellar/core/diplomacy_runtime.hpp` +
+  `core/src/diplomacy_runtime.cpp`
+  (`DiplomacyStrategicKnowledgeProvider`, `StrategicKnowledgeIntel`);
+  `core/src/integrated_adaptive_campaign.cpp` (production wiring).
+- **Public interfaces** — `StrategicKnowledgeIntel` carries optional
+  observer-legitimate inputs: fleet list (ownership attribution), fleet
+  power observations (per-observer), lane graph (adjacency), and colonies
+  (the observer's own territory). `build(observer, tick, intel)` fills
+  `has_military_estimate`/`estimated_military_low`/`high`/`confidence`/
+  `last_military_observation_tick` from the newest per-fleet observations
+  attributed to identified owners (coverage saturates at four fleets,
+  confidence decays over one year of age); `has_defense_treaty_with_observer`
+  and `known_trade_dependence` from active agreements between the pair
+  (trade 0.5, cooperation 0.25 + treaty, research exchange 0.25);
+  `has_shared_border` from contested systems or lane-adjacent
+  observer-visible claims. `intel` defaults to empty, preserving the prior
+  stub-zero behavior for callers without intel sources.
+- **Consumers** — the integrated campaign's `StrategicKnowledgeQuery`
+  supplies live `campaign.fleets`, `campaign.combat_intelligence`,
+  `lanes().build()`, and `campaign.colonies`; `CivilizationStrategicDirector`
+  / `StrategicDecisionEvaluator` now exercise the estimate, border, treaty,
+  and dependence branches for real.
+- **Tests** — new `strategic_knowledge_intel` CTest: treaty/dependence
+  weights, contested and lane-adjacent borders, uncommunicated-claim
+  privacy, per-fleet observation attribution (newest wins, foreign
+  observers ignored, unidentified owners excluded), estimate decay, and
+  war-ledger exhaustion/at-war fields. `diplomacy_runtime_parity`,
+  `strategic_planning_parity`, `strategic_runtime_parity`, and
+  `developer_fixed_simulation` unchanged and green.
+- **Save/performance** — no persisted fields added; intel is derived per
+  call from existing campaign state and the O(lanes+claims+observations)
+  scan runs once per strategic review per observer.
+- **Limitations** — the military estimate counts *observed* fleets only (a
+  civilization can be stronger than its low bound; the high bound is a
+  heuristic, not reconnaissance quality); trade dependence weighs treaty
+  *existence*, not actual logistics throughput; foreign colony ownership is
+  deliberately not read, so borders track claims rather than real
+  occupation; non-observer lane topology is assumed public astronomy.
+- **Future reuse** — the intel struct is the seam for reconnaissance-driven
+  intel upgrades (partial ship-class breakdowns, observation staleness per
+  fleet) and for the AI action channel (diplomacy proposals, war
+  declarations, fleet posture) that consumes these fields.
+
 ## Notes
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,

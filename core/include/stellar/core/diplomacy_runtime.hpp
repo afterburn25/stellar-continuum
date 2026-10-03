@@ -4,6 +4,8 @@
 #include <stellar/core/diplomacy_lifecycle.hpp>
 #include <stellar/core/diplomacy_observer_commands.hpp>
 #include <stellar/core/exploration_advance.hpp>
+#include <stellar/core/fleet_power_observation.hpp>
+#include <stellar/core/lane_network.hpp>
 #include <stellar/core/strategic_planning.hpp>
 
 #include <cstdint>
@@ -57,12 +59,27 @@ private:
   const DiplomacyState *state_{};
 };
 
+// Observer-legitimate non-diplomatic intelligence feeding the strategic
+// knowledge snapshot. Every span is optional: an absent input yields no
+// estimate rather than privileged information. `fleets` provides ownership
+// attribution for `observations` (power estimates only attach to fleets
+// whose owner the observer has identified); `lanes` supplies adjacency for
+// shared-border detection; `colonies` supplies the observer's own territory
+// — own state is always legitimate knowledge.
+struct StrategicKnowledgeIntel {
+  std::span<const FleetState> fleets{};
+  std::span<const FleetPowerObservation> observations{};
+  std::span<const InterstellarLane> lanes{};
+  std::span<const Colony> colonies{};
+};
+
 class DiplomacyStrategicKnowledgeProvider final {
 public:
   explicit DiplomacyStrategicKnowledgeProvider(const DiplomacyState &state) noexcept;
   DiplomacyStrategicKnowledgeProvider(DiplomacyState &&) = delete;
-  [[nodiscard]] StrategicKnowledgeSnapshot build(int observer,
-                                                  std::int64_t now_tick) const;
+  [[nodiscard]] StrategicKnowledgeSnapshot
+  build(int observer, std::int64_t now_tick,
+        const StrategicKnowledgeIntel &intel = {}) const;
 private:
   const DiplomacyState *state_{};
 };

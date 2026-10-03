@@ -40,9 +40,9 @@ Strategic reviews are bounded derived state. They run only at scheduled review b
 
 ### Foreign-information boundary
 
-Diplomacy currently has observer-filtered contracts and validation, but it does not yet have one authoritative persisted runtime owner in the campaign/Core lifecycle. Until that ownership exists, the strategic runtime supplies an empty foreign-information snapshot. Therefore it must not create defensive/war priorities from authoritative rival fleets, economies, IDs, or other hidden state.
+The campaign/Core lifecycle owns a persisted diplomacy runtime, and `DiplomacyStrategicKnowledgeProvider` builds `StrategicKnowledgeSnapshot` strictly from observer-legitimate state: identified contacts and relationships, the observer-scoped war ledger, agreements the observer is party to or can legitimately see, territorial claims communicated to the observer, the observer's own territory, and fleet-power observations recorded for the observer. Fields without legitimate evidence stay empty — an absent `StrategicKnowledgeIntel` input yields no estimate, never a privileged shortcut.
 
-When a persisted Diplomacy/intelligence runtime is introduced, it should build `KnowledgeSnapshot` strictly from observer-visible contacts/relationships/intelligence estimates. Do not derive exact enemy strength directly from `GalaxyState` as a shortcut.
+Strategic priorities must not be created from authoritative rival fleets, economies, IDs, or other hidden state. Do not derive exact enemy strength directly from `GalaxyState`/`FreshCampaignState` as a shortcut; the provider's military estimate is deliberately a confidence-weighted low/high range, not the true fleet power.
 
 ## Difficulty
 

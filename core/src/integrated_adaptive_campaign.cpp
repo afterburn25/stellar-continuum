@@ -45,7 +45,7 @@ SourceCompatibleCampaignConfiguration configuration(
 
 CivilizationStrategicRuntimeCoordinator strategic_runtime(
     AdaptiveResearchShipbuildingCapabilityView *shipbuilding,
-    DiplomacyState *diplomacy) {
+    DiplomacyState *diplomacy, CampaignSimulationState *world) {
   StrategicShipbuildingCapabilityQuery capability =
       [shipbuilding](const StrategicInputWorldView &, int civilization,
                      std::string_view id) {
@@ -53,10 +53,15 @@ CivilizationStrategicRuntimeCoordinator strategic_runtime(
       };
   CivilizationStrategicDirector director(
       CivilizationStrategicInputBuilder({}, std::move(capability), {}));
-  StrategicKnowledgeQuery knowledge = [diplomacy](int observer,
-                                                   std::int64_t tick) {
-    return DiplomacyStrategicKnowledgeProvider(*diplomacy).build(observer,
-                                                                 tick);
+  StrategicKnowledgeQuery knowledge = [diplomacy, world](int observer,
+                                                          std::int64_t tick) {
+    auto &campaign = world->campaign();
+    const StrategicKnowledgeIntel intel{campaign.fleets,
+                                        campaign.combat_intelligence,
+                                        world->lanes().build(),
+                                        campaign.colonies};
+    return DiplomacyStrategicKnowledgeProvider(*diplomacy)
+        .build(observer, tick, intel);
   };
   return CivilizationStrategicRuntimeCoordinator(std::move(director),
                                                    std::move(knowledge));
@@ -105,7 +110,7 @@ struct IntegratedAdaptiveCampaignRuntime::Storage {
         construction(research), shipbuilding(research),
         diplomacy_runtime(diplomacy),
         core(configuration(&construction, &shipbuilding),
-             strategic_runtime(&shipbuilding, &diplomacy),
+             strategic_runtime(&shipbuilding, &diplomacy, &world),
              diplomacy_runtime.create_combat_command_runtime()),
         scripted(static_cast<std::uint64_t>(
             world.campaign().seed ^ 0x5C41DED5A9B7B3E1ll)),

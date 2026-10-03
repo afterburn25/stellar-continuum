@@ -118,8 +118,9 @@ DiplomacyStrategicKnowledgeProvider::DiplomacyStrategicKnowledgeProvider(
     : state_(&state) {}
 
 StrategicKnowledgeSnapshot
-DiplomacyStrategicKnowledgeProvider::build(int observer,
-                                            std::int64_t now_tick) const {
+DiplomacyStrategicKnowledgeProvider::build(
+    int observer, std::int64_t now_tick,
+    const StrategicKnowledgeIntel &intel) const {
   if (observer < 0)
     throw DiplomacyArgumentRangeError(range_message("observerCivilizationId"));
   if (now_tick < 0)
@@ -138,6 +139,33 @@ DiplomacyStrategicKnowledgeProvider::build(int observer,
       targets.push_back(*contact.target_civilization_id);
   }
   std::ranges::sort(targets);
+
+  // Observer-side territory: the observer's own active claims and colony
+  // systems are own-state facts. Foreign territory only enters through the
+  // observer-scoped claim view — foreign colony ownership is never read.
+  std::unordered_set<int> own_systems;
+  for (const auto &claim : view.claims)
+    if (claim.active && claim.claimant_civilization_id == observer)
+      own_systems.insert(claim.system_id);
+  for (const auto &colony : intel.colonies)
+    if (colony.civilization_id == observer)
+      own_systems.insert(colony.system_id);
+
+  // Fleet attribution plus the observer's own power record, reduced to the
+  // newest observation per fleet.
+  std::unordered_map<int, int> fleet_owners;
+  for (const auto &fleet : intel.fleets)
+    fleet_owners.emplace(fleet.id, fleet.civilization_id);
+  std::unordered_map<int, const FleetPowerObservation *> latest_observations;
+  for (const auto &observation : intel.observations) {
+    if (observation.observer_id != observer)
+      continue;
+    const auto found = latest_observations.find(observation.fleet_id);
+    if (found == latest_observations.end() ||
+        found->second->observed_day <= observation.observed_day)
+      latest_observations[observation.fleet_id] = &observation;
+  }
+
   StrategicKnowledgeSnapshot result{now_tick, {}};
   result.civilizations.reserve(targets.size());
   for (const int target : targets) {
@@ -165,11 +193,98 @@ DiplomacyStrategicKnowledgeProvider::build(int observer,
         known_war_exhaustion =
             std::max(known_war_exhaustion, war.defender_exhaustion);
     }
+
+    // Active agreements between the pair feed the treaty/dependence fields.
+    double trade_dependence = 0;
+    bool defense_treaty = false;
+    for (const auto &agreement : view.agreements) {
+      if (agreement.status != DiplomaticAgreementStatus::active)
+        continue;
+      const bool pair =
+          (agreement.civilization_a_id == observer &&
+           agreement.civilization_b_id == target) ||
+          (agreement.civilization_a_id == target &&
+           agreement.civilization_b_id == observer);
+      if (!pair)
+        continue;
+      switch (agreement.type) {
+      case DiplomaticAgreementType::trade:
+        trade_dependence += 0.5;
+        break;
+      case DiplomaticAgreementType::research_exchange:
+        trade_dependence += 0.25;
+        break;
+      case DiplomaticAgreementType::cooperation:
+        trade_dependence += 0.25;
+        defense_treaty = true;
+        break;
+      default:
+        break;
+      }
+    }
+
+    // Shared border: contested systems, or a lane joining the observer's
+    // territory to the target's observer-visible claimed systems.
+    std::unordered_set<int> target_systems;
+    for (const auto &claim : view.claims)
+      if (claim.active && claim.claimant_civilization_id == target)
+        target_systems.insert(claim.system_id);
+    bool shared_border = false;
+    for (const int system : own_systems) {
+      if (target_systems.contains(system)) {
+        shared_border = true;
+        break;
+      }
+    }
+    for (const auto &lane : intel.lanes) {
+      if (shared_border)
+        break;
+      if ((own_systems.contains(lane.first_system_id) &&
+           target_systems.contains(lane.second_system_id)) ||
+          (own_systems.contains(lane.second_system_id) &&
+           target_systems.contains(lane.first_system_id)))
+        shared_border = true;
+    }
+
+    // Military estimate: the newest per-fleet power observation attributed
+    // to the target's fleets. Coverage saturates at four observed fleets;
+    // confidence decays over one year of observation age.
+    double observed_power = 0;
+    double latest_day = -1;
+    int observed_fleets = 0;
+    for (const auto &[fleet_id, observation] : latest_observations) {
+      const auto owner = fleet_owners.find(fleet_id);
+      if (owner == fleet_owners.end() || owner->second != target)
+        continue;
+      observed_power += observation->power;
+      latest_day = std::max(latest_day, observation->observed_day);
+      ++observed_fleets;
+    }
+    double estimate_low = 0, estimate_high = 0, estimate_confidence = 0;
+    std::int64_t last_observation_tick = 0;
+    const bool has_estimate = observed_fleets > 0;
+    if (has_estimate) {
+      estimate_low = observed_power;
+      last_observation_tick = static_cast<std::int64_t>(latest_day);
+      const double coverage =
+          std::min(1.0, static_cast<double>(observed_fleets) / 4.0);
+      const double age =
+          std::max(0.0, static_cast<double>(now_tick) - latest_day);
+      const double recency = std::clamp(1.0 - age / 365.0, 0.0, 1.0);
+      estimate_confidence = coverage * (0.35 + 0.65 * recency);
+      estimate_high =
+          observed_power *
+          (1.1 + 2.0 * (1.0 - coverage) + 0.5 * (1.0 - recency));
+    }
+
     result.civilizations.push_back(
         {target,
-         KnownCivilization{target, trust, 0, 0, 0, 0, false, 0,
-                           known_war_exhaustion, at_war,
-                           false, false}});
+         KnownCivilization{target, trust, estimate_low, estimate_high,
+                           estimate_confidence, last_observation_tick,
+                           shared_border,
+                           std::clamp(trade_dependence, 0.0, 1.0),
+                           known_war_exhaustion, at_war, defense_treaty,
+                           has_estimate}});
   }
   return result;
 }
