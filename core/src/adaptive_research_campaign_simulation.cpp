@@ -257,7 +257,8 @@ std::vector<AdaptiveResearchCampaignEvent> AdaptiveResearchCampaignSimulation::a
   const auto economic_construction = economic_construction_projection(w.construction);
   const auto economic_fleets = economic_fleet_projection(w.fleets);
   const EconomyWorldView economy_view{w.civilizations, w.bodies,
-                                      economic_construction, economic_fleets};
+                                      economic_construction, economic_fleets,
+                                      w.empire_policies};
   const SettlementBodyIndex body_index(w.colonies, w.bodies);
   std::unordered_map<int, std::vector<const Colony *>> colony_index;
   for (const auto &colony : w.colonies)

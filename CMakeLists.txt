@@ -224,6 +224,7 @@ add_library(stellar_core STATIC core/src/stellar_activity.cpp core/src/phenomeno
   core/src/adaptive_research_campaign_simulation.cpp
   core/src/diplomacy_state.cpp
   core/src/diplomacy_simulation.cpp
+  core/src/empire_policy.cpp
   core/src/diplomacy_snapshot_invariants.cpp
   core/src/diplomacy_lifecycle.cpp
   core/src/diplomacy_observer_commands.cpp
@@ -1154,6 +1155,10 @@ if(BUILD_TESTING)
     "${CMAKE_SOURCE_DIR}/native-tests/fixtures/diplomacy-runtime.json"
     "${CMAKE_SOURCE_DIR}")
   set_tests_properties(diplomacy_runtime_parity PROPERTIES TIMEOUT 180)
+  add_executable(stellar_empire_war_policy_tests native-tests/empire_war_policy_tests.cpp)
+  target_link_libraries(stellar_empire_war_policy_tests PRIVATE stellar_core stellar_json)
+  add_test(NAME empire_war_policy COMMAND stellar_empire_war_policy_tests)
+  set_tests_properties(empire_war_policy PROPERTIES TIMEOUT 180)
   add_executable(stellar_fleet_combat_intelligence_tests native-tests/fleet_combat_intelligence_tests.cpp)
   target_link_libraries(stellar_fleet_combat_intelligence_tests PRIVATE stellar_core stellar_json)
   add_test(NAME fleet_combat_intelligence_parity COMMAND stellar_fleet_combat_intelligence_tests

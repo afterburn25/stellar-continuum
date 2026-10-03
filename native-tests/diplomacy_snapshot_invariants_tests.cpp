@@ -190,6 +190,31 @@ DiplomaticHistoryEventSnapshot history(const Json &j) {
         j.at("KnownToCivilizationIds").get<std::vector<int>>();
   return v;
 }
+WarGoalSnapshot war_goal(const Json &j) {
+  WarGoalSnapshot v;
+  v.kind = en<WarGoalKind>(j, "Kind");
+  v.beneficiary_civilization_id = j.at("BeneficiaryCivilizationId").get<int>();
+  v.system_id = opt<int>(j, "SystemId");
+  v.achieved = j.at("Achieved").get<bool>();
+  return v;
+}
+WarSnapshot war(const Json &j) {
+  WarSnapshot v;
+  v.war_id = j.at("WarId").get<std::int64_t>();
+  v.aggressor_civilization_id = j.at("AggressorCivilizationId").get<int>();
+  v.defender_civilization_id = j.at("DefenderCivilizationId").get<int>();
+  if (!j.at("Goals").is_null())
+    for (const auto &x : j.at("Goals"))
+      v.goals.push_back(war_goal(x));
+  v.war_score = number(j.at("WarScore"));
+  v.aggressor_exhaustion = number(j.at("AggressorExhaustion"));
+  v.defender_exhaustion = number(j.at("DefenderExhaustion"));
+  v.declared_at_tick = j.at("DeclaredAtTick").get<std::int64_t>();
+  v.last_activity_tick = j.at("LastActivityTick").get<std::int64_t>();
+  v.resolved_at_tick = opt<std::int64_t>(j, "ResolvedAtTick");
+  v.outcome = en<WarOutcome>(j, "Outcome");
+  return v;
+}
 DiplomacyStateSnapshot snapshot(const Json &j) {
   DiplomacyStateSnapshot v;
   auto load = [&](std::string_view key, auto fn, auto &out) {
@@ -205,10 +230,15 @@ DiplomacyStateSnapshot snapshot(const Json &j) {
   load("Agreements", agreement, v.agreements);
   load("Proposals", proposal, v.proposals);
   load("RecentHistory", history, v.recent_history);
+  // Wars is an additive tail: pre-war saves and rows omit the key entirely.
+  if (const auto wars = j.find("Wars"); wars != j.end() && !wars->is_null())
+    for (const auto &x : *wars)
+      v.wars.push_back(war(x));
   v.next_claim_id = j.at("NextClaimId").get<std::int64_t>();
   v.next_agreement_id = j.at("NextAgreementId").get<std::int64_t>();
   v.next_proposal_id = j.at("NextProposalId").get<std::int64_t>();
   v.next_event_id = j.at("NextEventId").get<std::int64_t>();
+  v.next_war_id = j.value("NextWarId", std::int64_t{});
   return v;
 }
 
@@ -316,8 +346,29 @@ template <class V, class F> Json array(const V &values, F fn) {
     r.push_back(fn(v));
   return r;
 }
+Json jwar_goal(const WarGoalSnapshot &v) {
+  return {{"Kind", static_cast<int>(v.kind)},
+          {"BeneficiaryCivilizationId", v.beneficiary_civilization_id},
+          {"SystemId",
+           v.system_id ? Json(*v.system_id) : Json(nullptr)},
+          {"Achieved", v.achieved}};
+}
+Json jwar(const WarSnapshot &v) {
+  return {{"WarId", v.war_id},
+          {"AggressorCivilizationId", v.aggressor_civilization_id},
+          {"DefenderCivilizationId", v.defender_civilization_id},
+          {"Goals", array(v.goals, jwar_goal)},
+          {"WarScore", v.war_score},
+          {"AggressorExhaustion", v.aggressor_exhaustion},
+          {"DefenderExhaustion", v.defender_exhaustion},
+          {"DeclaredAtTick", v.declared_at_tick},
+          {"LastActivityTick", v.last_activity_tick},
+          {"ResolvedAtTick", v.resolved_at_tick ? Json(*v.resolved_at_tick)
+                                                : Json(nullptr)},
+          {"Outcome", static_cast<int>(v.outcome)}};
+}
 Json jsnapshot(const DiplomacyStateSnapshot &v) {
-  return {{"Contacts", array(v.contacts, jcontact)},
+  Json result = {{"Contacts", array(v.contacts, jcontact)},
           {"Relationships", array(v.relationships, jrelationship)},
           {"AccessPermissions", array(v.access_permissions, jaccess)},
           {"Claims", array(v.claims, jclaim)},
@@ -329,6 +380,11 @@ Json jsnapshot(const DiplomacyStateSnapshot &v) {
           {"NextAgreementId", v.next_agreement_id},
           {"NextProposalId", v.next_proposal_id},
           {"NextEventId", v.next_event_id}};
+  if (!v.wars.empty()) {
+    result["Wars"] = array(v.wars, jwar);
+    result["NextWarId"] = v.next_war_id;
+  }
+  return result;
 }
 
 struct PreparedSnapshot {
@@ -341,12 +397,17 @@ struct PreparedSnapshot {
   bool agreements_present{};
   bool proposals_present{};
   bool history_present{};
+  // `Wars` is an additive key: absent on pre-war saves, null is a distinct
+  // marker, populated only when wars exist.
+  bool wars_key_present{};
+  bool wars_present{};
   std::vector<bool> grievance_presence;
   std::vector<bool> claim_audience_presence;
   std::vector<bool> history_audience_presence;
   std::vector<DiplomaticRelationshipValidationView> relationship_views;
   std::vector<TerritorialClaimValidationView> claim_views;
   std::vector<DiplomaticHistoryEventValidationView> history_views;
+  std::vector<WarValidationView> war_views;
 
   DiplomacySnapshotValidationView view() {
     relationship_views.clear();
@@ -379,6 +440,15 @@ struct PreparedSnapshot {
                                value.secondary_civilization_id, value.system_id,
                                value.summary, audience});
     }
+    war_views.clear();
+    for (const auto &value : owned.wars)
+      war_views.push_back({value.war_id, value.aggressor_civilization_id,
+                           value.defender_civilization_id,
+                           std::span<const WarGoalSnapshot>(value.goals),
+                           value.war_score, value.aggressor_exhaustion,
+                           value.defender_exhaustion, value.declared_at_tick,
+                           value.last_activity_tick, value.resolved_at_tick,
+                           value.outcome});
     return {
         contacts_present
             ? std::optional(std::span<const DiplomaticContactSnapshot>(owned.contacts))
@@ -404,10 +474,14 @@ struct PreparedSnapshot {
         history_present
             ? std::optional(std::span<const DiplomaticHistoryEventValidationView>(history_views))
             : std::nullopt,
+        wars_present
+            ? std::optional(std::span<const WarValidationView>(war_views))
+            : std::nullopt,
         owned.next_claim_id,
         owned.next_agreement_id,
         owned.next_proposal_id,
         owned.next_event_id,
+        owned.next_war_id,
     };
   }
 };
@@ -423,6 +497,9 @@ PreparedSnapshot prepared_snapshot(const Json &input) {
   result.agreements_present = !input.at("Agreements").is_null();
   result.proposals_present = !input.at("Proposals").is_null();
   result.history_present = !input.at("RecentHistory").is_null();
+  result.wars_key_present = input.contains("Wars");
+  result.wars_present =
+      result.wars_key_present && !input.at("Wars").is_null();
   if (result.relationships_present)
     for (const auto &value : input.at("Relationships"))
       result.grievance_presence.push_back(!value.at("Grievances").is_null());
@@ -465,6 +542,13 @@ Json project(const PreparedSnapshot &value) {
     for (std::size_t index = 0; index < value.history_audience_presence.size(); ++index)
       if (!value.history_audience_presence[index])
         result["RecentHistory"][index]["KnownToCivilizationIds"] = nullptr;
+  if (!value.wars_key_present) {
+    result.erase("Wars");
+    result.erase("NextWarId");
+  } else if (!value.wars_present) {
+    result["Wars"] = nullptr;
+    result.erase("NextWarId");
+  }
   return result;
 }
 

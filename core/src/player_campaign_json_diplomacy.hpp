@@ -102,6 +102,31 @@ DiplomaticProposalSnapshot proposal(const Json &j) {
   v.external_terms_reference = opt<std::string>(j, "ExternalTermsReference");
   return v;
 }
+WarGoalSnapshot war_goal(const Json &j) {
+  WarGoalSnapshot v;
+  v.kind = en<WarGoalKind>(j, "Kind");
+  v.beneficiary_civilization_id = j.at("BeneficiaryCivilizationId").get<int>();
+  v.system_id = opt<int>(j, "SystemId");
+  v.achieved = j.at("Achieved").get<bool>();
+  return v;
+}
+WarSnapshot war(const Json &j) {
+  WarSnapshot v;
+  v.war_id = j.at("WarId").get<std::int64_t>();
+  v.aggressor_civilization_id = j.at("AggressorCivilizationId").get<int>();
+  v.defender_civilization_id = j.at("DefenderCivilizationId").get<int>();
+  if (!j.at("Goals").is_null())
+    for (const auto &x : j.at("Goals"))
+      v.goals.push_back(war_goal(x));
+  v.war_score = number(j.at("WarScore"));
+  v.aggressor_exhaustion = number(j.at("AggressorExhaustion"));
+  v.defender_exhaustion = number(j.at("DefenderExhaustion"));
+  v.declared_at_tick = j.at("DeclaredAtTick").get<std::int64_t>();
+  v.last_activity_tick = j.at("LastActivityTick").get<std::int64_t>();
+  v.resolved_at_tick = opt<std::int64_t>(j, "ResolvedAtTick");
+  v.outcome = en<WarOutcome>(j, "Outcome");
+  return v;
+}
 DiplomaticHistoryEventSnapshot history(const Json &j) {
   DiplomaticHistoryEventSnapshot v;
   v.event_id = j.at("EventId").get<std::int64_t>();
@@ -132,10 +157,12 @@ DiplomacyStateSnapshot snapshot(const Json &j) {
   load("Agreements", agreement, v.agreements);
   load("Proposals", proposal, v.proposals);
   load("RecentHistory", history, v.recent_history);
+  load("Wars", war, v.wars);
   v.next_claim_id = j.value("NextClaimId", std::int64_t{});
   v.next_agreement_id = j.value("NextAgreementId", std::int64_t{});
   v.next_proposal_id = j.value("NextProposalId", std::int64_t{});
   v.next_event_id = j.value("NextEventId", std::int64_t{});
+  v.next_war_id = j.value("NextWarId", std::int64_t{});
   return v;
 }
 
@@ -243,8 +270,29 @@ template <class V, class F> Json array(const V &values, F fn) {
     r.push_back(fn(v));
   return r;
 }
+Json jwar_goal(const WarGoalSnapshot &v) {
+  return {{"Kind", static_cast<int>(v.kind)},
+          {"BeneficiaryCivilizationId", v.beneficiary_civilization_id},
+          {"SystemId",
+           v.system_id ? Json(*v.system_id) : Json(nullptr)},
+          {"Achieved", v.achieved}};
+}
+Json jwar(const WarSnapshot &v) {
+  return {{"WarId", v.war_id},
+          {"AggressorCivilizationId", v.aggressor_civilization_id},
+          {"DefenderCivilizationId", v.defender_civilization_id},
+          {"Goals", array(v.goals, jwar_goal)},
+          {"WarScore", v.war_score},
+          {"AggressorExhaustion", v.aggressor_exhaustion},
+          {"DefenderExhaustion", v.defender_exhaustion},
+          {"DeclaredAtTick", v.declared_at_tick},
+          {"LastActivityTick", v.last_activity_tick},
+          {"ResolvedAtTick", v.resolved_at_tick ? Json(*v.resolved_at_tick)
+                                                : Json(nullptr)},
+          {"Outcome", static_cast<int>(v.outcome)}};
+}
 Json jsnapshot(const DiplomacyStateSnapshot &v) {
-  return {{"Contacts", array(v.contacts, jcontact)},
+  Json result = {{"Contacts", array(v.contacts, jcontact)},
           {"Relationships", array(v.relationships, jrelationship)},
           {"AccessPermissions", array(v.access_permissions, jaccess)},
           {"Claims", array(v.claims, jclaim)},
@@ -256,6 +304,13 @@ Json jsnapshot(const DiplomacyStateSnapshot &v) {
           {"NextAgreementId", v.next_agreement_id},
           {"NextProposalId", v.next_proposal_id},
           {"NextEventId", v.next_event_id}};
+  // Wars and their counter emit only when the campaign has seen one, keeping
+  // pre-war saves byte-identical.
+  if (!v.wars.empty()) {
+    result["Wars"] = array(v.wars, jwar);
+    result["NextWarId"] = v.next_war_id;
+  }
+  return result;
 }
 
 } // namespace stellar::core::player_json_detail

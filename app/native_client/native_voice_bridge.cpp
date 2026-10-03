@@ -652,7 +652,8 @@ void NativeGameplayVoiceBridge::observe_logistics(
       core::economic_construction_projection(campaign.construction);
   const auto fleets = core::economic_fleet_projection(campaign.fleets);
   const core::EconomyWorldView world{campaign.civilizations, campaign.bodies,
-                                     construction, fleets};
+                                     construction, fleets,
+                                     campaign.empire_policies};
   const auto logistics = core::economy_logistics(world, campaign.colonies,
                                                  campaign.economies,
                                                  scope.player_id);

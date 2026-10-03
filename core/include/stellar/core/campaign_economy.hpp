@@ -1,5 +1,6 @@
 #pragma once
 #include <stellar/core/colony_biology.hpp>
+#include <stellar/core/empire_policy.hpp>
 #include <stellar/core/settlement_body_index.hpp>
 #include <stellar/core/surface_economy.hpp>
 
@@ -16,6 +17,9 @@ struct EconomyWorldView {
     std::span<const PlanetaryBody> bodies;
     std::span<const EconomyConstructionState> construction;
     std::span<const EconomyFleetState> fleets;
+    // Empire policy assignments feeding income/output modifiers; empty means
+    // every civilization runs the domain defaults.
+    std::span<const EmpirePolicyState> empire_policies{};
 };
 struct CreditFlowSnapshot {
     double colony_revenue_per_day{}, trade_revenue_per_day{}, colony_administration_per_day{}, population_services_per_day{};

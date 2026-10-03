@@ -9368,7 +9368,8 @@ class NativeCampaign final {
     }
     const auto outcome=diplomacy_controller_.execute(
         session_->frame(),command.campaign_generation,command.diplomacy_revision,
-        command.action,command.target_civilization_id,command.proposal_id);
+        command.action,command.target_civilization_id,command.proposal_id,
+        command.war_goals,command.policy_id);
     diplomacy_workspace_.set_notice(outcome.message,outcome.accepted);
     if(outcome.accepted)refresh_notifications();
     refresh_diplomacy(true);

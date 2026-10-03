@@ -74,6 +74,8 @@ enum class DiplomaticEventKind {
   agreement_terminated,
   relationship_changed,
   war_declared,
+  war_goal_achieved,
+  war_ended,
 };
 
 class DiplomacyArgumentRangeError final : public std::out_of_range {
@@ -200,6 +202,42 @@ struct DiplomaticHistoryEventSnapshot {
   std::string summary;
   std::vector<int> known_to_civilization_ids;
 };
+enum class WarGoalKind {
+  humiliate,
+  secure_claims,
+  conquer_system,
+  resist_aggression,
+};
+enum class WarOutcome { active, aggressor_victory, defender_victory, white_peace };
+
+// Caller-supplied declaration for one war goal; the beneficiary and achieved
+// flag are authoritative state, not input.
+struct WarGoalSpec {
+  WarGoalKind kind{};
+  std::optional<int> system_id;
+};
+
+struct WarGoalSnapshot {
+  WarGoalKind kind{};
+  int beneficiary_civilization_id{};
+  std::optional<int> system_id;
+  bool achieved{};
+};
+struct WarSnapshot {
+  std::int64_t war_id{};
+  int aggressor_civilization_id{};
+  int defender_civilization_id{};
+  std::vector<WarGoalSnapshot> goals;
+  // [-1, 1]; positive favors the aggressor.
+  double war_score{};
+  double aggressor_exhaustion{};
+  double defender_exhaustion{};
+  std::int64_t declared_at_tick{};
+  std::int64_t last_activity_tick{};
+  std::optional<std::int64_t> resolved_at_tick;
+  WarOutcome outcome{WarOutcome::active};
+};
+
 struct DiplomacyStateSnapshot {
   std::vector<DiplomaticContactSnapshot> contacts;
   std::vector<DiplomaticRelationshipSnapshot> relationships;
@@ -209,10 +247,12 @@ struct DiplomacyStateSnapshot {
   std::vector<DiplomaticAgreementSnapshot> agreements;
   std::vector<DiplomaticProposalSnapshot> proposals;
   std::vector<DiplomaticHistoryEventSnapshot> recent_history;
+  std::vector<WarSnapshot> wars;
   std::int64_t next_claim_id{};
   std::int64_t next_agreement_id{};
   std::int64_t next_proposal_id{};
   std::int64_t next_event_id{};
+  std::int64_t next_war_id{};
 };
 
 struct DiplomaticContactView {
@@ -245,6 +285,7 @@ struct DiplomaticStateView {
   std::vector<DiplomaticAgreementSnapshot> agreements;
   std::vector<DiplomaticProposalSnapshot> proposals;
   std::vector<DiplomaticHistoryEventSnapshot> recent_events;
+  std::vector<WarSnapshot> wars;
 };
 
 namespace detail {
@@ -262,6 +303,8 @@ public:
   static constexpr std::size_t max_stored_proposals = 128;
   static constexpr std::size_t max_pending_proposals_per_pair = 8;
   static constexpr std::size_t max_grievances_per_relationship = 16;
+  static constexpr std::size_t max_goals_per_war = 8;
+  static constexpr std::size_t max_active_wars = 256;
 
   DiplomacyState();
   ~DiplomacyState();
@@ -292,6 +335,15 @@ public:
   [[nodiscard]] std::int64_t history_latest_event_id() const noexcept;
   [[nodiscard]] std::vector<DiplomaticHistoryEventSnapshot>
   history_events_since(std::int64_t event_id) const;
+
+  // War records, in stable war-id order. The optional observer scope follows
+  // the view's visibility rule: belligerents and observers who have identified
+  // both sides see the war.
+  [[nodiscard]] std::vector<WarSnapshot>
+  wars(std::optional<int> observer = std::nullopt) const;
+  [[nodiscard]] std::optional<WarSnapshot> get_war(std::int64_t war_id) const;
+  [[nodiscard]] std::optional<WarSnapshot> active_war_between(int a,
+                                                            int b) const;
 
   // Low-level historical conversion matching DiplomacyState.Restore. This is
   // intentionally permissive and is separate from the later strict player-save

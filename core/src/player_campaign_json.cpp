@@ -517,6 +517,54 @@ DiplomaticProposalSnapshot decode_proposal(const OrderedValue &value,
   return result;
 }
 
+WarGoalSnapshot decode_war_goal(const OrderedValue &value,
+                                const std::string &path) {
+  WarGoalSnapshot result;
+  for (const auto &[name, field] : typed_object(value, path)) {
+    const auto p = path + "/" + name;
+    if (name == "Kind")
+      result.kind = typed_enum<WarGoalKind>(field, p);
+    else if (name == "BeneficiaryCivilizationId")
+      result.beneficiary_civilization_id = typed_integer<int>(field, p);
+    else if (name == "SystemId")
+      result.system_id = typed_optional<int>(field, p, typed_integer<int>);
+    else if (name == "Achieved")
+      result.achieved = typed_bool(field, p);
+  }
+  return result;
+}
+
+WarSnapshot decode_war(const OrderedValue &value, const std::string &path) {
+  WarSnapshot result;
+  for (const auto &[name, field] : typed_object(value, path)) {
+    const auto p = path + "/" + name;
+    if (name == "WarId")
+      result.war_id = typed_integer<std::int64_t>(field, p);
+    else if (name == "AggressorCivilizationId")
+      result.aggressor_civilization_id = typed_integer<int>(field, p);
+    else if (name == "DefenderCivilizationId")
+      result.defender_civilization_id = typed_integer<int>(field, p);
+    else if (name == "Goals")
+      result.goals = typed_list<WarGoalSnapshot>(field, p, decode_war_goal);
+    else if (name == "WarScore")
+      result.war_score = typed_double(field, p);
+    else if (name == "AggressorExhaustion")
+      result.aggressor_exhaustion = typed_double(field, p);
+    else if (name == "DefenderExhaustion")
+      result.defender_exhaustion = typed_double(field, p);
+    else if (name == "DeclaredAtTick")
+      result.declared_at_tick = typed_integer<std::int64_t>(field, p);
+    else if (name == "LastActivityTick")
+      result.last_activity_tick = typed_integer<std::int64_t>(field, p);
+    else if (name == "ResolvedAtTick")
+      result.resolved_at_tick =
+          typed_optional<std::int64_t>(field, p, typed_integer<std::int64_t>);
+    else if (name == "Outcome")
+      result.outcome = typed_enum<WarOutcome>(field, p);
+  }
+  return result;
+}
+
 DiplomaticHistoryEventSnapshot decode_history(const OrderedValue &value,
                                               const std::string &path) {
   DiplomaticHistoryEventSnapshot result;
@@ -574,6 +622,16 @@ DiplomacyStateSnapshot decode_diplomacy(const OrderedValue &value) {
         collection(6, decode_proposal, result.proposals);
       else if (name == "RecentHistory")
         collection(7, decode_history, result.recent_history);
+      // Wars are additive: older snapshots omit the key, and a present null
+      // also decodes to an empty ledger. They never join the required-array
+      // check below.
+      else if (name == "Wars") {
+        result.wars.clear();
+        if (!std::holds_alternative<std::nullptr_t>(field.data))
+          result.wars = typed_list<WarSnapshot>(field, path, decode_war);
+      }
+      else if (name == "NextWarId")
+        result.next_war_id = typed_integer<std::int64_t>(field, path);
       else if (name == "NextClaimId")
         result.next_claim_id = typed_integer<std::int64_t>(field, path);
       else if (name == "NextAgreementId")

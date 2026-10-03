@@ -20,6 +20,7 @@ struct DiplomacySnapshotValidationResult {
   int agreement_count{};
   int proposal_count{};
   int history_event_count{};
+  int war_count{};
 };
 
 class DiplomacySnapshotValidationError final : public std::runtime_error {
@@ -59,10 +60,25 @@ struct DiplomaticHistoryEventValidationView {
   std::optional<std::span<const int>> known_to_civilization_ids;
 };
 
+struct WarValidationView {
+  std::int64_t war_id{};
+  int aggressor_civilization_id{};
+  int defender_civilization_id{};
+  std::optional<std::span<const WarGoalSnapshot>> goals;
+  double war_score{};
+  double aggressor_exhaustion{};
+  double defender_exhaustion{};
+  std::int64_t declared_at_tick{};
+  std::int64_t last_activity_tick{};
+  std::optional<std::int64_t> resolved_at_tick;
+  WarOutcome outcome{};
+};
+
 // Parser-facing borrowed view. A disengaged optional represents a null/missing
 // top-level array and remains distinct from an engaged empty span. All spans
 // need remain valid only for the validation call; the validator stores nothing
-// and never mutates the snapshot records.
+// and never mutates the snapshot records. `wars` is additive: disengaged
+// means a pre-war save and validates as empty.
 struct DiplomacySnapshotValidationView {
   std::optional<std::span<const DiplomaticContactSnapshot>> contacts;
   std::optional<std::span<const DiplomaticRelationshipValidationView>> relationships;
@@ -72,10 +88,12 @@ struct DiplomacySnapshotValidationView {
   std::optional<std::span<const DiplomaticAgreementSnapshot>> agreements;
   std::optional<std::span<const DiplomaticProposalSnapshot>> proposals;
   std::optional<std::span<const DiplomaticHistoryEventValidationView>> recent_history;
+  std::optional<std::span<const WarValidationView>> wars;
   std::int64_t next_claim_id{};
   std::int64_t next_agreement_id{};
   std::int64_t next_proposal_id{};
   std::int64_t next_event_id{};
+  std::int64_t next_war_id{};
 };
 
 class DiplomacySnapshotInvariantValidator final {

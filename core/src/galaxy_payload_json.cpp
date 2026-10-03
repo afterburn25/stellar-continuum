@@ -820,6 +820,20 @@ AuthoredShipDesignSaveDto decode_authored_ship_design(
   return result;
 }
 
+EmpirePolicySaveDto decode_empire_policy(const Value &value,
+                                         const std::string &path) {
+  EmpirePolicySaveDto result;
+  for (const auto &[name, member] : object(value, path)) {
+    const auto p = child(path, name);
+    if (name == "CivilizationId")
+      result.civilization_id = integer<int>(member, p);
+    else if (name == "PolicyId") result.policy_id = string(member, p);
+    else if (name == "ChangedAtTick")
+      result.changed_at_tick = integer<std::int64_t>(member, p);
+  }
+  return result;
+}
+
 ShipyardPersistenceDto decode_shipyard(const Value &value,
                                        const std::string &path) {
   ShipyardPersistenceDto result;
@@ -1352,6 +1366,12 @@ void decode_galaxy(GalaxyPayloadV16Dto &result, const Value &value,
       else
         result.authored_ship_designs = list<AuthoredShipDesignSaveDto>(
             member, p, decode_authored_ship_design);
+    } else if (name == "EmpirePolicies") {
+      if (is_null(member))
+        result.empire_policies = std::nullopt;
+      else
+        result.empire_policies =
+            list<EmpirePolicySaveDto>(member, p, decode_empire_policy);
     }
     } catch (const GalaxyPayloadJsonError &error) {
       if (error.phase() != GalaxyPayloadJsonErrorPhase::Representability)
@@ -1385,6 +1405,7 @@ void replace_galaxy(GalaxyPayloadV16Dto &target,
   target.combat_intelligence = std::move(replacement.combat_intelligence);
   target.authored_ship_designs =
       std::move(replacement.authored_ship_designs);
+  target.empire_policies = std::move(replacement.empire_policies);
 }
 
 GalaxyPayloadV16Dto decode_root(
@@ -1763,6 +1784,12 @@ Json encode_authored_ship_design(const AuthoredShipDesignSaveDto &value) {
           {"OwnerCivilizationId", value.owner_civilization_id},
           {"HullId", value.hull_id},
           {"ComponentIds", Json(value.component_ids)}};
+}
+
+Json encode_empire_policy(const EmpirePolicySaveDto &value) {
+  return {{"CivilizationId", value.civilization_id},
+          {"PolicyId", value.policy_id},
+          {"ChangedAtTick", value.changed_at_tick}};
 }
 
 Json encode_shipyard(const ShipyardPersistenceDto &value) {
@@ -2168,6 +2195,9 @@ Json encode_galaxy(const GalaxyPayloadV16Dto &value) {
   if (value.authored_ship_designs)
     result["AuthoredShipDesigns"] = encode_list(
         *value.authored_ship_designs, encode_authored_ship_design);
+  if (value.empire_policies)
+    result["EmpirePolicies"] =
+        encode_list(*value.empire_policies, encode_empire_policy);
   return result;
 }
 
@@ -2277,6 +2307,7 @@ void detail::stream_galaxy_members(JsonStreamWriter& out,const GalaxyPayloadV16D
     validate_stellar_activity_clock(v.stellar_activity_day);
     if(v.stellar_activity_day)field("StellarActivityDay",*v.stellar_activity_day);
     if(v.authored_ship_designs)list("AuthoredShipDesigns",v.authored_ship_designs,encode_authored_ship_design);
+    if(v.empire_policies)list("EmpirePolicies",v.empire_policies,encode_empire_policy);
     out.end_object();
   }catch(const nlohmann::json::exception& error){throw GalaxyPayloadJsonError(GalaxyPayloadJsonErrorPhase::Encode,error.what(),"$");}
 }

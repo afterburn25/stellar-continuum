@@ -3,6 +3,7 @@
 #include <stellar/core/campaign_payload_provenance.hpp>
 #include <stellar/core/colony_economy.hpp>
 #include <stellar/core/construction_state.hpp>
+#include <stellar/core/empire_policy.hpp>
 #include <stellar/core/fleet_power_observation.hpp>
 #include <stellar/core/fleet_seeding.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
@@ -48,6 +49,10 @@ struct FreshCampaignState {
   // Player/civilization-authored componentized ship designs. Absent in
   // pre-authorship saves; empty for campaigns that only use the fixed catalog.
   std::vector<AuthoredShipDesign> authored_ship_designs;
+  // Per-civilization empire policy assignments. Entries materialize only when
+  // a civilization diverges from a domain default, so untouched campaigns and
+  // pre-policy saves carry nothing.
+  std::vector<EmpirePolicyState> empire_policies;
 };
 
 FreshCampaignState

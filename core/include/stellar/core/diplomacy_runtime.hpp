@@ -7,6 +7,7 @@
 #include <stellar/core/strategic_planning.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <span>
@@ -109,9 +110,12 @@ public:
   void reset(double simulation_days, bool review_immediately = true);
   [[nodiscard]] DiplomacyRuntimeSchedule schedule() const;
   void restore_schedule(const DiplomacyRuntimeSchedule &);
+  // `war_exhaustion_factor` optionally maps a civilization to its policy
+  // multiplier for passive war-exhaustion accrual (default 1.0).
   [[nodiscard]] DiplomacyCampaignRuntimeStepResult
   process(std::span<const ExplorationEvent> exploration_events,
-          std::span<const CombatEvent> combat_events, double simulation_days);
+          std::span<const CombatEvent> combat_events, double simulation_days,
+          const std::function<double(int)> &war_exhaustion_factor = {});
 
 private:
   struct Storage;

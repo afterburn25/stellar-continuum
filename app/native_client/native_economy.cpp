@@ -168,7 +168,8 @@ struct EconomyContext {
                                           std::vector<EconomyFleetState>& fleets) {
   construction = economic_construction_projection(campaign.construction);
   fleets = economic_fleet_projection(campaign.fleets);
-  return {campaign.civilizations, campaign.bodies, construction, fleets};
+  return {campaign.civilizations, campaign.bodies, construction, fleets,
+          campaign.empire_policies};
 }
 
 [[nodiscard]] std::string grouped(const double value) {

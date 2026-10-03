@@ -219,12 +219,9 @@ int main() try {
           "Tab bar click was not captured.");
 
   // Proposals tab: the Accept button emits a proposal command.
-  const UiRect proposals_tab{layout.tabs.x + (layout.tabs.width - 8.f * s * 4.f) /
-                                                   5.f +
-                                 8.f * s,
-                             layout.tabs.y,
-                             (layout.tabs.width - 8.f * s * 4.f) / 5.f,
-                             layout.tabs.height};
+  const auto tab_width = (layout.tabs.width - 8.f * s * 6.f) / 7.f;
+  const UiRect proposals_tab{layout.tabs.x + tab_width + 8.f * s,
+                             layout.tabs.y, tab_width, layout.tabs.height};
   (void)workspace.handle({InputEventType::LeftPressed, center(proposals_tab)},
                          1280, 720);
   const auto card_height = 108.f * s;
@@ -443,9 +440,9 @@ int main() try {
   intelligence.open();
   intelligence.set_view(sample_view());
   const UiRect intelligence_tab{
-      layout.tabs.x + 3.f * ((layout.tabs.width - 8.f * s * 4.f) / 5.f +
+      layout.tabs.x + 3.f * ((layout.tabs.width - 8.f * s * 6.f) / 7.f +
                               8.f * s),
-      layout.tabs.y, (layout.tabs.width - 8.f * s * 4.f) / 5.f,
+      layout.tabs.y, (layout.tabs.width - 8.f * s * 6.f) / 7.f,
       layout.tabs.height};
   (void)intelligence.handle({InputEventType::LeftPressed, center(intelligence_tab)},
                             1280, 720);
@@ -472,10 +469,10 @@ int main() try {
   const auto compact_s = compact_layout.scale;
   const UiRect compact_intelligence_tab{
       compact_layout.tabs.x +
-          3.f * ((compact_layout.tabs.width - 8.f * compact_s * 4.f) / 5.f +
+          3.f * ((compact_layout.tabs.width - 8.f * compact_s * 6.f) / 7.f +
                  8.f * compact_s),
       compact_layout.tabs.y,
-      (compact_layout.tabs.width - 8.f * compact_s * 4.f) / 5.f,
+      (compact_layout.tabs.width - 8.f * compact_s * 6.f) / 7.f,
       compact_layout.tabs.height};
   NativeDiplomacyWorkspace clipped_focus;
   clipped_focus.open();
@@ -706,6 +703,157 @@ int main() try {
   workspace.render(notice_draw, 1280, 720, nullptr);
   require(has_text(notice_draw, "review the current terms"),
           "Rejection notice did not reach the result line.");
+
+  // Declare war opens the multi-select goal picker; confirming carries only
+  // the checked goal specs through the authoritative command surface.
+  {
+    auto goal_view = sample_view();
+    goal_view.selected.war_goal_options = {
+        {stellar::core::WarGoalKind::humiliate, std::nullopt, "Humiliate"},
+        {stellar::core::WarGoalKind::conquer_system, 9, "Conquer Sol"},
+        {stellar::core::WarGoalKind::secure_claims, std::nullopt,
+         "Secure claims"}};
+    NativeDiplomacyWorkspace goals;
+    goals.open();
+    goals.set_view(goal_view);
+    const UiRect declare{layout.actions.x + 8.f * s,
+                         layout.actions.y + 8.f * s + 2.f * 36.f * s,
+                         layout.actions.width - 16.f * s, 30.f * s};
+    const auto picker_opened = goals.handle(
+        {InputEventType::LeftPressed, center(declare)}, 1280, 720);
+    require(picker_opened.captured && goals.modal_open(),
+            "Declare war did not open the goal picker.");
+    DrawList picker_draw;
+    goals.render(picker_draw, 1280, 720, nullptr);
+    require(has_text(picker_draw, "Humiliate") &&
+                has_text(picker_draw, "Conquer Sol"),
+            "Goal picker did not render the war-goal options.");
+    // Uncheck the preselected first goal, check the conquest goal.
+    const UiRect term0{layout.modal_panel.x + 16.f * s,
+                       layout.modal_panel.y + 74.f * s,
+                       layout.modal_panel.width - 32.f * s, 36.f * s};
+    const UiRect term1{layout.modal_panel.x + 16.f * s,
+                       layout.modal_panel.y + 74.f * s + 42.f * s,
+                       layout.modal_panel.width - 32.f * s, 36.f * s};
+    (void)goals.handle({InputEventType::LeftPressed, center(term0)}, 1280, 720);
+    (void)goals.handle({InputEventType::LeftPressed, center(term1)}, 1280, 720);
+    const UiRect picker_confirm{layout.modal_panel.x + 16.f * s,
+                                layout.modal_panel.y +
+                                    layout.modal_panel.height - 92.f * s,
+                                layout.modal_panel.width - 32.f * s, 36.f * s};
+    const auto declared_command = goals.handle(
+        {InputEventType::LeftPressed, center(picker_confirm)}, 1280, 720);
+    require(declared_command.kind == DiplomacyWorkspaceCommandKind::Action &&
+                declared_command.action ==
+                    DiplomacyWorkspaceAction::declare_war &&
+                declared_command.target_civilization_id == 7 &&
+                declared_command.war_goals.size() == 1 &&
+                declared_command.war_goals[0].kind ==
+                    stellar::core::WarGoalKind::conquer_system &&
+                declared_command.war_goals[0].system_id == 9 &&
+                declared_command.campaign_generation == 4 &&
+                declared_command.diplomacy_revision == 3 &&
+                declared_command.captured,
+            "Goal picker did not emit the checked war goals.");
+    require(!goals.modal_open(), "Goal picker stayed open after confirming.");
+  }
+
+  // The wars ledger renders observer-visible wars with their goals on a
+  // dedicated tab.
+  {
+    auto ledger_view = sample_view();
+    NativeDiplomacyWarRow war_row{};
+    war_row.war_id = 3;
+    war_row.aggressor_name = "Nova Concord";
+    war_row.defender_name = "Your Empire";
+    war_row.counterpart_id = 7;
+    war_row.counterpart_name = "Nova Concord";
+    war_row.observer_is_belligerent = true;
+    war_row.score = .25;
+    war_row.observer_exhaustion = .1;
+    war_row.counterpart_exhaustion = .4;
+    war_row.declared = "2051-04-01";
+    war_row.outcome = "Active";
+    war_row.goals.push_back({stellar::core::WarGoalKind::conquer_system,
+                             "Conquer Sol", 42, false});
+    ledger_view.wars.push_back(war_row);
+    NativeDiplomacyWorkspace ledger;
+    ledger.open();
+    ledger.set_view(ledger_view);
+    const UiRect wars_tab{layout.tabs.x + 5.f * (tab_width + 8.f * s),
+                          layout.tabs.y, tab_width, layout.tabs.height};
+    (void)ledger.handle({InputEventType::LeftPressed, center(wars_tab)},
+                        1280, 720);
+    DrawList war_draw;
+    ledger.render(war_draw, 1280, 720, nullptr);
+    require(has_text(war_draw, "WAR · Nova Concord") &&
+                has_text(war_draw, "Score 25%") &&
+                has_text(war_draw, "Conquer Sol"),
+            "War ledger did not render the war, its score, or its goals.");
+  }
+
+  // Policies render on their own tab; selecting an inactive policy commits
+  // through the confirmation modal with the authoritative policy id.
+  {
+    auto policy_view = sample_view();
+    NativeDiplomacyPolicyRow industrial{};
+    industrial.domain_index = 0;
+    industrial.domain_label = "ECONOMY";
+    industrial.policy_id = "industrial_focus";
+    industrial.display_name = "Industrial Focus";
+    industrial.summary = "Favors industry";
+    industrial.effects = "+20% industry";
+    NativeDiplomacyPolicyRow standard{};
+    standard.domain_index = 1;
+    standard.domain_label = "MILITARY";
+    standard.policy_id = "standard_doctrine";
+    standard.display_name = "Standard Doctrine";
+    standard.active = true;
+    policy_view.policies = {industrial, standard};
+    NativeDiplomacyWorkspace policies;
+    policies.open();
+    policies.set_view(policy_view);
+    const UiRect policies_tab{layout.tabs.x + 6.f * (tab_width + 8.f * s),
+                              layout.tabs.y, tab_width, layout.tabs.height};
+    (void)policies.handle({InputEventType::LeftPressed, center(policies_tab)},
+                          1280, 720);
+    DrawList policy_draw;
+    policies.render(policy_draw, 1280, 720, nullptr);
+    require(has_text(policy_draw, "ECONOMY") &&
+                has_text(policy_draw, "Industrial Focus") &&
+                has_text(policy_draw, "Standard Doctrine"),
+            "Policy rows did not render their domains and names.");
+    const UiRect row0{layout.detail_rows.x + 8.f * s,
+                      layout.detail_rows.y + 8.f * s,
+                      layout.detail_rows.width - 16.f * s, 56.f * s};
+    (void)policies.handle({InputEventType::LeftPressed, center(row0)},
+                          1280, 720);
+    require(policies.modal_open(),
+            "An inactive policy row did not open the confirmation modal.");
+    const UiRect policy_confirm{layout.modal_panel.x + 16.f * s,
+                                layout.modal_panel.y +
+                                    layout.modal_panel.height - 92.f * s,
+                                layout.modal_panel.width - 32.f * s, 36.f * s};
+    const auto applied = policies.handle(
+        {InputEventType::LeftPressed, center(policy_confirm)}, 1280, 720);
+    require(applied.kind == DiplomacyWorkspaceCommandKind::Action &&
+                applied.action ==
+                    DiplomacyWorkspaceAction::set_empire_policy &&
+                applied.policy_id == "industrial_focus" &&
+                applied.campaign_generation == 4 &&
+                applied.diplomacy_revision == 3 && applied.captured,
+            "Policy confirmation did not emit the policy command.");
+    // The active policy row is inert: no confirmation modal, no command.
+    const UiRect row1{layout.detail_rows.x + 8.f * s,
+                      layout.detail_rows.y + 8.f * s + 62.f * s,
+                      layout.detail_rows.width - 16.f * s, 56.f * s};
+    const auto inactive_hit = policies.handle(
+        {InputEventType::LeftPressed, center(row1)}, 1280, 720);
+    require(inactive_hit.captured &&
+                inactive_hit.kind == DiplomacyWorkspaceCommandKind::None &&
+                !policies.modal_open(),
+            "The active policy row dispatched a command.");
+  }
 
   std::cout << "Native diplomacy workspace input, modal, selection and render "
                "tests passed\n";

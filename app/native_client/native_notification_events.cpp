@@ -19,6 +19,8 @@ const char* diplomatic_message(core::DiplomaticEventKind kind){
   case agreement_activated:return "A diplomatic agreement is now active.";
   case agreement_terminated:return "A diplomatic agreement has ended.";
   case war_declared:return "A declaration of war has been recorded.";
+  case war_goal_achieved:return "A war goal has been achieved.";
+  case war_ended:return "A war has ended.";
   default:return nullptr;
   }
 }
@@ -33,6 +35,8 @@ const char* diplomatic_message_key(core::DiplomaticEventKind kind){
   case agreement_activated:return "NOTIFY_DIP_AGREEMENT_ACTIVE";
   case agreement_terminated:return "NOTIFY_DIP_AGREEMENT_ENDED";
   case war_declared:return "NOTIFY_DIP_WAR";
+  case war_goal_achieved:return "NOTIFY_DIP_WAR_GOAL";
+  case war_ended:return "NOTIFY_DIP_WAR_ENDED";
   default:return nullptr;
   }
 }
@@ -142,7 +146,8 @@ void NativeDiplomaticNotifications::harvest(NativeNotificationFeed& feed,
     }
     using enum core::DiplomaticEventKind;
     const auto severity=
-        event.kind==war_declared?NotificationSeverity::Alert
+        event.kind==war_declared||event.kind==war_ended
+            ?NotificationSeverity::Alert
         :event.kind==proposal_rejected||event.kind==agreement_terminated
             ?NotificationSeverity::Caution
         :event.kind==proposal_accepted||event.kind==agreement_activated||

@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -63,6 +64,56 @@ struct NativeDiplomacyHistoryRow {
   std::string summary;
 };
 
+// Observer-scoped war ledger rows: only wars the observer legitimately sees —
+// as a belligerent or after identifying both sides — are projected.
+struct NativeDiplomacyWarGoalRow {
+  stellar::core::WarGoalKind kind{};
+  std::string label;
+  std::optional<int> system_id;
+  bool achieved{};
+};
+struct NativeDiplomacyWarRow {
+  std::int64_t war_id{};
+  std::optional<int> aggressor_civilization_id;
+  std::optional<int> defender_civilization_id;
+  std::string aggressor_name;
+  std::string defender_name;
+  // The counterpart relative to the observer; empty for foreign-vs-foreign wars.
+  std::optional<int> counterpart_id;
+  std::string counterpart_name;
+  bool observer_is_belligerent{};
+  bool observer_is_aggressor{};
+  // [-1, 1]; positive favors the observer when they are a belligerent,
+  // otherwise favors the aggressor.
+  double score{};
+  double observer_exhaustion{};
+  double counterpart_exhaustion{};
+  std::string declared;
+  std::optional<std::string> resolved;
+  std::string outcome;
+  std::vector<NativeDiplomacyWarGoalRow> goals;
+};
+
+// A war-goal choice the observer may attach to a declaration; the authoritative
+// command revalidates it — this list only shapes the picker.
+struct NativeDiplomacyWarGoalOption {
+  stellar::core::WarGoalKind kind{};
+  std::optional<int> system_id;
+  std::string label;
+};
+
+// Empire-policy rows for the player's own empire: the catalog is public
+// knowledge, the active assignment is authoritative state.
+struct NativeDiplomacyPolicyRow {
+  int domain_index{};
+  std::string domain_label;
+  std::string policy_id;
+  std::string display_name;
+  std::string summary;
+  std::string effects;
+  bool active{};
+};
+
 struct NativeDiplomacySelected {
   bool present{};
   std::optional<int> target_civilization_id;
@@ -98,6 +149,12 @@ struct NativeDiplomacySelected {
   stellar::core::DiplomacyActionBlocker offer_ceasefire_blocker{};
   stellar::core::DiplomacyActionBlocker set_access_blocker{};
   stellar::core::DiplomacyActionBlocker declare_war_blocker{};
+  // Goals the declaration picker may offer; humiliate/resist handling stays
+  // authoritative — conquer rows appear only for systems with an active
+  // observer claim.
+  std::vector<NativeDiplomacyWarGoalOption> war_goal_options;
+  // One-line status when a visible war exists with the selected counterpart.
+  std::string war_summary;
 };
 
 struct NativeDiplomacyView {
@@ -110,6 +167,8 @@ struct NativeDiplomacyView {
   std::vector<NativeDiplomacyProposalRow> proposals;
   std::vector<NativeDiplomacyAgreementRow> agreements;
   std::vector<NativeDiplomacyHistoryRow> history;
+  std::vector<NativeDiplomacyWarRow> wars;
+  std::vector<NativeDiplomacyPolicyRow> policies;
 };
 
 enum class NativeDiplomacyContactFilter {
@@ -136,6 +195,7 @@ enum class DiplomacyWorkspaceAction {
   accept_proposal,
   reject_proposal,
   withdraw_proposal,
+  set_empire_policy,
 };
 
 struct NativeDiplomacyCommandOutcome {
@@ -159,7 +219,9 @@ public:
   execute(stellar::core::CampaignFrame &frame, std::uint64_t generation,
           std::uint64_t revision, DiplomacyWorkspaceAction action,
           std::optional<int> target_civilization_id,
-          std::optional<std::int64_t> proposal_id);
+          std::optional<std::int64_t> proposal_id,
+          std::span<const stellar::core::WarGoalSpec> war_goals = {},
+          std::string_view policy_id = {});
   void set_localization(
       const stellar::engine::LocalizationTable *table) noexcept {
     locale_ = table;

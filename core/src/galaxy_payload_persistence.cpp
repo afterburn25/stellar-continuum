@@ -136,6 +136,8 @@ capture_galaxy_payload_v16(FreshCampaignState &galaxy,
   if (!galaxy.authored_ship_designs.empty())
     result.authored_ship_designs =
         capture_authored_ship_designs(galaxy.authored_ship_designs);
+  if (!galaxy.empire_policies.empty())
+    result.empire_policies = capture_empire_policies(galaxy.empire_policies);
   result.player_civilization_id = galaxy.player_civilization_id;
   result.knowledge = capture_civilization_knowledge(galaxy.knowledge);
   if (galaxy.active_combat_encounter)
@@ -249,6 +251,9 @@ restore_galaxy_payload_v16(const GalaxyPayloadV16Dto &payload) {
   if (payload.authored_ship_designs)
     galaxy.authored_ship_designs = restore_authored_ship_designs(
         *payload.authored_ship_designs, galaxy.civilizations);
+  if (payload.empire_policies)
+    galaxy.empire_policies = restore_empire_policies(*payload.empire_policies,
+                                                   galaxy.civilizations);
   const auto &shipyard_dtos = required(payload.shipyard_states);
   galaxy.shipyards =
       shipyard_dtos.empty()

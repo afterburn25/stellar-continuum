@@ -109,7 +109,8 @@ CreditFlowSnapshot credit_flow(EconomyWorldView world, const ColonyRange& owned,
     for (const auto& fleet : world.fleets) if (fleet.is_active && fleet.civilization_id == civilization_id) result.fleet_operations_per_day += fleet_operating_cost(fleet.role);
     for (const auto& id : unique_projects(construction)) for (const auto& profile : construction_economic_profiles()) if (profile.id == id) result.orbital_maintenance_per_day += profile.upkeep_credits_per_day;
     result.research_operations_per_day = include_research ? economy_for(economies, civilization_id).last_research_spending_per_day : 0;
-    result.gross_income_per_day = result.colony_revenue_per_day + result.trade_revenue_per_day;
+    result.gross_income_per_day = (result.colony_revenue_per_day + result.trade_revenue_per_day) *
+        empire_policy_effects(world.empire_policies, civilization_id).credit_factor;
     result.operating_costs_per_day = result.colony_administration_per_day + result.population_services_per_day + result.habitat_support_per_day + result.fleet_operations_per_day + result.orbital_maintenance_per_day + result.surface_maintenance_per_day + result.research_operations_per_day;
     result.net_credits_per_day = result.gross_income_per_day - result.operating_costs_per_day;
     return result;
@@ -191,6 +192,8 @@ void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies
             ? 1.0
             : std::clamp(paid_toward_current_operations / current_operating_obligations, 0.0, 1.0);
         economy.last_base_operations_funding_fraction = operating_funding_fraction;
+        const auto policy =
+            empire_policy_effects(world.empire_policies, economy.civilization_id);
 
         double industry_per_day = 0.0;
         double science_per_day = 0.0;
@@ -220,6 +223,7 @@ void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies
                 const auto reserves = advance_colony_reserves(colony, sustenance, days);
                 const double population_rate = reserves.effective_support_ratio >= 1.0
                     ? .000055 * stability * demographic.effective_growth_pace_factor *
+                        policy.expansion_factor *
                         std::clamp(1.0 - (1.0 / sustenance.support_ratio), 0.0, 1.0)
                     : -.00040 * std::clamp(1.0 - reserves.effective_support_ratio, 0.0, 1.0);
                 colony.population_millions *= std::exp(population_rate * days);
@@ -235,8 +239,8 @@ void advance_colony_economies(EconomyWorldView world, std::span<Colony> colonies
         }
         if (completed(construction, "research_network")) science_per_day *= 1.30;
 
-        industry_per_day *= operating_funding_fraction;
-        science_per_day *= operating_funding_fraction;
+        industry_per_day *= operating_funding_fraction * policy.industry_factor;
+        science_per_day *= operating_funding_fraction * policy.science_factor;
 
         const double net_credits_per_day = flow.net_credits_per_day;
         economy.industry += industry_per_day * days;

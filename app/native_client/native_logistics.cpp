@@ -98,7 +98,7 @@ CivilizationLogisticsCoverage canonical_project(const FreshCampaignState &campai
   auto construction = economic_construction_projection(campaign.construction);
   auto fleets = economic_fleet_projection(campaign.fleets);
   const EconomyWorldView world{campaign.civilizations, campaign.bodies,
-                               construction, fleets};
+                               construction, fleets, campaign.empire_policies};
   return civilization_logistics_coverage(world, campaign.colonies,
                                          campaign.economies, campaign.systems,
                                          civilization_id);

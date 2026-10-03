@@ -231,7 +231,7 @@ std::vector<stellar::engine::DiagnosticRecord> inspect_campaign_operations(
   if(records.size()>=maximum)truncated=true;else{
     const auto econ_construction=economic_construction_projection(world.construction);
     const auto econ_fleets=economic_fleet_projection(world.fleets);
-    const EconomyWorldView econ{world.civilizations,world.bodies,econ_construction,econ_fleets};
+    const EconomyWorldView econ{world.civilizations,world.bodies,econ_construction,econ_fleets,world.empire_policies};
     const SettlementBodyIndex population_index(world.colonies,world.bodies);
     for(const auto &civ:world.civilizations){
       if(records.size()>=maximum){truncated=true;break;}

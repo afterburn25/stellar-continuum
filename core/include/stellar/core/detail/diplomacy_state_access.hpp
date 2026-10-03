@@ -85,6 +85,22 @@ struct DiplomacyProposalState {
   [[nodiscard]] DiplomaticProposalSnapshot snapshot() const;
 };
 
+struct DiplomacyWarState {
+  std::int64_t id{};
+  int aggressor{};
+  int defender{};
+  std::vector<WarGoalSnapshot> goals;
+  double war_score{};
+  double aggressor_exhaustion{};
+  double defender_exhaustion{};
+  std::int64_t declared{};
+  std::int64_t last_activity{};
+  std::optional<std::int64_t> resolved;
+  WarOutcome outcome{WarOutcome::active};
+
+  [[nodiscard]] WarSnapshot snapshot() const;
+};
+
 // Controlled equivalent of DiplomacyState's source-internal storage methods.
 // Higher-level command and maintenance ports compose these primitives rather
 // than gaining direct access to the Pimpl containers. Returned references and
@@ -135,6 +151,15 @@ public:
                      DiplomaticEventKind kind, int primary,
                      std::optional<int> secondary, std::optional<int> system_id,
                      std::string summary, std::vector<int> audience);
+  [[nodiscard]] static DiplomacyWarState &
+  create_war(DiplomacyState &state, int aggressor, int defender,
+             std::vector<WarGoalSnapshot> goals, std::int64_t tick);
+  [[nodiscard]] static DiplomacyWarState &war(DiplomacyState &state,
+                                              std::int64_t war_id);
+  [[nodiscard]] static DiplomacyWarState *
+  active_war_between(DiplomacyState &state, int a, int b) noexcept;
+  [[nodiscard]] static std::vector<DiplomacyWarState *>
+  active_wars(DiplomacyState &state);
 };
 
 } // namespace stellar::core::detail

@@ -330,6 +330,50 @@ void projections(const fs::path &research_root, const fs::path &catalog_path) {
           "German withdraw denial kept the English literal");
   controller.set_localization(nullptr);
 
+  // The war ledger projects the declared war observer-safely: the observer is
+  // the aggressor, the counterpart resolves to the identified civilization,
+  // and both the supplied goal and the automatic defender resistance appear.
+  require(at_war.wars.size() == 1 &&
+              at_war.wars.front().observer_is_belligerent &&
+              at_war.wars.front().observer_is_aggressor &&
+              at_war.wars.front().counterpart_id == foreign->id &&
+              at_war.wars.front().goals.size() == 2,
+          "war ledger projection diverged");
+  require(!at_war.selected.war_summary.empty(),
+          "selected belligerent carried no war summary");
+
+  // Empire policies project the catalog with one active row per domain from
+  // authoritative state, and policy commands mutate through the same
+  // revision-bounded path.
+  require(std::ranges::count_if(at_war.policies, [](const auto &row) {
+            return row.active;
+          }) == 4,
+          "policy projection did not mark one active policy per domain");
+  const auto pre_policy = controller.build(frame, 7, 0);
+  const auto policy_change = controller.execute(
+      frame, 7, pre_policy.diplomacy_revision,
+      DiplomacyWorkspaceAction::set_empire_policy, std::nullopt, std::nullopt,
+      {}, "industrial_focus");
+  require(policy_change.accepted, "empire policy command was rejected");
+  const auto repolicy = controller.build(frame, 7, 0);
+  const auto industrial =
+      std::ranges::find(repolicy.policies, "industrial_focus",
+                        &NativeDiplomacyPolicyRow::policy_id);
+  require(industrial != repolicy.policies.end() && industrial->active,
+          "policy command did not update the projected active assignment");
+  const auto stale_policy = controller.execute(
+      frame, 7, pre_policy.diplomacy_revision,
+      DiplomacyWorkspaceAction::set_empire_policy, std::nullopt, std::nullopt,
+      {}, "mercantile_focus");
+  require(!stale_policy.accepted,
+          "a stale revision was accepted for a policy change");
+  const auto cooldown_policy = controller.execute(
+      frame, 7, repolicy.diplomacy_revision,
+      DiplomacyWorkspaceAction::set_empire_policy, std::nullopt, std::nullopt,
+      {}, "mercantile_focus");
+  require(!cooldown_policy.accepted,
+          "a same-domain policy change beat the cooldown");
+
   // Contact filters.
   const auto all = filter_native_diplomacy_contacts(
       at_war, NativeDiplomacyContactFilter::all);

@@ -91,7 +91,13 @@ template <> bool defined(TerritorialClaimResponse value) {
   return value >= TerritorialClaimResponse::none && value <= TerritorialClaimResponse::disputed;
 }
 template <> bool defined(DiplomaticEventKind value) {
-  return value >= DiplomaticEventKind::contact_observed && value <= DiplomaticEventKind::war_declared;
+  return value >= DiplomaticEventKind::contact_observed && value <= DiplomaticEventKind::war_ended;
+}
+template <> bool defined(WarGoalKind value) {
+  return value >= WarGoalKind::humiliate && value <= WarGoalKind::resist_aggression;
+}
+template <> bool defined(WarOutcome value) {
+  return value >= WarOutcome::active && value <= WarOutcome::white_peace;
 }
 
 template <class Enum> void require_enum(Enum value, std::string label) {
@@ -170,6 +176,17 @@ DiplomacySnapshotInvariantValidator::validate(const DiplomacyStateSnapshot &snap
                        value.system_id, value.summary,
                        std::span<const int>(value.known_to_civilization_ids)});
   }
+  std::vector<WarValidationView> wars;
+  wars.reserve(snapshot.wars.size());
+  for (const auto &value : snapshot.wars) {
+    wars.push_back({value.war_id, value.aggressor_civilization_id,
+                    value.defender_civilization_id,
+                    std::span<const WarGoalSnapshot>(value.goals),
+                    value.war_score, value.aggressor_exhaustion,
+                    value.defender_exhaustion, value.declared_at_tick,
+                    value.last_activity_tick, value.resolved_at_tick,
+                    value.outcome});
+  }
   return validate({std::span<const DiplomaticContactSnapshot>(snapshot.contacts),
                    std::span<const DiplomaticRelationshipValidationView>(relationships),
                    std::span<const DiplomaticAccessSnapshot>(snapshot.access_permissions),
@@ -178,8 +195,10 @@ DiplomacySnapshotInvariantValidator::validate(const DiplomacyStateSnapshot &snap
                    std::span<const DiplomaticAgreementSnapshot>(snapshot.agreements),
                    std::span<const DiplomaticProposalSnapshot>(snapshot.proposals),
                    std::span<const DiplomaticHistoryEventValidationView>(history),
+                   std::span<const WarValidationView>(wars),
                    snapshot.next_claim_id, snapshot.next_agreement_id,
-                   snapshot.next_proposal_id, snapshot.next_event_id});
+                   snapshot.next_proposal_id, snapshot.next_event_id,
+                   snapshot.next_war_id});
 }
 
 DiplomacySnapshotValidationResult
@@ -241,6 +260,7 @@ DiplomacySnapshotInvariantValidator::validate(DiplomacySnapshotValidationView sn
   }
 
   std::set<std::pair<int, int>> relationship_pairs;
+  std::map<std::pair<int, int>, DiplomaticPoliticalState> relationship_states;
   for (const auto &relationship : relationships) {
     require_civilization(relationship.civilization_a_id, "relationship civilization A");
     require_civilization(relationship.civilization_b_id, "relationship civilization B");
@@ -251,6 +271,7 @@ DiplomacySnapshotInvariantValidator::validate(DiplomacySnapshotValidationView sn
     if (!relationship_pairs.insert(pair).second)
       fail("Duplicate relationship pair " + std::to_string(pair.first) + "/" +
            std::to_string(pair.second) + ".");
+    relationship_states.emplace(pair, relationship.political_state);
     if (!identified_pairs.contains(pair) &&
         !identified_pairs.contains(std::pair{pair.second, pair.first}))
       fail("Relationship " + std::to_string(pair.first) + "/" + std::to_string(pair.second) +
@@ -469,6 +490,82 @@ DiplomacySnapshotInvariantValidator::validate(DiplomacySnapshotValidationView sn
            " audience is not canonical/sorted.");
   }
 
+  std::set<std::int64_t> war_ids;
+  std::set<std::pair<int, int>> active_war_pairs;
+  const auto wars = snapshot.wars
+                        ? *snapshot.wars
+                        : std::span<const WarValidationView>{};
+  for (const auto &war : wars) {
+    if (war.war_id <= 0 || !war_ids.insert(war.war_id).second)
+      fail("War ID " + std::to_string(war.war_id) + " is invalid or duplicated.");
+    require_civilization(war.aggressor_civilization_id, "war aggressor");
+    require_civilization(war.defender_civilization_id, "war defender");
+    if (war.aggressor_civilization_id == war.defender_civilization_id)
+      fail("War " + std::to_string(war.war_id) + " targets its own aggressor.");
+    const auto pair =
+        canonical(war.aggressor_civilization_id, war.defender_civilization_id);
+    if (!relationship_pairs.contains(pair))
+      fail("War " + std::to_string(war.war_id) +
+           " has no diplomatic relationship between its belligerents.");
+    if (!std::isfinite(war.war_score) || war.war_score < -1 ||
+        war.war_score > 1)
+      fail("War " + std::to_string(war.war_id) +
+           " score must be finite and within [-1,1].");
+    if (!std::isfinite(war.aggressor_exhaustion) ||
+        war.aggressor_exhaustion < 0 || war.aggressor_exhaustion > 1 ||
+        !std::isfinite(war.defender_exhaustion) ||
+        war.defender_exhaustion < 0 || war.defender_exhaustion > 1)
+      fail("War " + std::to_string(war.war_id) +
+           " exhaustion must be finite and within [0,1].");
+    if (war.declared_at_tick < 0 ||
+        war.last_activity_tick < war.declared_at_tick)
+      fail("War " + std::to_string(war.war_id) + " has invalid chronology.");
+    require_enum(war.outcome, "war " + std::to_string(war.war_id) + " outcome");
+    if (war.resolved_at_tick) {
+      if (*war.resolved_at_tick < war.declared_at_tick)
+        fail("War " + std::to_string(war.war_id) +
+             " resolves before it was declared.");
+      if (war.outcome == WarOutcome::active)
+        fail("War " + std::to_string(war.war_id) +
+             " is resolved but reports an active outcome.");
+    } else if (war.outcome != WarOutcome::active) {
+      fail("War " + std::to_string(war.war_id) +
+           " reports a terminal outcome without a resolution tick.");
+    }
+    if (!war.resolved_at_tick) {
+      if (!active_war_pairs.insert(pair).second)
+        fail("Multiple active wars between civilizations " +
+             std::to_string(pair.first) + "/" + std::to_string(pair.second) +
+             ".");
+      const auto state = relationship_states.find(pair);
+      if (state == relationship_states.end() ||
+          state->second != DiplomaticPoliticalState::at_war)
+        fail("Unresolved war " + std::to_string(war.war_id) +
+             " lacks a belligerent relationship at war.");
+    }
+    const auto goals = require_array(
+        war.goals, "war " + std::to_string(war.war_id) + " goals");
+    for (const auto &goal : goals) {
+      require_enum(goal.kind,
+                   "war " + std::to_string(war.war_id) + " goal kind");
+      if (goal.beneficiary_civilization_id != war.aggressor_civilization_id &&
+          goal.beneficiary_civilization_id != war.defender_civilization_id)
+        fail("War " + std::to_string(war.war_id) +
+             " goal benefits a non-belligerent civilization.");
+      if (goal.kind == WarGoalKind::resist_aggression &&
+          goal.beneficiary_civilization_id != war.defender_civilization_id)
+        fail("War " + std::to_string(war.war_id) +
+             " grants resist-aggression to the aggressor.");
+      if (goal.kind == WarGoalKind::conquer_system &&
+          (!goal.system_id || *goal.system_id < 0))
+        fail("War " + std::to_string(war.war_id) +
+             " conquer-system goal lacks a valid target system.");
+      if (goal.achieved && !war.resolved_at_tick)
+        fail("War " + std::to_string(war.war_id) +
+             " marks a goal achieved before the war resolves.");
+    }
+  }
+
   require_next_id(snapshot.next_claim_id, claim_ids.empty() ? 0 : *claim_ids.rbegin(), "claim");
   require_next_id(snapshot.next_agreement_id,
                   agreement_ids.empty() ? 0 : *agreement_ids.rbegin(), "agreement");
@@ -476,11 +573,14 @@ DiplomacySnapshotInvariantValidator::validate(DiplomacySnapshotValidationView sn
                   proposal_ids.empty() ? 0 : *proposal_ids.rbegin(), "proposal");
   require_next_id(snapshot.next_event_id,
                   history_ids.empty() ? 0 : *history_ids.rbegin(), "history event");
+  if (!war_ids.empty())
+    require_next_id(snapshot.next_war_id, *war_ids.rbegin(), "war");
 
   return {static_cast<int>(contacts.size()), static_cast<int>(relationships.size()),
           static_cast<int>(access_permissions.size()), static_cast<int>(claims.size()),
           static_cast<int>(claim_responses.size()), static_cast<int>(agreements.size()),
-          static_cast<int>(proposals.size()), static_cast<int>(history.size())};
+          static_cast<int>(proposals.size()), static_cast<int>(history.size()),
+          static_cast<int>(wars.size())};
 }
 
 } // namespace stellar::core

@@ -184,6 +184,11 @@ DiplomaticProposalSnapshot DiplomacyProposalState::snapshot() const {
   return {id, proposer, recipient, kind, agreement_type, status, created,
           resolved, summary, external_terms};
 }
+WarSnapshot DiplomacyWarState::snapshot() const {
+  return {id,        aggressor,      defender, goals, war_score,
+          aggressor_exhaustion,      defender_exhaustion,
+          declared,  last_activity,  resolved, outcome};
+}
 } // namespace detail
 
 struct DiplomacyState::Storage {
@@ -195,10 +200,12 @@ struct DiplomacyState::Storage {
   std::list<detail::DiplomacyAgreementState> agreements;
   std::list<detail::DiplomacyProposalState> proposals;
   std::vector<DiplomaticHistoryEventSnapshot> history;
+  std::list<detail::DiplomacyWarState> wars;
   std::int64_t next_claim{1};
   std::int64_t next_agreement{1};
   std::int64_t next_proposal{1};
   std::int64_t next_event{1};
+  std::int64_t next_war{1};
 };
 
 DiplomacyState::DiplomacyState() : storage_(std::make_unique<Storage>()) {}
@@ -293,10 +300,14 @@ DiplomacyStateSnapshot DiplomacyState::snapshot() const {
     result.proposals.push_back(value.snapshot());
   std::ranges::sort(result.proposals, {}, &DiplomaticProposalSnapshot::proposal_id);
   result.recent_history = storage_->history;
+  for (const auto &value : storage_->wars)
+    result.wars.push_back(value.snapshot());
+  std::ranges::sort(result.wars, {}, &WarSnapshot::war_id);
   result.next_claim_id = storage_->next_claim;
   result.next_agreement_id = storage_->next_agreement;
   result.next_proposal_id = storage_->next_proposal;
   result.next_event_id = storage_->next_event;
+  result.next_war_id = storage_->next_war;
   return result;
 }
 
@@ -381,7 +392,48 @@ DiplomaticStateView DiplomacyState::build_view_for(int observer) const {
     if (std::ranges::find(value.known_to_civilization_ids, observer) !=
         value.known_to_civilization_ids.end())
       result.recent_events.push_back(value);
+  for (const auto &value : storage_->wars) {
+    const bool belligerent =
+        value.aggressor == observer || value.defender == observer;
+    if (belligerent ||
+        (knows(value.aggressor) && knows(value.defender)))
+      result.wars.push_back(value.snapshot());
+  }
+  std::ranges::sort(result.wars, {}, &WarSnapshot::war_id);
   return result;
+}
+
+std::vector<WarSnapshot>
+DiplomacyState::wars(std::optional<int> observer) const {
+  std::vector<WarSnapshot> result;
+  for (const auto &value : storage_->wars) {
+    if (observer && value.aggressor != *observer &&
+        value.defender != *observer &&
+        !(detail::DiplomacyStateAccess::has_identified(
+              *this, *observer, value.aggressor) &&
+          detail::DiplomacyStateAccess::has_identified(
+              *this, *observer, value.defender)))
+      continue;
+    result.push_back(value.snapshot());
+  }
+  std::ranges::sort(result, {}, &WarSnapshot::war_id);
+  return result;
+}
+std::optional<WarSnapshot> DiplomacyState::get_war(std::int64_t war_id) const {
+  const auto found = std::ranges::find(storage_->wars, war_id,
+                                       &detail::DiplomacyWarState::id);
+  return found == storage_->wars.end()
+             ? std::nullopt
+             : std::optional<WarSnapshot>(found->snapshot());
+}
+std::optional<WarSnapshot> DiplomacyState::active_war_between(int a,
+                                                            int b) const {
+  for (const auto &value : storage_->wars)
+    if (!value.resolved &&
+        ((value.aggressor == a && value.defender == b) ||
+         (value.aggressor == b && value.defender == a)))
+      return value.snapshot();
+  return std::nullopt;
 }
 
 DiplomacyState DiplomacyState::restore(const DiplomacyStateSnapshot &input) {
@@ -519,15 +571,39 @@ DiplomacyState DiplomacyState::restore(const DiplomacyStateSnapshot &input) {
         value.known_to_civilization_ids.end());
     s.history.push_back(std::move(value));
   }
-  std::int64_t max_claim=0,max_agreement=0,max_proposal=0,max_event=0;
+  for (const auto &value : input.wars) {
+    if (value.war_id <= 0 ||
+        value.aggressor_civilization_id == value.defender_civilization_id)
+      continue;
+    detail::DiplomacyWarState restored;
+    restored.id = value.war_id;
+    restored.aggressor = value.aggressor_civilization_id;
+    restored.defender = value.defender_civilization_id;
+    restored.goals = value.goals;
+    restored.war_score = std::clamp(value.war_score, -1.0, 1.0);
+    restored.aggressor_exhaustion = clamp01(value.aggressor_exhaustion);
+    restored.defender_exhaustion = clamp01(value.defender_exhaustion);
+    restored.declared = std::max<std::int64_t>(0, value.declared_at_tick);
+    restored.last_activity =
+        std::max<std::int64_t>(restored.declared, value.last_activity_tick);
+    restored.resolved = value.resolved_at_tick;
+    restored.outcome = value.outcome;
+    const auto found = std::ranges::find(
+        s.wars, value.war_id, &detail::DiplomacyWarState::id);
+    if (found == s.wars.end()) s.wars.push_back(std::move(restored));
+    else *found = std::move(restored);
+  }
+  std::int64_t max_claim=0,max_agreement=0,max_proposal=0,max_event=0,max_war=0;
   for(const auto&value:s.claims)max_claim=std::max(max_claim,value.id);
   for(const auto&value:s.agreements)max_agreement=std::max(max_agreement,value.id);
   for(const auto&value:s.proposals)max_proposal=std::max(max_proposal,value.id);
   for(const auto&e:s.history)max_event=std::max(max_event,e.event_id);
+  for(const auto&value:s.wars)max_war=std::max(max_war,value.id);
   s.next_claim=std::max({std::int64_t{1},input.next_claim_id,next_after_max(max_claim,"claim")});
   s.next_agreement=std::max({std::int64_t{1},input.next_agreement_id,next_after_max(max_agreement,"agreement")});
   s.next_proposal=std::max({std::int64_t{1},input.next_proposal_id,next_after_max(max_proposal,"proposal")});
   s.next_event=std::max({std::int64_t{1},input.next_event_id,next_after_max(max_event,"event")});
+  s.next_war=std::max({std::int64_t{1},input.next_war_id,next_after_max(max_war,"war")});
   return state;
 }
 
@@ -764,6 +840,46 @@ void DiplomacyStateAccess::record(
   while (state.storage_->history.size() >
          DiplomacyState::max_recent_history_events)
     state.storage_->history.erase(state.storage_->history.begin());
+}
+DiplomacyWarState &DiplomacyStateAccess::create_war(
+    DiplomacyState &state, int aggressor, int defender,
+    std::vector<WarGoalSnapshot> goals, std::int64_t tick) {
+  std::size_t active = 0;
+  for (const auto &value : state.storage_->wars)
+    if (!value.resolved) ++active;
+  if (active >= DiplomacyState::max_active_wars)
+    throw DiplomacyOperationError(
+        "Diplomatic war storage cannot hold another active war.");
+  const auto id = state.storage_->next_war;
+  state.storage_->next_war = next_after_max(id, "war");
+  state.storage_->wars.push_back({id, aggressor, defender, std::move(goals), 0,
+                                  0, 0, tick, tick, std::nullopt,
+                                  WarOutcome::active});
+  return state.storage_->wars.back();
+}
+DiplomacyWarState &DiplomacyStateAccess::war(DiplomacyState &state,
+                                             std::int64_t war_id) {
+  const auto found = std::ranges::find(state.storage_->wars, war_id,
+                                       &DiplomacyWarState::id);
+  if (found == state.storage_->wars.end())
+    throw DiplomacyOperationError("Unknown war.");
+  return *found;
+}
+DiplomacyWarState *DiplomacyStateAccess::active_war_between(
+    DiplomacyState &state, int a, int b) noexcept {
+  for (auto &value : state.storage_->wars)
+    if (!value.resolved &&
+        ((value.aggressor == a && value.defender == b) ||
+         (value.aggressor == b && value.defender == a)))
+      return &value;
+  return nullptr;
+}
+std::vector<DiplomacyWarState *>
+DiplomacyStateAccess::active_wars(DiplomacyState &state) {
+  std::vector<DiplomacyWarState *> result;
+  for (auto &value : state.storage_->wars)
+    if (!value.resolved) result.push_back(&value);
+  return result;
 }
 
 } // namespace stellar::core::detail

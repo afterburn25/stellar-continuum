@@ -2,6 +2,7 @@
 
 #include <stellar/core/campaign_event_history.hpp>
 #include <stellar/core/campaign_scripted_content.hpp>
+#include <stellar/core/empire_policy.hpp>
 
 #include <algorithm>
 #include <cmath>
@@ -292,7 +293,11 @@ IntegratedAdaptiveCampaignRuntime::advance(double elapsed_days,
     trace->research_events = result.research_events;
   result.diplomacy = storage_->diplomacy_runtime.process(
       result.core.exploration_events, result.core.combat_events,
-      absolute_end_day);
+      absolute_end_day,
+      [&campaign = storage_->world.campaign()](int civilization_id) {
+        return empire_policy_effects(campaign.empire_policies, civilization_id)
+            .war_exhaustion_factor;
+      });
   timing.finish(storage_->performance[3]);
   if (trace)
     trace->diplomacy = result.diplomacy;

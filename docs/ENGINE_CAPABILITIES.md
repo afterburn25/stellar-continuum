@@ -5378,6 +5378,92 @@ model, and the native Design Bureau UI.
 - Component prerequisites reuse the ship-design capability vocabulary; there
   is no per-component cost scaling, upkeep, or salvage.
 
+## War records, war goals and empire policies (2026-10-02)
+
+P3 workstream on `game/ui-visual-overhaul`: an authoritative war ledger and
+empire-policy layer on top of the existing diplomacy core, with native UI.
+
+### ENGINE CAPABILITIES ADDED / EXTENDED
+
+- **War records** (`WarSnapshot`/`WarGoalSpec`/`WarGoalSnapshot` on
+  `DiplomacyState`): stable war IDs from a `NextWarId` counter, aggressor and
+  defender civilization IDs, goal lists, war score in `[-1, 1]`, per-side
+  exhaustion, declaration/last-activity/resolution ticks, and outcome
+  (`active`, `aggressor_victory`, `defender_victory`, `white_peace`).
+  Observer-scoped `wars(observer)` returns only wars the observer is party
+  to or has legitimately identified — matching the diplomatic knowledge
+  contract; `get_war`/`active_war_between` round out the read surface.
+- **War goals** (`WarGoalKind`): `humiliate`, `secure_claims`,
+  `conquer_system` (nonnegative system ID), and `resist_aggression`.
+  `DiplomacySimulation::declare_war` accepts explicit caller goals (empty
+  becomes a generic `humiliate`), rejects `resist_aggression` in the caller
+  set and any duplicates, caps declarations at eight goals including the
+  defender's automatic `resist_aggression`, and refuses to target hidden
+  civilizations. Declaration terminates active agreements and forces the
+  relationship to `at_war`.
+- **War progression and settlement**: `apply_battle_outcome` moves war score
+  and adds battle exhaustion to both belligerents; `advance_wars` accrues
+  passive exhaustion per tick through a policy-adjusted exhaustion-factor
+  callback and emits `war_goal_achieved`/`war_ended` history events. Peace
+  and ceasefire agreement activation routes through `settle_active_war`,
+  so war resolution rides the existing agreement pipeline.
+- **Empire policies** (`empire_policy.*`): a four-domain catalog (economy,
+  military, research, frontier) of twelve policies with signed effect
+  factors (industry, credit, science, shipbuilding, expansion, war
+  exhaustion). `EmpirePolicyState` materializes lazily on
+  `FreshCampaignState::empire_policies` — campaigns that never change a
+  policy carry no state and stay byte-identical with older saves.
+  `set_empire_policy` validates the civilization, policy ID and domain,
+  rejects duplicates and negative ticks, and enforces a
+  `empire_policy_change_cooldown_ticks` (30,000-tick) per-domain cooldown.
+- **Consumers**: the combat diplomacy bridge receives live war data; the
+  campaign coordinator accrues passive war exhaustion each tick; economy
+  applies industry/credit factors at the economy tick; shipbuilding applies
+  the shipbuilding factor to order throughput; strategic knowledge receives
+  real war exhaustion instead of the placeholder zero.
+- **Persistence**: diplomacy JSON emits `Wars`/`NextWarId` only when wars
+  exist (old saves unaffected; untouched saves byte-stable); galaxy payload
+  carries an additive optional `EmpirePolicies` array
+  (`capture_empire_policies`/`restore_empire_policies`). Snapshot invariants
+  validate war record structure, goal constraints, and the
+  unresolved-war-implies-`at_war` relationship.
+- **Native diplomacy UI**: the RELATIONS workspace gains WARS and POLICIES
+  tabs. WARS renders observer-visible war cards — counterparts, declaration
+  and resolution dates, score and exhaustion from the observer's side, and
+  per-goal rows — without leaking unidentified belligerents or hidden
+  system names. The declare-war action now opens a multi-select goal picker
+  (standing goals plus one `conquer_system` row per active claim) whose
+  checked specs ride the `declare_war` command for authoritative
+  revalidation. POLICIES renders the catalog grouped by domain with the
+  active assignment; picking an inactive policy opens a confirmation modal
+  that dispatches `set_empire_policy` with the authoritative policy ID. All
+  new commands stay revision- and generation-bounded through
+  `ObserverDiplomacyCommandService`, and policy state participates in the
+  revision signature so remote changes invalidate stale quotes.
+- **Tests:** `empire_war_policy` (war records, goal validation, score,
+  battle/passive/policy-adjusted exhaustion, peace settlement, snapshot
+  round-trip, invariant failures, observer command goals, policy
+  catalog/commands/cooldown/persistence), extended
+  `diplomacy_snapshot_invariants` (war codec and view coverage),
+  `native_diplomacy_controller` (war ledger projection, war summary, policy
+  projection/commands/cooldown/stale-revision), and
+  `native_diplomacy_workspace` (goal picker toggling/confirm, war ledger
+  rendering, policy tab and confirmation flow).
+
+### ENGINE LIMITATIONS REMAINING
+
+- War score and exhaustion are scalar aggregates — no per-front or per-
+  battle breakdown, no captured-territory accounting, and no negotiated
+  settlement terms (peace resolves white/outcome-based only).
+- War goals are status-tracked but do not yet drive territorial transfer or
+  tribute on resolution; `conquer_system` achievement signals intent without
+  executing annexation.
+- Policy effects are flat signed factors; there is no per-policy cost,
+  cooldown stagger beyond the shared 30-day window, or AI-driven policy
+  selection for non-player civilizations.
+- The war ledger shows one card per war with no filtering beyond the contact
+  filter; there is no dedicated war-detail view or exhaustion forecast.
+
 ## Notes
 
 - `engine/foundation.hpp` primitives are scaffolding: `EntityRegistry`,

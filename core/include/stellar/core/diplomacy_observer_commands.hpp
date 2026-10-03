@@ -124,7 +124,8 @@ public:
   set_access_permission(int observer, int target, AccessPermission permission,
                         std::int64_t tick);
   [[nodiscard]] ObserverDiplomacyCommandResult
-  declare_war(int observer, int target, std::int64_t tick);
+  declare_war(int observer, int target, std::int64_t tick,
+              std::span<const WarGoalSpec> goals = {});
   [[nodiscard]] ObserverDiplomacyCommandResult terminate_agreement(
       int observer, std::int64_t agreement_id, std::int64_t tick,
       std::string_view reason);

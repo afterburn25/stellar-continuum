@@ -131,6 +131,34 @@ std::string response_name(TerritorialClaimResponse value) {
   return std::to_string(static_cast<int>(value));
 }
 
+std::string goal_name(WarGoalKind value) {
+  switch (value) {
+  case WarGoalKind::humiliate:
+    return "Humiliate";
+  case WarGoalKind::secure_claims:
+    return "SecureClaims";
+  case WarGoalKind::conquer_system:
+    return "ConquerSystem";
+  case WarGoalKind::resist_aggression:
+    return "ResistAggression";
+  }
+  return std::to_string(static_cast<int>(value));
+}
+
+std::string outcome_name(WarOutcome value) {
+  switch (value) {
+  case WarOutcome::active:
+    return "Active";
+  case WarOutcome::aggressor_victory:
+    return "AggressorVictory";
+  case WarOutcome::defender_victory:
+    return "DefenderVictory";
+  case WarOutcome::white_peace:
+    return "WhitePeace";
+  }
+  return std::to_string(static_cast<int>(value));
+}
+
 double clamp(double value) { return std::clamp(value, 0.0, 1.0); }
 } // namespace
 
@@ -464,11 +492,44 @@ void DiplomacySimulation::set_hostile(int a, int b, std::int64_t tick,
 }
 
 void DiplomacySimulation::declare_war(int declarer, int target,
-                                      std::int64_t tick) {
+                                      std::int64_t tick,
+                                      std::span<const WarGoalSpec> specs) {
   validate_tick(tick);
   if (!DiplomacyStateAccess::has_identified(*state_, declarer, target))
     throw DiplomacyOperationError(
         "War declaration cannot target a hidden civilization.");
+  if (specs.size() + 1 > DiplomacyState::max_goals_per_war)
+    throw DiplomacyArgumentError(
+        "A war declaration cannot carry more than " +
+        std::to_string(DiplomacyState::max_goals_per_war) +
+        " goals including the defender's resistance. (Parameter 'goals')");
+  std::vector<WarGoalSnapshot> goals;
+  goals.reserve(specs.size() + 1);
+  for (const auto &spec : specs) {
+    if (spec.kind == WarGoalKind::resist_aggression)
+      throw DiplomacyArgumentError(
+          "Resist-aggression is assigned to the defender automatically. "
+          "(Parameter 'goals')");
+    if (spec.kind == WarGoalKind::conquer_system &&
+        (!spec.system_id || *spec.system_id < 0))
+      throw DiplomacyArgumentError(
+          "A conquer-system war goal requires a target system. (Parameter "
+          "'goals')");
+    const auto duplicate = std::ranges::any_of(goals, [&](const auto &goal) {
+      return goal.kind == spec.kind &&
+             (spec.kind != WarGoalKind::conquer_system ||
+              goal.system_id == spec.system_id);
+    });
+    if (duplicate)
+      throw DiplomacyArgumentError(
+          "A war declaration cannot repeat the same goal. (Parameter "
+          "'goals')");
+    goals.push_back({spec.kind, declarer, spec.system_id, false});
+  }
+  if (goals.empty())
+    goals.push_back({WarGoalKind::humiliate, declarer, std::nullopt, false});
+  goals.push_back(
+      {WarGoalKind::resist_aggression, target, std::nullopt, false});
   auto &relationship =
       DiplomacyStateAccess::relationship(*state_, declarer, target);
   if (relationship.political_state == DiplomaticPoliticalState::at_war)
@@ -499,6 +560,103 @@ void DiplomacySimulation::declare_war(int declarer, int target,
                                    std::to_string(target) + ".",
                                target_knows ? std::vector<int>{declarer, target}
                                             : std::vector<int>{declarer});
+  (void)DiplomacyStateAccess::create_war(*state_, declarer, target,
+                                         std::move(goals), tick);
+}
+
+bool DiplomacySimulation::apply_battle_outcome(
+    int victor, int defeated, std::optional<int> system_id, double magnitude,
+    std::int64_t tick) {
+  validate_tick(tick);
+  if (victor == defeated || !std::isfinite(magnitude) || magnitude <= 0)
+    return false;
+  auto *war = DiplomacyStateAccess::active_war_between(*state_, victor,
+                                                     defeated);
+  if (!war || tick < war->declared) return false;
+  const double m = std::clamp(magnitude, 0.0, 1.0);
+  double delta = 0.1 * m;
+  for (const auto &goal : war->goals)
+    if (goal.kind == WarGoalKind::conquer_system && goal.system_id &&
+        system_id && *goal.system_id == *system_id &&
+        goal.beneficiary_civilization_id == victor)
+      delta += 0.05 * m;
+  war->war_score =
+      std::clamp(war->war_score + (victor == war->aggressor ? delta : -delta),
+                 -1.0, 1.0);
+  auto &loser_exhaustion = defeated == war->aggressor
+                               ? war->aggressor_exhaustion
+                               : war->defender_exhaustion;
+  auto &victor_exhaustion = victor == war->aggressor
+                                ? war->aggressor_exhaustion
+                                : war->defender_exhaustion;
+  loser_exhaustion = clamp(loser_exhaustion + 0.03 * m);
+  victor_exhaustion = clamp(victor_exhaustion + 0.01 * m);
+  war->last_activity = std::max(war->last_activity, tick);
+  return true;
+}
+
+void DiplomacySimulation::advance_wars(
+    std::int64_t tick, const std::function<double(int)> &exhaustion_factor) {
+  validate_tick(tick);
+  constexpr double exhaustion_per_day = 0.001;
+  for (auto *war : DiplomacyStateAccess::active_wars(*state_)) {
+    const double days =
+        static_cast<double>(tick - war->last_activity) / 1000.0;
+    if (days <= 0) continue;
+    const auto factor = [&](int civilization) {
+      if (!exhaustion_factor) return 1.0;
+      const double value = exhaustion_factor(civilization);
+      return std::isfinite(value) ? std::clamp(value, 0.25, 4.0) : 1.0;
+    };
+    war->aggressor_exhaustion =
+        clamp(war->aggressor_exhaustion +
+                  days * exhaustion_per_day * factor(war->aggressor));
+    war->defender_exhaustion =
+        clamp(war->defender_exhaustion +
+                  days * exhaustion_per_day * factor(war->defender));
+    war->last_activity = tick;
+  }
+}
+
+void DiplomacySimulation::settle_active_war(int a, int b, std::int64_t tick,
+                                            bool negotiated_peace) {
+  auto *war = DiplomacyStateAccess::active_war_between(*state_, a, b);
+  if (!war) return;
+  const auto outcome =
+      !negotiated_peace
+          ? WarOutcome::white_peace
+      : war->war_score >= 0.25  ? WarOutcome::aggressor_victory
+      : war->war_score <= -0.25 ? WarOutcome::defender_victory
+                                : WarOutcome::white_peace;
+  const bool aggressor_won = outcome == WarOutcome::aggressor_victory;
+  const bool defender_won = outcome == WarOutcome::defender_victory;
+  for (auto &goal : war->goals) {
+    if (goal.achieved) continue;
+    if ((aggressor_won && goal.beneficiary_civilization_id == war->aggressor) ||
+        (defender_won && goal.beneficiary_civilization_id == war->defender)) {
+      goal.achieved = true;
+      DiplomacyStateAccess::record(
+          *state_, tick, DiplomaticEventKind::war_goal_achieved,
+          goal.beneficiary_civilization_id,
+          goal.beneficiary_civilization_id == war->aggressor ? war->defender
+                                                            : war->aggressor,
+          goal.system_id,
+          "War goal " + goal_name(goal.kind) + " achieved in war " +
+              std::to_string(war->id) + ".",
+          {war->aggressor, war->defender});
+    }
+  }
+  war->resolved = tick;
+  war->outcome = outcome;
+  war->last_activity = tick;
+  DiplomacyStateAccess::record(
+      *state_, tick, DiplomaticEventKind::war_ended, war->aggressor,
+      war->defender, std::nullopt,
+      "War " + std::to_string(war->id) + " between civilizations " +
+          std::to_string(war->aggressor) + " and " +
+          std::to_string(war->defender) + " ended (" + outcome_name(outcome) +
+          ").",
+      {war->aggressor, war->defender});
 }
 
 void DiplomacySimulation::apply_accepted(
@@ -551,10 +709,13 @@ void DiplomacySimulation::activate(int a, int b, DiplomaticAgreementType type,
     throw DiplomacyOperationError("Non-aggression cannot replace active war.");
   auto &agreement = DiplomacyStateAccess::activate_agreement(
       *state_, a, b, type, tick, std::move(external_terms));
-  if (type == DiplomaticAgreementType::peace)
+  if (type == DiplomaticAgreementType::peace) {
     relationship.political_state = DiplomaticPoliticalState::peace;
-  else if (type == DiplomaticAgreementType::ceasefire)
+    settle_active_war(a, b, tick, true);
+  } else if (type == DiplomaticAgreementType::ceasefire) {
     relationship.political_state = DiplomaticPoliticalState::ceasefire;
+    settle_active_war(a, b, tick, false);
+  }
   else if (type == DiplomaticAgreementType::access) {
     DiplomacyStateAccess::set_access(*state_, a, b, AccessPermission::granted,
                                      tick);

@@ -75,6 +75,11 @@ int CombatDiplomacyBridge::process(std::span<const CombatEvent> events,
                              "Military vessel destroyed in system " + system +
                                  ": " + event.message},
           tick);
+      // A destroyed fleet is a decisive battle result for any active war
+      // between the pair; without one this is still a grievance only.
+      (void)simulation_.apply_battle_outcome(event.actor_civilization_id,
+                                             target, event.system_id, 0.4,
+                                             tick);
       ++processed;
     }
   }
@@ -147,9 +152,23 @@ DiplomacyStrategicKnowledgeProvider::build(int observer,
     const bool at_war = relationship &&
                         relationship->political_state ==
                             DiplomaticPoliticalState::at_war;
+    // Wars the observer legitimately sees supply authoritative exhaustion for
+    // their belligerents — the strategic evaluator's estimate then tracks the
+    // real war ledger rather than a stub.
+    double known_war_exhaustion = 0;
+    for (const auto &war : view.wars) {
+      if (war.resolved_at_tick) continue;
+      if (war.aggressor_civilization_id == target)
+        known_war_exhaustion =
+            std::max(known_war_exhaustion, war.aggressor_exhaustion);
+      else if (war.defender_civilization_id == target)
+        known_war_exhaustion =
+            std::max(known_war_exhaustion, war.defender_exhaustion);
+    }
     result.civilizations.push_back(
         {target,
-         KnownCivilization{target, trust, 0, 0, 0, 0, false, 0, 0, at_war,
+         KnownCivilization{target, trust, 0, 0, 0, 0, false, 0,
+                           known_war_exhaustion, at_war,
                            false, false}});
   }
   return result;
@@ -247,7 +266,8 @@ void DiplomacyCampaignRuntimeCoordinator::restore_schedule(const DiplomacyRuntim
 }
 DiplomacyCampaignRuntimeStepResult DiplomacyCampaignRuntimeCoordinator::process(
     std::span<const ExplorationEvent> exploration_events,
-    std::span<const CombatEvent> combat_events, double simulation_days) {
+    std::span<const CombatEvent> combat_events, double simulation_days,
+    const std::function<double(int)> &war_exhaustion_factor) {
   const auto tick = DiplomacyCampaignClock::from_simulation_days(simulation_days);
   if (storage_->last_processed_tick >= 0 &&
       tick < storage_->last_processed_tick)
@@ -261,6 +281,7 @@ DiplomacyCampaignRuntimeStepResult DiplomacyCampaignRuntimeCoordinator::process(
   const int combat = combat_events.empty()
                          ? 0
                          : storage_->combat_bridge.process(combat_events, tick);
+  storage_->simulation.advance_wars(tick, war_exhaustion_factor);
   auto maintenance = storage_->maintenance.review_if_due(tick);
   storage_->last_processed_tick = tick;
   return {tick, first, combat, std::move(maintenance)};

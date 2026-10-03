@@ -125,6 +125,8 @@ std::string_view diplomacy_category(DiplomaticEventKind kind) {
   case agreement_terminated:    return "diplomacy.agreement_terminated";
   case relationship_changed:    return "diplomacy.relationship_changed";
   case war_declared:            return "diplomacy.war_declared";
+  case war_goal_achieved:       return "diplomacy.war_goal_achieved";
+  case war_ended:               return "diplomacy.war_ended";
   }
   return "diplomacy.event";
 }
@@ -133,6 +135,8 @@ double diplomacy_significance(DiplomaticEventKind kind) {
   using enum DiplomaticEventKind;
   switch (kind) {
   case war_declared:            return 0.95;
+  case war_ended:              return 0.9;
+  case war_goal_achieved:      return 0.7;
   case agreement_activated:
   case agreement_terminated:    return 0.8;
   case proposal_accepted:
@@ -181,6 +185,8 @@ std::string_view diplomacy_summary(DiplomaticEventKind kind) {
   case agreement_terminated:    return "A diplomatic agreement has ended.";
   case relationship_changed:    return "A diplomatic relationship has changed.";
   case war_declared:            return "A declaration of war has been recorded.";
+  case war_goal_achieved:       return "A war goal has been achieved.";
+  case war_ended:               return "A war has ended.";
   }
   return "A diplomatic event has been recorded.";
 }

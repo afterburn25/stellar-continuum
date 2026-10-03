@@ -3,6 +3,7 @@
 
 #include <stellar/core/diplomacy_lifecycle.hpp>
 #include <stellar/core/diplomacy_observer_commands.hpp>
+#include <stellar/core/empire_policy.hpp>
 #include <stellar/core/species_environment.hpp>
 #include <stellar/engine/localization.hpp>
 
@@ -94,6 +95,13 @@ std::string localized_command_message(
       {"Border warning was already issued.",
        "DIPLOMACY_MSG_WARNING_EXISTS"},
       {"Border warning issued.", "DIPLOMACY_MSG_WARNING_SENT"},
+      {"Unknown empire policy.", "DIPLOMACY_ERR_POLICY_UNKNOWN"},
+      {"Unknown civilization.", "DIPLOMACY_ERR_POLICY_CIVILIZATION"},
+      {"That policy is already active.", "DIPLOMACY_ERR_POLICY_ACTIVE"},
+      {"That policy domain was changed recently; the empire must wait "
+       "before changing it again.", "DIPLOMACY_ERR_POLICY_COOLDOWN"},
+      {"Policy changes cannot be applied at a negative tick.",
+       "DIPLOMACY_ERR_REQUEST"},
   };
   for (const auto &[literal, key] : messages)
     if (message == literal) return resolve(locale, key, literal);
@@ -277,9 +285,89 @@ std::string event_kind_name(const stellar::engine::LocalizationTable *locale,
                    "Relationship Changed");
   case DiplomaticEventKind::war_declared:
     return resolve(locale, "DIPLOMACY_EVENT_WAR_DECLARED", "War Declared");
+  case DiplomaticEventKind::war_goal_achieved:
+    return resolve(locale, "DIPLOMACY_EVENT_WAR_GOAL_ACHIEVED",
+                   "War Goal Achieved");
+  case DiplomaticEventKind::war_ended:
+    return resolve(locale, "DIPLOMACY_EVENT_WAR_ENDED", "War Ended");
   }
   return resolve(locale, "DIPLOMACY_EVENT_RELATIONSHIP_CHANGED",
                  "Relationship Changed");
+}
+std::string war_goal_kind_name(const stellar::engine::LocalizationTable *locale,
+                             WarGoalKind value) {
+  switch (value) {
+  case WarGoalKind::humiliate:
+    return resolve(locale, "DIPLOMACY_GOAL_HUMILIATE", "Humiliate");
+  case WarGoalKind::secure_claims:
+    return resolve(locale, "DIPLOMACY_GOAL_SECURE_CLAIMS", "Secure claims");
+  case WarGoalKind::conquer_system:
+    return resolve(locale, "DIPLOMACY_GOAL_CONQUER", "Conquer system");
+  case WarGoalKind::resist_aggression:
+    return resolve(locale, "DIPLOMACY_GOAL_RESIST", "Resist aggression");
+  }
+  return resolve(locale, "DIPLOMACY_GOAL_HUMILIATE", "Humiliate");
+}
+std::string war_outcome_name(const stellar::engine::LocalizationTable *locale,
+                             WarOutcome value) {
+  switch (value) {
+  case WarOutcome::active:
+    return resolve(locale, "DIPLOMACY_OUTCOME_ACTIVE", "Ongoing");
+  case WarOutcome::aggressor_victory:
+    return resolve(locale, "DIPLOMACY_OUTCOME_AGGRESSOR", "Aggressor victory");
+  case WarOutcome::defender_victory:
+    return resolve(locale, "DIPLOMACY_OUTCOME_DEFENDER", "Defender victory");
+  case WarOutcome::white_peace:
+    return resolve(locale, "DIPLOMACY_OUTCOME_WHITE", "White peace");
+  }
+  return resolve(locale, "DIPLOMACY_OUTCOME_ACTIVE", "Ongoing");
+}
+std::string policy_domain_name(const stellar::engine::LocalizationTable *locale,
+                               EmpirePolicyDomain value) {
+  switch (value) {
+  case EmpirePolicyDomain::economy:
+    return resolve(locale, "DIPLOMACY_POLICY_ECONOMY", "Economy");
+  case EmpirePolicyDomain::military:
+    return resolve(locale, "DIPLOMACY_POLICY_MILITARY", "Military");
+  case EmpirePolicyDomain::research:
+    return resolve(locale, "DIPLOMACY_POLICY_RESEARCH", "Research");
+  case EmpirePolicyDomain::frontier:
+    return resolve(locale, "DIPLOMACY_POLICY_FRONTIER", "Frontier");
+  }
+  return resolve(locale, "DIPLOMACY_POLICY_ECONOMY", "Economy");
+}
+// Condensed signed-factor summary for one policy definition.
+std::string policy_effects_name(
+    const stellar::engine::LocalizationTable *locale,
+    const EmpirePolicyEffects &effects) {
+  const std::pair<double, std::pair<std::string_view, std::string_view>>
+      factors[] = {
+          {effects.industry_factor,
+           {"DIPLOMACY_EFFECT_INDUSTRY", "Industry"}},
+          {effects.credit_factor,
+           {"DIPLOMACY_EFFECT_TRADE", "Trade"}},
+          {effects.science_factor,
+           {"DIPLOMACY_EFFECT_SCIENCE", "Science"}},
+          {effects.shipbuilding_factor,
+           {"DIPLOMACY_EFFECT_SHIPBUILDING", "Shipbuilding"}},
+          {effects.expansion_factor,
+           {"DIPLOMACY_EFFECT_EXPANSION", "Expansion"}},
+          {effects.war_exhaustion_factor,
+           {"DIPLOMACY_EFFECT_EXHAUSTION", "War exhaustion"}}};
+  std::string out;
+  for (const auto &[factor, names] : factors) {
+    if (std::fabs(factor - 1.0) < 1e-9) continue;
+    if (!out.empty()) out += " · ";
+    const auto percent_delta = static_cast<int>(std::lround((factor - 1.0) * 100.0));
+    out += resolve(locale, names.first, names.second);
+    out += ' ';
+    out += percent_delta > 0 ? '+' : '-';
+    out += std::to_string(std::abs(percent_delta));
+    out += '%';
+  }
+  return out.empty() ? resolve(locale, "DIPLOMACY_EFFECT_NEUTRAL",
+                               "No modifiers")
+                     : out;
 }
 
 using stellar::native_campaign::format_campaign_date;
@@ -394,6 +482,24 @@ template <class T> void append_signature(std::ostringstream &out, const T &value
   append_signature(out, view.recent_events.size());
   for (const auto &event : view.recent_events)
     append_signature(out, event.event_id);
+  // Wars sign their structure — belligerents, goals and resolution — but not
+  // the drifting score/exhaustion meters: passive accrual must not make every
+  // pending command read as a stale view.
+  append_signature(out, view.wars.size());
+  for (const auto &war : view.wars) {
+    append_signature(out, war.war_id);
+    append_signature(out, war.aggressor_civilization_id);
+    append_signature(out, war.defender_civilization_id);
+    append_signature(out, war.goals.size());
+    for (const auto &goal : war.goals) {
+      append_signature(out, static_cast<int>(goal.kind));
+      append_signature(out, goal.beneficiary_civilization_id);
+      append_signature(out, goal.system_id.value_or(-1));
+      append_signature(out, goal.achieved);
+    }
+    append_signature(out, war.resolved_at_tick.value_or(-1));
+    append_signature(out, static_cast<int>(war.outcome));
+  }
   return out.str();
 }
 
@@ -447,6 +553,103 @@ struct Projection {
   v.observer_civilization_id = observer;
   v.date = format_campaign_date(frame.clock().simulation_days());
   out.signature = signature_for(view, v.date);
+  // The player's empire-policy assignment belongs to the guarded mutation set:
+  // a committed change must invalidate pending diplomacy commands.
+  {
+    std::ostringstream policy_tail;
+    policy_tail.imbue(std::locale::classic());
+    const auto found = std::ranges::find(world.empire_policies, observer,
+                                         &EmpirePolicyState::civilization_id);
+    if (found != world.empire_policies.end())
+      for (const auto &assignment : found->assignments) {
+        append_signature(policy_tail, static_cast<int>(assignment.domain));
+        append_signature(policy_tail, assignment.policy_id);
+        append_signature(policy_tail, assignment.changed_at_tick);
+      }
+    out.signature += policy_tail.str();
+  }
+
+  const auto tick_date = [](std::int64_t tick) {
+    return format_campaign_date(
+        static_cast<double>(tick) /
+        static_cast<double>(DiplomacyCampaignClock::ticks_per_simulation_day));
+  };
+  // War ledger: the view's wars are already observer-filtered. Scores are
+  // presented from the observer's side when they are a belligerent.
+  for (const auto &war : view.wars) {
+    NativeDiplomacyWarRow row;
+    row.war_id = war.war_id;
+    row.aggressor_civilization_id = war.aggressor_civilization_id;
+    row.defender_civilization_id = war.defender_civilization_id;
+    row.aggressor_name = identified_name(war.aggressor_civilization_id);
+    row.defender_name = identified_name(war.defender_civilization_id);
+    row.observer_is_aggressor = observer == war.aggressor_civilization_id;
+    row.observer_is_belligerent =
+        row.observer_is_aggressor || observer == war.defender_civilization_id;
+    if (row.observer_is_aggressor) {
+      row.counterpart_id = war.defender_civilization_id;
+      row.counterpart_name = row.defender_name;
+      row.score = war.war_score;
+      row.observer_exhaustion = war.aggressor_exhaustion;
+      row.counterpart_exhaustion = war.defender_exhaustion;
+    } else if (observer == war.defender_civilization_id) {
+      row.counterpart_id = war.aggressor_civilization_id;
+      row.counterpart_name = row.aggressor_name;
+      row.score = -war.war_score;
+      row.observer_exhaustion = war.defender_exhaustion;
+      row.counterpart_exhaustion = war.aggressor_exhaustion;
+    } else {
+      row.counterpart_name = resolved(
+          locale, "DIPLOMACY_WAR_BETWEEN",
+          {row.aggressor_name, row.defender_name}, "{0} vs {1}");
+      row.score = war.war_score;
+      row.observer_exhaustion = war.aggressor_exhaustion;
+      row.counterpart_exhaustion = war.defender_exhaustion;
+    }
+    row.declared = tick_date(war.declared_at_tick);
+    if (war.resolved_at_tick) row.resolved = tick_date(*war.resolved_at_tick);
+    row.outcome = war_outcome_name(locale, war.outcome);
+    row.goals.reserve(war.goals.size());
+    for (const auto &goal : war.goals) {
+      NativeDiplomacyWarGoalRow goal_row;
+      goal_row.kind = goal.kind;
+      goal_row.system_id = goal.system_id;
+      goal_row.label = war_goal_kind_name(locale, goal.kind);
+      if (goal.system_id)
+        goal_row.label = resolved(
+            locale, "DIPLOMACY_GOAL_AT",
+            {goal_row.label,
+             observer_safe_system_name(world, view, *goal.system_id)},
+            "{0}: {1}");
+      if (goal.beneficiary_civilization_id != observer)
+        goal_row.label = resolved(locale, "DIPLOMACY_GOAL_THEIRS",
+                                  {goal_row.label}, "Their goal · {0}");
+      goal_row.achieved = goal.achieved;
+      row.goals.push_back(std::move(goal_row));
+    }
+    v.wars.push_back(std::move(row));
+  }
+  // Empire policy panel: the catalog is public, the active assignment comes
+  // from authoritative campaign state for the observer's own civilization.
+  {
+    const auto found = std::ranges::find(world.empire_policies, observer,
+                                         &EmpirePolicyState::civilization_id);
+    const EmpirePolicyState empty{observer, {}};
+    const auto &state =
+        found == world.empire_policies.end() ? empty : *found;
+    for (const auto &definition : empire_policy_catalog()) {
+      NativeDiplomacyPolicyRow row;
+      row.domain_index = static_cast<int>(definition.domain);
+      row.domain_label = policy_domain_name(locale, definition.domain);
+      row.policy_id = std::string(definition.id);
+      row.display_name = std::string(definition.display_name);
+      row.summary = std::string(definition.summary);
+      row.effects = policy_effects_name(locale, definition.effects);
+      const auto *active = active_empire_policy(state, definition.domain);
+      row.active = active && active->id == definition.id;
+      v.policies.push_back(std::move(row));
+    }
+  }
 
   v.contacts.reserve(view.contacts.size());
   for (std::size_t index = 0; index < view.contacts.size(); ++index) {
@@ -718,6 +921,41 @@ struct Projection {
                   s.can_set_access)
                     ? no_terms
                     : none;
+
+      // War-goal picker options: the two standing goals plus a conquer row
+      // for each active claim the observer has asserted — the authoritative
+      // command revalidates every attached goal.
+      if (s.can_declare_war) {
+        s.war_goal_options.push_back(
+            {WarGoalKind::humiliate, std::nullopt,
+             resolve(locale, "DIPLOMACY_GOAL_HUMILIATE", "Humiliate")});
+        s.war_goal_options.push_back(
+            {WarGoalKind::secure_claims, std::nullopt,
+             resolve(locale, "DIPLOMACY_GOAL_SECURE_CLAIMS", "Secure claims")});
+        for (const auto &claim : view.claims)
+          if (claim.active && claim.claimant_civilization_id == observer)
+            s.war_goal_options.push_back(
+                {WarGoalKind::conquer_system, claim.system_id,
+                 resolved(locale, "DIPLOMACY_GOAL_CONQUER_AT",
+                          {observer_safe_system_name(world, view,
+                                                     claim.system_id)},
+                          "Conquer {0}")});
+      }
+      // War status for the selected counterpart when a visible war exists.
+      for (const auto &war : v.wars) {
+        if (!war.counterpart_id || *war.counterpart_id != target || war.resolved)
+          continue;
+        const auto score = static_cast<int>(std::lround(war.score * 100.0));
+        s.war_summary = resolved(
+            locale, "DIPLOMACY_WAR_SUMMARY",
+            {std::to_string(score),
+             std::to_string(
+                 static_cast<int>(std::lround(war.observer_exhaustion * 100.))),
+             std::to_string(static_cast<int>(
+                 std::lround(war.counterpart_exhaustion * 100.)))},
+            "War score {0}% · Our exhaustion {1}% · Their exhaustion {2}%");
+        break;
+      }
     }
   }
 
@@ -791,7 +1029,8 @@ NativeDiplomacyController::build(CampaignFrame &frame,
 NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
     CampaignFrame &frame, std::uint64_t generation, std::uint64_t revision,
     DiplomacyWorkspaceAction action, std::optional<int> target,
-    std::optional<std::int64_t> proposal_id) {
+    std::optional<std::int64_t> proposal_id,
+    std::span<const WarGoalSpec> war_goals, std::string_view policy_id) {
   require_owner();
   if (!generation_ || *generation_ != generation || revision != revision_ ||
       !signature_)
@@ -847,7 +1086,7 @@ NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
     break;
   case DiplomacyWorkspaceAction::declare_war:
     if (!target) return stale(locale_);
-    result = service.declare_war(observer, *target, tick);
+    result = service.declare_war(observer, *target, tick, war_goals);
     break;
   case DiplomacyWorkspaceAction::accept_proposal:
     if (!proposal_id) return stale(locale_);
@@ -861,6 +1100,19 @@ NativeDiplomacyCommandOutcome NativeDiplomacyController::execute(
     if (!proposal_id) return stale(locale_);
     result = service.withdraw_proposal(observer, *proposal_id, tick);
     break;
+  case DiplomacyWorkspaceAction::set_empire_policy: {
+    const auto policy = set_empire_policy(runtime.world().campaign(), observer,
+                                          policy_id, tick);
+    if (policy.accepted) signature_.reset();
+    if (!policy.accepted)
+      return {false, localized_command_message(locale_, policy.message)};
+    const auto *definition = find_empire_policy(policy_id);
+    return {true,
+            resolved(locale_, "DIPLOMACY_MSG_POLICY_SET",
+                     {definition ? std::string(definition->display_name)
+                                 : std::string(policy_id)},
+                     "Policy set: {0}")};
+  }
   }
   if (result.accepted) signature_.reset();
   return {result.accepted, localized_command_message(locale_, result.message)};

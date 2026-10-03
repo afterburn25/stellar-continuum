@@ -79,6 +79,9 @@ struct GalaxyPayloadV16Dto {
   // Civilization-authored component ship designs; absent on pre-authorship
   // saves and on campaigns that only reference the fixed catalog.
   std::optional<std::vector<AuthoredShipDesignSaveDto>> authored_ship_designs;
+  // Per-civilization empire policy assignments; absent on pre-policy saves and
+  // on campaigns that never diverged from the domain defaults.
+  std::optional<std::vector<EmpirePolicySaveDto>> empire_policies;
 };
 
 struct GalaxyPayloadCaptureOptions {

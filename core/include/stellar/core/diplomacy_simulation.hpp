@@ -3,7 +3,9 @@
 #include <stellar/core/diplomacy_state.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -56,11 +58,28 @@ public:
                                  const RelationshipImpact &impact,
                                  std::int64_t tick);
   void set_hostile(int a, int b, std::int64_t tick, std::string_view reason);
-  void declare_war(int declarer, int target, std::int64_t tick);
+  // Declares war with an explicit goal set. An empty set means a generic
+  // humiliate war. The defender automatically gains a resist-aggression goal.
+  void declare_war(int declarer, int target, std::int64_t tick,
+                   std::span<const WarGoalSpec> goals = {});
+  // Applies one resolved battle to the war between the pair: the score moves
+  // toward the victor by `magnitude` (clamped to [0,1], scaled internally) and
+  // both sides accrue exhaustion. Returns false when no active war exists.
+  bool apply_battle_outcome(int victor, int defeated,
+                            std::optional<int> system_id, double magnitude,
+                            std::int64_t tick);
+  // Passive exhaustion accrual for every active war; `exhaustion_factor`
+  // optionally maps a civilization to a policy multiplier (default 1.0).
+  // Calling twice for the same tick is a no-op.
+  void advance_wars(
+      std::int64_t tick,
+      const std::function<double(int)> &exhaustion_factor = {});
 
 private:
   void apply_accepted(const detail::DiplomacyProposalState &proposal,
                       std::int64_t tick);
+  void settle_active_war(int a, int b, std::int64_t tick,
+                         bool negotiated_peace);
   void activate(int a, int b, DiplomaticAgreementType type,
                 std::int64_t tick,
                 std::optional<std::string> external_terms);

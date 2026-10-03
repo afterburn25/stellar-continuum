@@ -54,7 +54,8 @@ CivilizationStrategicRuntimeCoordinator make_default_strategic_runtime(
 EconomyWorldView economy_world(FreshCampaignState &campaign,
                                std::span<const EconomyConstructionState> construction,
                                std::span<const EconomyFleetState> fleets) {
-  return {campaign.civilizations, campaign.bodies, construction, fleets};
+  return {campaign.civilizations, campaign.bodies, construction, fleets,
+          campaign.empire_policies};
 }
 
 ConstructionWorld construction_world(
@@ -95,7 +96,7 @@ ShipbuildingWorld shipbuilding_world(
           std::span<const ShipbuildingStrategicPreference>{},
           std::move(query),
           std::move(preference), campaign_civilization_control(campaign),
-          campaign.authored_ship_designs};
+          campaign.authored_ship_designs, campaign.empire_policies};
 }
 
 StrategicInputWorldView strategic_input_world(FreshCampaignState &campaign,

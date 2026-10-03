@@ -49,6 +49,8 @@ enum class DiplomacyWorkspaceTab {
   history,
   intelligence,
   overview,
+  wars,
+  policies,
 };
 
 enum class DiplomacyWorkspaceCommandKind {
@@ -72,6 +74,11 @@ struct DiplomacyWorkspaceCommand {
   int focus_system_id{};
   std::uint64_t campaign_generation{};
   std::uint64_t diplomacy_revision{};
+  // War-goal picks ride on Action/declare_war commands; the authoritative
+  // service revalidates every attached spec.
+  std::vector<stellar::core::WarGoalSpec> war_goals;
+  // Policy id for Action/set_empire_policy commands.
+  std::string policy_id;
 };
 
 class NativeDiplomacyWorkspace final {
@@ -114,6 +121,10 @@ public:
 private:
   struct ModalState {
     bool negotiation{};
+    // Multi-select war-goal picker: terms toggle `goal_chosen` in place and
+    // the confirm button commits the checked specs — unlike `negotiation`,
+    // picking a term does not leave the chooser.
+    bool war_goal_picker{};
     std::string title;
     std::string description;
     stellar::native_diplomacy::DiplomacyWorkspaceAction action{
@@ -123,6 +134,8 @@ private:
     std::uint64_t diplomacy_revision{};
     bool danger{};
     std::string confirm_label;
+    // Policy id when the confirm commits a set_empire_policy action.
+    std::string policy_id;
     struct ModalTerm {
       std::string label;
       stellar::native_diplomacy::DiplomacyWorkspaceAction action{
@@ -130,8 +143,12 @@ private:
       bool enabled{};
       // Blocker reason surfaced as the why when `enabled` is false.
       std::string tip;
+      // Attached war-goal spec when this row is a picker option.
+      std::optional<stellar::core::WarGoalSpec> goal;
     };
     std::vector<ModalTerm> terms;
+    // Parallel to `terms` while `war_goal_picker` is active.
+    std::vector<bool> goal_chosen;
   };
 
   void reconcile_selection();

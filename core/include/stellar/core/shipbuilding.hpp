@@ -2,6 +2,7 @@
 
 #include <stellar/core/civilization_catalog.hpp>
 #include <stellar/core/colony_economy.hpp>
+#include <stellar/core/empire_policy.hpp>
 #include <stellar/core/construction_projects.hpp>
 #include <stellar/core/fleet_state.hpp>
 #include <stellar/core/galaxy_catalog.hpp>
@@ -60,6 +61,8 @@ struct ShipbuildingWorld {
   std::function<ShipbuildingStrategicPreference(int)> preference_query;
   CivilizationControlQuery control;
   std::span<const AuthoredShipDesign> authored_designs{};
+  // Empire policy assignments feeding shipbuilding throughput modifiers.
+  std::span<const EmpirePolicyState> empire_policies{};
   ShipbuildingReadView read() const {
     return {civilizations, systems,      construction,
             shipyards,     colonies,     economies,

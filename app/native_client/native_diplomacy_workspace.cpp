@@ -92,11 +92,14 @@ constexpr std::pair<DiplomacyWorkspaceTab, const char *> tab_labels[] = {
     {DiplomacyWorkspaceTab::history, "HISTORY"},
     {DiplomacyWorkspaceTab::intelligence, "INTELLIGENCE"},
     {DiplomacyWorkspaceTab::overview, "OVERVIEW"},
+    {DiplomacyWorkspaceTab::wars, "WARS"},
+    {DiplomacyWorkspaceTab::policies, "POLICIES"},
 };
 constexpr const char *tab_keys[] = {
     "DIPLOMACY_TAB_AGREEMENTS", "DIPLOMACY_TAB_PROPOSALS",
     "DIPLOMACY_TAB_HISTORY", "DIPLOMACY_TAB_INTELLIGENCE",
-    "DIPLOMACY_TAB_OVERVIEW",
+    "DIPLOMACY_TAB_OVERVIEW", "DIPLOMACY_TAB_WARS",
+    "DIPLOMACY_TAB_POLICIES",
 };
 
 [[nodiscard]] UiRect filter_button(const DiplomacyWorkspaceLayout &layout,
@@ -142,9 +145,19 @@ constexpr const char *tab_keys[] = {
 [[nodiscard]] UiRect tab_button(const DiplomacyWorkspaceLayout &layout,
                                 std::size_t index) noexcept {
   const auto gap = 8.f * layout.scale;
-  const auto width = (layout.tabs.width - gap * 4.f) / 5.f;
+  const auto count = static_cast<float>(std::size(tab_labels));
+  const auto width = (layout.tabs.width - gap * (count - 1.f)) / count;
   return {layout.tabs.x + static_cast<float>(index) * (width + gap),
           layout.tabs.y, width, layout.tabs.height};
+}
+
+[[nodiscard]] UiRect policy_row(const DiplomacyWorkspaceLayout &layout,
+                                std::size_t index, float scroll) noexcept {
+  const auto s = layout.scale;
+  return {layout.detail_rows.x + 8.f * s,
+          layout.detail_rows.y + 8.f * s +
+              static_cast<float>(index) * 62.f * s - scroll,
+          layout.detail_rows.width - 16.f * s, 56.f * s};
 }
 
 [[nodiscard]] UiRect action_button(const DiplomacyWorkspaceLayout &layout,
@@ -530,6 +543,28 @@ float NativeDiplomacyWorkspace::detail_content_height(
     content = card_bottom(view_->contacts.empty() ? 0 : view_->contacts.size() - 1,
                           view_->contacts.empty() ? 64.f * s : 44.f * s);
     break;
+  case DiplomacyWorkspaceTab::wars: {
+    // One card per visible war; height tracks goal rows so scroll length
+    // matches the renderer.
+    if (view_->wars.empty()) {
+      content = card_bottom(0, 64.f * s);
+      break;
+    }
+    float y = 8.f * s;
+    for (const auto &war : view_->wars) {
+      const float height =
+          66.f * s + static_cast<float>(war.goals.size()) * 18.f * s;
+      y += height + 8.f * s;
+    }
+    content = y;
+    break;
+  }
+  case DiplomacyWorkspaceTab::policies:
+    content = view_->policies.empty()
+                  ? card_bottom(0, 64.f * s)
+                  : 8.f * s +
+                        static_cast<float>(view_->policies.size()) * 62.f * s;
+    break;
   }
   return content + 8.f * s;
 }
@@ -554,6 +589,12 @@ NativeDiplomacyWorkspace::focusables(
         if (modal_->terms[index].enabled)
           out.push_back({modal_term_button(layout, index),
                          modal_->terms[index].label});
+    } else if (modal_->war_goal_picker) {
+      for (std::size_t index = 0; index < modal_->terms.size(); ++index)
+        if (modal_->terms[index].enabled)
+          out.push_back({modal_term_button(layout, index),
+                         modal_->terms[index].label});
+      out.push_back({modal_confirm_button(layout), modal_->confirm_label});
     } else {
       out.push_back({modal_confirm_button(layout), modal_->confirm_label});
     }
@@ -621,6 +662,16 @@ NativeDiplomacyWorkspace::focusables(
                    tr(proposal_names[which], proposal_fallbacks[which]),
                    button, /*scroll_lane=*/2});
           }
+      }
+    }
+    if (tab_ == DiplomacyWorkspaceTab::policies) {
+      for (std::size_t index = 0; index < view_->policies.size(); ++index) {
+        if (view_->policies[index].active) continue;
+        const auto row_rect =
+            policy_row(layout, index, detail_scroll_.scroll_offset);
+        if (const auto clipped = intersection(row_rect, layout.detail_rows))
+          out.push_back({*clipped, view_->policies[index].display_name,
+                         row_rect, /*scroll_lane=*/2});
       }
     }
     if (tab_ == DiplomacyWorkspaceTab::intelligence && sel.present) {
@@ -777,6 +828,35 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
 
   if (modal_) {
     const auto &modal = *modal_;
+    if (modal.war_goal_picker) {
+      if (modal_cancel_button(layout).contains(event.position)) {
+        modal_.reset();
+        return {DiplomacyWorkspaceCommandKind::None, true};
+      }
+      for (std::size_t index = 0; index < modal.terms.size(); ++index) {
+        if (modal.terms[index].enabled &&
+            modal_term_button(layout, index).contains(event.position)) {
+          if (index < modal_->goal_chosen.size())
+            modal_->goal_chosen[index] = !modal_->goal_chosen[index];
+          return {DiplomacyWorkspaceCommandKind::None, true};
+        }
+      }
+      if (modal_confirm_button(layout).contains(event.position)) {
+        DiplomacyWorkspaceCommand command{DiplomacyWorkspaceCommandKind::Action,
+                                          true};
+        command.action = modal.action;
+        command.target_civilization_id = modal.target_civilization_id;
+        command.campaign_generation = modal.campaign_generation;
+        command.diplomacy_revision = modal.diplomacy_revision;
+        for (std::size_t index = 0; index < modal.terms.size(); ++index)
+          if (index < modal.goal_chosen.size() && modal.goal_chosen[index] &&
+              modal.terms[index].goal)
+            command.war_goals.push_back(*modal.terms[index].goal);
+        modal_.reset();
+        return command;
+      }
+      return {DiplomacyWorkspaceCommandKind::None, true};
+    }
     if (modal.negotiation) {
       if (modal_cancel_button(layout).contains(event.position)) {
         modal_.reset();
@@ -814,6 +894,7 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
       command.target_civilization_id = modal.target_civilization_id;
       command.campaign_generation = modal.campaign_generation;
       command.diplomacy_revision = modal.diplomacy_revision;
+      command.policy_id = modal.policy_id;
       modal_.reset();
       return command;
     }
@@ -932,18 +1013,26 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
     if (s.can_declare_war) {
       if (action_hit(action_index)) {
         ModalState modal;
+        modal.war_goal_picker = true;
         modal.title = trf("DIPLOMACY_DECLARE_WAR_ON", {s.contact_name},
                           "DECLARE WAR ON {0}");
         modal.description = tr(
-            "DIPLOMACY_DECLARE_WAR_WARNING",
-            "Your civilizations will enter a state of war. Active agreements "
-            "may be affected.");
+            "DIPLOMACY_DECLARE_WAR_GOALS",
+            "Choose the war goals for this declaration. Active agreements "
+            "will end when war begins.");
         modal.action = DiplomacyWorkspaceAction::declare_war;
         modal.target_civilization_id = s.target_civilization_id;
         modal.campaign_generation = view_->campaign_generation;
         modal.diplomacy_revision = view_->diplomacy_revision;
         modal.danger = true;
         modal.confirm_label = tr("DIPLOMACY_DECLARE_WAR", "DECLARE WAR");
+        modal.terms.reserve(s.war_goal_options.size());
+        for (const auto &option : s.war_goal_options)
+          modal.terms.push_back(
+              {option.label, DiplomacyWorkspaceAction::declare_war, true, {},
+               stellar::core::WarGoalSpec{option.kind, option.system_id}});
+        modal.goal_chosen.resize(modal.terms.size());
+        if (!modal.goal_chosen.empty()) modal.goal_chosen.front() = true;
         modal_ = std::move(modal);
         return {DiplomacyWorkspaceCommandKind::None, true};
       }
@@ -971,6 +1060,30 @@ DiplomacyWorkspaceCommand NativeDiplomacyWorkspace::handle(
           command.diplomacy_revision = view_->diplomacy_revision;
           return command;
         }
+      }
+    }
+  }
+  if (tab_ == DiplomacyWorkspaceTab::policies) {
+    for (std::size_t index = 0; index < view_->policies.size(); ++index) {
+      const auto &policy = view_->policies[index];
+      if (policy.active) continue;
+      const auto clipped =
+          intersection(policy_row(layout, index, detail_scroll_.scroll_offset),
+                       layout.detail_rows);
+      if (clipped && clipped->contains(event.position)) {
+        ModalState modal;
+        modal.title = trf("DIPLOMACY_SET_POLICY", {policy.domain_label},
+                          "SET {0} POLICY");
+        modal.description =
+            policy.display_name + " — " + policy.summary +
+            (policy.effects.empty() ? "" : " · " + policy.effects);
+        modal.action = DiplomacyWorkspaceAction::set_empire_policy;
+        modal.campaign_generation = view_->campaign_generation;
+        modal.diplomacy_revision = view_->diplomacy_revision;
+        modal.policy_id = policy.policy_id;
+        modal.confirm_label = tr("DIPLOMACY_APPLY_POLICY", "SET POLICY");
+        modal_ = std::move(modal);
+        return {DiplomacyWorkspaceCommandKind::None, true};
       }
     }
   }
@@ -1518,6 +1631,109 @@ void NativeDiplomacyWorkspace::render(
     }
     break;
   }
+  case DiplomacyWorkspaceTab::wars: {
+    if (view_->wars.empty()) {
+      const auto bounds = card(0, 64.f * s);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
+      card_text(bounds, 8.f * s, tr("DIPLOMACY_NO_WARS", "NO WARS"), accent,
+                layout.body_font_pixels);
+      card_text(bounds, 30.f * s,
+                tr("DIPLOMACY_NO_WARS_HINT",
+                   "Declared wars you are party to — or have observed — will "
+                   "be tracked here."),
+                muted, layout.body_font_pixels);
+      break;
+    }
+    float war_y = layout.detail_rows.y + 8.f * s - detail_scroll_.scroll_offset;
+    for (const auto &war : view_->wars) {
+      const float card_h =
+          66.f * s + static_cast<float>(war.goals.size()) * 18.f * s;
+      const UiRect bounds{layout.detail_rows.x + 8.f * s, war_y,
+                          layout.detail_rows.width - 16.f * s, card_h};
+      war_y += card_h + 8.f * s;
+      const bool related = view_->selected.present &&
+                           war.counterpart_id &&
+                           *war.counterpart_id ==
+                               view_->selected.target_civilization_id;
+      detail_fill(bounds, related ? selected
+                                  : bounds.contains(pointer_) ? hover : row);
+      detail_stroke(bounds, border);
+      card_text(bounds, 8.f * s,
+                trf("DIPLOMACY_WAR_TITLE",
+                    {war.counterpart_name, war.declared},
+                    "WAR · {0} · since {1}"),
+                war.resolved ? muted : danger, layout.body_font_pixels);
+      const auto score = static_cast<int>(std::lround(war.score * 100.0));
+      card_text(bounds, 28.f * s,
+                trf("DIPLOMACY_WAR_SCORE",
+                    {std::to_string(score),
+                     std::to_string(static_cast<int>(
+                         std::lround(war.observer_exhaustion * 100.))),
+                     std::to_string(static_cast<int>(
+                         std::lround(war.counterpart_exhaustion * 100.)))},
+                    "Score {0}% · Exhaustion {1}% vs {2}%"),
+                bright, layout.body_font_pixels);
+      float goal_y = 48.f * s;
+      for (const auto &goal : war.goals) {
+        card_text(bounds, goal_y,
+                  (goal.achieved ? tr("DIPLOMACY_GOAL_DONE", "[✓] ")
+                                 : tr("DIPLOMACY_GOAL_OPEN", "[ ] ")) +
+                      goal.label,
+                  goal.achieved ? accent : muted, layout.small_font_pixels);
+        goal_y += 18.f * s;
+      }
+      if (war.resolved)
+        card_text(bounds, goal_y,
+                  trf("DIPLOMACY_WAR_RESOLVED", {war.outcome, *war.resolved},
+                      "Resolved: {0} · {1}"),
+                  muted, layout.small_font_pixels);
+    }
+    break;
+  }
+  case DiplomacyWorkspaceTab::policies: {
+    if (view_->policies.empty()) {
+      const auto bounds = card(0, 64.f * s);
+      detail_fill(bounds, row);
+      detail_stroke(bounds, border);
+      card_text(bounds, 8.f * s,
+                tr("DIPLOMACY_NO_POLICIES", "NO EMPIRE POLICIES"), accent,
+                layout.body_font_pixels);
+      card_text(bounds, 30.f * s,
+                tr("DIPLOMACY_NO_POLICIES_HINT",
+                   "Empire policies tune your civilization's allocation."),
+                muted, layout.body_font_pixels);
+      break;
+    }
+    int last_domain = -1;
+    for (std::size_t index = 0; index < view_->policies.size(); ++index) {
+      const auto &policy = view_->policies[index];
+      const auto bounds =
+          policy_row(layout, index, detail_scroll_.scroll_offset);
+      if (const auto clipped = detail_clip(bounds)) {
+        detail_fill(bounds,
+                    policy.active ? selected
+                                  : bounds.contains(pointer_) ? hover : row);
+        detail_stroke(bounds, policy.active ? accent : border);
+        const bool new_domain = policy.domain_index != last_domain;
+        if (new_domain) {
+          last_domain = policy.domain_index;
+          card_text(bounds, 2.f * s, policy.domain_label, accent,
+                    layout.small_font_pixels);
+        }
+        card_text(bounds, new_domain ? 18.f * s : 6.f * s,
+                  policy.display_name +
+                      (policy.active
+                           ? tr("DIPLOMACY_POLICY_ACTIVE", " · ACTIVE")
+                           : ""),
+                  policy.active ? accent : bright, layout.body_font_pixels);
+        card_text(bounds, new_domain ? 36.f * s : 28.f * s,
+                  policy.summary + " — " + policy.effects, muted,
+                  layout.small_font_pixels);
+      }
+    }
+    break;
+  }
   }
 
   // Result line.
@@ -1544,15 +1760,32 @@ void NativeDiplomacyWorkspace::render(
          {layout.modal_panel.x + 16.f * s, layout.modal_panel.y + 48.f * s,
           layout.modal_panel.width - 32.f * s, 44.f * s},
          modal_->description, bright, layout.body_font_pixels);
-    if (modal_->negotiation) {
+    if (modal_->negotiation || modal_->war_goal_picker) {
       for (std::size_t index = 0; index < modal_->terms.size(); ++index) {
         const auto &term = modal_->terms[index];
         const auto bounds = modal_term_button(layout, index);
-        theme::button(out, bounds, term.label, pointer_,
-                      layout.body_font_pixels, theme::Tone::Diplomacy, false,
+        std::string label = term.label;
+        if (modal_->war_goal_picker && index < modal_->goal_chosen.size())
+          label = (modal_->goal_chosen[index]
+                       ? tr("DIPLOMACY_GOAL_CHECKED", "[x] ")
+                       : tr("DIPLOMACY_GOAL_UNCHECKED", "[ ] ")) +
+                  label;
+        theme::button(out, bounds, std::move(label), pointer_,
+                      layout.body_font_pixels,
+                      modal_->danger ? theme::Tone::Danger
+                                     : theme::Tone::Diplomacy,
+                      modal_->war_goal_picker &&
+                          index < modal_->goal_chosen.size() &&
+                          modal_->goal_chosen[index],
                       term.enabled);
         theme::hover_tooltip(out, bounds, pointer_, term.label, term.tip,
                              width, height, s);
+      }
+      if (modal_->war_goal_picker) {
+        theme::button(out, modal_confirm_button(layout), modal_->confirm_label,
+                      pointer_, layout.body_font_pixels, theme::Tone::Danger,
+                      true);
+        stroke(out, modal_confirm_button(layout), danger);
       }
     } else {
       theme::button(out, modal_confirm_button(layout), modal_->confirm_label,

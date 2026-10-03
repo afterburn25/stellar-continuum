@@ -575,8 +575,12 @@ advance_core(ShipbuildingWorld world,
                                                            : item->second;
                        }(),
                        economy.industry);
+    const double shipyard_rate =
+        shipbuilding_industry_per_day *
+        empire_policy_effects(world.empire_policies, civilization.id)
+            .shipbuilding_factor;
     const double spend = math_min(
-        remaining, math_min(available, shipbuilding_industry_per_day * days));
+        remaining, math_min(available, shipyard_rate * days));
     if (spend <= 0 && remaining > .0001)
       continue;
     economy.industry -= spend;

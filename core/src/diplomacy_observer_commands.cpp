@@ -428,7 +428,8 @@ ObserverDiplomacyCommandService::set_access_permission(
 }
 
 ObserverDiplomacyCommandResult ObserverDiplomacyCommandService::declare_war(
-    int observer, int target, std::int64_t tick) {
+    int observer, int target, std::int64_t tick,
+    std::span<const WarGoalSpec> goals) {
   if (!valid_actor_and_tick(observer, tick) || target < 0 || target == observer)
     return invalid_request();
   if (!any(build_view(observer).contacts, [target](const auto &contact) {
@@ -437,7 +438,7 @@ ObserverDiplomacyCommandResult ObserverDiplomacyCommandService::declare_war(
       }))
     return action_unavailable();
   try {
-    DiplomacySimulation(*state_).declare_war(observer, target, tick);
+    DiplomacySimulation(*state_).declare_war(observer, target, tick, goals);
     return observer_result(true, ObserverDiplomacyCommandStatus::accepted,
                            "War declared.");
   } catch (const DiplomacyArgumentError &) {
